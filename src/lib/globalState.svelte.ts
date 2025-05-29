@@ -5,7 +5,8 @@ class GlobalState {
 	theme = $state<'light' | 'dark'>()!;
 	iconsSlice = $state<Record<string, string>>({});
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>()!;
-	feeds = $state<Record<string, undefined | SelectThought[]>>({});
+	feeds = $state<Record<string, undefined | string[]>>({});
+	thoughts = $state<Record<string, SelectThought>>({});
 }
 
 export let gs = new GlobalState();

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import { getSystemTheme, setTheme } from '$lib/theme';
 	import { gs } from '$lib/globalState.svelte';
@@ -7,8 +7,10 @@
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { thoughtsTable } from '$lib';
 	import { dev } from '$app/environment';
+	import type { LayoutData } from './$types';
+	import { getThoughtId } from '$lib/thoughts';
 
-	let { children } = $props();
+	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
 		const savedTheme = localStorage.getItem('theme');
@@ -16,6 +18,7 @@
 			['light', 'dark'].includes(savedTheme!) ? (savedTheme as typeof gs.theme) : getSystemTheme()
 		)!;
 		setTheme(gs.theme);
+		gs.iconsSlice = data.iconsSlice;
 
 		if ('serviceWorker' in navigator) {
 			addEventListener('load', function () {
@@ -48,9 +51,6 @@
 				`;
 
 			gs.db = drizzle(driver, batchDriver);
-			let thoughts = await gs.db.select().from(thoughtsTable).orderBy(thoughtsTable.ms).all();
-			console.log('thoughts:', thoughts);
-			gs.feeds[''] = thoughts;
 		} catch (error) {
 			console.log('error:', error);
 		}

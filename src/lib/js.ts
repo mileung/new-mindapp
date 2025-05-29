@@ -4,7 +4,8 @@ import { minute, second } from './time';
 // https://tabler.io/icons
 export const ALLOWED_ICONS = [
 	'search',
-	//
+	'arrow-up',
+	'trash',
 ] as const satisfies (keyof typeof iconsJson)[];
 export type IconName = (typeof ALLOWED_ICONS)[number];
 
