@@ -3,8 +3,15 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"prettier": {
+		"printWidth": 100,
+		"semi": true,
+		"singleQuote": true,
+		"useTabs": true,
+		"trailingComma": "all"
+	},
 	"scripts": {
-		"dev": "vite dev",
+		"dev": "vite dev --open",
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
@@ -40,8 +47,16 @@
 		"vite": "^6.2.6"
 	},
 	"dependencies": {
+		"@iconify-json/tabler": "^1.2.18",
+		"@iconify/utils": "^2.3.0",
 		"@inlang/paraglide-js": "^2.0.0",
 		"@libsql/client": "^0.14.0",
-		"drizzle-orm": "^0.40.0"
+		"@trpc/client": "^10.45.2",
+		"@trpc/server": "^10.45.2",
+		"drizzle-orm": "^0.40.0",
+		"rate-limiter-flexible": "^7.1.1",
+		"sqlocal": "^0.14.1",
+		"trpc-sveltekit": "^3.6.3",
+		"zod": "^3.25.34"
 	}
 }

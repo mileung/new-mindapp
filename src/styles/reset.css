@@ -1,0 +1,22 @@
+body {
+	@apply bg-bg1 text-fg1;
+}
+
+*:focus-visible {
+	/* @apply outline-hl1 outline-2 outline-double; */
+}
+
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+
+input[type='number'] {
+	-moz-appearance: textfield; /* For Firefox */
+}
+
+a {
+	user-select: text;
+	-webkit-user-drag: none;
+}

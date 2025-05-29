@@ -9,7 +9,7 @@ if (!dev && !env.DATABASE_AUTH_TOKEN) throw new Error('DATABASE_AUTH_TOKEN is no
 
 const client = createClient({
 	url: env.DATABASE_URL,
-	authToken: env.DATABASE_AUTH_TOKEN
+	authToken: env.DATABASE_AUTH_TOKEN,
 });
 
 export const db = drizzle(client, { schema });

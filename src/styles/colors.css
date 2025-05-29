@@ -1,0 +1,36 @@
+@layer base {
+	:root {
+		--bg1: #fafaf8;
+		--bg2: #f6f5f2;
+		--bg3: #f2f1ed;
+		--bg4: #edecea;
+		--bg5: #e8e7e4;
+		--bg6: #e3e2de;
+		--bg7: #deddd8;
+		--bg8: #d9d7d2;
+		--hl1: #3096f5;
+		--hl2: #1b83e4;
+		--hl3: #e1e8ff;
+		--fg1: #2c353a;
+		--fg2: #6d6d69;
+		--fg3: #8b8b8a;
+	}
+
+	.dark {
+		/* --bg1: #141415; */
+		--bg1: #000000;
+		--bg2: #1a1a1c;
+		--bg3: #202022;
+		--bg4: #262628;
+		--bg5: #2c2c2e;
+		--bg6: #323234;
+		--bg7: #38383a;
+		--bg8: #3e3e40;
+		--hl1: #cdff39;
+		--hl2: #c0e749;
+		--hl3: #3d4321;
+		--fg1: #e8e8e7;
+		--fg2: #a5a5a4;
+		--fg3: #8e8e8e;
+	}
+}
