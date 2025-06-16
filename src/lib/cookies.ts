@@ -6,7 +6,7 @@ export const setCookie = (name: string, value: string, days?: number) => {
 		expiry.setFullYear(9999);
 	}
 	const expires = `expires=${expiry.toUTCString()}`;
-	document.cookie = `${name}=${value}; ${expires}; path=/`;
+	document.cookie = `${name}=${value}; ${expires}; name=/`;
 };
 
 export const getClientSideCookie = (name: string): string | null => {

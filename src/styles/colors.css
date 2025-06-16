@@ -8,8 +8,8 @@
 		--bg6: #e3e2de;
 		--bg7: #deddd8;
 		--bg8: #d9d7d2;
-		--hl1: #3096f5;
-		--hl2: #1b83e4;
+		--hl1: var(--color-cyan-500);
+		--hl2: var(--color-cyan-600);
 		--hl3: #e1e8ff;
 		--fg1: #2c353a;
 		--fg2: #6d6d69;
@@ -26,8 +26,8 @@
 		--bg6: #323234;
 		--bg7: #38383a;
 		--bg8: #3e3e40;
-		--hl1: #cdff39;
-		--hl2: #c0e749;
+		--hl1: var(--color-cyan-400);
+		--hl2: var(--color-cyan-300);
 		--hl3: #3d4321;
 		--fg1: #e8e8e7;
 		--fg2: #a5a5a4;

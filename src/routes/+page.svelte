@@ -1,35 +1,28 @@
 <script lang="ts">
-	import { thoughtsTable, type SelectThought } from '$lib';
 	import { scrollToBottom } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
 	import { and, desc, eq, isNull } from 'drizzle-orm';
 	import { onMount } from 'svelte';
-	import Icon from './Icon.svelte';
-
-	let loadThoughts = async () => {
-		let thoughts = await gs.db.select().from(thoughtsTable).orderBy(thoughtsTable.ms).all();
-		const newThoughts = { ...gs.thoughts };
-		thoughts.forEach((t) => (newThoughts[getThoughtId(t)] = t));
-		gs.thoughts = newThoughts;
-		gs.feeds[''] = thoughts.map((t) => getThoughtId(t));
-		scrollToBottom();
-	};
+	import ThoughtWriter from './ThoughtWriter.svelte';
+	import {
+		getThoughtId,
+		loadThoughtsChronologically,
+		thoughtsTable,
+		type ThoughtInsert,
+	} from '$lib/thoughts';
+	import ThoughtDrop from './ThoughtDrop.svelte';
+	import { m } from '$lib/paraglide/messages';
 
 	$effect(() => {
 		if (gs.db) {
-			loadThoughts();
-			console.log('hi');
+			document.documentElement.classList.add('scrollbar-hidden');
+			loadThoughtsChronologically({}).then(({ thoughts }) => {
+				gs.feeds[''] = thoughts.map((t) => getThoughtId(t)).reverse();
+				scrollToBottom();
+				setTimeout(() => document.documentElement.classList.remove('scrollbar-hidden'), 0);
+			});
 		}
 	});
-
-	let ta: HTMLTextAreaElement;
-	let ipt: HTMLInputElement;
-
-	let taVal = $state('');
-
-	export function getThoughtId(thought: SelectThought) {
-		return `${thought.ms}_${thought.by_id || ''}`;
-	}
 
 	let deleteThought = async (tid: string) => {
 		let [ms, by_id] = tid.split('_');
@@ -45,63 +38,62 @@
 		newFeed?.splice(newFeed.indexOf(tid), 1);
 		gs.feeds[''] = newFeed;
 	};
-	let saveThought = async () => {
+
+	let addThought = async ({ tags, body }: { tags?: string[]; body?: string }) => {
+		let ms = Date.now();
 		await gs.db.insert(thoughtsTable).values({
-			ms: Date.now(),
-			body: ta.value,
+			ms,
+			tags,
+			body,
 		});
-		taVal = '';
 		let [thought] = await gs.db
 			.select()
 			.from(thoughtsTable)
-			.orderBy(desc(thoughtsTable.ms))
+			.where(and(eq(thoughtsTable.ms, ms), isNull(thoughtsTable.by_id)))
 			.limit(1);
-		gs.feeds[''] ??= [];
+
 		let tid = getThoughtId(thought);
-		gs.thoughts[tid] = thought;
-		gs.feeds[''].push(tid);
-		scrollToBottom();
+		gs.thoughts = { ...gs.thoughts, [tid]: thought };
+		gs.feeds = { ...gs.feeds, ['']: [...(gs.feeds[''] || []), tid] };
+
+		// console.log('gs.thoughts:', $state.snapshot(gs.thoughts));
+		// console.log('gs', $state.snapshot(gs.feeds['']));
+		// gs.feeds = clone(gs.feeds);
+		// scrollToBottom();
 	};
+
+	$effect(() => {
+		// console.log($state.snapshot(gs.feeds['']));
+	});
+
+	let isAtBottom = true;
+	const checkScrollPosition = () => {
+		isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight;
+	};
+	const handleResize = () => isAtBottom && scrollToBottom();
+	onMount(() => {
+		window.addEventListener('scroll', checkScrollPosition);
+		window.addEventListener('resize', handleResize);
+		return () => {
+			window.removeEventListener('scroll', checkScrollPosition);
+			window.removeEventListener('resize', handleResize);
+		};
+	});
+	let initialTags = $state([]);
+	let initialBody = $state('');
+
+	let feed = $derived(gs.feeds['']?.map((tid) => gs.thoughts[tid]).filter((t) => !!t));
 </script>
 
-<!-- <div class="b xy h-screen"><p class="text-6xl">test</p></div> -->
-<div class="">
-	{#if !gs.feeds['']}
-		<div class="">loading</div>
+<div class="flex-1 p-2 gap-2 min-h-screen flex flex-col">
+	{#if !feed}
+		<div class="text-fg2 my-2 text-lg text-center">{m.loading()}</div>
+	{:else if !feed.length}
+		<p class="my-2 text-xl text-center">{m.noThoughtsFound()}</p>
 	{:else}
-		{#each gs.feeds[''] as tid}
-			<div class="b">
-				<p class="whitespace-pre-wrap break-words inline font-medium">{gs.thoughts[tid].body}</p>
-				<button class="mt-4 cursor-pointer xy b h-8 w-8" onclick={() => deleteThought(tid)}>
-					<Icon name="trash" class="text-hl1 h-5 w-5" />
-				</button>
-			</div>
+		{#each feed as thought}
+			<ThoughtDrop {thought} />
 		{/each}
 	{/if}
-</div>
-<div class="b mb-12 sticky bg-bg1 bottom-0 w-full p-2">
-	<div class="relative">
-		<textarea
-			bind:this={ta}
-			bind:value={taVal}
-			placeholder="Share thought"
-			class="border-fg3 block w-full resize-none rounded-t border-1 p-2 text-xl pr-12 focus:outline-none"
-			onkeydown={async (e) => {
-				if (e.metaKey && e.key === 'Enter') {
-					saveThought();
-				}
-			}}
-			>...................................................................................................................................................................................................................................................................................................................................................................................
-		</textarea>
-		{#if taVal}
-			<button class="cursor-pointer xy b h-8 w-8 absolute bottom-2 right-2" onclick={saveThought}>
-				<Icon name="arrow-up" class="text-hl1 h-5 w-5" />
-			</button>
-		{/if}
-	</div>
-	<input
-		bind:this={ipt}
-		class="border-fg3 w-full rounded-b border-1 border-t-0 p-2 text-xl focus:outline-none"
-		placeholder="Tags"
-	/>
+	<ThoughtWriter {initialTags} {initialBody} onSubmit={(a) => addThought(a)} />
 </div>

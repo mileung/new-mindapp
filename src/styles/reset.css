@@ -2,6 +2,10 @@ body {
 	@apply bg-bg1 text-fg1;
 }
 
+button {
+	@apply cursor-pointer;
+}
+
 *:focus-visible {
 	/* @apply outline-hl1 outline-2 outline-double; */
 }

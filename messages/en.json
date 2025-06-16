@@ -1,4 +1,8 @@
 {
 	"$schema": "https://inlang.com/schema/inlang-message-format",
-	"hello_world": "Hello, {name} from en!"
+	"hello_world": "Hello, {name} from en!",
+	"loading": "Loading...",
+	"areYouSureYouWantToDeleteThisThought": "Are you sure you want to delete this thought?",
+	"noThoughtsFound": "No thoughts found",
+	"test": "test"
 }

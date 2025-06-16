@@ -6,6 +6,19 @@ export const ALLOWED_ICONS = [
 	'search',
 	'arrow-up',
 	'trash',
+	'circle-x-filled',
+	'x',
+	'play',
+	'dots',
+	'pencil',
+	'corner-up-left',
+	'corner-down-right',
+	'fingerprint',
+	'copy',
+	'cube',
+	'cube-3d-sphere',
+	'browser',
+	'settings',
 ] as const satisfies (keyof typeof iconsJson)[];
 export type IconName = (typeof ALLOWED_ICONS)[number];
 
@@ -52,6 +65,7 @@ export let post = (body: object) => ({
 });
 
 export function copyToClipboard(text: string): void {
+	if (text === '') text = ' ';
 	if (navigator?.clipboard?.writeText) {
 		navigator.clipboard
 			.writeText(text)
@@ -119,3 +133,33 @@ export const throttle = <T extends unknown[]>(callback: (...args: T) => void, de
 		setTimeout(() => (isWaiting = false), delay);
 	};
 };
+
+export function isRecord(value: unknown) {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+export function isStringifiedRecord(value?: string) {
+	if (!value) return false;
+	try {
+		const obj = JSON.parse(value);
+		return isRecord(obj);
+	} catch (error) {}
+	return false;
+}
+
+export const sortUniArr = (a: string[]) => {
+	return [...new Set(a)].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+};
+
+export function clone<T>(obj: T): T {
+	if (obj === null || obj === undefined) {
+		return obj;
+	}
+	if (Array.isArray(obj)) {
+		return obj.map((item) => clone(item)) as unknown as T;
+	}
+	if (typeof obj === 'object') {
+		return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, clone(value)])) as T;
+	}
+	return obj;
+}

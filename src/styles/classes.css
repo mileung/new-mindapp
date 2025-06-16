@@ -14,44 +14,24 @@
 	.o {
 		outline: 1px solid red !important;
 	}
-	@keyframes progress {
-		0% {
-			transform: scaleX(0);
-		}
-		100% {
-			transform: scaleX(1);
-		}
+	.scrollbar-hidden::-webkit-scrollbar {
+		display: none;
 	}
-	.progress {
-		transform-origin: left;
-		animation: progress linear forwards;
+	.scrollbar-hidden {
+		scrollbar-width: none;
+		-ms-overflow-style: none;
 	}
-	@keyframes fade-in {
-		0% {
-			opacity: 0;
-		}
-		100% {
-			opacity: 1;
-		}
+	.mini-scroll {
+		overflow: scroll;
 	}
-	.fade-in {
-		animation: fade-in 200ms ease-in-out forwards;
+	.mini-scroll::-webkit-scrollbar-track {
+		/* background-color: #f00; */
 	}
-	[alt='omegle.com'] {
-		filter: grayscale(20%) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.99));
+	.mini-scroll::-webkit-scrollbar {
+		width: 3px;
+		height: 0;
 	}
-
-	.omegle-spinner {
-		line-height: 1.15;
-		-webkit-text-size-adjust: 100%;
-		font-family: 'Source Serif Pro', serif;
-		font-size: 16px;
-		box-sizing: border-box;
-		width: 3rem;
-		height: 3rem;
-		border-top: 4px solid #c9c9c9;
-		border-right: 4px solid transparent;
-		border-radius: 50%;
-		animation: rotation 0.8s linear infinite;
+	.mini-scroll::-webkit-scrollbar-thumb {
+		@apply bg-fg3;
 	}
 }

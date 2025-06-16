@@ -6,10 +6,26 @@ export const week = 7 * day;
 export const month = 30 * day;
 export const year = 365 * day;
 
-export let toYyyyMmDd = (timestamp: number) => {
-	const date = new Date(timestamp);
-	const year = date.getFullYear();
-	const month = String(date.getMonth() + 1).padStart(2, '0');
-	const day = String(date.getDate()).padStart(2, '0');
-	return `${year}-${month}-${day}`;
-};
+export function formatMs(ms: number): string {
+	const now = Date.now();
+	const timeDiff = now - ms;
+	if (timeDiff < minute) {
+		return '<1m';
+	} else if (timeDiff < hour) {
+		const minutesAgo = Math.floor(timeDiff / minute);
+		return `${minutesAgo}m`;
+	} else if (timeDiff < day) {
+		const hoursAgo = Math.floor(timeDiff / hour);
+		return `${hoursAgo}h`;
+	} else if (timeDiff <= week) {
+		const daysAgo = Math.floor(timeDiff / day);
+		return `${daysAgo}d`;
+	}
+	const date = new Date(ms);
+	const years = date.getFullYear();
+	const months = String(date.getMonth() + 1).padStart(2, '0');
+	const days = String(date.getDate()).padStart(2, '0');
+	const hours = String(date.getHours()).padStart(2, '0');
+	const minutes = String(date.getMinutes()).padStart(2, '0');
+	return `${years}-${months}-${days} ${hours}:${minutes}`;
+}
