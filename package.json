@@ -55,6 +55,7 @@
 		"@trpc/client": "^10.45.2",
 		"@trpc/server": "^10.45.2",
 		"drizzle-orm": "^0.40.0",
+		"drizzle-zod": "^0.8.2",
 		"match-sorter": "^8.0.2",
 		"rate-limiter-flexible": "^7.1.1",
 		"sqlocal": "^0.14.1",

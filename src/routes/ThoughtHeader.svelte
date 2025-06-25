@@ -30,7 +30,7 @@
 		thought: ThoughtSelect;
 	} = $props();
 	let id = $derived(getThoughtId(p.thought));
-	let when = $derived(formatMs(p.thought.ms));
+	let when = $derived(formatMs(p.thought.ms || 0));
 	let moreOptionsOpen = $state(false);
 </script>
 
@@ -82,11 +82,11 @@
 						onclick={async () => {
 							const ok =
 								dev ||
-								Date.now() - p.thought.ms < minute ||
+								Date.now() - (p.thought.ms || 0) < minute ||
 								confirm(m.areYouSureYouWantToDeleteThisThought());
 							if (!ok) return;
 							// TODO: soft deletes
-							deleteThought({ id });
+							await deleteThought({ id });
 							gs.thoughts[id] = null;
 							// const newRoots = clone(roots);
 							// let pointer = newRoots;

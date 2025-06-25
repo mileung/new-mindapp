@@ -3,6 +3,8 @@
 @import './colors.css';
 @import './reset.css';
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
 	--color-bg1: var(--bg1);
 	--color-bg2: var(--bg2);

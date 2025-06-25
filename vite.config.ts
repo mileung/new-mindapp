@@ -11,6 +11,7 @@ export default defineConfig({
 		format: 'es',
 	},
 	server: {
+		port: 8888,
 		headers: {
 			'Cross-Origin-Embedder-Policy': 'require-corp',
 			'Cross-Origin-Opener-Policy': 'same-origin',

@@ -2,7 +2,8 @@ body {
 	@apply bg-bg1 text-fg1;
 }
 
-button {
+button,
+select {
 	@apply cursor-pointer;
 }
 

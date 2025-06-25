@@ -8,7 +8,7 @@
 
 	const p: { miniMentions?: boolean; thought: ThoughtSelect } = $props();
 
-	const thoughtIdsRegex = /(^|\s)\d{9,}_(|[A-HJ-NP-Za-km-z1-9]{9,})_(|[\w:\.-]{3,})($|\s)/g;
+	const thoughtIdsRegex = /\d*_\d*_\d*/g;
 	function separateMentions(text: string) {
 		const matches = text.matchAll(thoughtIdsRegex);
 		const result: string[] = [];

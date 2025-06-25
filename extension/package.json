@@ -1,0 +1,13 @@
+{
+	"name": "extension",
+	"type": "module",
+	"scripts": {
+		"dev": "VITE_ENV=DEV vite build --watch",
+		"build": "vite build"
+	},
+	"devDependencies": {
+		"@types/chrome": "0.0.326",
+		"typescript": "5.8.3",
+		"vite": "^6.3.5"
+	}
+}

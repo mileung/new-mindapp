@@ -1,0 +1,17 @@
+{
+	"manifest_version": 3,
+	"name": "Mindapp",
+	"version": "1.0.0",
+	"icons": { "1024": "mindapp-logo.png" },
+	"description": "Save thoughts with `Alt m`",
+	"permissions": ["contextMenus"],
+	"background": {
+		"service_worker": "background.js"
+	},
+	"content_scripts": [
+		{
+			"matches": ["<all_urls>"],
+			"js": ["content.js"]
+		}
+	]
+}
