@@ -13,7 +13,7 @@ export async function initLocalDb() {
 		PRAGMA journal_mode=WAL;
 		CREATE TABLE IF NOT EXISTS thoughts (
 			ms INTEGER,
-			tags TEXT, -- stringified string array
+			tags TEXT,
 			body TEXT,
 			by_id INTEGER,
 			to_id TEXT,

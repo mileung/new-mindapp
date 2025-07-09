@@ -9,5 +9,9 @@
 		"@types/chrome": "0.0.326",
 		"typescript": "5.8.3",
 		"vite": "^6.3.5"
+	},
+	"dependencies": {
+		"@types/turndown": "^5.0.5",
+		"turndown": "^7.2.0"
 	}
 }

@@ -1,29 +1,26 @@
 <script lang="ts">
 	import { scrollToBottom } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
-	import { and, desc, eq, isNull } from 'drizzle-orm';
-	import { onMount } from 'svelte';
-	import ThoughtWriter from './ThoughtWriter.svelte';
-	import {
-		getThoughtId,
-		gsdb,
-		loadThoughtsChronologically,
-		thoughtsTable,
-		type ThoughtInsert,
-	} from '$lib/thoughts';
-	import ThoughtDrop from './ThoughtDrop.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { getThoughtId, gsdb, loadThoughtsChronologically, thoughtsTable } from '$lib/thoughts';
+	import { and, eq, isNull } from 'drizzle-orm';
+	import { onMount } from 'svelte';
+	import ThoughtDrop from './ThoughtDrop.svelte';
+	import ThoughtWriter from './ThoughtWriter.svelte';
+
+	onMount(() => {
+		scrollToBottom();
+	});
 
 	$effect(() => {
 		if (gs.db && !gs.feeds['']) {
 			document.documentElement.classList.add('scrollbar-hidden');
 			loadThoughtsChronologically({}).then(({ thoughts }) => {
 				gs.feeds[''] = thoughts.map((t) => getThoughtId(t)).reverse();
+				scrollToBottom();
 			});
 		}
 		// TODO: remember scroll position when switching between pages
-		scrollToBottom();
-		setTimeout(() => document.documentElement.classList.remove('scrollbar-hidden'), 0);
 	});
 
 	let addThought = async ({ tags, body }: { tags?: string[]; body?: string }) => {
@@ -55,19 +52,6 @@
 		// console.log($state.snapshot(gs.feeds['']));
 	});
 
-	let isAtBottom = true;
-	const checkScrollPosition = () => {
-		isAtBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight;
-	};
-	const handleResize = () => isAtBottom && scrollToBottom();
-	onMount(() => {
-		window.addEventListener('scroll', checkScrollPosition);
-		window.addEventListener('resize', handleResize);
-		return () => {
-			window.removeEventListener('scroll', checkScrollPosition);
-			window.removeEventListener('resize', handleResize);
-		};
-	});
 	let initialTags = $state([]);
 	let initialBody = $state('');
 

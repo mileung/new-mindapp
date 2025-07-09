@@ -6,6 +6,7 @@
 	import { deleteThought, getThoughtId, type ThoughtSelect } from '$lib/thoughts';
 	import { formatMs, minute } from '$lib/time';
 	import {
+		IconCheck,
 		IconCopy,
 		IconCornerDownRight,
 		IconCube,
@@ -20,6 +21,19 @@
 	let xBtn = $state<HTMLButtonElement>();
 	let trashBtn = $state<HTMLButtonElement>();
 	let pencilBtn = $state<HTMLButtonElement>();
+	let fingerprintClicked = $state(false);
+	let copyClicked = $state(false);
+
+	function handleFingerprintClick() {
+		copyToClipboard(id);
+		fingerprintClicked = true;
+		setTimeout(() => (fingerprintClicked = false), 1000);
+	}
+	function handleCopyClick() {
+		copyToClipboard(p.thought.body || '');
+		copyClicked = true;
+		setTimeout(() => (copyClicked = false), 1000);
+	}
 
 	let p: {
 		parsed: boolean;
@@ -31,6 +45,7 @@
 	} = $props();
 	let id = $derived(getThoughtId(p.thought));
 	let when = $derived(formatMs(p.thought.ms || 0));
+	let whenVerbose = $derived(formatMs(p.thought.ms || 0, true));
 	let moreOptionsOpen = $state(false);
 </script>
 
@@ -39,20 +54,26 @@
 		<a
 			target="_blank"
 			href={`/?q=${id}`}
+			title={whenVerbose}
 			class={`${
 				when.length > 9 ? 'truncate' : ''
 			} text-sm font-bold transition text-fg2 hover:text-fg1 h-6 xy`}
 		>
 			{when}
 		</a>
-		<button class="h-6 hover:text-fg1 transition" onclick={() => copyToClipboard(id)}>
-			<IconFingerprint class="h-4 w-4" />
+		<button class="h-6 hover:text-fg1 transition" onclick={handleFingerprintClick}>
+			{#if fingerprintClicked}
+				<IconCheck class="h-4 w-4" />
+			{:else}
+				<IconFingerprint class="h-4 w-4" />
+			{/if}
 		</button>
-		<button
-			class="h-6 hover:text-fg1 transition"
-			onclick={() => copyToClipboard(p.thought.body || '')}
-		>
-			<IconCopy class="h-4 w-4" />
+		<button class="h-6 hover:text-fg1 transition" onclick={handleCopyClick}>
+			{#if copyClicked}
+				<IconCheck class="h-4 w-4" />
+			{:else}
+				<IconCopy class="h-4 w-4" />
+			{/if}
 		</button>
 		<button class="h-6 hover:text-fg1 transition" onclick={p.onToggleParsed}>
 			{#if p.parsed}
@@ -62,8 +83,8 @@
 			{/if}
 		</button>
 		<div class="flex-1 h-4 fx">
-			<button class="flex-1 min-w-4 h-7 fx hover:text-fg1 transition" onclick={() => p.onLink}>
-				<IconCornerDownRight class="absolute w-5" />
+			<button class="flex-1 min-w-4 h-7 fx hover:text-fg1 transition" onclick={p.onLink}>
+				<!-- <IconCornerDownRight class="absolute w-5" /> -->
 			</button>
 			{#if moreOptionsOpen}
 				<div class="fx gap-2">
@@ -115,7 +136,7 @@
 					>
 						<IconTrash class="absolute h-4 w-4" />
 					</button>
-					<button
+					<!-- <button
 						bind:this={pencilBtn}
 						class="h-4 w-4 xy hover:text-fg1 transition"
 						onclick={p.onEdit}
@@ -123,7 +144,7 @@
 						onblur={p.onShowMoreBlur}
 					>
 						<IconPencil class="absolute h-4 w-4" />
-					</button>
+					</button> -->
 				</div>
 			{:else}
 				<button

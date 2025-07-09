@@ -6,20 +6,22 @@ export const week = 7 * day;
 export const month = 30 * day;
 export const year = 365 * day;
 
-export function formatMs(ms: number): string {
+export function formatMs(ms: number, verbose = false): string {
 	const now = Date.now();
 	const timeDiff = now - ms;
-	if (timeDiff < minute) {
-		return '<1m';
-	} else if (timeDiff < hour) {
-		const minutesAgo = Math.floor(timeDiff / minute);
-		return `${minutesAgo}m`;
-	} else if (timeDiff < day) {
-		const hoursAgo = Math.floor(timeDiff / hour);
-		return `${hoursAgo}h`;
-	} else if (timeDiff <= week) {
-		const daysAgo = Math.floor(timeDiff / day);
-		return `${daysAgo}d`;
+	if (!verbose) {
+		if (timeDiff < minute) {
+			return '<1m';
+		} else if (timeDiff < hour) {
+			const minutesAgo = Math.floor(timeDiff / minute);
+			return `${minutesAgo}m`;
+		} else if (timeDiff < day) {
+			const hoursAgo = Math.floor(timeDiff / hour);
+			return `${hoursAgo}h`;
+		} else if (timeDiff <= week) {
+			const daysAgo = Math.floor(timeDiff / day);
+			return `${daysAgo}d`;
+		}
 	}
 	const date = new Date(ms);
 	const years = date.getFullYear();
@@ -27,5 +29,10 @@ export function formatMs(ms: number): string {
 	const days = String(date.getDate()).padStart(2, '0');
 	const hours = String(date.getHours()).padStart(2, '0');
 	const minutes = String(date.getMinutes()).padStart(2, '0');
+	if (verbose) {
+		const seconds = String(date.getSeconds()).padStart(2, '0');
+		const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
+		return `${years}-${months}-${days} ${hours}:${minutes}:${seconds}.${milliseconds}`;
+	}
 	return `${years}-${months}-${days} ${hours}:${minutes}`;
 }

@@ -1,22 +1,21 @@
 <script lang="ts">
 	import { gs } from '$lib/globalState.svelte';
-	import { getSystemTheme, setTheme } from '$lib/theme';
+	import { setTheme } from '$lib/theme';
+	import { initLocalDb } from '$lib/thoughts';
+	import { IconBrowser, IconSettings } from '@tabler/icons-svelte';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
-	import { IconBrowser, IconSettings } from '@tabler/icons-svelte';
-	import { dropThoughtsTableInDev, initLocalDb } from '$lib/thoughts';
 
 	let { data, children }: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
 		const savedTheme = localStorage.getItem('theme');
 		gs.theme = (
-			['light', 'dark'].includes(savedTheme!) ? (savedTheme as typeof gs.theme) : getSystemTheme()
+			['light', 'dark', 'system'].includes(savedTheme!) ? (savedTheme as typeof gs.theme) : 'system'
 		)!;
-		setTheme(gs.theme);
 
 		if ('serviceWorker' in navigator) {
 			addEventListener('load', function () {
@@ -36,18 +35,30 @@
 		}
 	});
 
+	$effect(() => gs.theme && setTheme(gs.theme));
+
 	$effect(() => {
-		if (gs.theme) {
-			localStorage.setItem('theme', gs.theme);
-			gs.theme.includes('dark')
-				? document.documentElement.classList.add('dark')
-				: document.documentElement.classList.remove('dark');
+		if (gs.theme === 'system') {
+			window
+				?.matchMedia('(prefers-color-scheme: dark)')
+				?.addEventListener?.('change', () => setTheme('system'));
 		}
 	});
+	// let mouseHandlers = {
+	// 	onmousedown: () => document.documentElement.classList.add('scrollbar-hidden'),
+	// 	onclick: () => {
+	// 		setTimeout(() => document.documentElement.classList.remove('scrollbar-hidden'), 1);
+	// 	},
+	// };
 </script>
 
-<div class="flex">
-	<div class="bg-bg2 sticky top-0 bottom-0 h-screen w-12 flex flex-col gap-1.5 p-1.5">
+<div class="flex ml-12">
+	<div class="bg-bg2 fixed left-0 w-12 h-screen flex flex-col gap-1.5 p-1.5">
+		<!-- <a href="/search" class="xy aspect-square">
+			<div class="h-full w-full xy rounded transition bg-bg8 hover:bg-bg6 text-fg1">
+				<IconSearch class="h-full text-fg1" />
+			</div>
+		</a> -->
 		<a href="/" class="xy aspect-square">
 			<div class="h-full w-full xy rounded transition bg-bg8 hover:bg-bg6 text-fg1">
 				<IconBrowser class="h-full text-fg1" />

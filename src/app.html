@@ -10,7 +10,12 @@
 		<link rel="icon" href="%sveltekit.assets%/mindapp-logo.svg" />
 		%sveltekit.head%
 		<script>
-			localStorage.getItem('theme')?.includes('dark') &&
+			let theme = localStorage.getItem('theme');
+			if (
+				theme === 'system'
+					? window.matchMedia('(prefers-color-scheme: dark)').matches
+					: theme === 'dark'
+			)
 				document.documentElement.classList.add('dark');
 		</script>
 	</head>

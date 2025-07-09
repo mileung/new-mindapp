@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { isStringifiedRecord, sortUniArr } from '$lib/js';
-	import type { ThoughtInsert, ThoughtSelect } from '$lib/thoughts';
+	import type { ThoughtSelect } from '$lib/thoughts';
 	import { matchSorter } from 'match-sorter';
 
 	import { IconArrowUp, IconCircleXFilled } from '@tabler/icons-svelte';
+	import { onMount } from 'svelte';
 
 	let bodyTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;
@@ -92,6 +93,18 @@
 			return [...new Set(arr)].filter((tag) => tag && !addedTagsSet.has(tag));
 		})(),
 	);
+
+	onMount(() => {
+		window.postMessage({ type: 'page-ready' }, '*');
+		window.addEventListener('message', (event) => {
+			if (event.source !== window) return;
+			if (event.data && event.data.type === 'extension-data') {
+				let { tags, body } = (event.data.payload.data as { tags?: string[]; body?: string }) || {};
+				tags && (addedTags = tags);
+				body && (bodyVal = body);
+			}
+		});
+	});
 </script>
 
 <div class="bg-bg5 w-full rounded">
@@ -131,6 +144,7 @@
 		{/each}
 	</div>
 	<input
+		autofocus
 		bind:this={tagsIpt}
 		bind:value={tagsFilter}
 		autocomplete="off"
@@ -185,19 +199,21 @@
 	/>
 	<div class="relative h-28">
 		<div
-			class={`z-50 flex flex-col overflow-scroll rounded-b absolute w-full backdrop-blur-xs max-h-full shadow ${
+			class={`z-50 flex flex-col overflow-scroll rounded-b absolute w-full backdrop-blur-md max-h-full shadow ${
 				tagsFilter ? '' : 'hidden'
 			}`}
 		>
 			{#if suggestedTags.length}
 				{#each suggestedTags as tag, i}
-					<button
-						bind:this={tagSuggestionsRefs[i]}
-						class={`fx px-3 text-nowrap text-xl hover:bg-bg4 ${tagIndex === i ? 'hover:bg-bg8 bg-bg8' : ''}`}
-						onclick={() => addTag(tag)}
-					>
-						{tag}
-					</button>
+					<div class="fx">
+						<button
+							bind:this={tagSuggestionsRefs[i]}
+							class={`flex-1 text-left px-3 text-nowrap text-xl hover:bg-bg7 ${tagIndex === i ? 'bg-bg7' : ''}`}
+							onclick={() => addTag(tag)}
+						>
+							{tag}
+						</button>
+					</div>
 				{/each}
 			{/if}
 		</div>

@@ -1,13 +1,37 @@
 let dev = import.meta.env.VITE_ENV === 'DEV';
 
 chrome.runtime.onMessage.addListener((msg) => {
-	if (msg.type === 'save') openPopup(true);
+	if (msg.type === 'save-thought') openPopup(true);
 });
 
+let mindappNewDevUrl = 'http://localhost:8888';
+let mindappNewUrl = 'https://new.mindapp.cc';
+let mindappOldDevUrl = 'http://localhost:1234';
+let mindappOldUrl = 'https://mindap.cc';
+
+if (
+	[mindappNewDevUrl, mindappNewUrl, mindappOldDevUrl, mindappOldUrl].some((url) =>
+		location.href.startsWith(url),
+	)
+) {
+	window.addEventListener('message', (event) => {
+		if (event.source !== window) return;
+		if (event.data.type === 'page-ready') {
+			chrome.runtime
+				.sendMessage({
+					type: 'mindapp-open',
+				})
+				.then((data) => {
+					window.postMessage({ type: 'extension-data', payload: data }, '*');
+				});
+		}
+	});
+}
+
 addEventListener('keydown', (e) => {
-	let openingNewMindapp = e.key === '©'; // alt g
+	let openingNewMindapp = e.key === 'µ'; // alt m
 	if (
-		(e.key === 'µ' || // alt m
+		(e.key === '©' || // alt g
 			openingNewMindapp) &&
 		!['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName)
 	) {
@@ -18,39 +42,45 @@ addEventListener('keydown', (e) => {
 let openPopup = (openingNewMindapp?: boolean) => {
 	let baseUrl = openingNewMindapp
 		? dev
-			? 'http://localhost:8888'
-			: 'https://new.mindapp.cc'
+			? mindappNewDevUrl
+			: mindappNewUrl
 		: dev
-			? 'http://localhost:1234'
-			: 'https://mindap.cc';
+			? mindappOldDevUrl
+			: mindappOldUrl;
 	const selector =
 		urlSelectors[location.host + location.pathname]?.() || urlSelectors[location.host]?.();
-	const thoughtHeadline = (
-		window.getSelection()?.toString() ||
-		// TODO: selectionToMarkdown() ||
-		selector?.headline ||
-		// TODO: pageToMarkdown() ||
-		getTitle()
-	).trim();
 
-	let json = JSON.stringify(
-		openingNewMindapp
-			? {
-					body: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
-					tags: selector?.tags,
-				}
-			: {
-					json: JSON.stringify({
-						// https://news.ycombinator.com/item?id=31871577
-						// 431 Request Header Fields Too Large
-						// https://vitejs.dev/guide/troubleshooting.html#_431-request-header-fields-too-large
-						// TODO: thoughtHeadline.slice(0, 99999) or something to avoid 431
-						initialContent: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
-						initialTags: selector?.tags,
-					}),
-				},
-	);
+	const thoughtHeadline =
+		// TODO: This doesn't return the highlighted text all the time - e.g. go to a reddit post and try highlighting the headline and clipping: https://www.reddit.com/r/videos/comments/10oak86/goldsmith_uses_chemistry_to_refine_indistinct/
+		(
+			window.getSelection()?.toString() ||
+			// getSelectionAsMarkdown() ||
+			// TODO: selectionToMarkdown() ||
+			selector?.headline ||
+			// TODO: pageToMarkdown() ||
+			getTitle()
+		).trim();
 
+	if (openingNewMindapp) {
+		chrome.runtime.sendMessage({
+			type: 'init-popup',
+			data: {
+				body: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
+				tags: selector?.tags,
+			},
+		} as PopupMessage);
+	}
+
+	let json = JSON.stringify({
+		json: JSON.stringify({
+			// https://news.ycombinator.com/item?id=31871577
+			// 431 Request Header Fields Too Large
+			// https://vitejs.dev/guide/troubleshooting.html#_431-request-header-fields-too-large
+			// TODO: thoughtHeadline.slice(0, 99999) or something to avoid 431
+			initialContent: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
+			initialTags: selector?.tags,
+		}),
+	});
 	window.open(
 		openingNewMindapp //
 			? baseUrl
@@ -72,9 +102,13 @@ const urlSelectors: Record<
 	},
 	'www.reddit.com': () => {
 		const subreddit = location.href.match(/\/(r\/[^/]+)/)?.[1];
+		// TODO: get the post body as markdown
+		// e.g. https://www.reddit.com/r/UI_Design/comments/vzqe34/menu_knowledge_is_essential/
 		return { headline: getTitle(), tags: subreddit ? [subreddit] : [] };
 	},
 	'www.youtube.com/watch': () => {
+		// @ts-ignore
+		const title: string = document.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
 		const nameTag = document.querySelector('#top-row yt-formatted-string a');
 		const ppHref = decodeURIComponent(
 			document.querySelector('#owner > ytd-video-owner-renderer > a')?.getAttribute('href')!,
@@ -86,7 +120,7 @@ const urlSelectors: Record<
 			: `YouTube${ppHref?.slice(1)!}`;
 
 		return {
-			headline: getTitle(),
+			headline: title,
 			tags: [author],
 			url: location.href.replace('&list=WL', '').replace('app=desktop&', ''),
 		};
@@ -98,14 +132,24 @@ const urlSelectors: Record<
 				?.getAttribute('href')
 				?.slice(1)!,
 		);
-		return { headline: getTitle(), tags: [`YouTube${author}`] };
+
+		return {
+			headline: document.querySelector<HTMLHeadElement>(
+				'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
+			)?.innerText,
+			tags: [`YouTube${author}`],
+		};
 	},
 	'www.youtube.com': () => {
 		const author = location.pathname.startsWith('/@')
 			? location.pathname.slice(1, location.pathname.indexOf('/', 1))
 			: null;
 		const tags = author ? ['YouTube Channel', `YouTube${author}`] : [];
-		return { headline: getTitle(), tags };
+		return {
+			headline: document.querySelector<HTMLHeadElement>('h1.dynamic-text-view-model-wiz__h1')
+				?.innerText,
+			tags,
+		};
 	},
 	'x.com': () => {
 		let author = location.pathname.slice(1);
@@ -154,3 +198,25 @@ function getTitle() {
 }
 
 export {};
+
+// 1. Get the current selection as HTML
+function getSelectionHtml(): string | null {
+	const selection = window.getSelection();
+	if (!selection || selection.rangeCount === 0) return null;
+	const range = selection.getRangeAt(0);
+	const container = document.createElement('div');
+	container.appendChild(range.cloneContents());
+	return container.innerHTML;
+}
+
+// 2. Convert HTML to Markdown (using a library)
+import TurndownService from 'turndown';
+import { PopupMessage } from './background';
+
+// https://www.perplexity.ai/search/ts-get-current-selection-as-ma-ifzId2TsRWizLAgFLVjtPg
+function getSelectionAsMarkdown(): string | null {
+	const html = getSelectionHtml();
+	if (!html) return null;
+	const turndownService = new TurndownService();
+	return turndownService.turndown(html);
+}

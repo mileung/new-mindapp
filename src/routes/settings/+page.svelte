@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { suppressScrollbarFlash } from '$lib/dom';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/globalState.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -12,19 +13,25 @@
 		type ThoughtSelect,
 	} from '$lib/thoughts';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
-	import { asc, eq, isNotNull } from 'drizzle-orm';
+	import { asc, isNotNull } from 'drizzle-orm';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
+	import { onMount } from 'svelte';
+
+	onMount(() => {
+		suppressScrollbarFlash();
+	});
 </script>
 
 <div class="p-2 space-y-2 w-full max-w-xl">
 	<p class="text-xl font-bold">{m.theme()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
-	<!-- TODO: make this not flash "Light" when refreshing page with dark theme on -->
+	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
 	<select
 		name={m.theme()}
 		class="w-full p-2 rounded transition bg-bg5 hover:bg-bg7 text-fg1"
 		bind:value={gs.theme}
 	>
+		<option value="system">{m.system()}</option>
 		<option value="light">{m.light()}</option>
 		<option value="dark">{m.dark()}</option>
 		<!-- TODO: More themes like a text editor -->

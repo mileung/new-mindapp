@@ -16,6 +16,7 @@
 	"deleteLocalData": "Delete Local Data",
 	"dataSuccessfullyMerged": "Data successfully merged",
 	"incorrect": "Incorrect",
+	"system": "System",
 	"thoughtsWithTheSamePrimaryKeyButDifferentTagsBodyToIdFound": "Thoughts with the same primary key but different tags/body/to_id found",
 	"localDataDeleted": "Local data deleted",
 	"importAndMergeData": "Import and Merge Data",
