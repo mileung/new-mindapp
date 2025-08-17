@@ -52,22 +52,15 @@
 <div class="sticky top-0 bg-inherit">
 	<div class="mr-1 gap-2 fx h-5 text-fg2 max-w-full">
 		<a
-			target="_blank"
-			href={`/?q=${id}`}
+			href={`/${id}`}
 			title={whenVerbose}
 			class={`${
 				when.length > 9 ? 'truncate' : ''
 			} text-sm font-bold transition text-fg2 hover:text-fg1 h-6 xy`}
 		>
 			{when}
+			<!-- {p.thought.ms} -->
 		</a>
-		<button class="h-6 hover:text-fg1 transition" onclick={handleFingerprintClick}>
-			{#if fingerprintClicked}
-				<IconCheck class="h-4 w-4" />
-			{:else}
-				<IconFingerprint class="h-4 w-4" />
-			{/if}
-		</button>
 		<button class="h-6 hover:text-fg1 transition" onclick={handleCopyClick}>
 			{#if copyClicked}
 				<IconCheck class="h-4 w-4" />
@@ -82,9 +75,16 @@
 				<IconCube3dSphere class="h-4 w-4" />
 			{/if}
 		</button>
+		<button class="h-6 hover:text-fg1 transition" onclick={handleFingerprintClick}>
+			{#if fingerprintClicked}
+				<IconCheck class="h-4 w-4" />
+			{:else}
+				<IconFingerprint class="h-4 w-4" />
+			{/if}
+		</button>
 		<div class="flex-1 h-4 fx">
 			<button class="flex-1 min-w-4 h-7 fx hover:text-fg1 transition" onclick={p.onLink}>
-				<!-- <IconCornerDownRight class="absolute w-5" /> -->
+				<IconCornerDownRight class="w-5" />
 			</button>
 			{#if moreOptionsOpen}
 				<div class="fx gap-2">
@@ -136,7 +136,7 @@
 					>
 						<IconTrash class="absolute h-4 w-4" />
 					</button>
-					<!-- <button
+					<button
 						bind:this={pencilBtn}
 						class="h-4 w-4 xy hover:text-fg1 transition"
 						onclick={p.onEdit}
@@ -144,7 +144,7 @@
 						onblur={p.onShowMoreBlur}
 					>
 						<IconPencil class="absolute h-4 w-4" />
-					</button> -->
+					</button>
 				</div>
 			{:else}
 				<button
@@ -160,11 +160,10 @@
 		</div>
 	</div>
 	{#if p.thought.tags?.length}
-		<div class="flex flex-wrap gap-x-2">
+		<div class="flex flex-wrap gap-x-2 overflow-scroll mini-scroll max-h-18">
 			{#each p.thought.tags as tag}
 				<a
-					target="_blank"
-					href={`/?q=[${encodeURIComponent(tag)}]`}
+					href={`/?q=${encodeURIComponent(`[${tag}]`)}`}
 					class="font-bold leading-5 transition text-fg2 hover:text-fg1"
 				>
 					{tag}

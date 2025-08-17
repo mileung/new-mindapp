@@ -44,7 +44,8 @@
 		"tailwindcss": "^4.0.0",
 		"typescript": "^5.0.0",
 		"typescript-eslint": "^8.20.0",
-		"vite": "^6.2.6"
+		"vite": "^6.2.6",
+		"vite-plugin-devtools-json": "^0.4.1"
 	},
 	"dependencies": {
 		"@iconify-json/tabler": "^1.2.18",
@@ -59,6 +60,7 @@
 		"match-sorter": "^8.0.2",
 		"rate-limiter-flexible": "^7.1.1",
 		"sqlocal": "^0.14.1",
+		"svelte-infinite-loading": "^1.4.0",
 		"trpc-sveltekit": "^3.6.3",
 		"zod": "^3.25.34"
 	}

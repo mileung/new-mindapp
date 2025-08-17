@@ -16,9 +16,18 @@
 	"deleteLocalData": "Delete Local Data",
 	"dataSuccessfullyMerged": "Data successfully merged",
 	"incorrect": "Incorrect",
+	"local": "Local",
+	"search": "Search",
+	"anErrorOccurred": "An error occurred",
+	"endOfFeed": "End of feed",
+	"invalidLocalCache": "Invalid local cache",
+	"invalidLocalCacheUpdate": "Invalid local cache update",
 	"system": "System",
+	"tags": "Tags",
+	"shareThought": "Share thought...",
 	"thoughtsWithTheSamePrimaryKeyButDifferentTagsBodyToIdFound": "Thoughts with the same primary key but different tags/body/to_id found",
 	"localDataDeleted": "Local data deleted",
+	"addBrowserExtension": "Add Browser Extension",
 	"importAndMergeData": "Import and Merge Data",
 	"enterTheSumOfAAndBToIrreversiblyDeleteAllLocalData": "Enter the sum of {a} and {b} to irreversibly delete all local data"
 }

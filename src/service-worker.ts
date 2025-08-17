@@ -21,7 +21,11 @@ self.addEventListener('install', (event) => {
 	// Create a new cache and add all files to it
 	async function addFilesToCache() {
 		const cache = await caches.open(CACHE);
-		await cache.addAll(ASSETS);
+		try {
+			await cache.addAll(ASSETS);
+		} catch (error) {
+			console.log('error:', error);
+		}
 	}
 
 	event.waitUntil(addFilesToCache());
@@ -66,8 +70,8 @@ self.addEventListener('fetch', (event) => {
 				throw new Error('invalid response from fetch');
 			}
 
-			if (response.status === 200) {
-				cache.put(event.request, response.clone());
+			if (response.status === 200 && /^https?:$/.test(new URL(event.request.url).protocol)) {
+				await cache.put(event.request, response.clone());
 			}
 
 			return response;

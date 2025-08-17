@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { suppressScrollbarFlash } from '$lib/dom';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/globalState.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -15,11 +14,6 @@
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
 	import { asc, isNotNull } from 'drizzle-orm';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
-	import { onMount } from 'svelte';
-
-	onMount(() => {
-		suppressScrollbarFlash();
-	});
 </script>
 
 <div class="p-2 space-y-2 w-full max-w-xl">
@@ -43,7 +37,7 @@
 		class="xy px-2 py-1 rounded transition bg-bg5 hover:bg-bg7 text-fg1"
 		onclick={async () => {
 			exportTextAsFile(
-				`${Date.now()}-mindapp.json`,
+				`mindapp-${Date.now()}.json`,
 				JSON.stringify(
 					(
 						await (await gsdb())

@@ -1,6 +1,21 @@
 import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
 import { gs } from './globalState.svelte';
-import { and, asc, desc, eq, gte, isNotNull, isNull, like, lte, or } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gte,
+	isNotNull,
+	isNull,
+	like,
+	lte,
+	not,
+	notLike,
+	or,
+	SQL,
+	type SQLWrapper,
+} from 'drizzle-orm';
 import { dev } from '$app/environment';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { m } from './paraglide/messages';
@@ -9,24 +24,28 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 // https://sqlocal.dev/guide/introduction
 export async function initLocalDb() {
 	const { sql } = new SQLocalDrizzle('mindapp.db');
-	await sql`
-		PRAGMA journal_mode=WAL;
-		CREATE TABLE IF NOT EXISTS thoughts (
-			ms INTEGER,
-			tags TEXT,
-			body TEXT,
-			by_id INTEGER,
-			to_id TEXT,
-			in_id INTEGER,
-			CONSTRAINT thought_id PRIMARY KEY (ms, by_id, in_id)
-		);
-		CREATE INDEX IF NOT EXISTS ms_idx ON thoughts (ms);
-		CREATE INDEX IF NOT EXISTS tags_idx ON thoughts (tags);
-		CREATE INDEX IF NOT EXISTS body_idx ON thoughts (body);
-		CREATE INDEX IF NOT EXISTS by_id_idx ON thoughts (by_id);
-		CREATE INDEX IF NOT EXISTS to_id_idx ON thoughts (to_id);
-		CREATE INDEX IF NOT EXISTS in_id_idx ON thoughts (in_id);
+	try {
+		await sql`
+			PRAGMA journal_mode=WAL;
+			CREATE TABLE IF NOT EXISTS thoughts (
+				ms INTEGER,
+				tags TEXT,
+				body TEXT,
+				by_id INTEGER,
+				to_id TEXT,
+				in_id INTEGER,
+				CONSTRAINT thought_id PRIMARY KEY (ms, by_id, in_id)
+			);
+			CREATE INDEX IF NOT EXISTS ms_idx ON thoughts (ms);
+			CREATE INDEX IF NOT EXISTS tags_idx ON thoughts (tags);
+			CREATE INDEX IF NOT EXISTS body_idx ON thoughts (body);
+			CREATE INDEX IF NOT EXISTS by_id_idx ON thoughts (by_id);
+			CREATE INDEX IF NOT EXISTS to_id_idx ON thoughts (to_id);
+			CREATE INDEX IF NOT EXISTS in_id_idx ON thoughts (in_id);
 	`;
+	} catch (error) {
+		console.log('error:', error);
+	}
 }
 
 export const thoughtsTable = sqliteTable(
@@ -59,8 +78,8 @@ export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
 export let ThoughtInsertSchema = createInsertSchema(thoughtsTable);
 export let ThoughtSelectSchema = createSelectSchema(thoughtsTable);
 
-type ThoughtIdBits = Pick<ThoughtInsert, 'ms' | 'by_id' | 'in_id'>;
-export function getThoughtId(thought: ThoughtIdBits) {
+type ThoughtIdSegments = Pick<ThoughtInsert, 'ms' | 'by_id' | 'in_id'>;
+export function getThoughtId(thought: ThoughtIdSegments) {
 	return `${thought.ms || ''}_${thought.by_id || ''}_${thought.in_id || ''}`;
 }
 
@@ -69,7 +88,7 @@ export function isThoughtId(str = '') {
 	return thoughtIdRegex.test(str);
 }
 
-type ThoughtSelector = ThoughtIdBits & { id?: string };
+type ThoughtSelector = ThoughtIdSegments & { id?: string };
 export function filterThoughtId(t: ThoughtSelector) {
 	let { ms, by_id, in_id } = t;
 	if (t.id) {
@@ -81,11 +100,29 @@ export function filterThoughtId(t: ThoughtSelector) {
 		by_id = +s[1];
 		in_id = +s[1];
 	}
+	if (Number.isNaN(ms) || Number.isNaN(by_id) || Number.isNaN(in_id))
+		throw new Error('Invalid thought id');
 	return and(
 		ms ? eq(thoughtsTable.ms, ms) : isNull(thoughtsTable.ms),
 		by_id ? eq(thoughtsTable.by_id, by_id) : isNull(thoughtsTable.by_id),
 		in_id ? eq(thoughtsTable.in_id, in_id) : isNull(thoughtsTable.in_id),
 	);
+}
+
+export function getThoughtIdSegments(t: ThoughtSelector): ThoughtIdSegments {
+	let { ms, by_id, in_id } = t;
+	if (t.id) {
+		if (ms || by_id || in_id) {
+			if (getThoughtId(t) !== t.id) throw new Error('id mismatch');
+		}
+		let s = t.id.split('_', 3);
+		ms = +s[0];
+		by_id = +s[1];
+		in_id = +s[2];
+	}
+	if (Number.isNaN(ms) || Number.isNaN(by_id) || Number.isNaN(in_id))
+		throw new Error('Invalid thought id');
+	return { ms, by_id, in_id };
 }
 
 export async function gsdb() {
@@ -98,6 +135,10 @@ export async function gsdb() {
 		await new Promise((res) => setTimeout(res, 100));
 	}
 	return gs.db;
+}
+
+export async function overwriteThought(t: ThoughtInsert) {
+	return await (await gsdb()).update(thoughtsTable).set(t).where(filterThoughtId(t));
 }
 
 export async function deleteThought(t: ThoughtSelector) {
@@ -114,7 +155,76 @@ export function dropThoughtsTableInDev() {
 	}
 }
 
-// export let loadThoughtsHierarchically = async (q: {
+export let rootsPerLoad = 10;
+
+export let loadRoots = async (q: {
+	rpc?: boolean;
+	hierarchical?: boolean;
+	oldestFirst?: boolean;
+	fromMs?: number;
+	thoughtsBeyond?: number;
+	thoughtId?: string;
+	excludeIds?: ThoughtSelector[];
+	authorIdsInclude?: number[];
+	authorIdsExclude?: number[];
+	tagsInclude?: string[];
+	tagsExclude?: string[];
+	bodyIncludes?: string[];
+	bodyExcludes?: string[];
+}) => {
+	let {
+		rpc = false,
+		hierarchical = false,
+		oldestFirst = false,
+		fromMs = q.oldestFirst ? 0 : Number.MAX_SAFE_INTEGER,
+		thoughtId,
+		excludeIds = [],
+		authorIdsInclude = [],
+		authorIdsExclude = [],
+		tagsInclude = [],
+		tagsExclude = [],
+		bodyIncludes = [],
+		bodyExcludes = [],
+	} = q;
+
+	let offset = 0;
+	const thoughts: ThoughtSelect[] = await (
+		await gsdb()
+	)
+		.select()
+		.from(thoughtsTable)
+		.where(
+			thoughtId
+				? filterThoughtId({ id: thoughtId })
+				: and(
+						isNotNull(thoughtsTable.ms),
+						...excludeIds.map((id) => {
+							let filter = filterThoughtId(id);
+							if (filter) filter = not(filter);
+							return filter;
+						}),
+						...authorIdsInclude.map((id) => eq(thoughtsTable.by_id, id)),
+						...authorIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),
+						...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`)),
+						...tagsExclude.map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
+						...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`)),
+						...bodyExcludes.map((term) => notLike(thoughtsTable.body, `%${term}%`)),
+						(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs || Date.now()),
+					),
+		)
+		.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
+		.limit(rootsPerLoad)
+		.offset(offset++);
+
+	// TODO: only do this for client side queries
+	const newThoughts = { ...gs.thoughts };
+	thoughts.forEach((t) => (newThoughts[getThoughtId(t)] = t));
+	gs.thoughts = newThoughts;
+
+	return { roots: thoughts };
+};
+
+// export let loadRootsHierarchically = async (q: {
 // 	from: number;
 // 	mode: 'new' | 'old';
 // 	thoughtId?: string;
@@ -197,50 +307,3 @@ export function dropThoughtsTableInDev() {
 
 // 	return { latestCreateDate, roots };
 // };
-
-export let loadThoughtsChronologically = async (q: {
-	from?: number;
-	mode?: 'new' | 'old';
-	thoughtId?: string;
-	authorIds?: number[];
-	tags?: string[];
-	other?: string[];
-	thoughtsBeyond?: number;
-}) => {
-	const oldToNew = q.mode === 'old';
-	let latestCreateDate = oldToNew ? 0 : Number.MAX_SAFE_INTEGER;
-	const rootsPerLoad = 10;
-
-	let offset = 0;
-	const thoughts: ThoughtSelect[] = await (
-		await gsdb()
-	)
-		.select()
-		.from(thoughtsTable)
-		.where(
-			and(
-				isNotNull(thoughtsTable.ms),
-				or(
-					...(q.authorIds || []).map((id) =>
-						id ? eq(thoughtsTable.by_id, id) : isNull(thoughtsTable.by_id),
-					),
-				),
-				q.thoughtId
-					? like(thoughtsTable.body, `%${q.thoughtId}%`)
-					: or(
-							...(q.tags || []).map((tag) => like(thoughtsTable.tags, `%"${tag}"%`)),
-							...(q.other || []).map((term) => like(thoughtsTable.body, `%${term}%`)),
-						),
-				(oldToNew ? gte : lte)(thoughtsTable.ms, q.thoughtsBeyond || Date.now()),
-			),
-		)
-		.orderBy((oldToNew ? asc : desc)(thoughtsTable.ms))
-		.limit(10)
-		.offset(offset++);
-
-	const newThoughts = { ...gs.thoughts };
-	thoughts.forEach((t) => (newThoughts[getThoughtId(t)] = t));
-	gs.thoughts = newThoughts;
-
-	return { thoughts };
-};

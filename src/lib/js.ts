@@ -65,7 +65,6 @@ export let post = (body: object) => ({
 });
 
 export function copyToClipboard(text: string): void {
-	if (text === '') text = ' ';
 	if (navigator?.clipboard?.writeText) {
 		navigator.clipboard
 			.writeText(text)

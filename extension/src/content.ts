@@ -7,23 +7,27 @@ chrome.runtime.onMessage.addListener((msg) => {
 let mindappNewDevUrl = 'http://localhost:8888';
 let mindappNewUrl = 'https://new.mindapp.cc';
 let mindappOldDevUrl = 'http://localhost:1234';
-let mindappOldUrl = 'https://mindap.cc';
+let mindappOldUrl = 'https://mindapp.cc';
+
+if (['localhost:8888', 'new.mindapp.cc', 'mindapp.cc'].includes(location.host)) {
+	const script = document.createElement('script');
+	script.src = '/inject.js';
+	(document.head || document.documentElement).appendChild(script);
+	script.onload = () => script.remove();
+}
 
 if (
 	[mindappNewDevUrl, mindappNewUrl, mindappOldDevUrl, mindappOldUrl].some((url) =>
 		location.href.startsWith(url),
 	)
 ) {
-	window.addEventListener('message', (event) => {
+	window.addEventListener('message', async (event) => {
 		if (event.source !== window) return;
 		if (event.data.type === 'page-ready') {
-			chrome.runtime
-				.sendMessage({
-					type: 'mindapp-open',
-				})
-				.then((data) => {
-					window.postMessage({ type: 'extension-data', payload: data }, '*');
-				});
+			window.postMessage({
+				type: 'extension-data',
+				payload: await chrome.runtime.sendMessage({ type: 'mindapp-open' }),
+			});
 		}
 	});
 }
@@ -62,6 +66,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 		).trim();
 
 	if (openingNewMindapp) {
+		// TODO: just pass the whole document to the popup so the site can scrape data instead of the extension (avoids waiting for web store approval)
 		chrome.runtime.sendMessage({
 			type: 'init-popup',
 			data: {
@@ -119,10 +124,15 @@ const urlSelectors: Record<
 				nameTag.innerText
 			: `YouTube${ppHref?.slice(1)!}`;
 
+		let url = location.href.replace('app=desktop&', '');
+		if (url.includes('list=WL')) {
+			url = url.replace('&list=WL', '');
+			url = url.replace(/&index=\d+/, '');
+		}
 		return {
 			headline: title,
 			tags: [author],
-			url: location.href.replace('&list=WL', '').replace('app=desktop&', ''),
+			url,
 		};
 	},
 	'www.youtube.com/playlist': () => {

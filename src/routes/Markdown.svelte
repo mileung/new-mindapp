@@ -20,20 +20,18 @@
 	type Img = { alt: string; imageUri: string };
 	type Video = { alt: string; videoUri: string };
 	type Audio = { alt: string; audioUri: string };
-	const result: (string | A | Img | Video | Audio)[] = $derived(
-		(() => {
-			let start = 0;
-			let result = [];
-			for (const match of uriMatches) {
-				result.push(text.substring(start, match.index), { text: match[0], uri: match[0] });
-				start = match.index! + match[0].length;
-			}
-			if (start < text.length) {
-				result.push(text.substring(start));
-			}
-			return result;
-		})(),
-	);
+	const result: (string | A | Img | Video | Audio)[] = $derived.by(() => {
+		let start = 0;
+		let result = [];
+		for (const match of uriMatches) {
+			result.push(text.substring(start, match.index), { text: match[0], uri: match[0] });
+			start = match.index! + match[0].length;
+		}
+		if (start < text.length) {
+			result.push(text.substring(start));
+		}
+		return result;
+	});
 </script>
 
 {#each result as tag}

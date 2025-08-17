@@ -6,6 +6,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+	--w-sidebar: max(15rem, 20vw);
 	--color-bg1: var(--bg1);
 	--color-bg2: var(--bg2);
 	--color-bg3: var(--bg3);

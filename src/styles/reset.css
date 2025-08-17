@@ -1,3 +1,7 @@
+* {
+	overflow-anchor: auto;
+}
+
 body {
 	@apply bg-bg1 text-fg1;
 }
@@ -8,7 +12,7 @@ select {
 }
 
 *:focus-visible {
-	/* @apply outline-hl1 outline-2 outline-double; */
+	@apply outline-hl1 outline-2 outline-solid;
 }
 
 input[type='number']::-webkit-inner-spin-button,

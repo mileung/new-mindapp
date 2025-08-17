@@ -9,21 +9,27 @@
 
 	let {
 		thought,
+		linking,
 		// onDelete,
 		// onEdit,
-		// onLink,
+		onLink,
 	}: {
 		thought: ThoughtSelect;
+		linking?: boolean;
 		// onDelete: () => void;
 		// onEdit: () => void;
-		// onLink: () => void;
+		onLink: () => void;
 	} = $props();
-	let id = $derived(getThoughtId(thought));
-	let when = $derived(formatMs(thought.ms));
+	// let id = $derived(getThoughtId(thought));
+	// let when = $derived(formatMs(thought.ms));
 	let parsed = $state(true);
+	let id = $derived(getThoughtId(thought));
 </script>
 
-<div class="bg-bg2 p-1 rounded">
+<div {id} class="relative bg-bg2 p-1 rounded">
+	{#if linking}
+		<!-- <div class="b z-50 pointer-events-none absolute inset-0 bg-hl1/5"></div> -->
+	{/if}
 	<ThoughtHeader
 		{thought}
 		{parsed}
@@ -35,12 +41,10 @@
 			//
 		}}
 		onLink={() => {
-			//
+			onLink();
 		}}
 	/>
 	{#if thought.body}
-		<!-- TODO Get scroll chaining to work in Brave -->
-		<!-- <div class="max-h-[85vh] mini-scroll"> -->
 		<div>
 			{#if parsed}
 				<BodyParser {thought} />

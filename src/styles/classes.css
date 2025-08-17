@@ -35,3 +35,19 @@
 		@apply bg-fg3;
 	}
 }
+
+.reveal {
+	animation: reveal 400ms ease-in-out 1;
+	animation-fill-mode: forwards;
+}
+
+@keyframes reveal {
+	from {
+		height: 0px;
+		opacity: 0;
+	}
+	to {
+		height: 3.5rem;
+		opacity: 1;
+	}
+}
