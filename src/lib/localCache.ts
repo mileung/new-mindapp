@@ -1,14 +1,15 @@
 import { z } from 'zod';
 import { SpaceSchema } from './spaces';
-import { PersonaSchema } from './personas';
-import { filterThoughtId, gsdb, thoughtsTable, type ThoughtInsert } from './thoughts';
+import { PersonaSchema } from './accounts';
+import { getIdFilter, gsdb, thoughtsTable, type ThoughtInsert } from './thoughts';
 import { and, isNull } from 'drizzle-orm';
 import { m } from './paraglide/messages';
+import { gs } from './globalState.svelte';
 
 export let LocalCacheSchema = z
 	.object({
 		spaces: z.record(z.number(), SpaceSchema),
-		personas: z.array(PersonaSchema),
+		accounts: z.array(PersonaSchema),
 	})
 	.strict();
 
@@ -16,9 +17,11 @@ export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
 export let defaultLocalCache: LocalCache = {
 	spaces: {},
-	personas: [
+	accounts: [
 		{
 			id: undefined,
+			spaceIndex: 0,
+			spacesPinnedThrough: 0,
 			spaceIds: [
 				undefined, // local space id - everything local
 				0, // personal space id - everything private in cloud
@@ -59,7 +62,7 @@ export async function getLocalCache() {
 				// Not sure if I'll use tags or to_id to organize multiple author-less meta thoughts...
 				isNull(thoughtsTable.tags),
 				isNull(thoughtsTable.to_id),
-				filterThoughtId({}),
+				getIdFilter({}),
 			),
 		);
 	if (!localCacheRow) localCacheRow = await initLocalCache();
@@ -73,16 +76,20 @@ export async function getLocalCache() {
 	return localCache;
 }
 
-export async function updateLocalCache(updatedLocalCache: LocalCache) {
-	if (!LocalCacheSchema.safeParse(updatedLocalCache)) {
+export async function updateLocalCache(updater: (old: LocalCache) => LocalCache) {
+	let oldLocalCache = await getLocalCache();
+	let newLocalCache = updater(oldLocalCache);
+	if (!LocalCacheSchema.safeParse(newLocalCache)) {
 		return window.alert(m.invalidLocalCacheUpdate());
 	}
+	gs.accounts = newLocalCache.accounts;
+	gs.spaces = newLocalCache.spaces;
 	await (
 		await gsdb()
 	)
 		.update(thoughtsTable)
-		.set(makeLocalCacheThoughtInsert(updatedLocalCache))
-		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), filterThoughtId({})));
+		.set(makeLocalCacheThoughtInsert(newLocalCache))
+		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), getIdFilter({})));
 }
 
 export async function deleteLocalCache() {

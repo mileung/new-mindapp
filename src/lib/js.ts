@@ -1,26 +1,4 @@
-import { icons as iconsJson } from '@iconify-json/tabler/icons.json';
 import { minute, second } from './time';
-
-// https://tabler.io/icons
-export const ALLOWED_ICONS = [
-	'search',
-	'arrow-up',
-	'trash',
-	'circle-x-filled',
-	'x',
-	'play',
-	'dots',
-	'pencil',
-	'corner-up-left',
-	'corner-down-right',
-	'fingerprint',
-	'copy',
-	'cube',
-	'cube-3d-sphere',
-	'browser',
-	'settings',
-] as const satisfies (keyof typeof iconsJson)[];
-export type IconName = (typeof ALLOWED_ICONS)[number];
 
 export function sortObjectProps(obj: Record<string, any>): Record<string, any> {
 	// Check if the input is an object and not null

@@ -9,9 +9,7 @@
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
-
-	let { data, children }: { data: LayoutData; children: Snippet } = $props();
-
+	let p: { data: LayoutData; children: Snippet } = $props();
 	onMount(async () => {
 		const savedTheme = localStorage.getItem('theme');
 		gs.theme = (
@@ -19,7 +17,7 @@
 		)!;
 
 		if ('serviceWorker' in navigator) {
-			addEventListener('load', function () {
+			window.addEventListener('load', function () {
 				// unregister service workers at chrome://serviceworker-internals
 				navigator.serviceWorker.register('./service-worker.js');
 			});
@@ -33,7 +31,7 @@
 			gs.db = drizzle(driver, batchDriver);
 			// await deleteLocalCache()
 			let localCache = await getLocalCache();
-			gs.personas = localCache.personas;
+			gs.accounts = localCache.accounts;
 			gs.spaces = localCache.spaces;
 		} catch (error) {
 			console.log('error:', error);
@@ -51,6 +49,6 @@
 </script>
 
 <Sidebar />
-<div class="ml-[var(--w-sidebar)]">
-	{@render children()}
+<div class="xs:ml-[var(--w-sidebar)]">
+	{@render p.children()}
 </div>

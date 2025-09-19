@@ -1,7 +1,7 @@
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import type { ThoughtSelect } from './thoughts';
+import type { ThoughtNested, ThoughtSelect } from './thoughts';
 import type { Space } from './spaces';
-import type { Persona } from './personas';
+import type { Account } from './accounts';
 
 export type FeedRootIds = (null | string)[];
 
@@ -9,9 +9,9 @@ class GlobalState {
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
 	spaces = $state<Record<number, undefined | Space>>({});
-	personas = $state<(undefined | Persona)[]>([]);
+	accounts = $state<(undefined | Account)[]>([]);
 	feeds = $state<Record<string, undefined | FeedRootIds>>({});
-	thoughts = $state<Record<string, undefined | null | ThoughtSelect>>({});
+	thoughts = $state<Record<string, undefined | null | ThoughtNested>>({});
 }
 
 export let gs = new GlobalState();

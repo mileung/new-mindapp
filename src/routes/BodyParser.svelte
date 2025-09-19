@@ -1,49 +1,51 @@
 <script lang="ts">
 	import { gs } from '$lib/globalState.svelte';
-	import { isRecord, isStringifiedRecord } from '$lib/js';
-	import { isThoughtId, type ThoughtSelect } from '$lib/thoughts';
+	import { isStringifiedRecord } from '$lib/js';
+	import { idsRegex, type ThoughtInsert } from '$lib/thoughts';
+	import CitedThought from './CitedThought.svelte';
 	import Markdown from './Markdown.svelte';
-	import MentionedThought from './MentionedThought.svelte';
-	import MiniMentionedThought from './MiniMentionedThought.svelte';
+	import MiniCitedThought from './MiniCitedThought.svelte';
 
-	const p: { miniMentions?: boolean; thought: ThoughtSelect } = $props();
+	let p: {
+		thought: ThoughtInsert;
+		onLink: (id: string) => void;
+		onEdit: (id: string) => void;
+		depth: number;
+		miniCites?: boolean;
+		spotId?: string;
+		toId?: string;
+		editId?: string;
+	} = $props();
 
-	const thoughtIdsRegex = /\d*_\d*_\d*/g;
 	function separateMentions(text: string) {
-		const matches = text.matchAll(thoughtIdsRegex);
-		const result: string[] = [];
+		let matches = text.matchAll(idsRegex);
+		let result: string[] = [];
 		let start = 0;
-		for (const match of matches) {
+		for (let match of matches) {
 			result.push(text.substring(start, match.index), match[0]);
-			start = match.index! + match[0].length;
+			start = match.index + match[0].length;
 		}
-		if (start < text.length) {
-			result.push(text.substring(start));
-		}
-		return result;
+		start < text.length && result.push(text.substring(start));
+		return result.map((s) => s.trim());
 	}
-
 	let bodySegs = $derived(separateMentions(p.thought.body || ''));
-	$effect(() => {
-		// console.log(bodySegs);
-	});
+	// $effect(() => {
+	// 	console.log(bodySegs);
+	// });
 </script>
 
 {#each bodySegs as str, i}
 	{#if i % 2}
-		{#if p.miniMentions}
-			<MiniMentionedThought thoughtId={str} />
+		{#if p.miniCites}
+			<MiniCitedThought {...p} id={str} depth={p.depth + 1} />
 		{:else if gs.thoughts[str]}
-			<MentionedThought thought={gs.thoughts[str]} />
+			<CitedThought {...p} thought={gs.thoughts[str]} depth={p.depth + 1} />
 		{:else}
-			<p class="break-words">{str}</p>
+			<p>{str}</p>
 		{/if}
 	{:else if isStringifiedRecord(str)}
 		<pre>{JSON.stringify(JSON.parse(str), null, 2)}</pre>
 	{:else}
-		<!-- // remove the first new line cuz the mentioned thought has block display -->
-		<!-- {parseMd(i ? str.replace(/^\n/, '') : str)} -->
-		<!-- <Markdown text={i ? str.replace(/^\n/, '') : str} /> -->
 		<Markdown text={str} />
 	{/if}
 {/each}

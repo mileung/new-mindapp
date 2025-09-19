@@ -6,7 +6,11 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-	--w-sidebar: max(15rem, 20vw);
+	/* --w-sidebar: 100vw; */
+	--w-sidebar: max(12rem, min(17rem, 20vw));
+
+	--breakpoint-xs: 501px;
+
 	--color-bg1: var(--bg1);
 	--color-bg2: var(--bg2);
 	--color-bg3: var(--bg3);
@@ -17,8 +21,20 @@
 	--color-bg8: var(--bg8);
 	--color-hl1: var(--hl1);
 	--color-hl2: var(--hl2);
-	--color-hl3: var(--hl3);
+	--color-hl-link: var(--hl-link);
+	--color-hl-edit: var(--hl-edit);
+	--color-hl-spot: var(--hl-spot);
+	--color-hl-cite: var(--hl-cite);
 	--color-fg1: var(--fg1);
 	--color-fg2: var(--fg2);
 	--color-fg3: var(--fg3);
+
+	--color-local: var(--local);
+	--color-personal: var(--personal);
+	--color-global: var(--global);
 }
+/* @media (min-width: 501px) {
+	:root {
+		--w-sidebar: max(12rem, min(17rem, 20vw));
+	}
+} */

@@ -12,7 +12,7 @@
 		<script>
 			let theme = localStorage.getItem('theme');
 			if (
-				theme === 'system'
+				!theme || theme === 'system'
 					? window.matchMedia('(prefers-color-scheme: dark)').matches
 					: theme === 'dark'
 			)

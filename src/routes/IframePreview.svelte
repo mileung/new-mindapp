@@ -5,7 +5,6 @@
 		/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
 	let p: { uri: string } = $props();
-
 	let open = $state(false);
 	let videoId = $derived(p.uri.match(ytRegex)?.[1]);
 	let iframe = $state<HTMLIFrameElement>();

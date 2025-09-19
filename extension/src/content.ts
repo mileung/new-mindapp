@@ -1,7 +1,8 @@
-let dev = import.meta.env.VITE_ENV === 'DEV';
+import { PopupMessage } from './background';
 
+let dev = import.meta.env.VITE_ENV === 'DEV';
 chrome.runtime.onMessage.addListener((msg) => {
-	if (msg.type === 'save-thought') openPopup(true);
+	if (msg.type === 'context-menu-saves-thought') openPopup(true);
 });
 
 let mindappNewDevUrl = 'http://localhost:8888';
@@ -10,8 +11,8 @@ let mindappOldDevUrl = 'http://localhost:1234';
 let mindappOldUrl = 'https://mindapp.cc';
 
 if (['localhost:8888', 'new.mindapp.cc', 'mindapp.cc'].includes(location.host)) {
-	const script = document.createElement('script');
-	script.src = '/inject.js';
+	let script = document.createElement('script');
+	script.src = '/mindapp-inject.js';
 	(document.head || document.documentElement).appendChild(script);
 	script.onload = () => script.remove();
 }
@@ -23,16 +24,18 @@ if (
 ) {
 	window.addEventListener('message', async (event) => {
 		if (event.source !== window) return;
-		if (event.data.type === 'page-ready') {
+		if (event.data.type === '2-popup-requests-external-page-info') {
 			window.postMessage({
-				type: 'extension-data',
-				payload: await chrome.runtime.sendMessage({ type: 'mindapp-open' }),
+				type: '4-popup-receives-external-page-info',
+				payload: await chrome.runtime.sendMessage({
+					type: '3-content-script-retrieves-saved-page-info',
+				}),
 			});
 		}
 	});
 }
 
-addEventListener('keydown', (e) => {
+window.addEventListener('keydown', (e) => {
 	let openingNewMindapp = e.key === 'µ'; // alt m
 	if (
 		(e.key === '©' || // alt g
@@ -51,10 +54,10 @@ let openPopup = (openingNewMindapp?: boolean) => {
 		: dev
 			? mindappOldDevUrl
 			: mindappOldUrl;
-	const selector =
+	let selector =
 		urlSelectors[location.host + location.pathname]?.() || urlSelectors[location.host]?.();
 
-	const thoughtHeadline =
+	let thoughtHeadline =
 		// TODO: This doesn't return the highlighted text all the time - e.g. go to a reddit post and try highlighting the headline and clipping: https://www.reddit.com/r/videos/comments/10oak86/goldsmith_uses_chemistry_to_refine_indistinct/
 		(
 			window.getSelection()?.toString() ||
@@ -66,13 +69,20 @@ let openPopup = (openingNewMindapp?: boolean) => {
 		).trim();
 
 	if (openingNewMindapp) {
-		// TODO: just pass the whole document to the popup so the site can scrape data instead of the extension (avoids waiting for web store approval)
 		chrome.runtime.sendMessage({
-			type: 'init-popup',
-			data: {
-				body: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
-				tags: selector?.tags,
-			},
+			type: '1-content-amd-background-scripts-save-page-info',
+			url: window.location.href,
+			externalDomString: document.documentElement.outerHTML,
+			selectedHtmlString: (() => {
+				let selection = window.getSelection();
+				if (selection && selection.rangeCount !== 0) {
+					let range = selection.getRangeAt(0);
+					let fragment = range.cloneContents();
+					let div = document.createElement('div');
+					div.appendChild(fragment.cloneNode(true));
+					return div.innerHTML;
+				}
+			})(),
 		} as PopupMessage);
 	}
 
@@ -88,14 +98,14 @@ let openPopup = (openingNewMindapp?: boolean) => {
 	});
 	window.open(
 		openingNewMindapp //
-			? baseUrl
+			? baseUrl + '?extension'
 			: `${baseUrl}?${new URLSearchParams(JSON.parse(json)).toString()}`,
 		'_blank',
 		`width=700,height=500,top=0,left=99999999`,
 	);
 };
 
-const urlSelectors: Record<
+let urlSelectors: Record<
 	string,
 	undefined | (() => { headline?: string; url?: string; tags?: string[] })
 > = {
@@ -106,20 +116,20 @@ const urlSelectors: Record<
 		return { headline: document.querySelector('h1')?.innerText };
 	},
 	'www.reddit.com': () => {
-		const subreddit = location.href.match(/\/(r\/[^/]+)/)?.[1];
+		let subreddit = location.href.match(/\/(r\/[^/]+)/)?.[1];
 		// TODO: get the post body as markdown
 		// e.g. https://www.reddit.com/r/UI_Design/comments/vzqe34/menu_knowledge_is_essential/
 		return { headline: getTitle(), tags: subreddit ? [subreddit] : [] };
 	},
 	'www.youtube.com/watch': () => {
 		// @ts-ignore
-		const title: string = document.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
-		const nameTag = document.querySelector('#top-row yt-formatted-string a');
-		const ppHref = decodeURIComponent(
+		let title: string = document.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
+		let nameTag = document.querySelector('#top-row yt-formatted-string a');
+		let ppHref = decodeURIComponent(
 			document.querySelector('#owner > ytd-video-owner-renderer > a')?.getAttribute('href')!,
 		);
 
-		const author: string = ppHref?.startsWith('/channel/')
+		let author: string = ppHref?.startsWith('/channel/')
 			? // @ts-ignore
 				nameTag.innerText
 			: `YouTube${ppHref?.slice(1)!}`;
@@ -136,7 +146,7 @@ const urlSelectors: Record<
 		};
 	},
 	'www.youtube.com/playlist': () => {
-		const author: string = decodeURIComponent(
+		let author: string = decodeURIComponent(
 			document
 				.querySelector('yt-page-header-view-model a[href^="/@"]')
 				?.getAttribute('href')
@@ -151,10 +161,10 @@ const urlSelectors: Record<
 		};
 	},
 	'www.youtube.com': () => {
-		const author = location.pathname.startsWith('/@')
+		let author = location.pathname.startsWith('/@')
 			? location.pathname.slice(1, location.pathname.indexOf('/', 1))
 			: null;
-		const tags = author ? ['YouTube Channel', `YouTube${author}`] : [];
+		let tags = author ? ['YouTube Channel', `YouTube${author}`] : [];
 		return {
 			headline: document.querySelector<HTMLHeadElement>('h1.dynamic-text-view-model-wiz__h1')
 				?.innerText,
@@ -163,15 +173,13 @@ const urlSelectors: Record<
 	},
 	'x.com': () => {
 		let author = location.pathname.slice(1);
-		const i = author.indexOf('/');
+		let i = author.indexOf('/');
 		if (i !== -1) author = author.slice(0, i);
-		const tweetId = location.pathname.match(/\/status\/(\d+)/)?.[1];
+		let tweetId = location.pathname.match(/\/status\/(\d+)/)?.[1];
 		// TODO: X has really messy messy HTML on purpose I think to make query selectors break. Make this more robust.
-		const tweetBlock = document.querySelector(`a[href="/${author}/status/${tweetId}"]`)
-			?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
-		const tweetText = tweetBlock?.querySelector<HTMLElement>(
-			'[data-testid="tweetText"]',
-		)?.innerText;
+		let tweetBlock = document.querySelector(`a[href="/${author}/status/${tweetId}"]`)?.parentElement
+			?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
+		let tweetText = tweetBlock?.querySelector<HTMLElement>('[data-testid="tweetText"]')?.innerText;
 
 		return {
 			headline: tweetText,
@@ -179,26 +187,26 @@ const urlSelectors: Record<
 		};
 	},
 	'www.amazon.com': () => {
-		const headline = document.querySelector<HTMLElement>('#productTitle')?.innerText;
-		const endI = Math.min(
+		let headline = document.querySelector<HTMLElement>('#productTitle')?.innerText;
+		let endI = Math.min(
 			...[
 				//
 				location.href.indexOf('?'),
 				location.href.indexOf('/ref='),
 			].filter((n) => n !== -1),
 		);
-		const url = location.href.slice(0, endI);
+		let url = location.href.slice(0, endI);
 		return { headline, url };
 	},
 	'www.ebay.com': () => {
-		const headline = document.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
-		const endI = Math.min(
+		let headline = document.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
+		let endI = Math.min(
 			...[
 				//
 				location.href.indexOf('?'),
 			].filter((n) => n !== -1),
 		);
-		const url = location.href.slice(0, endI);
+		let url = location.href.slice(0, endI);
 		return { headline, url };
 	},
 };
@@ -208,25 +216,3 @@ function getTitle() {
 }
 
 export {};
-
-// 1. Get the current selection as HTML
-function getSelectionHtml(): string | null {
-	const selection = window.getSelection();
-	if (!selection || selection.rangeCount === 0) return null;
-	const range = selection.getRangeAt(0);
-	const container = document.createElement('div');
-	container.appendChild(range.cloneContents());
-	return container.innerHTML;
-}
-
-// 2. Convert HTML to Markdown (using a library)
-import TurndownService from 'turndown';
-import { PopupMessage } from './background';
-
-// https://www.perplexity.ai/search/ts-get-current-selection-as-ma-ifzId2TsRWizLAgFLVjtPg
-function getSelectionAsMarkdown(): string | null {
-	const html = getSelectionHtml();
-	if (!html) return null;
-	const turndownService = new TurndownService();
-	return turndownService.turndown(html);
-}

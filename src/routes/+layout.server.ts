@@ -1,6 +1,3 @@
-import { ALLOWED_ICONS } from '$lib/js';
-import { icons } from '@iconify-json/tabler/index.js';
-import { getIconData } from '@iconify/utils';
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async (e) => {

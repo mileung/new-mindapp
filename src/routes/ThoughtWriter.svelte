@@ -1,65 +1,40 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { isStringifiedRecord } from '$lib/js';
-	import type { ThoughtSelect } from '$lib/thoughts';
-	import { matchSorter } from 'match-sorter';
-
+	import { unsaveTagInPersona } from '$lib/accounts';
+	import { scrape, textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { unsaveTagInPersona } from '$lib/personas';
+	import type { ThoughtSelect } from '$lib/thoughts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
+	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
+	import html2md from 'html-to-md';
 
 	let bodyTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;
+
+	let p: {
+		toId?: string;
+		editId?: string;
+		thought?: ThoughtSelect;
+		onSubmit: (tags: string[], body: string) => void;
+	} = $props();
+	let editingThought = $derived(gs.thoughts[p.editId!]);
+
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let undoTagRefs = $state<(undefined | HTMLButtonElement)[]>([]);
-	let addedTagsContainerDiv: HTMLDivElement;
-
-	let tagsIptFocused = $state(true);
+	let tagsIptFocused = $state(false);
 	let tagVal = $state('');
 	let tagIndex = $state(0);
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
+	let currentTags = $state<string[]>([]);
+	let bodyVal = $state('');
 
-	$effect(() => {
-		// console.log($inspect(tagSuggestionsRefs));
-	});
-
-	$effect(() => {
-		if (tagsIptFocused) {
-			suggestingTags = !!tagVal;
-		} else {
-			suggestingTags = false;
-			xFocused = false;
-		}
-	});
-
-	let p: {
-		thought?: ThoughtSelect;
-		initialTags?: string[];
-		initialBody?: string;
-		onSubmit: (tags: string[], body: string) => void;
-	} = $props();
-
-	let jsonParam = $state(
-		(() => {
-			let json = page.url.searchParams.get('json');
-			return json ? (JSON.parse(json) as { body?: string; tags?: string[] }) : null;
-		})(),
-	);
-
-	let addedTags = $state<string[]>([...(p.initialTags || []), ...(jsonParam?.tags || [])]);
-	let bodyVal = $state(
-		(() => {
-			let body = p.initialBody || jsonParam?.body || '';
-			return isStringifiedRecord(body) ? JSON.stringify(JSON.parse(body), null, 2) : body;
-		})(),
-	);
-
+	let currentWritableTags = $derived(currentTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(tagVal.trim());
-	let allTagsSet = $derived(new Set(gs.personas[0]?.tags || []));
+	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
@@ -69,70 +44,102 @@
 		return [...new Set(arr)];
 	});
 
+	$effect(() => {
+		suggestingTags = tagsIptFocused ? !!tagVal : false;
+	});
+	$effect(() => {
+		// console.log($inspect(tagSuggestionsRefs));
+		if (p.toId || p.editId) tagsIpt.focus();
+	});
+	$effect(() => {
+		// if (editingThought) {
+		// 	currentTags = editingThought.tags || [];
+		// 	bodyVal = editingThought.body || '';
+		// } else {
+		// 	currentTags = [];
+		// 	bodyVal = '';
+		// }
+	});
+
 	onMount(() => {
-		window.postMessage({ type: 'page-ready' }, '*');
-		window.addEventListener('message', (event) => {
-			if (event.source !== window) return;
-			if (event.data && event.data.type === 'extension-data') {
-				let { tags, body } = (event.data.payload.data as { tags?: string[]; body?: string }) || {};
-				tags && (addedTags = tags);
-				body && (bodyVal = body);
-			}
+		window.addEventListener('keydown', (e) => {
+			!tagsIptFocused &&
+				!textInputFocused() &&
+				!e.altKey &&
+				(!e.ctrlKey || (e.ctrlKey && e.key === 'v')) &&
+				(!e.metaKey || (e.metaKey && e.key === 'v')) &&
+				((e.key.length === 1 && e.key !== '/') ||
+					['Backspace', 'Delete', 'Space'].includes(e.key)) &&
+				tagsIpt?.focus();
 		});
+		if (page.url.searchParams.get('extension') !== null) {
+			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
+			window.addEventListener('message', (event) => {
+				if (event.source !== window) return;
+				if (event.data.type === '4-popup-receives-external-page-info') {
+					let { url, externalDomString, selectedHtmlString } =
+						(event.data.payload as {
+							url?: string;
+							externalDomString?: string;
+							selectedHtmlString?: string;
+						}) || {};
+					if (!url || !externalDomString) return;
+					let scrapedInfo = selectedHtmlString
+						? {
+								headline: (() => {
+									let markdown = html2md(selectedHtmlString);
+									// console.log('selectedHtmlString:', selectedHtmlString);
+									// console.log('markdown:', markdown);
+									return markdown;
+								})(),
+								tags: [],
+								url,
+							}
+						: scrape(url, externalDomString);
+
+					currentTags = scrapedInfo?.tags || [];
+					bodyVal = `${scrapedInfo?.headline}\n${scrapedInfo?.url || url}\n\n`;
+					tagsIpt.focus();
+				}
+			});
+		}
 	});
 
 	let submit = () => {
 		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || tagVal.trim();
-		p.onSubmit([...addedTags, ...(otherTag ? [otherTag] : [])], bodyVal);
-		addedTags = [];
+		p.onSubmit([...currentTags, ...(otherTag ? [otherTag] : [])], bodyVal);
+		tagsIpt.blur();
+		bodyTa.blur();
+		currentTags = [];
 		tagVal = '';
 		bodyVal = '';
 	};
-
 	let addTag = (tagToAdd?: string) => {
 		tagToAdd = tagToAdd || suggestedTags[tagIndex] || tagFilter;
 		if (tagToAdd) {
-			addedTags = [...new Set([...addedTags, tagToAdd])];
+			currentTags = [...new Set([...currentTags, tagToAdd])];
 			tagVal = '';
 		}
 	};
-	$effect(() => {
-		!allTagsSet.size && (xFocused = false);
-	});
 </script>
 
 <div class="w-full">
 	<div
-		bind:this={addedTagsContainerDiv}
 		tabindex="-1"
-		class={`bg-bg4 rounded fx flex-wrap px-2 mb-0.5 py-0.5 gap-1 ${addedTags.length ? '' : 'hidden'}`}
+		class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${currentWritableTags.length ? '' : 'hidden'}`}
 		onclick={() => tagsIpt.focus()}
+		onmousedown={(e) => e.preventDefault()}
 	>
-		{#each addedTags as name, i}
+		{#each currentWritableTags as tag, i}
 			<div class="fx">
-				{name}
+				{tag}
 				<button
-					class="xy -ml-0.5 h-7 w-7 rounded-full -outline-offset-4 transition text-fg2 hover:text-fg1"
+					class="xy -ml-0.5 h-7 w-7 text-fg2 hover:text-fg1"
 					bind:this={undoTagRefs[i]}
 					onclick={(e) => {
 						e.stopPropagation(); // this is needed to focus the next tag
-						addedTags = addedTags.filter((_, index) => index !== i);
-						if (!addedTags.length || (i === addedTags.length && !e.shiftKey)) {
-							tagsIpt.focus();
-						}
-					}}
-					onkeydown={(e) => {
-						if (e.key === 'Backspace') {
-							if (undoTagRefs.filter((r) => !!r).slice(-1)[0] === document.activeElement) {
-								tagsIpt.focus();
-							}
-							addedTags = addedTags.filter((_, index) => index !== i);
-						} else if (!['Control', 'Alt', 'Tab', 'Shift', 'Meta', 'Enter'].includes(e.key)) {
-							tagsIpt.focus();
-						}
-					}}
-					onmouseup={() => {
-						setTimeout(() => tagsIpt.focus(), 0);
+						currentTags = currentTags.filter((t) => t !== tag);
+						if (!currentWritableTags.length) tagsIpt.focus();
 					}}
 				>
 					<IconCircleXFilled class="w-4 h-4" />
@@ -143,9 +150,8 @@
 	<input
 		bind:this={tagsIpt}
 		bind:value={tagVal}
-		autofocus
 		autocomplete="off"
-		class="bg-bg4 rounded w-full px-2 py-0.5 text-lg"
+		class="bg-bg4 w-full px-2 py-0.5 text-lg"
 		placeholder={m.tags()}
 		onfocus={() => (tagsIptFocused = true)}
 		onblur={() => (tagsIptFocused = false)}
@@ -153,11 +159,14 @@
 			let pastedText = e.clipboardData?.getData('text') || '';
 			let pastedTags = pastedText.split(/\r?\n/);
 			if (pastedTags.length > 1) {
-				addedTags = addedTags.concat(pastedTags.filter((t) => !!t && !addedTags.includes(t)));
+				currentTags = currentTags.concat(
+					pastedTags.map((t) => t.trim()).filter((t) => !!t && !currentTags.includes(t)),
+				);
 			}
 		}}
 		oninput={() => {
 			tagIndex = 0;
+			xFocused = false;
 			tagSuggestionsRefs[0]?.focus();
 			tagsIpt.focus();
 		}}
@@ -165,7 +174,7 @@
 			if (e.key === 'Escape') {
 				if (suggestingTags) {
 					suggestingTags = false;
-				} else tagsIpt.blur();
+				} else setTimeout(() => tagsIpt.blur(), 0);
 			}
 			if (e.key === 'Enter') {
 				if (xFocused) unsaveTagInPersona(suggestedTags[tagIndex]);
@@ -173,12 +182,19 @@
 			}
 			if (suggestingTags) {
 				if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
-					if (e.key === 'Tab' && tagIndex === -1) return;
+					if (e.key === 'Tab' && !suggestedTags.length) return;
 					e.preventDefault();
-					if (e.key === 'Tab') {
-						xFocused = !xFocused;
-						if (!xFocused) return;
-					} else xFocused = false;
+					if (tagIndex >= 0) {
+						if (e.key === 'Tab') {
+							xFocused = !xFocused;
+							if (!xFocused) return;
+						} else xFocused = false;
+					} else if (currentWritableTags.length) {
+						return undoTagRefs
+							.filter((r) => !!r)
+							.slice(-1)[0]
+							.focus();
+					}
 					let index = Math.max(tagIndex - 1, -1);
 					tagSuggestionsRefs[index]?.focus();
 					tagIndex = index;
@@ -204,38 +220,32 @@
 			}
 		}}
 	/>
-	<div class="relative mt-0.5 h-28">
+	<div class="relative h-28">
 		<div
-			class={`bg-bg2 flex flex-col overflow-scroll rounded absolute w-full backdrop-blur-md max-h-full shadow ${
+			class={`bg-bg1 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
 				suggestingTags ? '' : 'hidden'
 			}`}
 			onmousedown={(e) => e.preventDefault()}
 		>
 			{#each suggestedTags as tag, i}
-				<div class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}>
+				<div class={`group/tag fx hover:bg-bg4 ${tagIndex === i ? 'bg-bg4' : ''}`}>
 					<button
 						bind:this={tagSuggestionsRefs[i]}
-						class={`relative h-8 rounded truncate flex-1 text-left px-2 text-nowrap text-lg`}
+						class={`relative h-8 truncate flex-1 text-left px-2 text-nowrap text-lg`}
 						onclick={() => addTag(tag)}
 					>
 						{#if tagIndex === i && !xFocused}
-							<div
-								class="absolute rounded-r left-0 top-0 bottom-0 w-0.5 transition bg-hl1 group-hover/tag:bg-hl2"
-							></div>
+							<div class="absolute left-0 top-0 bottom-0 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
 						{/if}
 						{tag}
 					</button>
 					{#if allTagsSet.has(tag)}
 						<button
 							bind:this={unsaveTagXRefs[i]}
-							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex group/x xy h-8 w-8`}
+							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 							onclick={() => unsaveTagInPersona(tag)}
 						>
-							<div
-								class={`xy h-7 w-7 rounded-full transition group-hover/x:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-							>
-								<IconX class="h-5 w-5" />
-							</div>
+							<IconX class="h-5 w-5" />
 						</button>
 					{/if}
 				</div>
@@ -245,9 +255,9 @@
 			bind:this={bodyTa}
 			bind:value={bodyVal}
 			placeholder={m.shareThought()}
-			class="bg-bg4 rounded h-full resize-none block w-full px-2 py-0.5 text-lg pr-12"
+			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-12"
 			onkeydown={(e) => {
-				e.key === 'Escape' && bodyTa.blur();
+				e.key === 'Escape' && setTimeout(() => bodyTa.blur(), 0);
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>

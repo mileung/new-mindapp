@@ -1,5 +1,4 @@
-import { sqliteTable, text, integer, primaryKey, index } from 'drizzle-orm/sqlite-core';
-import { gs } from './globalState.svelte';
+import { dev } from '$app/environment';
 import {
 	and,
 	asc,
@@ -13,17 +12,18 @@ import {
 	not,
 	notLike,
 	or,
-	SQL,
-	type SQLWrapper,
 } from 'drizzle-orm';
-import { dev } from '$app/environment';
-import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { m } from './paraglide/messages';
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { SQLocalDrizzle } from 'sqlocal/drizzle';
+import { gs } from './globalState.svelte';
+import { m } from './paraglide/messages';
+import { minute } from './time';
+import { sortUniArr } from './js';
 
 // https://sqlocal.dev/guide/introduction
 export async function initLocalDb() {
-	const { sql } = new SQLocalDrizzle('mindapp.db');
+	let { sql } = new SQLocalDrizzle('mindapp.db');
 	try {
 		await sql`
 			PRAGMA journal_mode=WAL;
@@ -48,7 +48,7 @@ export async function initLocalDb() {
 	}
 }
 
-export const thoughtsTable = sqliteTable(
+export let thoughtsTable = sqliteTable(
 	'thoughts',
 	{
 		ms: integer('ms'),
@@ -59,7 +59,7 @@ export const thoughtsTable = sqliteTable(
 		in_id: integer('in_id'),
 	},
 	(table) => [
-		// https://orm.drizzle.team/docs/indexes-constraints#composite-primary-key
+		// https://orm.drizzle.team/docs/indexes-letraints#composite-primary-key
 		primaryKey({
 			name: 'thought_id',
 			columns: [table.ms, table.by_id, table.in_id],
@@ -75,33 +75,23 @@ export const thoughtsTable = sqliteTable(
 
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
 export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
+export type ThoughtNested = ThoughtInsert & { children?: ThoughtNested[]; childIds?: string[] };
 export let ThoughtInsertSchema = createInsertSchema(thoughtsTable);
 export let ThoughtSelectSchema = createSelectSchema(thoughtsTable);
 
-type ThoughtIdSegments = Pick<ThoughtInsert, 'ms' | 'by_id' | 'in_id'>;
-export function getThoughtId(thought: ThoughtIdSegments) {
-	return `${thought.ms || ''}_${thought.by_id || ''}_${thought.in_id || ''}`;
-}
+type IdSegments = Pick<ThoughtInsert, 'ms' | 'by_id' | 'in_id'>;
+export let getId = (thought: IdSegments) =>
+	`${thought.ms || ''}_${thought.by_id || ''}_${thought.in_id || ''}`;
 
-const thoughtIdRegex = /^\d*_\d*_\d*$/;
-export function isThoughtId(str = '') {
-	return thoughtIdRegex.test(str);
-}
+export let idRegex = /^\d*_\d*_\d*$/;
+export let idsRegex = /(^|\s)\d*_\d*_\d*($|\s)/g;
 
-type ThoughtSelector = ThoughtIdSegments & { id?: string };
-export function filterThoughtId(t: ThoughtSelector) {
-	let { ms, by_id, in_id } = t;
-	if (t.id) {
-		if (ms || by_id || in_id) {
-			if (getThoughtId(t) !== t.id) throw new Error('id mismatch');
-		}
-		let s = t.id.split('_', 3);
-		ms = +s[0];
-		by_id = +s[1];
-		in_id = +s[1];
-	}
-	if (Number.isNaN(ms) || Number.isNaN(by_id) || Number.isNaN(in_id))
-		throw new Error('Invalid thought id');
+export let isId = (str = '') => idRegex.test(str);
+
+type ThoughtSelector = IdSegments | string;
+
+export function getIdFilter(t: ThoughtSelector) {
+	let { ms, by_id, in_id } = parseId(t);
 	return and(
 		ms ? eq(thoughtsTable.ms, ms) : isNull(thoughtsTable.ms),
 		by_id ? eq(thoughtsTable.by_id, by_id) : isNull(thoughtsTable.by_id),
@@ -109,44 +99,26 @@ export function filterThoughtId(t: ThoughtSelector) {
 	);
 }
 
-export function getThoughtIdSegments(t: ThoughtSelector): ThoughtIdSegments {
-	let { ms, by_id, in_id } = t;
-	if (t.id) {
-		if (ms || by_id || in_id) {
-			if (getThoughtId(t) !== t.id) throw new Error('id mismatch');
-		}
-		let s = t.id.split('_', 3);
-		ms = +s[0];
-		by_id = +s[1];
-		in_id = +s[2];
+export function parseId(t: ThoughtSelector): IdSegments {
+	let segs: IdSegments = {};
+	if (typeof t === 'string') {
+		let s = t.split('_', 3);
+		segs.ms = s[0].length ? +s[0] : null;
+		segs.by_id = s[1].length ? +s[1] : null;
+		segs.in_id = s[2].length ? +s[2] : null;
+	} else {
+		let numOrNull = (n: any) => (typeof n === 'number' ? n : null);
+		segs.ms = numOrNull(t.ms);
+		segs.by_id = numOrNull(t.by_id);
+		segs.in_id = numOrNull(t.in_id);
 	}
-	if (Number.isNaN(ms) || Number.isNaN(by_id) || Number.isNaN(in_id))
+	if (Number.isNaN(segs.ms) || Number.isNaN(segs.by_id) || Number.isNaN(segs.in_id))
 		throw new Error('Invalid thought id');
-	return { ms, by_id, in_id };
-}
-
-export async function gsdb() {
-	let attempts = 0;
-	while (!gs.db) {
-		if (++attempts > 9) {
-			alert(m.localDatabaseTimedOut());
-			throw new Error(m.localDatabaseTimedOut());
-		}
-		await new Promise((res) => setTimeout(res, 100));
-	}
-	return gs.db;
-}
-
-export async function overwriteThought(t: ThoughtInsert) {
-	return await (await gsdb()).update(thoughtsTable).set(t).where(filterThoughtId(t));
-}
-
-export async function deleteThought(t: ThoughtSelector) {
-	return await (await gsdb()).delete(thoughtsTable).where(filterThoughtId(t));
+	return segs;
 }
 
 export function dropThoughtsTableInDev() {
-	const { sql } = new SQLocalDrizzle('mindapp.db');
+	let { sql } = new SQLocalDrizzle('mindapp.db');
 	if (dev) {
 		console.warn(
 			'Dropping thoughts table in development mode. This should NEVER run in production!',
@@ -155,16 +127,159 @@ export function dropThoughtsTableInDev() {
 	}
 }
 
-export let rootsPerLoad = 10;
+export async function gsdb() {
+	let attempts = 0;
+	while (!gs.db) {
+		if (++attempts > 88) {
+			alert(m.localDatabaseTimedOut());
+			throw new Error(m.localDatabaseTimedOut());
+		}
+		await new Promise((res) => setTimeout(res, 100));
+	}
+	return gs.db;
+}
 
-export let loadRoots = async (q: {
+export async function addThought(t: ThoughtInsert) {
+	if (typeof t.in_id === 'number') {
+		if (!t.by_id) throw new Error('Missing by_id');
+		// TODO: Verify user by_id is logged and has access to space in_id
+	}
+	if (!(t.tags || []).every((t) => t.length === t.trim().length))
+		throw new Error('Every tag must be trimmed');
+	let ms = Date.now();
+	await (await gsdb()).insert(thoughtsTable).values({ ...t, ms });
+	return ms;
+}
+
+let readOnlyTags = new Set([' edited:<ms>', ' deleted']);
+export function divideTags(thought: ThoughtInsert) {
+	let authorTags: string[] = [];
+	let readOnlyTags: string[] = [];
+	(thought.tags || []).forEach((t) => (t[0] === ' ' ? readOnlyTags : authorTags).push(t));
+	return { authorTags, readOnlyTags };
+}
+
+export async function editThought(t: ThoughtInsert) {
+	if (!t.ms) throw new Error('Missing ms');
+	if (t.tags?.[0] === ' deleted') throw new Error('Cannot edit deleted thoughts');
+	if (typeof t.in_id === 'number') {
+		if (!t.by_id) throw new Error('Missing by_id');
+		// TODO: Verify user by_id is logged and has access to space in_id
+	}
+	let originalThought = await getThought(t);
+	if (!originalThought) throw new Error('Original thought not found');
+	let { readOnlyTags: originalReadOnlyTags } = divideTags(originalThought);
+	let {
+		authorTags: newAuthorTags, //
+		readOnlyTags: newReadOnlyTags,
+	} = divideTags(t);
+	if (!newAuthorTags.every((t) => t.length === t.trim().length))
+		throw new Error('Every tag must be trimmed');
+	if (
+		originalReadOnlyTags.length !== newReadOnlyTags.length ||
+		!newReadOnlyTags.every((val) => originalReadOnlyTags.includes(val))
+	)
+		throw new Error('Cannot edit read-only tags');
+	let editedBefore = originalReadOnlyTags.some((t) => t.startsWith(' edited:'));
+	if (editedBefore) {
+		let editTagI = t.tags?.findIndex((t) => t.startsWith(' edited:'))!;
+		t.tags?.splice(editTagI, 1);
+	}
+	await (
+		await gsdb()
+	)
+		.update(thoughtsTable)
+		.set({ ...t, tags: sortUniArr([` edited:${Date.now()}`, ...(t.tags || [])]) })
+		.where(getIdFilter(t));
+}
+
+export async function deleteThought(t: IdSegments) {
+	if (typeof t.in_id === 'number') {
+		if (!t.by_id) throw new Error('Missing by_id');
+		// TODO: Verify user by_id is logged and has access to space in_id
+	}
+	if ((await getThoughtChildren(t, 1)).length) {
+		await (
+			await gsdb()
+		)
+			.update(thoughtsTable)
+			.set({
+				body: null,
+				tags: [' deleted'],
+			})
+			.where(getIdFilter(t));
+		return { soft: true };
+	} else {
+		await (await gsdb()).delete(thoughtsTable).where(getIdFilter(t));
+		return { soft: false };
+	}
+}
+
+// TODO: paginate children when there's too many with fromMs
+// Reddit does this - HN does not
+export async function getThoughtChildren(s: ThoughtSelector, limit = -1) {
+	let children = await (
+		await gsdb()
+	)
+		.select()
+		.from(thoughtsTable)
+		.where(eq(thoughtsTable.to_id, typeof s === 'string' ? s : getId(s)))
+		.orderBy(desc(thoughtsTable.ms))
+		.limit(limit);
+	return children;
+}
+
+export async function getThought(t: ThoughtSelector): Promise<ThoughtSelect | undefined> {
+	return (await (await gsdb()).select().from(thoughtsTable).where(getIdFilter(t)).limit(1))[0];
+}
+
+async function getRootThought(thought: ThoughtSelect) {
+	let rootThought = thought;
+	// let interThoughts: Record<string, ThoughtSelect> = {};
+	while (rootThought?.to_id) {
+		// interThoughts[getId(thought)] = rootThought;
+		let toThought = await getThought(rootThought.to_id);
+		if (toThought) rootThought = toThought;
+	}
+	return {
+		rootThought,
+		// TODO: maybe make loading thoughts more efficient by not getting rows that have already been gotten?
+		// interThoughts
+	};
+}
+
+async function expandThought(thought: ThoughtSelect): Promise<{
+	citedIds: string[];
+	byIds: (null | number)[];
+	nestedThought: ThoughtNested;
+}> {
+	let citedIds = [...(thought.body || '').matchAll(idsRegex)].map((match) => match[0].trim());
+	let byIds = [thought.by_id];
+	let children: ThoughtNested[] = await Promise.all(
+		(await getThoughtChildren(thought)).map(async (t) => {
+			let exp = await expandThought(t);
+			citedIds.push(...exp.citedIds);
+			byIds.push(...exp.byIds);
+			return exp.nestedThought;
+		}),
+	);
+	return {
+		citedIds,
+		byIds,
+		nestedThought: { ...thought, ...(children.length ? { children } : {}) },
+	};
+}
+
+export let rootsPerLoad = 10;
+export let loadThoughts = async (q: {
 	rpc?: boolean;
-	hierarchical?: boolean;
+	spaceId?: number;
+	nested?: boolean;
 	oldestFirst?: boolean;
 	fromMs?: number;
 	thoughtsBeyond?: number;
-	thoughtId?: string;
-	excludeIds?: ThoughtSelector[];
+	idsInclude?: string[];
+	idsExclude?: string[];
 	authorIdsInclude?: number[];
 	authorIdsExclude?: number[];
 	tagsInclude?: string[];
@@ -174,11 +289,12 @@ export let loadRoots = async (q: {
 }) => {
 	let {
 		rpc = false,
-		hierarchical = false,
+		spaceId,
+		nested = false,
 		oldestFirst = false,
 		fromMs = q.oldestFirst ? 0 : Number.MAX_SAFE_INTEGER,
-		thoughtId,
-		excludeIds = [],
+		idsInclude = [],
+		idsExclude = [],
 		authorIdsInclude = [],
 		authorIdsExclude = [],
 		tagsInclude = [],
@@ -186,124 +302,91 @@ export let loadRoots = async (q: {
 		bodyIncludes = [],
 		bodyExcludes = [],
 	} = q;
+	if (spaceId === undefined) {
+		// TODO: query local sqlite db
+	} else {
+		// TODO: query Turso db
+	}
 
-	let offset = 0;
-	const thoughts: ThoughtSelect[] = await (
-		await gsdb()
-	)
-		.select()
-		.from(thoughtsTable)
-		.where(
-			thoughtId
-				? filterThoughtId({ id: thoughtId })
-				: and(
-						isNotNull(thoughtsTable.ms),
-						...excludeIds.map((id) => {
-							let filter = filterThoughtId(id);
-							if (filter) filter = not(filter);
-							return filter;
-						}),
-						...authorIdsInclude.map((id) => eq(thoughtsTable.by_id, id)),
-						...authorIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),
-						...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`)),
-						...tagsExclude.map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
-						...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`)),
-						...bodyExcludes.map((term) => notLike(thoughtsTable.body, `%${term}%`)),
-						(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs || Date.now()),
-					),
-		)
-		.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
-		.limit(rootsPerLoad)
-		.offset(offset++);
+	let idsExcludeSet = new Set(idsExclude);
+	let db = await gsdb();
+	let roots: ThoughtNested[] = [];
+	let byIds: (null | number)[] = [];
+	let toIds: string[] = [];
+	let citedIds: string[] = [];
+	let auxThoughts: Record<string, ThoughtSelect> = {};
+	let baseFilters = [
+		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
+		isNotNull(thoughtsTable.ms),
+		// not(like(thoughtsTable.tags, `%" private"%`)),
+		or(...idsInclude.map((id) => getIdFilter(id))),
+		or(...authorIdsInclude.map((id) => eq(thoughtsTable.by_id, id))),
+		or(...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
+		or(...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`))),
+		...idsExclude.map((id) => {
+			let filter = getIdFilter(id);
+			return filter ? not(filter) : undefined;
+		}),
+		...authorIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),
+		...tagsExclude.map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
+		...bodyExcludes.map((term) => notLike(thoughtsTable.body, `%${term}%`)),
+	];
 
-	// TODO: only do this for client side queries
-	const newThoughts = { ...gs.thoughts };
-	thoughts.forEach((t) => (newThoughts[getThoughtId(t)] = t));
-	gs.thoughts = newThoughts;
+	if (nested) {
+		let offset = 0;
+		while (true) {
+			let [currentRow] = await db
+				.select()
+				.from(thoughtsTable)
+				.where(and(...baseFilters))
+				.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
+				.limit(1)
+				.offset(offset++);
+			if (!currentRow) break;
+			let {
+				rootThought, //interThoughts
+			} = await getRootThought(currentRow);
+			if (
+				!idsExcludeSet.has(getId(rootThought)) &&
+				!roots.find((root) => getId(root) === getId(rootThought))
+			) {
+				let et = await expandThought(rootThought);
+				citedIds.push(...et.citedIds);
+				byIds.push(...et.byIds);
+				roots.push(et.nestedThought);
+			}
+			if (roots.length === rootsPerLoad) break;
+		}
+	} else {
+		roots = await db
+			.select()
+			.from(thoughtsTable)
+			.where(and(...baseFilters))
+			.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
+			.limit(rootsPerLoad);
 
-	return { roots: thoughts };
+		// TODO: I shouldn't have to add a bang to r.to_id!. TypeScript bug? Don't want to use typeof i==='string' in filter
+		toIds = roots.map((r) => r.to_id!).filter((i) => !!i);
+		citedIds = roots.flatMap((r) =>
+			[...(r.body || '').matchAll(idsRegex)].map((m) => m[0].trim()).filter((i) => !!i),
+		);
+	}
+
+	await Promise.all(
+		[...new Set([...citedIds, ...toIds])].map((id) => {
+			return getThought(id).then((thought) => {
+				if (thought) {
+					auxThoughts[id] = thought;
+					byIds.push(auxThoughts[id].by_id);
+				}
+			});
+		}),
+	);
+	// await Promise.all(
+	// 	[...new Set(byIds)].map((id) => {
+	// 		if (id) return getThought().then((a) => a && (authors[id] = a));
+	// 	}),
+	// );
+
+	return { roots, auxThoughts };
 };
-
-// export let loadRootsHierarchically = async (q: {
-// 	from: number;
-// 	mode: 'new' | 'old';
-// 	thoughtId?: string;
-// 	authorIds?: string[];
-// 	tags?: string[];
-// 	other?: string[];
-// 	ignoreRootIds: string[];
-// 	thoughtsBeyond: number;
-// }) => {
-// 	const { from, mode, thoughtId, authorIds, tags = [], other = [], ignoreRootIds, thoughtsBeyond } = q;
-
-// 	const oldToNew = mode === 'old';
-// 	const excludeIds = new Set(ignoreRootIds);
-// 	const roots: ThoughtSelect[] = [];
-// 	const mentionedThoughtIds = new Set<string>();
-// 	const allAuthorIdsSet = new Set<string>();
-// 	let latestCreateDate = oldToNew ? 0 : Number.MAX_SAFE_INTEGER;
-// 	const rootsPerLoad = 8;
-
-// 	if (thoughtId && !ignoreRootIds.length) {
-// 		const thought = await gs.db
-// 			.select()
-// 			.from(thoughtsTable)
-// 			.where(eq(thoughtsTable.by_id, thoughtId))
-// 			.limit(1)
-// 			.then((rows) => rows[0]);
-
-// 		if (!thought) {
-// 			return { mentionedThoughts: {}, roots: [] };
-// 		}
-
-// 		const rootThought = await new Thought(thought).getRootThought();
-// 		const { clientProps, allMentionedIds, allAuthorIds } = await rootThought.expand(from);
-// 		allMentionedIds.forEach((id) => mentionedThoughtIds.add(id));
-// 		allAuthorIds.forEach((id) => allAuthorIdsSet.add(id));
-// 		roots.push(clientProps);
-// 	}
-
-// 	let offset = 0;
-// 	while (true) {
-// 		const [currentRow] = await gs.db
-// 			.select()
-// 			.from(thoughtsTable)
-// 			.where(
-// 				and(
-// 					or(
-// 						...(authorIds || []).map((id) =>
-// 							id ? eq(thoughtsTable.by_id, id) : isNull(thoughtsTable.by_id),
-// 						),
-// 					),
-// 					thoughtId
-// 						? like(thoughtsTable.body, `%${thoughtId}%`)
-// 						: or(
-// 								...tags.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`)),
-// 								...other.map((term) => like(thoughtsTable.body, `%${term}%`)),
-// 							),
-// 					(oldToNew ? gte : lte)(thoughtsTable.ms, thoughtsBeyond),
-// 				),
-// 			)
-// 			.orderBy((oldToNew ? asc : desc)(thoughtsTable.ms))
-// 			.limit(1)
-// 			.offset(offset++);
-
-// 		if (!currentRow) break;
-// 		const rootThought = await new Thought(currentRow).getRootThought();
-// 		if (
-// 			!excludeIds.has(rootThought.id) &&
-// 			!roots.find((root) => new Thought(root).id === rootThought.id)
-// 		) {
-// 			const { clientProps, allMentionedIds, allAuthorIds } = await rootThought.expand(from);
-// 			allMentionedIds.forEach((id) => mentionedThoughtIds.add(id));
-// 			allAuthorIds.forEach((id) => allAuthorIdsSet.add(id));
-// 			roots.push(clientProps);
-// 		}
-// 		latestCreateDate = (oldToNew ? Math.max : Math.min)(latestCreateDate, currentRow.ms);
-// 		if (roots.length === rootsPerLoad) {
-// 			break;
-// 		}
-// 	}
-
-// 	return { latestCreateDate, roots };
-// };

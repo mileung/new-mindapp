@@ -28,26 +28,10 @@
 		/* background-color: #f00; */
 	}
 	.mini-scroll::-webkit-scrollbar {
-		width: 3px;
+		width: 2px;
 		height: 0;
 	}
 	.mini-scroll::-webkit-scrollbar-thumb {
-		@apply bg-fg3;
-	}
-}
-
-.reveal {
-	animation: reveal 400ms ease-in-out 1;
-	animation-fill-mode: forwards;
-}
-
-@keyframes reveal {
-	from {
-		height: 0px;
-		opacity: 0;
-	}
-	to {
-		height: 3.5rem;
-		opacity: 1;
+		@apply bg-fg2;
 	}
 }

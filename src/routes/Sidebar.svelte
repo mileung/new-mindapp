@@ -2,40 +2,46 @@
 	import {
 		IconArrowLeft,
 		IconBrowser,
-		IconMenu2,
 		IconPuzzle,
 		IconSearch,
 		IconSettings,
+		IconUser,
+		IconUserPlus,
+		IconWorld,
 		IconX,
 	} from '@tabler/icons-svelte';
 
-	import { matchSorter } from 'match-sorter';
-	import { page } from '$app/state';
-	import { bracketRegex } from '$lib/tags';
 	import { goto } from '$app/navigation';
-	import { m } from '$lib/paraglide/messages';
+	import { page } from '$app/state';
+	import { unsaveTagInPersona } from '$lib/accounts';
+	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
+	import { updateLocalCache } from '$lib/localCache';
+	import { m } from '$lib/paraglide/messages';
+	import { bracketRegex } from '$lib/tags';
+	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
-	import { unsaveTagInPersona } from '$lib/personas';
+	import AccountIcon from './AccountIcon.svelte';
+	import SpaceIcon from './SpaceIcon.svelte';
 
 	let searchIpt: HTMLInputElement;
 	let searchA: HTMLAnchorElement;
 	let searchedText = $state(page.url.searchParams.get('q') || '');
 	let searchVal = $state((() => searchedText)());
 	let searchIptFocused = $state(false);
-	let showingSideMenu = $state(false);
-	let showingBurgerMenu = $state(false);
 	let xFocused = $state(false);
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let browserExtensionAdded = $state(true);
-	let tagIndex = $state<number>(0);
+	let tagIndex = $state(0);
+	let accountMenuOpen = $state(false);
+	let spaceMenuOpen = $state(false);
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
-	let allTagsSet = $derived(new Set(gs.personas[0]?.tags || []));
+	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
 	let suggestedTags = $derived.by(() => {
-		if (!showingSideMenu || !tagFilter) return [];
+		if (!searchIptFocused || !tagFilter) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
 		let arr = matchSorter([...allTagsSet], filter)
 			.slice(0, 99)
@@ -63,76 +69,70 @@
 	let searchInput = (e: KeyboardEvent) => {
 		let q = encodeURIComponent(searchVal.trim());
 		if (q) {
-			if (e.metaKey) window.open(`/?q=${q}`, '_blank');
+			page.state.modalId = page.state.fromPathname = undefined;
+			if (e.metaKey) open(`/?q=${q}`, '_blank');
 			else goto(`/?q=${q}`);
 		}
 	};
-
 	$effect(() => {
-		if (searchIptFocused) showingSideMenu = true;
+		// console.log(gs.accounts[0]?.spaceIndex);
+		// console.log(gs.accounts[0]?.id);
+		// console.log(gs.accounts[0]?.spaceIds);
 	});
 </script>
 
 <svelte:window
 	on:keydown={(e) => {
-		if (e.key === '/') {
-			const activeElement = document.activeElement!;
-			if (!['INPUT', 'TEXTAREA'].includes(activeElement.tagName)) {
-				setTimeout(() => searchIpt?.focus(), 0); // setTimeout prevents inputting '/' on focus
-			}
+		if (!textInputFocused()) {
+			e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
+			e.key === 'Escape' && (accountMenuOpen = spaceMenuOpen = false);
 		}
 	}}
 />
-<div class="w-[var(--w-sidebar)]"></div>
-<aside class="w-[var(--w-sidebar)] z-50 fixed h-screen bg-bg2">
+<div class="hidden xs:block w-[var(--w-sidebar)]"></div>
+<aside class="block w-screen xs:h-screen xs:w-[var(--w-sidebar)] z-50 fixed bg-bg2">
 	<div class="h-full flex-1 flex flex-col">
-		<div class="p-2 pb-1 gap-2 flex">
-			{#if showingSideMenu}
-				<button
-					class="h-8 w-8 xy rounded transition hover:bg-bg5 text-fg1"
-					onclick={() => {
-						searchIpt?.blur();
-						if (showingSideMenu) showingSideMenu = false;
-						else showingBurgerMenu = !showingBurgerMenu;
-					}}
-				>
+		<div class="flex">
+			{#if searchIptFocused}
+				<button class="h-9 w-9 xy hover:bg-bg5 text-fg1" onclick={() => searchIpt.blur()}>
 					<IconArrowLeft class="h-6 w-6" />
 				</button>
 			{:else}
-				<!-- <IconMenu2 class="h-6 w-6" /> -->
-				<a href="/settings" class="h-8 w-8 xy rounded transition hover:bg-bg5 text-fg1">
-					<IconSettings class="h-6 w-6" />
-				</a>
+				<button
+					class="h-9 w-9 xy hover:bg-bg5 text-fg1"
+					onclick={() => {
+						spaceMenuOpen = false;
+						accountMenuOpen = !accountMenuOpen;
+					}}
+				>
+					<AccountIcon />
+				</button>
+				<button
+					class="xs:hidden h-9 w-9 xy hover:bg-bg5 text-fg1"
+					onclick={() => {
+						accountMenuOpen = false;
+						spaceMenuOpen = !spaceMenuOpen;
+					}}
+				>
+					<SpaceIcon />
+				</button>
 			{/if}
 			<input
 				bind:this={searchIpt}
 				bind:value={searchVal}
 				enterkeyhint="search"
-				class="min-w-0 flex-1 pl-2 pr-10 rounded bg-bg5"
+				class="min-w-0 flex-1 pl-2 pr-10"
 				placeholder={m.search()}
 				onfocus={() => (searchIptFocused = true)}
 				onblur={() => (searchIptFocused = false)}
 				oninput={(e) => (tagIndex = -1)}
 				onkeydown={(e) => {
-					// if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-					// 	e.preventDefault();
-					// 	let index = Math.min(
-					// 		Math.max(tagIndex + (e.key === 'ArrowUp' ? -1 : 1), -1),
-					// 		suggestedTags.length - 1,
-					// 	);
-					// 	tagSuggestionsRefs[index]?.focus();
-					// 	searchIpt?.focus();
-					// 	tagIndex = index;
-					// }
-
-					if (e.key === 'Escape') {
-						showingSideMenu = false;
-						searchIpt?.blur();
-					}
+					if (e.key === 'Escape') setTimeout(() => searchIpt.blur(), 0);
 					if (e.key === 'Enter') {
 						let tag = suggestedTags[tagIndex];
 						xFocused ? unsaveTagInPersona(tag) : tag ? addTagToSearchInput(tag) : searchInput(e);
 					}
+					if (e.key === 'Tab' && !tagFilter) return;
 					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
 						if (e.key === 'Tab' && tagIndex === -1) return;
 						e.preventDefault();
@@ -146,10 +146,12 @@
 						searchIpt.focus();
 					}
 					if ((e.key === 'Tab' && !e.shiftKey) || e.key === 'ArrowDown') {
-						if (e.key === 'Tab' && tagIndex === suggestedTags.length - 1) {
-							if (allTagsSet.has(suggestedTags[tagIndex])) {
-								if (xFocused) return; // bodyTa.focus();
-							} else return; // bodyTa.focus();
+						if (e.key === 'Tab') {
+							if (tagIndex === suggestedTags.length - 1) {
+								if (allTagsSet.has(suggestedTags[tagIndex])) {
+									if (xFocused) return;
+								} else return;
+							}
 						}
 						e.preventDefault();
 						if (e.key === 'Tab' && !xFocused && tagIndex > -1) {
@@ -166,103 +168,118 @@
 			/>
 			<a
 				bind:this={searchA}
-				class="xy -ml-12 w-10 rounded transition text-fg2 hover:text-fg1"
+				class="xy -ml-10 w-10 text-fg2 hover:text-fg1"
 				href={`/?q=${encodeURIComponent(searchVal)}`}
 			>
 				<IconSearch class="h-6 w-6" />
 			</a>
 		</div>
-		<div class="relative p-2 pt-1 flex-1 overflow-scroll">
-			{#if !browserExtensionAdded}
-				<div class="reveal">
-					<a
-						target="_blank"
-						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-						class={`z-0 fx rounded gap-2 p-2 h-14 w-full text-bg1 transition bg-hl1 hover:bg-hl2`}
+		<div class="max-h-48 xs:max-h-none relative flex-1 overflow-scroll">
+			<div class={searchIptFocused && tagFilter ? '' : 'hidden'}>
+				{#if tagFilter}
+					<p class="ml-1 mt-1 text-sm text-fg2">{m.tags()}</p>
+				{/if}
+				{#each suggestedTags as tag, i}
+					<div
+						class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}
+						onmousedown={(e) => e.preventDefault()}
 					>
-						<div class="xy h-10 w-10"><IconPuzzle class="h-7 w-7" /></div>
-						<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
-					</a>
-				</div>
-			{/if}
-			{#each gs.personas.length ? gs.personas[0]!.spaceIds.slice(0, 1) : [undefined] as id, i}
-				<a
-					href="/"
-					class={`translate-0 fx rounded gap-2 p-2 h-14 w-full transition hover:bg-bg5 ${i ? '' : 'bg-bg5'}`}
-					onmousedown={(e) => e.preventDefault()}
-				>
-					<div class="xy bg-bg8 h-10 w-10 rounded-full"><IconBrowser class="h-7 w-7" /></div>
-					<p class="font-medium">{m.local()}</p>
-				</a>
-				<!-- <a
-					href="/"
-					class={`translate-0 fx rounded gap-2 px-2 py-1 h-14 w-full transition hover:bg-bg5 ${i ? '' : 'bg-bg5'}`}
-					onmousedown={(e) => e.preventDefault()}
-				>
-					<IconBrowser class="h-7 w-7" />
-					<div class="flex-1 h-full">
-						<p class="leading-4 font-medium">{m.local()}</p>
-						<p class="text- xs text-fg2 line-clamp-2">
-							{gs.thoughts[gs.feeds[id || '']?.[0]!]?.body || ''}
-						</p>
-					</div>
-				</a> -->
-			{/each}
-			{#if showingSideMenu}
-				<div class="absolute p-2 pt-0 bg-bg2 inset-0 overflow-scroll">
-					{#if suggestedTags.length}
-						<p class="text-sm text-fg2">{m.tags()}</p>
-					{/if}
-					{#each suggestedTags as tag, i}
-						<div class={`rounded group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}>
-							<button
-								bind:this={tagSuggestionsRefs[i]}
-								class={`relative h-8 rounded truncate flex-1 text-left px-2 text-nowrap text-lg`}
-								onmousedown={(e) => e.preventDefault()}
-								onclick={() => addTagToSearchInput(tag)}
-							>
-								{#if tagIndex === i && !xFocused}
-									<div
-										class="absolute rounded-r left-0 top-0 bottom-0 w-0.5 transition bg-hl1 group-hover/tag:bg-hl2"
-									></div>
-								{/if}
-								{tag}
-							</button>
-							{#if allTagsSet.has(tag)}
-								<button
-									bind:this={unsaveTagXRefs[i]}
-									class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex group/x xy h-8 w-8`}
-									onclick={() => unsaveTagInPersona(tag)}
-								>
-									<div
-										class={`xy h-7 w-7 rounded-full transition group-hover/x:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-									>
-										<IconX class="h-5 w-5" />
-									</div>
-								</button>
+						<button
+							bind:this={tagSuggestionsRefs[i]}
+							class={`relative h-8 truncate flex-1 text-left px-2 text-nowrap text-lg`}
+							onclick={() => addTagToSearchInput(tag)}
+						>
+							{#if tagIndex === i && !xFocused}
+								<div
+									class="absolute left-0 top-0 bottom-0 w-0.5 bg-hl1 group-hover/tag:bg-hl2"
+								></div>
 							{/if}
-						</div>
-					{/each}
-				</div>
-			{/if}
+							{tag}
+						</button>
+						{#if allTagsSet.has(tag)}
+							<button
+								bind:this={unsaveTagXRefs[i]}
+								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+								onclick={() => unsaveTagInPersona(tag)}
+							>
+								<IconX class="h-5 w-5" />
+							</button>
+						{/if}
+					</div>
+				{/each}
+			</div>
+			<div class={`${accountMenuOpen ? '' : 'hidden'}`}>
+				{#each gs.accounts as p, i}
+					<a class={`translate-0 fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
+						{#if !i}
+							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
+						{/if}
+						<AccountIcon id={p!.id} />
+						{(() => {
+							let accountJson = gs.thoughts[p!.id || '']?.body;
+							if (accountJson) {
+								let obj = JSON.parse(accountJson);
+								return obj + '';
+							}
+							return '';
+						})() || m.anon()}
+					</a>
+				{/each}
+				<a href="/add-account" class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+					<IconUserPlus class="h-6 w-6" />
+					{m.addAccount()}
+				</a>
+				<a href="/settings" class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+					<IconSettings class="h-6 w-6" />
+					{m.settings()}
+				</a>
+			</div>
+			<div
+				class={`${spaceMenuOpen ? '' : `hidden ${accountMenuOpen || (searchIptFocused && tagFilter) ? '' : 'xs:block'}`}`}
+			>
+				{#if !browserExtensionAdded}
+					<div>
+						<a
+							target="_blank"
+							href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
+							class={`fx gap-1 p-2 h-12 text-bg1 bg-hl1 hover:bg-hl2`}
+						>
+							<IconPuzzle class="h-6 w-9" />
+							<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
+						</a>
+					</div>
+				{/if}
+				{#each gs.accounts[0]?.spaceIds || [] as id, i}
+					<a
+						href={`/__${id ?? ''}`}
+						class={`fx gap-1 p-2 h-12 ${i === gs.accounts[0]?.spaceIndex ? 'bg-bg5' : ''} hover:bg-bg5`}
+						onclick={async () => {
+							await updateLocalCache((lc) => {
+								lc.accounts[0].spaceIndex = i;
+								return lc;
+							});
+						}}
+					>
+						{#if i === gs.accounts[0]?.spaceIndex}
+							<div class="absolute left-0 h-12 w-0.5 bg-hl1"></div>
+						{/if}
+						{#if id === null}
+							<IconBrowser class="h-6 w-9 text-local" />
+						{:else if id === 0}
+							<IconUser class="h-6 w-9 text-personal" />
+						{:else if id === 1}
+							<IconWorld class="h-6 w-9 text-global" />
+						{/if}
+						<p class="font-medium">
+							{id === null ? m.local() : id === 0 ? m.personal() : id === 1 ? m.global() : 'id'}
+						</p>
+					</a>
+				{/each}
+				<!-- <a href="/add-space" class="fx gap-1 p-2 h-12 hover:bg-bg5">
+					<IconSquarePlus2 class="h-6 w-9" />
+					{m.addSpace()}
+				</a> -->
+			</div>
 		</div>
 	</div>
 </aside>
-
-<!-- <div class="flex ml-12">
-	<div class="bg-bg2 fixed left-0 w-12 h-screen flex flex-col p-1.5">
-		<div class="flex-1 flex flex-col gap-1.5 pb-1.5 overflow-scroll">
-			<a href="/search" class="xy aspect-square rounded transition bg-bg8 hover:bg-bg6 text-fg1">
-				<IconSearch />
-			</a>
-			<button class="xy aspect-square rounded transition bg-bg8 hover:bg-bg6 text-fg1">
-				<IconUser />
-			</button>
-			<a href="/" class="xy aspect-square rounded transition bg-bg8 hover:bg-bg6 text-fg1">
-				<IconBrowser />
-			</a>
-		</div>
-		<a href="/settings" class="xy aspect-square rounded transition bg-bg8 hover:bg-bg6 text-fg1">
-			<IconSettings />
-		</a>
-	</div> -->

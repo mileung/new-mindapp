@@ -3,9 +3,7 @@
 	import { type IconName } from '$lib/js';
 	import IframePreview from './IframePreview.svelte';
 
-	let {
-		text,
-	}: {
+	let p: {
 		text: string;
 	} = $props();
 
@@ -14,7 +12,7 @@
 	const uriRegex = /([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(\S+)/g;
 	// const assetMatches = text.matchAll(assetRegex);
 	// const linkMatches = text.matchAll(linkRegex);
-	const uriMatches = $derived(text.matchAll(uriRegex));
+	const uriMatches = $derived(p.text.matchAll(uriRegex));
 
 	type A = { text: string; uri: string };
 	type Img = { alt: string; imageUri: string };
@@ -24,11 +22,11 @@
 		let start = 0;
 		let result = [];
 		for (const match of uriMatches) {
-			result.push(text.substring(start, match.index), { text: match[0], uri: match[0] });
+			result.push(p.text.substring(start, match.index), { text: match[0], uri: match[0] });
 			start = match.index! + match[0].length;
 		}
-		if (start < text.length) {
-			result.push(text.substring(start));
+		if (start < p.text.length) {
+			result.push(p.text.substring(start));
 		}
 		return result;
 	});
@@ -43,7 +41,7 @@
 		<a
 			target="_blank"
 			href={tag.uri}
-			class="font-medium inline break-all transition text-hl1 text hover:text-hl2"
+			class="font-medium inline break-all text-hl1 text hover:text-hl2"
 		>
 			{tag.text}
 		</a>
