@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { IconPlayerPlay, IconX } from '@tabler/icons-svelte';
+	import { m } from '$lib/paraglide/messages';
+	import { IconX } from '@tabler/icons-svelte';
 
 	const ytRegex =
 		/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
@@ -8,29 +9,32 @@
 	let open = $state(false);
 	let videoId = $derived(p.uri.match(ytRegex)?.[1]);
 	let iframe = $state<HTMLIFrameElement>();
-	// mini-scroll
-	// $effect(() => {
-	// 	open && iframe?.scrollIntoView();
-	// });
+	$effect(() => {
+		if (open) {
+			iframe?.scrollIntoView({ block: 'center' });
+		}
+	});
 </script>
 
 {#if videoId}
-	<!-- <img
-		class="h-64 b object-contain cover"
-		src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
-		alt="YouTube Thumbnail"
-	/> -->
-	<button
-		class="h-5 w-5 rounded bg-bg8 xy translate-y-0.5 inline-flex"
-		onclick={() => (open = !open)}
-	>
-		{#if open}
-			<IconX class="absolute h-5 w-5" />
-		{:else}
-			<IconPlayerPlay class="absolute h-4 w-4" />
-		{/if}
-	</button>
 	{#if open}
+		<button
+			class="absolute h-6 w-6 bg-bg5 hover:bg-bg8 xy inline-flex ml-1"
+			onclick={() => (open = false)}
+		>
+			<IconX class="absolute h-5 w-5" />
+		</button>
+	{:else}
+		<button class="block" onclick={() => (open = true)}>
+			<img
+				class="h-42 bg-bg3 aspect-video object-cover"
+				src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
+				alt={m.youTubeThumbnail()}
+			/></button
+		>
+	{/if}
+	{#if open}
+		<!-- TODO: add allow="autoplay" attribute and add ?autoplay=1 to url once you are able to focus the embedded player when it renders. That way keyboard shortcuts work without having to click pause and play first -->
 		<!-- TODO: ignore this ts error -->
 		<!-- @ts-ignore -->
 		<iframe
@@ -39,6 +43,7 @@
 			bind:this={iframe}
 			class="w-full max-h-[80vh] max-w-[calc(80vh*16/9)] aspect-video"
 			src={`https://www.youtube.com/embed/${videoId}`}
+			onkeydown={(e) => e.key === 'Escape' && (open = false)}
 		></iframe>
 	{/if}
 {/if}

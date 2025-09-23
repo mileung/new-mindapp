@@ -3,14 +3,11 @@
 
 	let p: {
 		data?: string;
-		saturation?: number;
-		lightness?: number;
 		class?: string;
 	} = $props();
 
 	let svgURI = $derived(
-		'data:image/svg+xml;utf8,' +
-			encodeURIComponent(minidenticon(p.data || '', p.saturation || 100, p.lightness || 80)),
+		'data:image/svg+xml;utf8,' + encodeURIComponent(minidenticon(p.data || '', 100, 80)),
 	);
 </script>
 

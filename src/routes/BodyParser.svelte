@@ -8,13 +8,8 @@
 
 	let p: {
 		thought: ThoughtInsert;
-		onLink: (id: string) => void;
-		onEdit: (id: string) => void;
 		depth: number;
 		miniCites?: boolean;
-		spotId?: string;
-		toId?: string;
-		editId?: string;
 	} = $props();
 
 	function separateMentions(text: string) {
@@ -47,5 +42,8 @@
 		<pre>{JSON.stringify(JSON.parse(str), null, 2)}</pre>
 	{:else}
 		<Markdown text={str} />
+		<!-- <div class="prose max-w-none dark:prose-invert">
+			<SvelteMarkdown source={str.replace(/\n/g, '\n\n')} renderers={{ link: MarkdownLink }} />
+		</div> -->
 	{/if}
 {/each}

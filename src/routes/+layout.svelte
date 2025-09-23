@@ -1,9 +1,13 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
 	import { getLocalCache } from '$lib/localCache';
 	import { setTheme } from '$lib/theme';
 	import { initLocalDb } from '$lib/thoughts';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
+	import html2md from 'html-to-md';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
@@ -31,6 +35,7 @@
 			gs.db = drizzle(driver, batchDriver);
 			// await deleteLocalCache()
 			let localCache = await getLocalCache();
+			// console.log('localCache:', localCache);
 			gs.accounts = localCache.accounts;
 			gs.spaces = localCache.spaces;
 		} catch (error) {
@@ -44,6 +49,64 @@
 			window
 				?.matchMedia('(prefers-color-scheme: dark)')
 				?.addEventListener?.('change', () => setTheme('system'));
+		}
+	});
+
+	function goToCurrentSpace() {
+		gs.accounts[0] &&
+			goto(`/__${gs.accounts[0].currentSpaceId}`, {
+				replaceState: true,
+				keepFocus: true,
+			});
+	}
+	$effect(() => {
+		page.url.pathname === '/' && goToCurrentSpace();
+	});
+	$effect(() => {
+		if (page.url.searchParams.get('extension') !== null) {
+			goToCurrentSpace();
+			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
+			window.addEventListener('message', (event) => {
+				if (event.source !== window) return;
+				if (event.data.type === '4-popup-receives-external-page-info') {
+					let { url, externalDomString, selectedPlainText, selectedHtmlString } =
+						(event.data.payload as {
+							url?: string;
+							externalDomString?: string;
+							selectedPlainText?: string;
+							selectedHtmlString?: string;
+						}) || {};
+					if (!url || !externalDomString) return;
+					let scrapedInfo = selectedHtmlString
+						? {
+								headline: (() => {
+									if (!0) {
+										return selectedPlainText;
+									}
+									console.log('selectedHtmlString:', selectedHtmlString);
+									let fragment = new DOMParser().parseFromString(selectedHtmlString, 'text/html');
+									fragment.querySelectorAll('a[href]').forEach((a) => {
+										a.setAttribute('href', new URL(a.getAttribute('href') || '/', url).href);
+									});
+									console.log('fragment:', fragment.body.innerHTML);
+
+									// return fragment.body.textContent;
+									let markdown = html2md(fragment.body.innerHTML.replace(/\n/g, '<br/>'), {
+										skipTags: ['font'],
+										renderCustomTags: 'SKIP',
+									});
+									// console.log('markdown:', markdown);
+									return markdown;
+								})(),
+								tags: [],
+								url,
+							}
+						: scrape(url, externalDomString);
+
+					gs.writerTags = scrapedInfo?.tags || [];
+					gs.writerBody = `${scrapedInfo?.headline}\n${scrapedInfo?.url || url}\n\n`;
+				}
+			});
 		}
 	});
 </script>

@@ -1,28 +1,18 @@
 <script lang="ts">
-	import {
-		IconArrowLeft,
-		IconBrowser,
-		IconPuzzle,
-		IconSearch,
-		IconSettings,
-		IconUser,
-		IconUserPlus,
-		IconWorld,
-		IconX,
-	} from '@tabler/icons-svelte';
-
+	import { IconPuzzle, IconSearch, IconSettings, IconUserPlus, IconX } from '@tabler/icons-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { unsaveTagInPersona } from '$lib/accounts';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
-	import { updateLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
 	import { bracketRegex } from '$lib/tags';
+	import { splitId } from '$lib/thoughts';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
+	import { updateLocalCache } from '$lib/localCache';
 
 	let searchIpt: HTMLInputElement;
 	let searchA: HTMLAnchorElement;
@@ -57,6 +47,14 @@
 		browserExtensionAdded = !!window.mindappBrowserExtensionAdded;
 	});
 
+	let changeCurrentSpace = (inId: string) => {
+		goto(`/__${inId}`);
+		updateLocalCache((lc) => {
+			lc.accounts[0].currentSpaceId = inId;
+			return lc;
+		});
+	};
+
 	let addTagToSearchInput = (tag: string) => {
 		searchVal = `${searchVal
 			.replace(/\s\s+/g, ' ')
@@ -68,16 +66,18 @@
 
 	let searchInput = (e: KeyboardEvent) => {
 		let q = encodeURIComponent(searchVal.trim());
-		if (q) {
-			page.state.modalId = page.state.fromPathname = undefined;
-			if (e.metaKey) open(`/?q=${q}`, '_blank');
-			else goto(`/?q=${q}`);
+		if (q && gs.accounts[0]) {
+			page.state.modalId = undefined;
+			let urlPath = `/__${gs.accounts[0].currentSpaceId}?q=${q}`;
+			if (e.metaKey) open(urlPath, '_blank');
+			else goto(urlPath);
 		}
 	};
+
 	$effect(() => {
-		// console.log(gs.accounts[0]?.spaceIndex);
+		// console.log(gs.accounts[0]?.currentSpaceId);
 		// console.log(gs.accounts[0]?.id);
-		// console.log(gs.accounts[0]?.spaceIds);
+		// console.log($inspect(gs.accounts[0]?.spaceIds));
 	});
 </script>
 
@@ -86,26 +86,39 @@
 		if (!textInputFocused()) {
 			e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
 			e.key === 'Escape' && (accountMenuOpen = spaceMenuOpen = false);
+			if (e.ctrlKey && e.altKey && e.key === 'Tab') {
+				let currentSpaceIdIndex = gs.accounts[0].spaceIds.indexOf(gs.accounts[0].currentSpaceId);
+				let newSpaceIdIndex = currentSpaceIdIndex + (e.shiftKey ? -1 : 1);
+				if (newSpaceIdIndex < 0) newSpaceIdIndex = gs.accounts[0].spaceIds.length - 1;
+				if (newSpaceIdIndex >= gs.accounts[0].spaceIds.length) newSpaceIdIndex = 0;
+				changeCurrentSpace(gs.accounts[0].spaceIds[newSpaceIdIndex]);
+			}
 		}
 	}}
 />
+
+<!-- TODO: header should go up off screen on scroll down for <xs screens -->
 <div class="hidden xs:block w-[var(--w-sidebar)]"></div>
-<aside class="block w-screen xs:h-screen xs:w-[var(--w-sidebar)] z-50 fixed bg-bg2">
+<aside class="top-0 fixed block w-screen xs:h-screen xs:w-[var(--w-sidebar)] z-50 bg-bg2">
 	<div class="h-full flex-1 flex flex-col">
 		<div class="flex">
-			{#if searchIptFocused}
+			{#if searchIptFocused && tagFilter}
 				<button class="h-9 w-9 xy hover:bg-bg5 text-fg1" onclick={() => searchIpt.blur()}>
-					<IconArrowLeft class="h-6 w-6" />
+					<IconX class="h-6 w-6" />
 				</button>
 			{:else}
 				<button
-					class="h-9 w-9 xy hover:bg-bg5 text-fg1"
+					class="h-9 w-9 xy hover:bg-bg5"
 					onclick={() => {
 						spaceMenuOpen = false;
 						accountMenuOpen = !accountMenuOpen;
 					}}
 				>
-					<AccountIcon />
+					{#if accountMenuOpen}
+						<IconX class="h-6 w-6" />
+					{:else}
+						<AccountIcon id={`${gs.accounts[0]?.id ?? ''}`} />
+					{/if}
 				</button>
 				<button
 					class="xs:hidden h-9 w-9 xy hover:bg-bg5 text-fg1"
@@ -114,7 +127,11 @@
 						spaceMenuOpen = !spaceMenuOpen;
 					}}
 				>
-					<SpaceIcon />
+					{#if spaceMenuOpen}
+						<IconX class="h-6 w-6" />
+					{:else}
+						<SpaceIcon id={`${gs.accounts[0]?.currentSpaceId ?? ''}`} />
+					{/if}
 				</button>
 			{/if}
 			<input
@@ -209,14 +226,17 @@
 				{/each}
 			</div>
 			<div class={`${accountMenuOpen ? '' : 'hidden'}`}>
-				{#each gs.accounts as p, i}
-					<a class={`translate-0 fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
+				{#each gs.accounts as a, i}
+					<a
+						class={`translate-0 fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
+						onclick={() => (accountMenuOpen = false)}
+					>
 						{#if !i}
 							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
 						{/if}
-						<AccountIcon id={p!.id} />
+						<AccountIcon id={a.id} />
 						{(() => {
-							let accountJson = gs.thoughts[p!.id || '']?.body;
+							let accountJson = gs.thoughts[a.id]?.body;
 							if (accountJson) {
 								let obj = JSON.parse(accountJson);
 								return obj + '';
@@ -225,11 +245,19 @@
 						})() || m.anon()}
 					</a>
 				{/each}
-				<a href="/add-account" class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+				<a
+					href="/add-account"
+					class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}
+					onclick={() => (accountMenuOpen = false)}
+				>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
-				<a href="/settings" class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+				<a
+					href="/settings"
+					class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}
+					onclick={() => (accountMenuOpen = false)}
+				>
 					<IconSettings class="h-6 w-6" />
 					{m.settings()}
 				</a>
@@ -250,30 +278,39 @@
 					</div>
 				{/if}
 				{#each gs.accounts[0]?.spaceIds || [] as id, i}
-					<a
-						href={`/__${id ?? ''}`}
-						class={`fx gap-1 p-2 h-12 ${i === gs.accounts[0]?.spaceIndex ? 'bg-bg5' : ''} hover:bg-bg5`}
-						onclick={async () => {
-							await updateLocalCache((lc) => {
-								lc.accounts[0].spaceIndex = i;
-								return lc;
-							});
-						}}
-					>
-						{#if i === gs.accounts[0]?.spaceIndex}
-							<div class="absolute left-0 h-12 w-0.5 bg-hl1"></div>
-						{/if}
-						{#if id === null}
-							<IconBrowser class="h-6 w-9 text-local" />
-						{:else if id === 0}
-							<IconUser class="h-6 w-9 text-personal" />
-						{:else if id === 1}
-							<IconWorld class="h-6 w-9 text-global" />
-						{/if}
-						<p class="font-medium">
-							{id === null ? m.local() : id === 0 ? m.personal() : id === 1 ? m.global() : 'id'}
-						</p>
-					</a>
+					<div class={`flex ${id === gs.accounts[0].currentSpaceId ? 'bg-bg5' : ''} hover:bg-bg5`}>
+						<a
+							href={`/__${id ?? ''}`}
+							class={`flex-1 fx gap-1 p-2 h-12`}
+							onclick={(e) => {
+								e.preventDefault();
+								changeCurrentSpace(id);
+							}}
+						>
+							{#if id === gs.accounts[0].currentSpaceId}
+								<div class="absolute left-0 h-12 w-0.5 bg-hl1"></div>
+							{/if}
+							<SpaceIcon {id} class="h-6 w-9" />
+							<p class="font-medium">
+								{!id
+									? m.local()
+									: id === '0'
+										? m.personal()
+										: id === '1'
+											? m.global()
+											: gs.spaces[id]?.id}
+							</p>
+						</a>
+						<!-- {#if i === gs.accounts[0]?.currentSpaceId}
+							<button class="text-fg2 hover:text-fg1 p-2">
+								{#if gs.spaces[gs.accounts[0]?.currentSpaceId!]?.nested}
+									<IconListTree />
+								{:else}
+									<IconList />
+								{/if}
+							</button>
+						{/if} -->
+					</div>
 				{/each}
 				<!-- <a href="/add-space" class="fx gap-1 p-2 h-12 hover:bg-bg5">
 					<IconSquarePlus2 class="h-6 w-9" />

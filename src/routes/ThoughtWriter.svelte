@@ -1,14 +1,12 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { unsaveTagInPersona } from '$lib/accounts';
-	import { scrape, textInputFocused } from '$lib/dom';
+	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/globalState.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type { ThoughtSelect } from '$lib/thoughts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
-	import html2md from 'html-to-md';
 
 	let bodyTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;
@@ -25,15 +23,12 @@
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let undoTagRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let tagsIptFocused = $state(false);
-	let tagVal = $state('');
 	let tagIndex = $state(0);
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
-	let currentTags = $state<string[]>([]);
-	let bodyVal = $state('');
 
-	let currentWritableTags = $derived(currentTags.filter((t) => t[0] !== ' '));
-	let tagFilter = $derived(tagVal.trim());
+	let currentWritableTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
+	let tagFilter = $derived(gs.writerTagVal.trim());
 	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
@@ -45,23 +40,21 @@
 	});
 
 	$effect(() => {
-		suggestingTags = tagsIptFocused ? !!tagVal : false;
+		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
 		// console.log($inspect(tagSuggestionsRefs));
 		if (p.toId || p.editId) tagsIpt.focus();
 	});
 	$effect(() => {
-		// if (editingThought) {
-		// 	currentTags = editingThought.tags || [];
-		// 	bodyVal = editingThought.body || '';
-		// } else {
-		// 	currentTags = [];
-		// 	bodyVal = '';
-		// }
+		if (editingThought) {
+			gs.writerTags = editingThought.tags || [];
+			gs.writerBody = editingThought.body || '';
+		}
 	});
 
 	onMount(() => {
+		tagsIpt.focus();
 		window.addEventListener('keydown', (e) => {
 			!tagsIptFocused &&
 				!textInputFocused() &&
@@ -70,60 +63,30 @@
 				(!e.metaKey || (e.metaKey && e.key === 'v')) &&
 				((e.key.length === 1 && e.key !== '/') ||
 					['Backspace', 'Delete', 'Space'].includes(e.key)) &&
-				tagsIpt?.focus();
+				tagsIpt.focus();
 		});
-		if (page.url.searchParams.get('extension') !== null) {
-			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
-			window.addEventListener('message', (event) => {
-				if (event.source !== window) return;
-				if (event.data.type === '4-popup-receives-external-page-info') {
-					let { url, externalDomString, selectedHtmlString } =
-						(event.data.payload as {
-							url?: string;
-							externalDomString?: string;
-							selectedHtmlString?: string;
-						}) || {};
-					if (!url || !externalDomString) return;
-					let scrapedInfo = selectedHtmlString
-						? {
-								headline: (() => {
-									let markdown = html2md(selectedHtmlString);
-									// console.log('selectedHtmlString:', selectedHtmlString);
-									// console.log('markdown:', markdown);
-									return markdown;
-								})(),
-								tags: [],
-								url,
-							}
-						: scrape(url, externalDomString);
-
-					currentTags = scrapedInfo?.tags || [];
-					bodyVal = `${scrapedInfo?.headline}\n${scrapedInfo?.url || url}\n\n`;
-					tagsIpt.focus();
-				}
-			});
-		}
 	});
 
 	let submit = () => {
-		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || tagVal.trim();
-		p.onSubmit([...currentTags, ...(otherTag ? [otherTag] : [])], bodyVal);
+		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || gs.writerTagVal.trim();
+		p.onSubmit([...gs.writerTags, ...(otherTag ? [otherTag] : [])], gs.writerBody);
 		tagsIpt.blur();
 		bodyTa.blur();
-		currentTags = [];
-		tagVal = '';
-		bodyVal = '';
+		gs.writerTags = [];
+		gs.writerTagVal = '';
+		gs.writerBody = '';
 	};
 	let addTag = (tagToAdd?: string) => {
 		tagToAdd = tagToAdd || suggestedTags[tagIndex] || tagFilter;
 		if (tagToAdd) {
-			currentTags = [...new Set([...currentTags, tagToAdd])];
-			tagVal = '';
+			gs.writerTags = [...new Set([...gs.writerTags, tagToAdd])];
+			gs.writerTagVal = '';
 		}
 	};
 </script>
 
-<div class="w-full">
+<!-- TODO: draggable height -->
+<div class="">
 	<div
 		tabindex="-1"
 		class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${currentWritableTags.length ? '' : 'hidden'}`}
@@ -138,7 +101,7 @@
 					bind:this={undoTagRefs[i]}
 					onclick={(e) => {
 						e.stopPropagation(); // this is needed to focus the next tag
-						currentTags = currentTags.filter((t) => t !== tag);
+						gs.writerTags = gs.writerTags.filter((t) => t !== tag);
 						if (!currentWritableTags.length) tagsIpt.focus();
 					}}
 				>
@@ -149,9 +112,9 @@
 	</div>
 	<input
 		bind:this={tagsIpt}
-		bind:value={tagVal}
+		bind:value={gs.writerTagVal}
 		autocomplete="off"
-		class="bg-bg4 w-full px-2 py-0.5 text-lg"
+		class="bg-bg4 w-full px-2 h-9 text-lg"
 		placeholder={m.tags()}
 		onfocus={() => (tagsIptFocused = true)}
 		onblur={() => (tagsIptFocused = false)}
@@ -159,8 +122,8 @@
 			let pastedText = e.clipboardData?.getData('text') || '';
 			let pastedTags = pastedText.split(/\r?\n/);
 			if (pastedTags.length > 1) {
-				currentTags = currentTags.concat(
-					pastedTags.map((t) => t.trim()).filter((t) => !!t && !currentTags.includes(t)),
+				gs.writerTags = gs.writerTags.concat(
+					pastedTags.map((t) => t.trim()).filter((t) => !!t && !gs.writerTags.includes(t)),
 				);
 			}
 		}}
@@ -182,7 +145,7 @@
 			}
 			if (suggestingTags) {
 				if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
-					if (e.key === 'Tab' && !suggestedTags.length) return;
+					if (e.key === 'Tab' && (!suggestedTags.length || tagIndex < 0)) return;
 					e.preventDefault();
 					if (tagIndex >= 0) {
 						if (e.key === 'Tab') {
@@ -195,6 +158,7 @@
 							.slice(-1)[0]
 							.focus();
 					}
+
 					let index = Math.max(tagIndex - 1, -1);
 					tagSuggestionsRefs[index]?.focus();
 					tagIndex = index;
@@ -222,13 +186,13 @@
 	/>
 	<div class="relative h-28">
 		<div
-			class={`bg-bg1 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
+			class={`bg-bg3 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
 				suggestingTags ? '' : 'hidden'
 			}`}
 			onmousedown={(e) => e.preventDefault()}
 		>
 			{#each suggestedTags as tag, i}
-				<div class={`group/tag fx hover:bg-bg4 ${tagIndex === i ? 'bg-bg4' : ''}`}>
+				<div class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}>
 					<button
 						bind:this={tagSuggestionsRefs[i]}
 						class={`relative h-8 truncate flex-1 text-left px-2 text-nowrap text-lg`}
@@ -242,7 +206,7 @@
 					{#if allTagsSet.has(tag)}
 						<button
 							bind:this={unsaveTagXRefs[i]}
-							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 							onclick={() => unsaveTagInPersona(tag)}
 						>
 							<IconX class="h-5 w-5" />
@@ -253,7 +217,7 @@
 		</div>
 		<textarea
 			bind:this={bodyTa}
-			bind:value={bodyVal}
+			bind:value={gs.writerBody}
 			placeholder={m.shareThought()}
 			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-12"
 			onkeydown={(e) => {
@@ -261,7 +225,7 @@
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
-		{#if bodyVal}
+		{#if gs.writerBody}
 			<button class="xy bg-hl1 h-8 w-8 absolute bottom-2 right-2 rounded-full" onclick={submit}>
 				<IconArrowUp class="text-bg1 h-8 w-8" />
 			</button>

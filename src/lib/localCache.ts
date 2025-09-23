@@ -19,13 +19,14 @@ export let defaultLocalCache: LocalCache = {
 	spaces: {},
 	accounts: [
 		{
-			id: undefined,
-			spaceIndex: 0,
+			id: '',
+			currentSpaceId: '',
 			spacesPinnedThrough: 0,
+			// sequentialSpaceIds:[],
 			spaceIds: [
-				undefined, // local space id - everything local
-				0, // personal space id - everything private in cloud
-				1, // global space id - everything public in cloud
+				'', // local space id - everything local
+				'0', // personal space id - everything private in cloud
+				'1', // global space id - everything public in cloud
 				// users can make additional spaces with custom privacy
 			],
 			tags: [],
@@ -62,13 +63,13 @@ export async function getLocalCache() {
 				// Not sure if I'll use tags or to_id to organize multiple author-less meta thoughts...
 				isNull(thoughtsTable.tags),
 				isNull(thoughtsTable.to_id),
-				getIdFilter({}),
+				getIdFilter('__'),
 			),
 		);
 	if (!localCacheRow) localCacheRow = await initLocalCache();
 	let localCache: LocalCache = JSON.parse(localCacheRow.body!);
-	if (!LocalCacheSchema.safeParse(localCache)) {
-		window.alert(m.invalidLocalCache());
+	if (!LocalCacheSchema.safeParse(localCache).success) {
+		window.alert(m.resettingInvalidLocalCache());
 		await deleteLocalCache();
 		localCacheRow = await initLocalCache();
 		localCache = JSON.parse(localCacheRow.body!);
@@ -77,11 +78,22 @@ export async function getLocalCache() {
 }
 
 export async function updateLocalCache(updater: (old: LocalCache) => LocalCache) {
+	let pseudoOldLC = {
+		accounts: gs.accounts,
+		spaces: gs.spaces,
+	} as LocalCache;
+	let pseudoNewLC = updater(pseudoOldLC);
+	gs.accounts = pseudoNewLC.accounts;
+	gs.spaces = pseudoNewLC.spaces;
+	// The above is to hide the delay of fetching the local cache
+
 	let oldLocalCache = await getLocalCache();
 	let newLocalCache = updater(oldLocalCache);
-	if (!LocalCacheSchema.safeParse(newLocalCache)) {
+
+	if (!LocalCacheSchema.safeParse(newLocalCache).success) {
 		return window.alert(m.invalidLocalCacheUpdate());
 	}
+
 	gs.accounts = newLocalCache.accounts;
 	gs.spaces = newLocalCache.spaces;
 	await (
@@ -89,7 +101,7 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 	)
 		.update(thoughtsTable)
 		.set(makeLocalCacheThoughtInsert(newLocalCache))
-		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), getIdFilter({})));
+		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), getIdFilter('__')));
 }
 
 export async function deleteLocalCache() {

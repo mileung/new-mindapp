@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
+	import { page } from '$app/state';
 	import { gs } from '$lib/globalState.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getId, type ThoughtNested } from '$lib/thoughts';
@@ -7,21 +8,16 @@
 	import BodyParser from './BodyParser.svelte';
 	import Self from './ThoughtDrop.svelte';
 	import ThoughtHeader from './ThoughtHeader.svelte';
-	import ThoughtHighlight from './ThoughtHighlight.svelte';
-	import { page } from '$app/state';
+	import Highlight from './Highlight.svelte';
 
 	let p: {
 		thought: ThoughtNested;
 		nested?: boolean;
 		depth: number;
-		onLink: (id: string) => void;
-		onEdit: (id: string) => void;
-		spotId?: string;
-		toId?: string;
-		editId?: string;
 		boldTags?: string[];
 		boldBody?: string[];
 	} = $props();
+	let container: HTMLDivElement;
 	let open = $state(true);
 	let parsed = $state(true);
 	let id = $derived(getId(p.thought));
@@ -31,11 +27,17 @@
 	let deletedToThought = $derived(toThought?.tags?.[0] === ' deleted');
 </script>
 
-<div id={'m' + id} class={`relative flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
+<div bind:this={container} id={'m' + id} class={`relative flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if p.nested}
 		<button
-			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg3' : 'hover:bg-bg4'}`}
-			onclick={() => (open = !open)}
+			class={`z-40 w-5 fy bg-inherit text-fg1 ${evenBg ? 'hover:bg-bg3' : 'hover:bg-bg4'}`}
+			onclick={() => {
+				let distanceFromTop = container.getBoundingClientRect().top;
+				let willBeOpen = !open;
+				if (!willBeOpen && distanceFromTop < (innerWidth > 500 ? 0 : 36))
+					container.scrollIntoView({ block: 'start' });
+				open = willBeOpen;
+			}}
 		>
 			<div class="sticky top-0.5 z-0 bg-inherit m-0.5 h-4 w-4 xy">
 				{#if open}
@@ -57,10 +59,7 @@
 							onclick={(e) => {
 								if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 									e.preventDefault();
-									pushState(`/${p.thought.to_id}`, {
-										modalId: p.thought.to_id!,
-										fromPathname: page.url.pathname,
-									});
+									pushState(`/${p.thought.to_id}`, { modalId: p.thought.to_id! });
 								}
 							}}
 						>
@@ -75,26 +74,26 @@
 						</a>
 						<button
 							class="flex-1 fx justify-end text-fg2 hover:text-fg1"
-							onclick={() => p.onLink(p.thought.to_id!)}
+							onclick={() =>
+								(gs.writerMode =
+									gs.writerMode[0] === 'to' && gs.writerMode[1] === p.thought.to_id
+										? ''
+										: ['to', p.thought.to_id!])}
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
-						<ThoughtHighlight {...p} id={p.thought.to_id} class="-left-2" />
+						<Highlight id={p.thought.to_id} class="-left-2" />
 					</div>
 				{/if}
 				<ThoughtHeader {...p} {parsed} onToggleParsed={() => (parsed = !parsed)} />
 			</div>
-			<ThoughtHighlight
-				{...p}
-				{id}
-				class={p.nested ? '-left-5' : `-left-2 ${p.thought.to_id ? 'top-6' : ''}`}
-			/>
-			<div class={open ? 'pb-1' : 'hidden'}>
+			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.thought.to_id ? 'top-6' : ''}`} />
+			<div class={open ? 'pb-1 pr-1' : 'hidden'}>
 				{#if p.thought.body}
 					{#if parsed}
 						<BodyParser {...p} />
 					{:else}
-						<pre>{p.thought.body}</pre>
+						<p class="whitespace-pre-wrap break-all font-thin font-mono">{p.thought.body}</p>
 					{/if}
 				{:else if !p.thought.body}
 					<p class={`${deleted ? 'text-fg2 font-bold' : 'text-bg8 font-black'} italic text-xs`}>

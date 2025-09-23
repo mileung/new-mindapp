@@ -4,8 +4,8 @@
 </script>
 
 <div class="xy flex-col h-screen">
-	<h1 class="text-5xl font-semibold">{page.status}</h1>
-	<p class="text-3xl font-semibold">
+	<h1 class="text-4xl font-semibold">{page.status}</h1>
+	<p class="text-2xl">
 		{page.status === 404 ? m.pageNotFound() : page.error?.message}
 	</p>
 </div>

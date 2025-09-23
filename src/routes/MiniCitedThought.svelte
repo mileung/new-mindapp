@@ -2,8 +2,8 @@
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { formatMs } from '$lib/time';
-	import ThoughtHighlight from './ThoughtHighlight.svelte';
-	let p: { id: string; depth: number; spotId?: string; toId?: string; editId?: string } = $props();
+	import Highlight from './Highlight.svelte';
+	let p: { id: string; depth: number } = $props();
 </script>
 
 <a
@@ -13,10 +13,10 @@
 	onclick={(e) => {
 		if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 			e.preventDefault();
-			pushState(`/${p.id}`, { modalId: p.id, fromPathname: page.url.pathname });
+			pushState(`/${p.id}`, { modalId: p.id });
 		}
 	}}
 >
-	<ThoughtHighlight {...p} class="-left-0.5" />
+	<Highlight {...p} class="-left-0.5" />
 	{formatMs(+p.id.substring(0, p.id.indexOf('_')))}
 </a>

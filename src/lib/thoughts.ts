@@ -88,33 +88,19 @@ export let idsRegex = /(^|\s)\d*_\d*_\d*($|\s)/g;
 
 export let isId = (str = '') => idRegex.test(str);
 
-type ThoughtSelector = IdSegments | string;
-
-export function getIdFilter(t: ThoughtSelector) {
-	let { ms, by_id, in_id } = parseId(t);
-	return and(
-		ms ? eq(thoughtsTable.ms, ms) : isNull(thoughtsTable.ms),
-		by_id ? eq(thoughtsTable.by_id, by_id) : isNull(thoughtsTable.by_id),
-		in_id ? eq(thoughtsTable.in_id, in_id) : isNull(thoughtsTable.in_id),
-	);
+export function splitId(id: string) {
+	let s = id.split('_', 3);
+	let segs = { ms: s[0], by_id: s[1], in_id: s[2] };
+	return segs;
 }
 
-export function parseId(t: ThoughtSelector): IdSegments {
-	let segs: IdSegments = {};
-	if (typeof t === 'string') {
-		let s = t.split('_', 3);
-		segs.ms = s[0].length ? +s[0] : null;
-		segs.by_id = s[1].length ? +s[1] : null;
-		segs.in_id = s[2].length ? +s[2] : null;
-	} else {
-		let numOrNull = (n: any) => (typeof n === 'number' ? n : null);
-		segs.ms = numOrNull(t.ms);
-		segs.by_id = numOrNull(t.by_id);
-		segs.in_id = numOrNull(t.in_id);
-	}
-	if (Number.isNaN(segs.ms) || Number.isNaN(segs.by_id) || Number.isNaN(segs.in_id))
-		throw new Error('Invalid thought id');
-	return segs;
+export function getIdFilter(id: string) {
+	let { ms, by_id, in_id } = splitId(id);
+	return and(
+		ms ? eq(thoughtsTable.ms, +ms) : isNull(thoughtsTable.ms),
+		by_id ? eq(thoughtsTable.by_id, +by_id) : isNull(thoughtsTable.by_id),
+		in_id ? eq(thoughtsTable.in_id, +in_id) : isNull(thoughtsTable.in_id),
+	);
 }
 
 export function dropThoughtsTableInDev() {
@@ -166,7 +152,7 @@ export async function editThought(t: ThoughtInsert) {
 		if (!t.by_id) throw new Error('Missing by_id');
 		// TODO: Verify user by_id is logged and has access to space in_id
 	}
-	let originalThought = await getThought(t);
+	let originalThought = await getThought(getId(t));
 	if (!originalThought) throw new Error('Original thought not found');
 	let { readOnlyTags: originalReadOnlyTags } = divideTags(originalThought);
 	let {
@@ -190,15 +176,16 @@ export async function editThought(t: ThoughtInsert) {
 	)
 		.update(thoughtsTable)
 		.set({ ...t, tags: sortUniArr([` edited:${Date.now()}`, ...(t.tags || [])]) })
-		.where(getIdFilter(t));
+		.where(getIdFilter(getId(t)));
 }
 
-export async function deleteThought(t: IdSegments) {
-	if (typeof t.in_id === 'number') {
-		if (!t.by_id) throw new Error('Missing by_id');
+export async function deleteThought(id: string) {
+	let s = splitId(id);
+	if (s.in_id) {
+		if (!s.by_id) throw new Error('Missing by_id');
 		// TODO: Verify user by_id is logged and has access to space in_id
 	}
-	if ((await getThoughtChildren(t, 1)).length) {
+	if ((await getThoughtChildren(id, 1)).length) {
 		await (
 			await gsdb()
 		)
@@ -207,30 +194,28 @@ export async function deleteThought(t: IdSegments) {
 				body: null,
 				tags: [' deleted'],
 			})
-			.where(getIdFilter(t));
+			.where(getIdFilter(id));
 		return { soft: true };
 	} else {
-		await (await gsdb()).delete(thoughtsTable).where(getIdFilter(t));
+		await (await gsdb()).delete(thoughtsTable).where(getIdFilter(id));
 		return { soft: false };
 	}
 }
 
 // TODO: paginate children when there's too many with fromMs
 // Reddit does this - HN does not
-export async function getThoughtChildren(s: ThoughtSelector, limit = -1) {
-	let children = await (
-		await gsdb()
-	)
+export async function getThoughtChildren(id: string, limit = -1) {
+	let children = await (await gsdb())
 		.select()
 		.from(thoughtsTable)
-		.where(eq(thoughtsTable.to_id, typeof s === 'string' ? s : getId(s)))
+		.where(eq(thoughtsTable.to_id, id))
 		.orderBy(desc(thoughtsTable.ms))
 		.limit(limit);
 	return children;
 }
 
-export async function getThought(t: ThoughtSelector): Promise<ThoughtSelect | undefined> {
-	return (await (await gsdb()).select().from(thoughtsTable).where(getIdFilter(t)).limit(1))[0];
+export async function getThought(id: string): Promise<ThoughtSelect | undefined> {
+	return (await (await gsdb()).select().from(thoughtsTable).where(getIdFilter(id)).limit(1))[0];
 }
 
 async function getRootThought(thought: ThoughtSelect) {
@@ -248,15 +233,17 @@ async function getRootThought(thought: ThoughtSelect) {
 	};
 }
 
+export let getIds = (str = '') => [...str.matchAll(idsRegex)].map((match) => match[0].trim());
+
 async function expandThought(thought: ThoughtSelect): Promise<{
 	citedIds: string[];
 	byIds: (null | number)[];
 	nestedThought: ThoughtNested;
 }> {
-	let citedIds = [...(thought.body || '').matchAll(idsRegex)].map((match) => match[0].trim());
+	let citedIds = getIds(thought.body || '');
 	let byIds = [thought.by_id];
 	let children: ThoughtNested[] = await Promise.all(
-		(await getThoughtChildren(thought)).map(async (t) => {
+		(await getThoughtChildren(getId(thought))).map(async (t) => {
 			let exp = await expandThought(t);
 			citedIds.push(...exp.citedIds);
 			byIds.push(...exp.byIds);
@@ -270,18 +257,18 @@ async function expandThought(thought: ThoughtSelect): Promise<{
 	};
 }
 
-export let rootsPerLoad = 10;
+export let rootsPerLoad = 15;
 export let loadThoughts = async (q: {
 	rpc?: boolean;
 	spaceId?: number;
 	nested?: boolean;
-	oldestFirst?: boolean;
+	oldestFirst?: boolean; // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
 	fromMs?: number;
 	thoughtsBeyond?: number;
 	idsInclude?: string[];
 	idsExclude?: string[];
-	authorIdsInclude?: number[];
-	authorIdsExclude?: number[];
+	byIdsInclude?: number[];
+	byIdsExclude?: number[];
 	tagsInclude?: string[];
 	tagsExclude?: string[];
 	bodyIncludes?: string[];
@@ -295,8 +282,8 @@ export let loadThoughts = async (q: {
 		fromMs = q.oldestFirst ? 0 : Number.MAX_SAFE_INTEGER,
 		idsInclude = [],
 		idsExclude = [],
-		authorIdsInclude = [],
-		authorIdsExclude = [],
+		byIdsInclude = [],
+		byIdsExclude = [],
 		tagsInclude = [],
 		tagsExclude = [],
 		bodyIncludes = [],
@@ -320,14 +307,14 @@ export let loadThoughts = async (q: {
 		isNotNull(thoughtsTable.ms),
 		// not(like(thoughtsTable.tags, `%" private"%`)),
 		or(...idsInclude.map((id) => getIdFilter(id))),
-		or(...authorIdsInclude.map((id) => eq(thoughtsTable.by_id, id))),
+		or(...byIdsInclude.map((id) => eq(thoughtsTable.by_id, id))),
 		or(...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
 		or(...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`))),
 		...idsExclude.map((id) => {
 			let filter = getIdFilter(id);
 			return filter ? not(filter) : undefined;
 		}),
-		...authorIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),
+		...byIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),
 		...tagsExclude.map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
 		...bodyExcludes.map((term) => notLike(thoughtsTable.body, `%${term}%`)),
 	];

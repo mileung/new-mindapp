@@ -5,10 +5,9 @@
 	import { gs } from '$lib/globalState.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { deleteThought, divideTags, getId, parseId, type ThoughtInsert } from '$lib/thoughts';
+	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/thoughts';
 	import { formatMs, minute } from '$lib/time';
 	import {
-		IconBrowser,
 		IconCheck,
 		IconCopy,
 		IconCornerUpLeft,
@@ -18,12 +17,9 @@
 		IconFingerprint,
 		IconPencil,
 		IconTrash,
-		IconUser,
-		IconUserFilled,
-		IconWorld,
 		IconX,
 	} from '@tabler/icons-svelte';
-	import Identicon from './Identicon.svelte';
+	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
 	let xBtn = $state<HTMLButtonElement>();
@@ -46,8 +42,6 @@
 	let p: {
 		parsed: boolean;
 		onToggleParsed: () => void;
-		onLink: (id: string) => void;
-		onEdit: (id: string) => void;
 		thought: ThoughtInsert;
 	} = $props();
 	let moreOptionsOpen = $state(false);
@@ -65,7 +59,7 @@
 	);
 </script>
 
-<div class="text-sm mr-1 fx h-5 text-fg2 max-w-full" onmousedown={(e) => e.preventDefault()}>
+<div class="text-sm fx h-5 text-fg2 max-w-full" onmousedown={(e) => e.preventDefault()}>
 	<a
 		href={`/${id}`}
 		title={whenVerbose}
@@ -73,40 +67,32 @@
 		onclick={(e) => {
 			if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 				e.preventDefault();
-				pushState(`/${id}`, { modalId: id, fromPathname: page.url.pathname });
+				pushState(`/${id}`, { modalId: id });
 			}
 		}}
 	>
 		{when}{editMs ? ' *' : ''}
 	</a>
 	<a
-		target="_blank"
-		href={`/?q=by:${p.thought.by_id || ''}`}
+		href={`/__${p.thought.in_id ?? ''}?q=by:${p.thought.by_id || ''}`}
 		class={`h-6 pl-2 pr-1 truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
-			gs.thoughts[p.thought.by_id || ''] ? '' : 'italic'
+			gs.thoughts[p.thought.by_id ?? ''] ? '' : 'italic'
 		}`}
 	>
-		{#if p.thought.by_id}
-			<Identicon data={p.thought.ms + ''} class="h-3 w-3 mr-1 scale-150" />
-		{:else}
-			<IconUserFilled class="text-fg2 h-3.5 w-3.5 mr-0.5" />
-		{/if}
+		<AccountIcon id={`${p.thought.by_id ?? ''}`} class="h-3.5 w-3.5 mr-0.5" />
 		<!-- TODO: names for users -->
 		<p class="whitespace-nowrap truncate">
 			{p.thought.by_id ? gs.thoughts[p.thought.by_id!]?.body || m.noName() : m.anon()}
 		</p>
 	</a>
-	<!-- TODO: Spaces -->
 	<a
-		target="_blank"
-		href={`/${p.thought.in_id}`}
+		href={`/__${p.thought.in_id ?? ''}`}
 		class={`h-6 px-1 mr-auto truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
 			p.thought.in_id ? '' : 'italic'
 		}`}
 	>
-		<!-- <Identicon class="h-3 w-3 mr-1 scale-150" /> -->
 		<div class="xy pr-1 h-5 w-5">
-			<SpaceIcon id={p.thought.in_id} />
+			<SpaceIcon id={`${p.thought.by_id ?? ''}`} />
 		</div>
 		<p class={`whitespace-nowrap truncate ${gs.thoughts[p.thought.in_id || ''] ? '' : 'italic'}`}>
 			{p.thought.in_id ? gs.thoughts[p.thought.in_id || '']?.body || p.thought.in_id : 'Local'}
@@ -136,12 +122,16 @@
 		<!-- <p class="ml-1">0</p> -->
 	</button>
 	<div class="flex-1 h-4 fx">
-		<button class="flex-1 min-w-4 h-7 fx hover:text-fg1" onclick={() => p.onLink(id)}>
+		<button
+			class="flex-1 min-w-4 h-7 fx hover:text-fg1"
+			onclick={() =>
+				(gs.writerMode = gs.writerMode[0] === 'to' && gs.writerMode[1] === id ? '' : ['to', id])}
+		>
 			<IconCornerUpLeft class="w-5" />
 			<!-- TODO: idk if I actually want to implement link count -->
 			<!-- <p class="ml-0.5">0</p> -->
 		</button>
-		<div class="-mr-1.5">
+		<div class="">
 			{#if moreOptionsOpen}
 				<div class="fx">
 					<button
@@ -161,7 +151,7 @@
 								Date.now() - (p.thought.ms || 0) < minute ||
 								confirm(m.areYouSureYouWantToDeleteThisThought());
 							if (!ok) return;
-							let { soft } = await deleteThought(parseId(id));
+							let { soft } = await deleteThought(id);
 							gs.thoughts[id] = soft
 								? {
 										...gs.thoughts[id],
@@ -177,7 +167,9 @@
 					<button
 						bind:this={pencilBtn}
 						class="h-7 w-6 xy hover:text-fg1"
-						onclick={() => p.onEdit(id)}
+						onclick={() =>
+							(gs.writerMode =
+								gs.writerMode[0] === 'edit' && gs.writerMode[1] === id ? '' : ['edit', id])}
 						onkeydown={(e) => e.key === 'Escape' && (moreOptionsOpen = false)}
 					>
 						<IconPencil class="w-5" />
@@ -192,15 +184,17 @@
 	</div>
 </div>
 {#if authorTags.length}
-	<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
-		{#each authorTags as tag}
-			<!-- TODO: Why does using leading-4 cause parent to scroll? -->
-			<a
-				href={`/?q=${encodeURIComponent(`[${tag}]`)}`}
-				class="px-1 font-bold leading-5 text-fg2 hover:text-fg1"
-			>
-				{tag}
-			</a>
-		{/each}
+	<div class="overflow-hidden">
+		<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
+			{#each authorTags as tag}
+				<!-- TODO: Why does using leading-4 cause parent to scroll? -->
+				<a
+					href={`/?q=${encodeURIComponent(`[${tag}]`)}`}
+					class="px-1 font-bold leading-5 text-fg2 hover:text-fg1"
+				>
+					{tag}
+				</a>
+			{/each}
+		</div>
 	</div>
 {/if}

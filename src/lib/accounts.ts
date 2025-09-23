@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { gs } from './globalState.svelte';
-import { getLocalCache, updateLocalCache } from './localCache';
 import { sortUniArr } from './js';
+import { updateLocalCache } from './localCache';
 
 export let currentPersona = () => {
 	return gs.accounts[0]!;
@@ -9,10 +9,10 @@ export let currentPersona = () => {
 
 export let PersonaSchema = z
 	.object({
-		id: z.number().optional(),
-		spaceIndex: z.number(),
+		id: z.string(),
+		currentSpaceId: z.string(),
 		spacesPinnedThrough: z.number(),
-		spaceIds: z.array(z.number().optional()),
+		spaceIds: z.array(z.string()),
 		tags: z.array(z.string()),
 	})
 	.strict();

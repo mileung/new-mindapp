@@ -2,15 +2,10 @@
 	import { getId, type ThoughtInsert } from '$lib/thoughts';
 	import BodyParser from './BodyParser.svelte';
 	import ThoughtHeader from './ThoughtHeader.svelte';
-	import ThoughtHighlight from './ThoughtHighlight.svelte';
+	import Highlight from './Highlight.svelte';
 	let p: {
 		thought: ThoughtInsert;
-		onLink: (id: string) => void;
-		onEdit: (id: string) => void;
 		depth: number;
-		spotId?: string;
-		toId?: string;
-		editId?: string;
 	} = $props();
 	let parsed = $state(true);
 	let id = $derived(getId(p.thought));
@@ -19,7 +14,7 @@
 <div
 	class={`m${id} z-0 relative border-l-2 border-hl-cite p-1 pl-2 m-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg3'}`}
 >
-	<ThoughtHighlight {...p} {id} class="-left-0.5" />
+	<Highlight {id} class="-left-0.5" />
 	<ThoughtHeader {...p} {parsed} onToggleParsed={() => (parsed = !parsed)} />
 	{#if p.thought.body}
 		{#if parsed}

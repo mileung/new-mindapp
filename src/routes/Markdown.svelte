@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { gs } from '$lib/globalState.svelte';
-	import { type IconName } from '$lib/js';
 	import IframePreview from './IframePreview.svelte';
 
 	let p: {

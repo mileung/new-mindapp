@@ -2,29 +2,28 @@ export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.acti
 
 // externalDom
 // url
-export function scrape(url: string, externalDomString: string) {
+export function scrape(externalUrl: string, externalDomString: string) {
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
-	let { title } = externalDom;
 
 	let urlScrapers: Record<
 		string,
 		undefined | (() => { headline?: string; tags?: string[]; url?: string })
 	> = {
 		'www.perplexity.ai': () => {
-			return { headline: document.querySelector('h1')?.innerText };
+			return { headline: externalDom.querySelector('h1')?.innerText };
 		},
 		'www.reddit.com': () => {
-			let subreddit = location.href.match(/\/(r\/[^/]+)/)?.[1];
+			let subreddit = externalUrl.match(/\/(r\/[^/]+)/)?.[1];
 			// TODO: get the post body as markdown
 			// e.g. https://www.reddit.com/r/UI_Design/comments/vzqe34/menu_knowledge_is_essential/
 			return { tags: subreddit ? [subreddit] : [] };
 		},
 		'www.youtube.com/watch': () => {
 			// @ts-ignore
-			let title: string = document.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
-			let nameTag = document.querySelector('#top-row yt-formatted-string a');
+			let title: string = externalDom.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
+			let nameTag = externalDom.querySelector('#top-row yt-formatted-string a');
 			let ppHref = decodeURIComponent(
-				document.querySelector('#owner > ytd-video-owner-renderer > a')?.getAttribute('href')!,
+				externalDom.querySelector('#owner > ytd-video-owner-renderer > a')?.getAttribute('href')!,
 			);
 
 			let author: string = ppHref?.startsWith('/channel/')
@@ -32,7 +31,7 @@ export function scrape(url: string, externalDomString: string) {
 					nameTag.innerText
 				: `YouTube${ppHref?.slice(1)!}`;
 
-			let url = location.href.replace('app=desktop&', '');
+			let url = externalUrl.replace('app=desktop&', '');
 			if (url.includes('list=WL')) {
 				url = url.replace('&list=WL', '');
 				url = url.replace(/&index=\d+/, '');
@@ -52,7 +51,7 @@ export function scrape(url: string, externalDomString: string) {
 			);
 
 			return {
-				headline: document.querySelector<HTMLHeadElement>(
+				headline: externalDom.querySelector<HTMLHeadElement>(
 					'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
 				)?.innerText,
 				tags: [`YouTube${author}`],
@@ -64,7 +63,7 @@ export function scrape(url: string, externalDomString: string) {
 				: null;
 			let tags = author ? ['YouTube Channel', `YouTube${author}`] : [];
 			return {
-				headline: document.querySelector<HTMLHeadElement>('h1.dynamic-text-view-model-wiz__h1')
+				headline: externalDom.querySelector<HTMLHeadElement>('h1.dynamic-text-view-model-wiz__h1')
 					?.innerText,
 				tags,
 			};
@@ -75,7 +74,7 @@ export function scrape(url: string, externalDomString: string) {
 			if (i !== -1) author = author.slice(0, i);
 			let tweetId = location.pathname.match(/\/status\/(\d+)/)?.[1];
 			// TODO: X has really messy messy HTML on purpose I think to make query selectors break. Make this more robust.
-			let tweetBlock = document.querySelector(`a[href="/${author}/status/${tweetId}"]`)
+			let tweetBlock = externalDom.querySelector(`a[href="/${author}/status/${tweetId}"]`)
 				?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
 			let tweetText = tweetBlock?.querySelector<HTMLElement>(
 				'[data-testid="tweetText"]',
@@ -87,31 +86,31 @@ export function scrape(url: string, externalDomString: string) {
 			};
 		},
 		'www.amazon.com': () => {
-			let headline = document.querySelector<HTMLElement>('#productTitle')?.innerText;
+			let headline = externalDom.querySelector<HTMLElement>('#productTitle')?.innerText;
 			let endI = Math.min(
 				...[
 					//
-					location.href.indexOf('?'),
-					location.href.indexOf('/ref='),
+					externalUrl.indexOf('?'),
+					externalUrl.indexOf('/ref='),
 				].filter((n) => n !== -1),
 			);
-			let url = location.href.slice(0, endI);
+			let url = externalUrl.slice(0, endI);
 			return { headline, url };
 		},
 		'www.ebay.com': () => {
-			let headline = document.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
+			let headline = externalDom.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
 			let endI = Math.min(
 				...[
 					//
-					location.href.indexOf('?'),
+					externalUrl.indexOf('?'),
 				].filter((n) => n !== -1),
 			);
-			let url = location.href.slice(0, endI);
+			let url = externalUrl.slice(0, endI);
 			return { headline, url };
 		},
 	};
 
-	let urlObj = new URL(url);
+	let urlObj = new URL(externalUrl);
 	let scraped = (urlScrapers[urlObj.host + urlObj.pathname] || urlScrapers[urlObj.host])?.();
 
 	return {
@@ -122,6 +121,6 @@ export function scrape(url: string, externalDomString: string) {
 			externalDom.querySelector('meta[name="title"]')?.getAttribute('content') ||
 			externalDom.title
 		).trim(),
-		url: scraped?.url || url,
+		url: scraped?.url || externalUrl,
 	};
 }

@@ -73,6 +73,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 			type: '1-content-amd-background-scripts-save-page-info',
 			url: window.location.href,
 			externalDomString: document.documentElement.outerHTML,
+			selectedPlainText: window.getSelection()?.toString().trim(),
 			selectedHtmlString: (() => {
 				let selection = window.getSelection();
 				if (selection && selection.rangeCount !== 0) {

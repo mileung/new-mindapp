@@ -18,13 +18,12 @@
 		--fg2: #6d6d69;
 		--fg3: #000;
 
-		--local: #7c7c7c;
+		--local: #f86262;
 		--personal: #6aa84f;
 		--global: #4a90a4;
 	}
 
 	.dark {
-		/* --bg1: #141415; */
 		--bg1: #000000;
 		--bg2: #1a1a1c;
 		--bg3: #202022;
@@ -43,7 +42,7 @@
 		--fg2: #a5a5a4;
 		--fg3: #fff;
 
-		--local: #b0b0b0;
+		--local: #ff9999;
 		--personal: #a2d39b;
 		--global: #6fc3df;
 	}

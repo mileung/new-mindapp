@@ -20,23 +20,27 @@ export type PopupMessage = {
 		| '3-content-script-retrieves-saved-page-info';
 	url: string;
 	externalDomString: string;
+	selectedPlainText?: string;
 	selectedHtmlString?: string;
 };
 
 let url: undefined | string;
 let externalDomString: undefined | string;
+let selectedPlainText: undefined | string;
 let selectedHtmlString: undefined | string;
 
 chrome.runtime.onMessage.addListener((message: PopupMessage, sender, sendResponse) => {
 	if (message.type === '1-content-amd-background-scripts-save-page-info') {
 		url = message.url;
 		externalDomString = message.externalDomString;
+		selectedPlainText = message.selectedPlainText;
 		selectedHtmlString = message.selectedHtmlString;
 	}
 	if (message.type === '3-content-script-retrieves-saved-page-info') {
-		sendResponse({ url, externalDomString, selectedHtmlString });
+		sendResponse({ url, externalDomString, selectedPlainText, selectedHtmlString });
 		url = undefined;
 		externalDomString = undefined;
+		selectedPlainText = undefined;
 		selectedHtmlString = undefined;
 	}
 });

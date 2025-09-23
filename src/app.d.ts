@@ -7,7 +7,6 @@ declare global {
 		// interface PageData {}
 		interface PageState {
 			modalId?: string;
-			fromPathname?: string;
 		}
 		// interface Platform {}
 	}

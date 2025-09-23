@@ -3,13 +3,13 @@
 	import Identicon from './Identicon.svelte';
 
 	let p: {
-		id?: null | number;
+		id: string;
 		class?: string;
 	} = $props();
 </script>
 
-{#if typeof p.id === 'number'}
-	<Identicon data={p.id + ''} class={p.class} />
+{#if p.id}
+	<Identicon data={p.id} class={p.class} />
 {:else}
-	<IconUserFilled class={p.class} />
+	<IconUserFilled class={`text-fg1 ${p.class}`} />
 {/if}
