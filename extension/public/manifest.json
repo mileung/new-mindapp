@@ -12,6 +12,16 @@
 		{
 			"matches": ["<all_urls>"],
 			"js": ["content.js"]
+		},
+		{
+			"matches": [
+				"http://localhost:8888/*",
+				"http://new.mindapp.cc/*",
+				"https://new.mindapp.cc/*",
+				"http://mindapp.cc/*",
+				"https://mindapp.cc/*"
+			],
+			"css": ["styles.css"]
 		}
 	]
 }

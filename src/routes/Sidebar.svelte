@@ -265,18 +265,15 @@
 			<div
 				class={`${spaceMenuOpen ? '' : `hidden ${accountMenuOpen || (searchIptFocused && tagFilter) ? '' : 'xs:block'}`}`}
 			>
-				{#if !browserExtensionAdded}
-					<div>
-						<a
-							target="_blank"
-							href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-							class={`fx gap-1 p-2 h-12 text-bg1 bg-hl1 hover:bg-hl2`}
-						>
-							<IconPuzzle class="h-6 w-9" />
-							<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
-						</a>
-					</div>
-				{/if}
+				<a
+					id="mindapp-extension"
+					target="_blank"
+					href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
+					class={`fx gap-1 p-2 h-12 text-bg1 bg-hl1 hover:bg-hl2`}
+				>
+					<IconPuzzle class="h-6 w-9" />
+					<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
+				</a>
 				{#each gs.accounts[0]?.spaceIds || [] as id, i}
 					<div class={`flex ${id === gs.accounts[0].currentSpaceId ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<a
