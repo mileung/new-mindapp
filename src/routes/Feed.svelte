@@ -41,9 +41,9 @@
 	onMount(() => {
 		window.addEventListener('keydown', (e) => {
 			if (!p.hidden && !textInputFocused()) {
-				if (e.key === 'n') {
+				if (e.key === 'n' && !gs.writerMode) {
 					e.preventDefault();
-					gs.writerMode = gs.writerMode === 'new' ? '' : 'new';
+					gs.writerMode = 'new';
 				}
 			}
 		});
@@ -185,103 +185,72 @@
 			gs.feeds = { ...gs.feeds, [identifier]: [tid, ...(gs.feeds[identifier] || [])] };
 		}
 		gs.writerMode = '';
-
 		viewPostToastId = tid;
 		setTimeout(() => (viewPostToastId = ''), 3000);
 	};
 
 	let feed = $derived(
-		gs.feeds[identifier]?.map((tid) => tid && gs.thoughts[tid]).filter((t) => !!t) || [],
+		gs.feeds[identifier]?.map((tid) => gs.thoughts[tid || '']).filter((t) => !!t),
 	);
 
 	let scrolledToSpotId = $state(false);
 	$effect(() => {
-		if (p.idParam && !scrolledToSpotId && gs.feeds[identifier]?.length) {
+		if (p.idParam && !scrolledToSpotId && feed?.length) {
 			setTimeout(() => scrollToHighlight(), 0);
 		}
 	});
 </script>
 
-{#snippet loader()}<InfiniteLoading
-		{identifier}
-		spinner="spiral"
-		direction={nested ? 'bottom' : 'top'}
-		on:infinite={loadMoreRoots}
-	>
-		<p slot="noResults" class="m-2 text-xl text-fg2">{m.noThoughtsFound()}</p>
-		<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
-		<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
-	</InfiniteLoading>
-{/snippet}
-{#snippet feeder()}
-	<div class="space-y-1 my-1">
-		{#each nested ? feed : [...feed].reverse() as thought (getId(thought))}
-			<ThoughtDrop {...p} {nested} {thought} depth={0} />
-		{/each}
+<div
+	bind:this={container}
+	class="relative bg-bg1 h-[calc(100vh-36px)] xs:h-screen flex flex-col overflow-scroll"
+>
+	{#if personalSpaceRequiresLogin}
+		<div class="xy h-full">
+			<p class="text-2xl sm:text-3xl font-black">Sign in to use this space</p>
+		</div>
+	{:else if p.idParam === '__' && feed && !feed.length}
+		welcome
+	{:else}
+		{#if feed}
+			<div class="space-y-1 my-1">
+				{#each feed as thought (getId(thought))}
+					<ThoughtDrop {...p} {nested} {thought} depth={0} />
+				{/each}
+			</div>
+		{/if}
+		<InfiniteLoading
+			{identifier}
+			spinner="spiral"
+			direction={nested ? 'bottom' : 'top'}
+			on:infinite={loadMoreRoots}
+		>
+			<p slot="noResults" class="m-2 text-xl text-fg2">{m.noThoughtsFound()}</p>
+			<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
+			<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
+		</InfiniteLoading>
+	{/if}
+	<div class="relative flex-1">
+		{#if spotId}
+			<button
+				class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
+				onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
+			>
+				<IconX class="w-8" />
+			</button>
+		{/if}
 	</div>
-{/snippet}
-{#snippet writer()}
-	<ThoughtWriter onSubmit={submitThought} />
-{/snippet}
-{#snippet rewRootBtn()}
 	{#if !p.modal}
 		<button
-			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
+			class="fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
 			onclick={() => (gs.writerMode = 'new')}
 		>
 			<PencilPlus class="h-9" />
 		</button>
 	{/if}
-{/snippet}
-<div
-	bind:this={container}
-	class="relative bg-bg1 h-[calc(100vh-36px)] xs:h-screen flex flex-col overflow-scroll"
->
-	{#if !feed.length && p.idParam === '__'}
-		welcome
-	{:else if personalSpaceRequiresLogin}
-		<div class="xy h-full">
-			<p class="text-2xl sm:text-3xl font-black">Sign in to use this space</p>
-		</div>
-	{:else if nested}
-		<!-- {@render writer()} -->
-		{@render rewRootBtn()}
-		{@render feeder()}
-		{@render loader()}
-		<div class="relative flex-1">
-			{#if spotId}
-				<button
-					class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
-					onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
-				>
-					<IconX class="w-8" />
-				</button>
-			{/if}
-		</div>
-	{:else}
-		<div class="flex-1"></div>
-		{@render loader()}
-		{@render feeder()}
-		<!-- {@render writer()} -->
-		{@render rewRootBtn()}
-	{/if}
-	{#if viewPostToastId}
-		<a
-			href={`/${viewPostToastId}`}
-			class="fx z-50 fixed h-10 pl-2 font-semibold bottom-2 self-center bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
-			onclick={(e) => {
-				if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-					e.preventDefault();
-					pushState(`/${viewPostToastId}`, { modalId: viewPostToastId });
-				}
-			}}
-		>
-			{m.viewPost()}
-			<IconChevronRight class="h-5" stroke={3} />
-		</a>
-	{/if}
-	<div class="sticky bottom-0 z-50">
-		{#if gs.writerMode}
+
+	{#if gs.writerMode}
+		<div class="sticky bottom-0 z-50">
 			<div class="flex group bg-bg4 relative w-full">
 				<!-- TODO: save writer data so it persists after page refresh. If the thought it's editing or linking to is not on the feed, open it in a modal? -->
 				<button class="truncate flex-1 h-8 pl-2 text-left fx gap-1" onclick={scrollToHighlight}>
@@ -302,7 +271,22 @@
 				</button>
 				<Highlight id={gs.writerMode !== 'new' ? gs.writerMode[1] : ''} />
 			</div>
-			{@render writer()}
-		{/if}
-	</div>
+			<ThoughtWriter onSubmit={submitThought} />
+		</div>
+	{/if}
+	{#if viewPostToastId}
+		<a
+			href={`/${viewPostToastId}`}
+			class="fx z-50 fixed h-10 pl-2 font-semibold bottom-2 self-center bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
+			onclick={(e) => {
+				if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
+					e.preventDefault();
+					pushState(`/${viewPostToastId}`, { modalId: viewPostToastId });
+				}
+			}}
+		>
+			{m.viewPost()}
+			<IconChevronRight class="h-5" stroke={3} />
+		</a>
+	{/if}
 </div>
