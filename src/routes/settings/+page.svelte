@@ -22,11 +22,7 @@
 	<p class="text-xl font-bold">{m.theme()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
-	<select
-		name={m.theme()}
-		class="w-full p-2 rounded bg-bg5 hover:bg-bg7 text-fg1"
-		bind:value={gs.theme}
-	>
+	<select name={m.theme()} class="w-full p-2 bg-bg5 hover:bg-bg7 text-fg1" bind:value={gs.theme}>
 		<option value="system">{m.system()}</option>
 		<option value="light">{m.light()}</option>
 		<option value="dark">{m.dark()}</option>
@@ -36,7 +32,7 @@
 	<p class="text-xl font-bold">{m.manageData()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
 	<button
-		class="xy px-2 py-1 rounded bg-bg5 hover:bg-bg7 text-fg1"
+		class="xy px-2 py-1 bg-bg5 hover:bg-bg7 text-fg1"
 		onclick={async () => {
 			exportTextAsFile(
 				`mindapp-${Date.now()}.json`,
@@ -64,7 +60,7 @@
 		}}><IconDownload class="w-5 mr-1" />{m.downloadLocalData()}</button
 	>
 	<button
-		class="xy px-2 py-1 rounded bg-teal-500/20 hover:bg-teal-500/30 text-teal-500"
+		class="xy px-2 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-500"
 		onclick={async () => {
 			const input = document.createElement('input');
 			input.type = 'file';
@@ -112,7 +108,7 @@
 	<p class="text-xl font-bold">{m.dangerZone()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
 	<button
-		class="xy px-2 py-1 rounded bg-red-500/20 hover:bg-red-500/30 text-red-500"
+		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
 		onclick={async () => {
 			let a = Math.floor(Math.random() * 90) + 10;
 			let b = Math.floor(Math.random() * 90) + 10;

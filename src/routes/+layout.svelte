@@ -112,6 +112,6 @@
 </script>
 
 <Sidebar />
-<div class="xs:ml-[var(--w-sidebar)]">
+<div class="xs:ml-[var(--w-sidebar)] mt-9 xs:mt-0">
 	{@render p.children()}
 </div>

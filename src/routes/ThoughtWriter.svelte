@@ -13,11 +13,9 @@
 
 	let p: {
 		toId?: string;
-		editId?: string;
 		thought?: ThoughtSelect;
 		onSubmit: (tags: string[], body: string) => void;
 	} = $props();
-	let editingThought = $derived(gs.thoughts[p.editId!]);
 
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
@@ -27,7 +25,7 @@
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
 
-	let currentWritableTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
+	let writtenTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(gs.writerTagVal.trim());
 	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
 	let suggestedTags = $derived.by(() => {
@@ -43,13 +41,13 @@
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
-		// console.log($inspect(tagSuggestionsRefs));
-		if (p.toId || p.editId) tagsIpt.focus();
+		if (['to', 'edit'].includes(gs.writerMode[0])) tagsIpt.focus();
 	});
 	$effect(() => {
-		if (editingThought) {
-			gs.writerTags = editingThought.tags || [];
-			gs.writerBody = editingThought.body || '';
+		if (gs.writerMode[0] === 'edit') {
+			let t = gs.thoughts[gs.writerMode[1]];
+			gs.writerTags = t?.tags || [];
+			gs.writerBody = t?.body || '';
 		}
 	});
 
@@ -76,6 +74,7 @@
 		gs.writerTagVal = '';
 		gs.writerBody = '';
 	};
+
 	let addTag = (tagToAdd?: string) => {
 		tagToAdd = tagToAdd || suggestedTags[tagIndex] || tagFilter;
 		if (tagToAdd) {
@@ -89,11 +88,11 @@
 <div class="">
 	<div
 		tabindex="-1"
-		class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${currentWritableTags.length ? '' : 'hidden'}`}
+		class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${writtenTags.length ? '' : 'hidden'}`}
 		onclick={() => tagsIpt.focus()}
 		onmousedown={(e) => e.preventDefault()}
 	>
-		{#each currentWritableTags as tag, i}
+		{#each writtenTags as tag, i}
 			<div class="fx">
 				{tag}
 				<button
@@ -102,7 +101,7 @@
 					onclick={(e) => {
 						e.stopPropagation(); // this is needed to focus the next tag
 						gs.writerTags = gs.writerTags.filter((t) => t !== tag);
-						if (!currentWritableTags.length) tagsIpt.focus();
+						if (!writtenTags.length) tagsIpt.focus();
 					}}
 				>
 					<IconCircleXFilled class="w-4 h-4" />
@@ -152,7 +151,7 @@
 							xFocused = !xFocused;
 							if (!xFocused) return;
 						} else xFocused = false;
-					} else if (currentWritableTags.length) {
+					} else if (writtenTags.length) {
 						return undoTagRefs
 							.filter((r) => !!r)
 							.slice(-1)[0]
@@ -219,15 +218,15 @@
 			bind:this={bodyTa}
 			bind:value={gs.writerBody}
 			placeholder={m.shareThought()}
-			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-12"
+			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-11"
 			onkeydown={(e) => {
 				e.key === 'Escape' && setTimeout(() => bodyTa.blur(), 0);
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
 		{#if gs.writerBody}
-			<button class="xy bg-hl1 h-8 w-8 absolute bottom-2 right-2 rounded-full" onclick={submit}>
-				<IconArrowUp class="text-bg1 h-8 w-8" />
+			<button class="xy bg-hl1 h-8 w-8 absolute bottom-1 right-1 text-black" onclick={submit}>
+				<IconArrowUp class="h-9 w-9" />
 			</button>
 		{/if}
 	</div>

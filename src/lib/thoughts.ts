@@ -171,12 +171,14 @@ export async function editThought(t: ThoughtInsert) {
 		let editTagI = t.tags?.findIndex((t) => t.startsWith(' edited:'))!;
 		t.tags?.splice(editTagI, 1);
 	}
+	let tags = sortUniArr([` edited:${Date.now()}`, ...(t.tags || [])]);
 	await (
 		await gsdb()
 	)
 		.update(thoughtsTable)
-		.set({ ...t, tags: sortUniArr([` edited:${Date.now()}`, ...(t.tags || [])]) })
+		.set({ ...t, tags })
 		.where(getIdFilter(getId(t)));
+	return tags;
 }
 
 export async function deleteThought(id: string) {

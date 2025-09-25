@@ -38,16 +38,9 @@
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
 	let viewPostToastId = $state('');
 
-	let exitSpotId = () => {
-		goto(`/__${gs.accounts[0].currentSpaceId}`);
-	};
-
 	onMount(() => {
 		window.addEventListener('keydown', (e) => {
 			if (!p.hidden && !textInputFocused()) {
-				if (e.key === 'Escape') {
-					spotId ? exitSpotId() : (gs.writerMode = '');
-				}
 				if (e.key === 'n') {
 					e.preventDefault();
 					gs.writerMode = gs.writerMode === 'new' ? '' : 'new';
@@ -64,12 +57,13 @@
 		e?.scrollIntoView({ block: 'start' });
 	};
 
+	let idParamSegs = $derived(splitId(p.idParam || ''));
+	let personalSpaceRequiresLogin = $derived(idParamSegs.in_id === '0' && !gs.accounts[0].id);
+
 	let loadMoreRoots = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
 		// console.log('loadMoreRoots', identifier);
-		if (!p.idParam) return;
-		let segs = splitId(p.idParam);
-		if (segs.in_id) return;
+		if (!p.idParam || personalSpaceRequiresLogin) return;
 
 		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
 		let thoughts: Awaited<ReturnType<typeof loadThoughts>>;
@@ -172,7 +166,7 @@
 				tags,
 				body,
 			};
-			await editThought(thought);
+			thought.tags = await editThought(thought);
 		} else {
 			thought = {
 				// in_id: // TODO: gs.spaces[currentSpace].id
@@ -232,7 +226,7 @@
 {#snippet rewRootBtn()}
 	{#if !p.modal}
 		<button
-			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
+			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
 			onclick={() => (gs.writerMode = 'new')}
 		>
 			<PencilPlus class="h-9" />
@@ -241,9 +235,15 @@
 {/snippet}
 <div
 	bind:this={container}
-	class="relative mt-9 xs:mt-0 bg-bg1 h-[calc(100vh-36px)] xs:h-screen flex flex-col overflow-scroll"
+	class="relative bg-bg1 h-[calc(100vh-36px)] xs:h-screen flex flex-col overflow-scroll"
 >
-	{#if nested}
+	{#if !feed.length && p.idParam === '__'}
+		welcome
+	{:else if personalSpaceRequiresLogin}
+		<div class="xy h-full">
+			<p class="text-2xl sm:text-3xl font-black">Sign in to use this space</p>
+		</div>
+	{:else if nested}
 		<!-- {@render writer()} -->
 		{@render rewRootBtn()}
 		{@render feeder()}
@@ -252,7 +252,7 @@
 			{#if spotId}
 				<button
 					class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
-					onclick={exitSpotId}
+					onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
 				>
 					<IconX class="w-8" />
 				</button>
@@ -283,6 +283,7 @@
 	<div class="sticky bottom-0 z-50">
 		{#if gs.writerMode}
 			<div class="flex group bg-bg4 relative w-full">
+				<!-- TODO: save writer data so it persists after page refresh. If the thought it's editing or linking to is not on the feed, open it in a modal? -->
 				<button class="truncate flex-1 h-8 pl-2 text-left fx gap-1" onclick={scrollToHighlight}>
 					{#if gs.writerMode[0] === 'to'}
 						<IconCornerUpLeft class="w-5" />

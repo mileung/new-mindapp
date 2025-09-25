@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { IconPuzzle, IconSearch, IconSettings, IconUserPlus, IconX } from '@tabler/icons-svelte';
+	import {
+		IconHelpSquareRounded,
+		IconPuzzle,
+		IconSearch,
+		IconSettings,
+		IconUserPlus,
+		IconX,
+	} from '@tabler/icons-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { unsaveTagInPersona } from '$lib/accounts';
@@ -85,7 +92,13 @@
 	on:keydown={(e) => {
 		if (!textInputFocused()) {
 			e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
-			e.key === 'Escape' && (accountMenuOpen = spaceMenuOpen = false);
+			if (e.key === 'Escape') {
+				if (accountMenuOpen || spaceMenuOpen) {
+					accountMenuOpen = spaceMenuOpen = false;
+				} else {
+					gs.writerMode ? (gs.writerMode = '') : goto(`/__${gs.accounts[0].currentSpaceId}`);
+				}
+			}
 			if (e.ctrlKey && e.altKey && e.key === 'Tab') {
 				let currentSpaceIdIndex = gs.accounts[0].spaceIds.indexOf(gs.accounts[0].currentSpaceId);
 				let newSpaceIdIndex = currentSpaceIdIndex + (e.shiftKey ? -1 : 1);
@@ -225,12 +238,9 @@
 					</div>
 				{/each}
 			</div>
-			<div class={`${accountMenuOpen ? '' : 'hidden'}`}>
+			<div class={`${accountMenuOpen ? '' : 'hidden'}`} onclick={() => (accountMenuOpen = false)}>
 				{#each gs.accounts as a, i}
-					<a
-						class={`translate-0 fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
-						onclick={() => (accountMenuOpen = false)}
-					>
+					<a class={`relative fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						{#if !i}
 							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
 						{/if}
@@ -245,21 +255,17 @@
 						})() || m.anon()}
 					</a>
 				{/each}
-				<a
-					href="/add-account"
-					class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}
-					onclick={() => (accountMenuOpen = false)}
-				>
+				<a href="/add-account" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
-				<a
-					href="/settings"
-					class={`translate-0 fx gap-1 p-2 h-10 w-full hover:bg-bg5`}
-					onclick={() => (accountMenuOpen = false)}
-				>
+				<a href="/settings" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
 					<IconSettings class="h-6 w-6" />
 					{m.settings()}
+				</a>
+				<a href="/user-guide" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+					<IconHelpSquareRounded class="h-6 w-6" />
+					{m.userGuide()}
 				</a>
 			</div>
 			<div
@@ -269,7 +275,7 @@
 					id="mindapp-extension"
 					target="_blank"
 					href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-					class={`fx gap-1 p-2 h-12 text-bg1 bg-hl1 hover:bg-hl2`}
+					class={`fx gap-1 p-2 h-12 text-black bg-hl1 hover:bg-hl2`}
 				>
 					<IconPuzzle class="h-6 w-9" />
 					<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
@@ -281,6 +287,7 @@
 							class={`flex-1 fx gap-1 p-2 h-12`}
 							onclick={(e) => {
 								e.preventDefault();
+								spaceMenuOpen = false;
 								changeCurrentSpace(id);
 							}}
 						>
