@@ -260,12 +260,12 @@ async function expandThought(thought: ThoughtSelect): Promise<{
 }
 
 export let rootsPerLoad = 15;
-export let loadThoughts = async (q: {
+export let loadFeed = async (q: {
 	rpc?: boolean;
 	spaceId?: number;
 	nested?: boolean;
 	oldestFirst?: boolean; // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
-	fromMs?: number;
+	fromMs: number;
 	thoughtsBeyond?: number;
 	idsInclude?: string[];
 	idsExclude?: string[];
@@ -281,7 +281,7 @@ export let loadThoughts = async (q: {
 		spaceId,
 		nested = false,
 		oldestFirst = false,
-		fromMs = q.oldestFirst ? 0 : Number.MAX_SAFE_INTEGER,
+		fromMs,
 		idsInclude = [],
 		idsExclude = [],
 		byIdsInclude = [],

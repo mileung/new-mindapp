@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { goto, pushState } from '$app/navigation';
-	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
-	import { gs, type FeedRootIds } from '$lib/globalState.svelte';
+	import { gs, type FeedSequence } from '$lib/globalState.svelte';
 	import { sortUniArr } from '$lib/js';
 	import { updateLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
@@ -13,24 +12,23 @@
 		getId,
 		getIds,
 		idsRegex,
-		isId,
-		loadThoughts,
-		splitId,
+		loadFeed,
 		rootsPerLoad,
-		type ThoughtInsert,
+		splitId,
 		type ThoughtNested,
 	} from '$lib/thoughts';
 	import { IconChevronRight, IconCornerUpLeft, IconPencil, IconX } from '@tabler/icons-svelte';
+	import PencilPlus from '@tabler/icons-svelte/icons/pencil-plus';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import ThoughtDrop from './ThoughtDrop.svelte';
 	import Highlight from './Highlight.svelte';
+	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
-	import PencilPlus from '@tabler/icons-svelte/icons/pencil-plus';
 
 	let byIdsRegex = /(^|\s)\/\d*($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
 	let container: HTMLDivElement;
+	let lastRootLatestIds: string[] = [];
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
 	let identifier = $derived(`/${p.idParam}?q=${p.searchedText}`);
 	// let nested = $derived(!!p.searchedText || !!p.idParam);
@@ -63,15 +61,17 @@
 	let loadMoreRoots = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
 		// console.log('loadMoreRoots', identifier);
+		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
+		if (fromMs === null) return e.detail.complete();
 		if (!p.idParam || personalSpaceRequiresLogin) return;
+		let oldestFirst = false;
+		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
 
 		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
-		let thoughts: Awaited<ReturnType<typeof loadThoughts>>;
-		if (gs.feeds[identifier]?.slice(-1)[0] === null) {
-			gs.feeds[identifier].length > 1 && e.detail.loaded();
-			return e.detail.complete();
-		} else if (spotId) {
-			thoughts = await loadThoughts({ nested, idsInclude: [spotId] });
+		let thoughts: Awaited<ReturnType<typeof loadFeed>>;
+
+		if (spotId) {
+			thoughts = await loadFeed({ nested, fromMs, idsInclude: [spotId] });
 		} else {
 			// TODO: Instead of set theory, implement tag groups
 			let ids = getIds(p.searchedText);
@@ -94,42 +94,54 @@
 					.map((s) => s.toLowerCase()),
 			];
 
-			let fromMs: undefined | number;
-			if (nested) {
-				//
-			} else {
-				let lastRootIndex = gs.feeds[identifier]?.findLastIndex((i) => i && !!gs.thoughts[i]) || -1;
-				if (lastRootIndex >= 0) {
-					let lastRoot = gs.thoughts[gs.feeds[identifier]![lastRootIndex]!]!;
-					fromMs = lastRoot.ms!;
-					// function traverseNestedIds(t: ThoughtNested) {
-					// 	// for latest fromMs
-					// 	// callback(node);
-					// 	for (const child of t.children || []) {
-					// 		traverseNestedIds(child);
-					// 	}
-					// }
-				}
-			}
+			let bumpedIdsOlderThanFromMs = oldestFirst
+				? []
+				: (
+						(gs.feeds[identifier] || []).filter((i) => {
+							if (typeof i !== 'string') return false;
+							let segs = splitId(i);
+							return +segs.ms < fromMs;
+						}) as string[]
+					).flatMap((i) => {
+						let ids: string[] = [];
+						let traverse = (i: string) => {
+							let segs = splitId(i);
+							+segs.ms < fromMs && ids.push(i);
+							gs.thoughts[i]?.childIds?.forEach((i) => traverse(i));
+						};
+						traverse(i);
+						return ids;
+					});
 
-			thoughts = await loadThoughts({
+			thoughts = await loadFeed({
 				nested,
 				fromMs,
 				tagsInclude,
 				byIdsInclude,
 				bodyIncludes,
 				idsExclude: [
+					...lastRootLatestIds,
+					...bumpedIdsOlderThanFromMs,
+					// ...thoughtsMadeClientSide
 					// TODO: Use only the necessary idsExclude
-					...(gs.feeds[identifier]?.flatMap((id) => (id ? [id] : [])) || []),
+					// ...(gs.feeds[identifier]?.flatMap((id) => (id ? [id] : [])) || []),
+					// ...Object.keys(gs.thoughts),
 				],
 			});
 		}
 		let { roots, auxThoughts } = thoughts;
 		let newThoughts: typeof gs.thoughts = {};
-		function traverseNestedThoughts(t: ThoughtNested) {
-			for (let child of t.children || []) {
-				traverseNestedThoughts(child);
+		let lastRoot = roots.slice(-1)[0] as undefined | ThoughtNested;
+		let newFromMs = lastRoot?.ms;
+		let endReached = roots.length < rootsPerLoad;
+		let lastRootNestedIds: Record<number, string[]> = {};
+
+		let traverse = (t: ThoughtNested, helpGetNewFromMs = false) => {
+			if (helpGetNewFromMs) {
+				lastRootNestedIds[t.ms!] = lastRootNestedIds[t.ms!] || [];
+				lastRootNestedIds[t.ms!].push(getId(t));
 			}
+			for (let child of t.children || []) traverse(child);
 			t.childIds =
 				t.children?.map((t) => {
 					let id = getId(t);
@@ -137,16 +149,24 @@
 					return id;
 				}) || [];
 			delete t.children;
-		}
-		roots.forEach((t) => {
+		};
+		roots.forEach((t, i) => {
 			newThoughts[getId(t)] = t;
-			traverseNestedThoughts(t);
+			traverse(t, !endReached && !oldestFirst && i === roots.length - 1);
 		});
+		if (!oldestFirst) {
+			newFromMs = +Object.keys(lastRootNestedIds).sort((a, b) => +a - +b)[0];
+			lastRootLatestIds = lastRootNestedIds[newFromMs];
+		}
 		gs.thoughts = { ...gs.thoughts, ...auxThoughts, ...newThoughts };
-		let newRootIds: FeedRootIds = roots.map(getId);
-		roots.length < rootsPerLoad && newRootIds.push(null);
-		gs.feeds[identifier] = [...(gs.feeds[identifier] || []), ...newRootIds];
-		gs.feeds[identifier][0] === null ? e.detail.complete() : e.detail.loaded();
+		let newRootIds = roots.map(getId);
+		gs.feeds[identifier] = [
+			...((gs.feeds[identifier]?.slice(0, gs.feeds[identifier].length - 1) || []) as string[]),
+			...newRootIds,
+			endReached ? null : newFromMs!,
+		];
+		e.detail.loaded();
+		endReached && e.detail.complete();
 	};
 
 	let submitThought = async (tags: string[], body: string) => {
@@ -182,7 +202,7 @@
 		if (nested && gs.writerMode[0] === 'to') {
 			gs.thoughts[gs.writerMode[1]]?.childIds?.unshift(tid);
 		} else if (gs.writerMode[0] !== 'edit') {
-			gs.feeds = { ...gs.feeds, [identifier]: [tid, ...(gs.feeds[identifier] || [])] };
+			gs.feeds = { ...gs.feeds, [identifier]: [tid, ...gs.feeds[identifier]!] };
 		}
 		gs.writerMode = '';
 		viewPostToastId = tid;
@@ -207,7 +227,7 @@
 >
 	{#if personalSpaceRequiresLogin}
 		<div class="xy h-full">
-			<p class="text-2xl sm:text-3xl font-black">Sign in to use this space</p>
+			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
 		</div>
 	{:else if p.idParam === '__' && feed && !feed.length}
 		welcome
@@ -225,7 +245,10 @@
 			direction={nested ? 'bottom' : 'top'}
 			on:infinite={loadMoreRoots}
 		>
-			<p slot="noResults" class="m-2 text-xl text-fg2">{m.noThoughtsFound()}</p>
+			<p slot="noResults" class="m-2 text-xl text-fg2">
+				<!-- TODO: idk y noResults shows after deleting the one and only thought then making another new thought in Local  -->
+				{feed?.length ? m.endOfFeed() : m.noThoughtsFound()}
+			</p>
 			<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
 			<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
 		</InfiniteLoading>
@@ -242,7 +265,7 @@
 	</div>
 	{#if !p.modal}
 		<button
-			class="fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
+			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
 			onclick={() => (gs.writerMode = 'new')}
 		>
 			<PencilPlus class="h-9" />

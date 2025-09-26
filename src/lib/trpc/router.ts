@@ -28,12 +28,13 @@ const logLimiter = makeLimiter(100, 1);
 
 export const router = t.router({
 	auth: t.router({
-		sendCode: t.procedure
+		sendOtp: t.procedure
 			.input(z.object({ email: z.string().email() }))
 			.mutation(async ({ input }) => {
 				let { email } = input;
 
 				let otp = Math.random().toString(36).slice(-6);
+				console.log('otp:', otp);
 
 				// await resend.emails.send({
 				// 	from: 'noreply@yourdomain.com',
@@ -64,6 +65,16 @@ export const router = t.router({
 				};
 			}),
 	}),
+	getFeed: t.procedure
+		.input(
+			z.object({
+				//
+				email: z.string().email(),
+			}),
+		)
+		.mutation(async ({ input }) => {
+			return { success: true };
+		}),
 });
 
 // https://trpc.io/docs/server/server-side-calls
