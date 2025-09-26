@@ -30,7 +30,7 @@
 <div bind:this={container} id={'m' + id} class={`relative flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if p.nested}
 		<button
-			class={`z-40 w-5 fy bg-inherit text-fg1 ${evenBg ? 'hover:bg-bg3' : 'hover:bg-bg4'}`}
+			class={`z-40 w-5 fy bg-inherit text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 			onclick={() => {
 				let distanceFromTop = container.getBoundingClientRect().top;
 				let willBeOpen = !open;

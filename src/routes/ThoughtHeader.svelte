@@ -59,7 +59,7 @@
 	);
 </script>
 
-<div class="text-sm fx h-5 text-fg2 max-w-full" onmousedown={(e) => e.preventDefault()}>
+<div class="text-sm fx h-5 text-fg2 max-w-full">
 	<a
 		href={`/${id}`}
 		title={whenVerbose}
@@ -183,13 +183,14 @@
 		</div>
 	</div>
 </div>
+{#if dev}<p class="font-bold text-fg2">{id}</p>{/if}
 {#if authorTags.length}
 	<div class="overflow-hidden">
 		<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
 			{#each authorTags as tag}
 				<!-- TODO: Why does using leading-4 cause parent to scroll? -->
 				<a
-					href={`/?q=${encodeURIComponent(`[${tag}]`)}`}
+					href={`/__${gs.accounts[0].currentSpaceId}?q=${encodeURIComponent(`[${tag}]`)}`}
 					class="px-1 font-bold leading-5 text-fg2 hover:text-fg1"
 				>
 					{tag}

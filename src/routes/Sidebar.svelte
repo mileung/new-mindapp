@@ -1,4 +1,12 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import { unsaveTagInPersona } from '$lib/accounts';
+	import { textInputFocused } from '$lib/dom';
+	import { gs } from '$lib/globalState.svelte';
+	import { updateLocalCache } from '$lib/localCache';
+	import { m } from '$lib/paraglide/messages';
+	import { bracketRegex } from '$lib/tags';
 	import {
 		IconHelpSquareRounded,
 		IconPuzzle,
@@ -7,19 +15,10 @@
 		IconUserPlus,
 		IconX,
 	} from '@tabler/icons-svelte';
-	import { goto } from '$app/navigation';
-	import { page } from '$app/state';
-	import { unsaveTagInPersona } from '$lib/accounts';
-	import { textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/globalState.svelte';
-	import { m } from '$lib/paraglide/messages';
-	import { bracketRegex } from '$lib/tags';
-	import { splitId } from '$lib/thoughts';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
-	import { updateLocalCache } from '$lib/localCache';
 
 	let searchIpt: HTMLInputElement;
 	let searchA: HTMLAnchorElement;
@@ -30,7 +29,7 @@
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let browserExtensionAdded = $state(true);
-	let tagIndex = $state(0);
+	let tagIndex = $state(-1);
 	let accountMenuOpen = $state(false);
 	let spaceMenuOpen = $state(false);
 	let tagFilter = $derived(

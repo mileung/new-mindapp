@@ -260,7 +260,7 @@ async function expandThought(thought: ThoughtSelect): Promise<{
 }
 
 export let rootsPerLoad = 15;
-export let loadFeed = async (q: {
+export let loadThoughts = async (q: {
 	rpc?: boolean;
 	spaceId?: number;
 	nested?: boolean;
@@ -305,8 +305,8 @@ export let loadFeed = async (q: {
 	let citedIds: string[] = [];
 	let auxThoughts: Record<string, ThoughtSelect> = {};
 	let baseFilters = [
-		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
 		isNotNull(thoughtsTable.ms),
+		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
 		// not(like(thoughtsTable.tags, `%" private"%`)),
 		or(...idsInclude.map((id) => getIdFilter(id))),
 		or(...byIdsInclude.map((id) => eq(thoughtsTable.by_id, id))),
@@ -362,7 +362,7 @@ export let loadFeed = async (q: {
 	}
 
 	await Promise.all(
-		[...new Set([...citedIds, ...toIds])].map((id) => {
+		[...new Set([...citedIds, ...(nested ? toIds : [])])].map((id) => {
 			return getThought(id).then((thought) => {
 				if (thought) {
 					auxThoughts[id] = thought;

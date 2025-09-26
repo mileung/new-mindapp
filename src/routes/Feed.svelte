@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto, pushState } from '$app/navigation';
 	import { textInputFocused } from '$lib/dom';
-	import { gs, type FeedSequence } from '$lib/globalState.svelte';
+	import { gs } from '$lib/globalState.svelte';
 	import { sortUniArr } from '$lib/js';
 	import { updateLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
@@ -12,13 +12,18 @@
 		getId,
 		getIds,
 		idsRegex,
-		loadFeed,
+		loadThoughts,
 		rootsPerLoad,
 		splitId,
 		type ThoughtNested,
 	} from '$lib/thoughts';
-	import { IconChevronRight, IconCornerUpLeft, IconPencil, IconX } from '@tabler/icons-svelte';
-	import PencilPlus from '@tabler/icons-svelte/icons/pencil-plus';
+	import {
+		IconChevronRight,
+		IconCornerUpLeft,
+		IconPencil,
+		IconPencilPlus,
+		IconX,
+	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import Highlight from './Highlight.svelte';
@@ -28,18 +33,21 @@
 	let byIdsRegex = /(^|\s)\/\d*($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
 	let container: HTMLDivElement;
-	let lastRootLatestIds: string[] = [];
+	let lastRootLatestIdsWithSameMs: string[] = [];
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
-	let identifier = $derived(`/${p.idParam}?q=${p.searchedText}`);
-	// let nested = $derived(!!p.searchedText || !!p.idParam);
-	let nested = $derived(true);
-	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
+
 	let viewPostToastId = $state('');
+
+	let makeFeedId = (id = '', q = '') => `/${id}?q=${q}`;
+	let identifier = $derived(makeFeedId(p.idParam, p.searchedText));
+	let nested = $derived(true); // TODO: linear
+	let oldestFirst = $derived(false);
+	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
 
 	onMount(() => {
 		window.addEventListener('keydown', (e) => {
 			if (!p.hidden && !textInputFocused()) {
-				if (e.key === 'n' && !gs.writerMode) {
+				if (e.key === 'n' && !gs.writerMode && !p.modal) {
 					e.preventDefault();
 					gs.writerMode = 'new';
 				}
@@ -55,23 +63,28 @@
 		e?.scrollIntoView({ block: 'start' });
 	};
 
-	let idParamSegs = $derived(splitId(p.idParam || ''));
-	let personalSpaceRequiresLogin = $derived(idParamSegs.in_id === '0' && !gs.accounts[0].id);
+	let personalSpaceRequiresLogin = $derived(
+		splitId(p.idParam || '').in_id === '0' && !gs.accounts[0].id,
+	);
 
-	let loadMoreRoots = async (e: InfiniteEvent) => {
+	let loadMoreThoughts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
-		// console.log('loadMoreRoots', identifier);
+		// console.log(
+		// 	'loadMoreThoughts',
+		// 	identifier,
+		// 	$state.snapshot(gs.feeds[identifier]),
+		// 	$state.snapshot(gs.thoughts),
+		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
 		if (fromMs === null) return e.detail.complete();
 		if (!p.idParam || personalSpaceRequiresLogin) return;
-		let oldestFirst = false;
 		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
 
 		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
-		let thoughts: Awaited<ReturnType<typeof loadFeed>>;
+		let thoughts: Awaited<ReturnType<typeof loadThoughts>>;
 
 		if (spotId) {
-			thoughts = await loadFeed({ nested, fromMs, idsInclude: [spotId] });
+			thoughts = await loadThoughts({ nested, fromMs, idsInclude: [spotId] });
 		} else {
 			// TODO: Instead of set theory, implement tag groups
 			let ids = getIds(p.searchedText);
@@ -113,35 +126,35 @@
 						return ids;
 					});
 
-			thoughts = await loadFeed({
+			thoughts = await loadThoughts({
 				nested,
 				fromMs,
 				tagsInclude,
 				byIdsInclude,
 				bodyIncludes,
 				idsExclude: [
-					...lastRootLatestIds,
+					// TODO: if oldestFirst, exclude the newest root ids with the same ms
+					...lastRootLatestIdsWithSameMs,
 					...bumpedIdsOlderThanFromMs,
-					// ...thoughtsMadeClientSide
-					// TODO: Use only the necessary idsExclude
-					// ...(gs.feeds[identifier]?.flatMap((id) => (id ? [id] : [])) || []),
-					// ...Object.keys(gs.thoughts),
 				],
 			});
 		}
 		let { roots, auxThoughts } = thoughts;
+		// console.log('thoughts:', thoughts);
 		let newThoughts: typeof gs.thoughts = {};
 		let lastRoot = roots.slice(-1)[0] as undefined | ThoughtNested;
 		let newFromMs = lastRoot?.ms;
 		let endReached = roots.length < rootsPerLoad;
 		let lastRootNestedIds: Record<number, string[]> = {};
 
-		let traverse = (t: ThoughtNested, helpGetNewFromMs = false) => {
+		let traverse = (t: ThoughtNested, rootId: string, helpGetNewFromMs = false) => {
+			let id = getId(t);
 			if (helpGetNewFromMs) {
-				lastRootNestedIds[t.ms!] = lastRootNestedIds[t.ms!] || [];
-				lastRootNestedIds[t.ms!].push(getId(t));
+				lastRootNestedIds[t.ms!] = (lastRootNestedIds[t.ms!] || []).concat(id);
 			}
-			for (let child of t.children || []) traverse(child);
+			for (let child of t.children || []) {
+				traverse(child, rootId, helpGetNewFromMs);
+			}
 			t.childIds =
 				t.children?.map((t) => {
 					let id = getId(t);
@@ -151,22 +164,30 @@
 			delete t.children;
 		};
 		roots.forEach((t, i) => {
-			newThoughts[getId(t)] = t;
-			traverse(t, !endReached && !oldestFirst && i === roots.length - 1);
+			let rootId = getId(t);
+			traverse(t, rootId, !endReached && !oldestFirst && i === roots.length - 1);
+			newThoughts[rootId] = t;
 		});
 		if (!oldestFirst) {
 			newFromMs = +Object.keys(lastRootNestedIds).sort((a, b) => +a - +b)[0];
-			lastRootLatestIds = lastRootNestedIds[newFromMs];
+			lastRootLatestIdsWithSameMs = lastRootNestedIds[newFromMs] || [];
 		}
-		gs.thoughts = { ...gs.thoughts, ...auxThoughts, ...newThoughts };
+		// console.log('gs.thoughts:', $state.snapshot(gs.thoughts));
+		// console.log('auxThoughts:', auxThoughts);
+		gs.thoughts = {
+			...auxThoughts,
+			// TODO: deep merge gs.thoughts with auxThoughts
+			// Sometimes auxThoughts will overwrite a thought is gs.thoughts, but auxThoughts don't have children - which is why auxThoughts goes above gs.thoughts - so to not delete the childIds in gs.thoughts
+			...gs.thoughts,
+			...newThoughts,
+		};
 		let newRootIds = roots.map(getId);
 		gs.feeds[identifier] = [
 			...((gs.feeds[identifier]?.slice(0, gs.feeds[identifier].length - 1) || []) as string[]),
 			...newRootIds,
 			endReached ? null : newFromMs!,
 		];
-		e.detail.loaded();
-		endReached && e.detail.complete();
+		endReached ? e.detail.complete() : e.detail.loaded();
 	};
 
 	let submitThought = async (tags: string[], body: string) => {
@@ -229,46 +250,37 @@
 		<div class="xy h-full">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
 		</div>
-	{:else if p.idParam === '__' && feed && !feed.length}
+	{:else if p.idParam === '__' && !p.searchedText && feed && !feed.length}
 		welcome
 	{:else}
-		{#if feed}
-			<div class="space-y-1 my-1">
-				{#each feed as thought (getId(thought))}
-					<ThoughtDrop {...p} {nested} {thought} depth={0} />
-				{/each}
-			</div>
-		{/if}
-		<InfiniteLoading
-			{identifier}
-			spinner="spiral"
-			direction={nested ? 'bottom' : 'top'}
-			on:infinite={loadMoreRoots}
-		>
+		<div class="space-y-1 my-1">
+			{#each feed || [] as thought (getId(thought))}
+				<ThoughtDrop {...p} {nested} {thought} depth={0} />
+			{/each}
+		</div>
+		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreThoughts}>
 			<p slot="noResults" class="m-2 text-xl text-fg2">
-				<!-- TODO: idk y noResults shows after deleting the one and only thought then making another new thought in Local  -->
+				<!-- TODO: noResults shows after deleting the one and only thought then making another new thought in Local  -->
 				{feed?.length ? m.endOfFeed() : m.noThoughtsFound()}
 			</p>
 			<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
 			<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
 		</InfiniteLoading>
 	{/if}
-	<div class="relative flex-1">
-		{#if spotId}
-			<button
-				class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
-				onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
-			>
-				<IconX class="w-8" />
-			</button>
-		{/if}
-	</div>
-	{#if !p.modal}
+	<div class="relative flex-1"></div>
+	{#if p.modal}
+		<button
+			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
+			onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
+		>
+			<IconX class="w-8" />
+		</button>
+	{:else}
 		<button
 			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
 			onclick={() => (gs.writerMode = 'new')}
 		>
-			<PencilPlus class="h-9" />
+			<IconPencilPlus class="h-9" />
 		</button>
 	{/if}
 
@@ -279,6 +291,8 @@
 				<button class="truncate flex-1 h-8 pl-2 text-left fx gap-1" onclick={scrollToHighlight}>
 					{#if gs.writerMode[0] === 'to'}
 						<IconCornerUpLeft class="w-5" />
+					{:else if gs.writerMode === 'new'}
+						<IconPencilPlus class="w-5" />
 					{:else}
 						<IconPencil class="w-5" />
 					{/if}

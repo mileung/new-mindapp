@@ -4,6 +4,7 @@
 	import { getLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
 	import {
+		getId,
 		getIdFilter,
 		getThought,
 		gsdb,
@@ -79,7 +80,7 @@
 							// TODO: make importing local data faster
 							let results = await Promise.all(
 								importedThoughts.map(
-									async (thought) => [thought, !!(await getThought(thought))] as const,
+									async (thought) => [thought, !!(await getThought(getId(thought)))] as const,
 								),
 							);
 							let inserts: ThoughtInsert[] = [];
@@ -89,7 +90,12 @@
 							results.forEach(([thought, exists]) => (exists ? updates : inserts).push(thought));
 							await Promise.all([
 								...inserts.map((i) => db.insert(thoughtsTable).values(i)),
-								...updates.map((u) => db.update(thoughtsTable).set(u).where(getIdFilter(u))),
+								...updates.map((u) =>
+									db
+										.update(thoughtsTable)
+										.set(u)
+										.where(getIdFilter(getId(u))),
+								),
 							]);
 							alert(m.dataSuccessfullyMerged());
 							gs.feeds['/__'] = undefined;
