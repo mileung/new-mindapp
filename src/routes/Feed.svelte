@@ -242,10 +242,7 @@
 	});
 </script>
 
-<div
-	bind:this={container}
-	class="relative bg-bg1 h-[calc(100vh-36px)] xs:h-screen flex flex-col overflow-scroll"
->
+<div bind:this={container} class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col">
 	{#if personalSpaceRequiresLogin}
 		<div class="xy h-full">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>

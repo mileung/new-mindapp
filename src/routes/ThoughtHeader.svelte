@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { pushState } from '$app/navigation';
-	import { page } from '$app/state';
 	import { gs } from '$lib/globalState.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
