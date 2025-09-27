@@ -254,7 +254,7 @@
 						})() || m.anon()}
 					</a>
 				{/each}
-				<a href="/add-account" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+				<a href="/sign-in" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>

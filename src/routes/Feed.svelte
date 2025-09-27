@@ -43,11 +43,15 @@
 	let nested = $derived(true); // TODO: linear
 	let oldestFirst = $derived(false);
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
+	let personalSpaceRequiresLogin = $derived(
+		splitId(p.idParam || '').in_id === '0' && (!gs.accounts[0] || !gs.accounts[0].id),
+	);
+	let allowNewWriting = $derived(!p.modal && !personalSpaceRequiresLogin);
 
 	onMount(() => {
 		window.addEventListener('keydown', (e) => {
 			if (!p.hidden && !textInputFocused()) {
-				if (e.key === 'n' && !gs.writerMode && !p.modal) {
+				if (e.key === 'n' && !gs.writerMode && allowNewWriting) {
 					e.preventDefault();
 					gs.writerMode = 'new';
 				}
@@ -62,10 +66,6 @@
 			document.querySelector('.m' + id);
 		e?.scrollIntoView({ block: 'start' });
 	};
-
-	let personalSpaceRequiresLogin = $derived(
-		splitId(p.idParam || '').in_id === '0' && !gs.accounts[0].id,
-	);
 
 	let loadMoreThoughts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
@@ -242,10 +242,17 @@
 	});
 </script>
 
-<div bind:this={container} class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col">
+<div bind:this={container} class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col min-h-screen">
 	{#if personalSpaceRequiresLogin}
-		<div class="xy h-full">
+		<div class="xy fy gap-2 flex-1">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
+			<a
+				href="/sign-in"
+				class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
+			>
+				{m.addAccount()}
+				<IconChevronRight class="h-5" stroke={3} />
+			</a>
 		</div>
 	{:else if p.idParam === '__' && !p.searchedText && feed && !feed.length}
 		welcome
@@ -264,7 +271,6 @@
 			<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
 		</InfiniteLoading>
 	{/if}
-	<div class="relative flex-1"></div>
 	{#if p.modal}
 		<button
 			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
@@ -272,7 +278,7 @@
 		>
 			<IconX class="w-8" />
 		</button>
-	{:else}
+	{:else if allowNewWriting}
 		<button
 			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
 			onclick={() => (gs.writerMode = 'new')}
@@ -282,6 +288,7 @@
 	{/if}
 
 	{#if gs.writerMode}
+		<div class="flex-1"></div>
 		<div class="sticky bottom-0 z-50">
 			<div class="flex group bg-bg4 relative w-full">
 				<!-- TODO: save writer data so it persists after page refresh. If the thought it's editing or linking to is not on the feed, open it in a modal? -->

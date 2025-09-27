@@ -11,7 +11,7 @@
 	{#if useModal}
 		<Feed modal {searchedText} {idParam} />
 	{/if}
-	<div class={useModal ? 'hidden' : ''}>
+	<div class={useModal ? 'hidden' : 'min-h-screen'}>
 		<Feed hidden={!!page.state.modalId} {idParam} searchedText="" />
 	</div>
 {/if}

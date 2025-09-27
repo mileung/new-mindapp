@@ -112,6 +112,6 @@
 </script>
 
 <Sidebar />
-<div class="xs:pl-[var(--w-sidebar)]">
+<div class="xs:pl-[var(--w-sidebar)] min-h-screen">
 	{@render p.children()}
 </div>
