@@ -137,7 +137,7 @@ export async function addThought(t: ThoughtInsert) {
 	return ms;
 }
 
-let readOnlyTags = new Set([' edited:<ms>', ' deleted']);
+// let readOnlyTags = new Set([' edited:<ms>', ' deleted']);
 export function divideTags(thought: ThoughtInsert) {
 	let authorTags: string[] = [];
 	let readOnlyTags: string[] = [];
@@ -154,24 +154,16 @@ export async function editThought(t: ThoughtInsert) {
 	}
 	let originalThought = await getThought(getId(t));
 	if (!originalThought) throw new Error('Original thought not found');
-	let { readOnlyTags: originalReadOnlyTags } = divideTags(originalThought);
-	let {
-		authorTags: newAuthorTags, //
-		readOnlyTags: newReadOnlyTags,
-	} = divideTags(t);
-	if (!newAuthorTags.every((t) => t.length === t.trim().length))
+	let { readOnlyTags } = divideTags(originalThought);
+	let { authorTags } = divideTags(t);
+	if (!authorTags.every((t) => t.length === t.trim().length))
 		throw new Error('Every tag must be trimmed');
-	if (
-		originalReadOnlyTags.length !== newReadOnlyTags.length ||
-		!newReadOnlyTags.every((val) => originalReadOnlyTags.includes(val))
-	)
-		throw new Error('Cannot edit read-only tags');
-	let editedBefore = originalReadOnlyTags.some((t) => t.startsWith(' edited:'));
-	if (editedBefore) {
-		let editTagI = t.tags?.findIndex((t) => t.startsWith(' edited:'))!;
-		t.tags?.splice(editTagI, 1);
-	}
-	let tags = sortUniArr([` edited:${Date.now()}`, ...(t.tags || [])]);
+
+	let tags = sortUniArr([
+		` edited:${Date.now()}`,
+		...readOnlyTags.filter((t) => !t.startsWith(' edited:')),
+		...authorTags,
+	]);
 	await (
 		await gsdb()
 	)
