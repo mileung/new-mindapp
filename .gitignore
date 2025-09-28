@@ -33,3 +33,5 @@ project.inlang/project_id
 draft
 /**/dist
 *.zip
+
+global-test.db

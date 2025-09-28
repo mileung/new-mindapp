@@ -1,9 +1,15 @@
+import { dev } from '$app/environment';
+import { tdb } from '$lib/server/db';
+import { filterThought, type ThoughtInsert } from '$lib/thoughts';
+import { thoughtsTable } from '$lib/thoughts-table';
 import type { Context } from '$lib/trpc/context';
 import type { RequestEvent } from '@sveltejs/kit';
 import { initTRPC } from '@trpc/server';
+import { desc, eq } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
-import { minute, second } from '../time';
+import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
+import { minute, second } from '../time';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -26,6 +32,16 @@ let makeLimiter = (pings: number, minutes: number) => {
 
 const logLimiter = makeLimiter(100, 1);
 
+const emailLimiter = makeLimiter(3, 5);
+async function email(config: { from: string; to: string; subject: string; html: string }) {
+	// const { err } = await emailLimiter.ping();
+	// if (err) throw new Error(err);
+	// const resend = new Resend(env.RESEND_API_KEY);
+	// const result = await resend.emails.send(config);
+	// return result;
+}
+
+// let sessionId = event.cookies.get('sessionId');
 export const router = t.router({
 	auth: t.router({
 		sendOtp: t.procedure
@@ -33,37 +49,88 @@ export const router = t.router({
 			.mutation(async ({ input }) => {
 				let { email } = input;
 
-				let otp = Math.random().toString(36).slice(-6);
-				console.log('otp:', otp);
+				console.log('tdb:', tdb);
+				console.log('email:', email);
+				if (email.length > 254) throw new Error('invalid email');
 
-				// await resend.emails.send({
-				// 	from: 'noreply@yourdomain.com',
-				// 	to: email,
-				// 	subject: 'Your Login Code',
-				// 	html: `${otp}`,
-				// });
+				let otp = ('' + Math.random()).slice(-6);
+				if (dev) {
+					console.log('otp:', otp);
+				} else {
+					// await resend.emails.send({
+					// 	from: 'noreply@yourdomain.com',
+					// 	to: email,
+					// 	subject: 'Your Login Code',
+					// 	html: `${otp}`,
+					// });
+				}
 
+				let now = Date.now();
+				let t: ThoughtInsert = {
+					ms: now,
+					tags: [` otp:${email}`],
+					body: JSON.stringify({ otp }),
+				};
+				await tdb.insert(thoughtsTable).values(t);
 				return { success: true };
 			}),
-		verifyCode: t.procedure
+		verifyOtp: t.procedure
 			.input(
 				z.object({
 					email: z.string().email(),
-					code: z.string().length(6),
+					otp: z.string().length(6),
 				}),
 			)
-			.mutation(async ({ input }) => {
-				const { email, code } = input;
+			.mutation(
+				async ({
+					input,
+					ctx,
+				}): Promise<{
+					strike?: number;
+					// account?: Account;
+					success?: any;
+				}> => {
+					let t = (
+						await tdb
+							.select()
+							.from(thoughtsTable)
+							.where(eq(thoughtsTable.tags, [` otp:${input.email}`]))
+							.orderBy(desc(thoughtsTable.ms))
+					)[0];
 
-				return {
-					success: true,
-					// token,
-					// user: {
-					// 	id: user.id,
-					// 	email: user.email,
-					// },
-				};
-			}),
+					console.log('t:', t);
+					let { otp, strike = 0 } = JSON.parse(t.body!);
+					if (input.otp === otp) {
+						ctx.event.cookies.set('sessionId', uuidv4(), {
+							httpOnly: true,
+							secure: true,
+							path: '/',
+							maxAge: 60 * 60 * 24 * 7, // 1 week
+							sameSite: 'lax',
+						});
+						return {
+							// account: {
+							success: {
+								// id: '',
+								// id: user.id,
+								// email: user.email,
+							},
+						};
+					}
+					strike++;
+					if (strike > 2) {
+						tdb.delete(thoughtsTable).where(filterThought(t));
+					} else {
+						tdb
+							.update(thoughtsTable)
+							.set({
+								body: JSON.stringify({ otp, strike }),
+							})
+							.where(filterThought(t));
+					}
+					return { strike };
+				},
+			),
 	}),
 	getFeed: t.procedure
 		.input(

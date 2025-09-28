@@ -279,7 +279,7 @@
 					<IconPuzzle class="h-6 w-9" />
 					<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
 				</a>
-				{#each gs.accounts[0]?.spaceIds || [] as id, i}
+				{#each gs.accounts[0]?.spaceIds || [] as id}
 					<div class={`flex ${id === gs.accounts[0].currentSpaceId ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<a
 							href={`/__${id ?? ''}`}

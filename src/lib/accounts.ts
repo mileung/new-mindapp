@@ -7,7 +7,7 @@ export let currentPersona = () => {
 	return gs.accounts[0]!;
 };
 
-export let PersonaSchema = z
+export let AccountSchema = z
 	.object({
 		id: z.string(),
 		currentSpaceId: z.string(),
@@ -17,7 +17,7 @@ export let PersonaSchema = z
 	})
 	.strict();
 
-export type Account = z.infer<typeof PersonaSchema>;
+export type Account = z.infer<typeof AccountSchema>;
 
 export async function unsaveTagInPersona(tag: string) {
 	await updateLocalCache((lc) => {

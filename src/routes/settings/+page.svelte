@@ -4,18 +4,18 @@
 	import { getLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
 	import {
+		filterThought,
 		getId,
-		getIdFilter,
 		getThought,
 		gsdb,
 		initLocalDb,
 		ThoughtInsertSchema,
-		thoughtsTable,
 		type ThoughtInsert,
 		type ThoughtSelect,
 	} from '$lib/thoughts';
+	import { thoughtsTable } from '$lib/thoughts-table';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
-	import { asc, isNotNull } from 'drizzle-orm';
+	import { asc } from 'drizzle-orm';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 </script>
 
@@ -90,12 +90,7 @@
 							results.forEach(([thought, exists]) => (exists ? updates : inserts).push(thought));
 							await Promise.all([
 								...inserts.map((i) => db.insert(thoughtsTable).values(i)),
-								...updates.map((u) =>
-									db
-										.update(thoughtsTable)
-										.set(u)
-										.where(getIdFilter(getId(u))),
-								),
+								...updates.map((u) => db.update(thoughtsTable).set(u).where(filterThought(u))),
 							]);
 							alert(m.dataSuccessfullyMerged());
 							gs.feeds['/__'] = undefined;

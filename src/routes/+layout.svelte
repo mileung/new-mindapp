@@ -27,7 +27,7 @@
 			});
 		}
 
-		// dropThoughtsTableInDev();
+		// dropThoughtsTableInOpfsInDev();
 
 		try {
 			await initLocalDb();

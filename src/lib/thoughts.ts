@@ -13,13 +13,14 @@ import {
 	notLike,
 	or,
 } from 'drizzle-orm';
-import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { gs } from './globalState.svelte';
-import { m } from './paraglide/messages';
-import { minute } from './time';
 import { sortUniArr } from './js';
+import { m } from './paraglide/messages';
+import { thoughtsTable } from './thoughts-table';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 
 // https://sqlocal.dev/guide/introduction
 export async function initLocalDb() {
@@ -48,31 +49,6 @@ export async function initLocalDb() {
 	}
 }
 
-export let thoughtsTable = sqliteTable(
-	'thoughts',
-	{
-		ms: integer('ms'),
-		tags: text('tags', { mode: 'json' }).$type<string[]>(),
-		body: text('body'),
-		by_id: integer('by_id'),
-		to_id: text('to_id'),
-		in_id: integer('in_id'),
-	},
-	(table) => [
-		// https://orm.drizzle.team/docs/indexes-letraints#composite-primary-key
-		primaryKey({
-			name: 'thought_id',
-			columns: [table.ms, table.by_id, table.in_id],
-		}),
-		index('ms_idx').on(table.ms),
-		index('tags_idx').on(table.tags),
-		index('body_idx').on(table.body),
-		index('by_id_idx').on(table.by_id),
-		index('to_id_idx').on(table.to_id),
-		index('in_id_idx').on(table.in_id),
-	],
-);
-
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
 export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
 export type ThoughtNested = ThoughtInsert & { children?: ThoughtNested[]; childIds?: string[] };
@@ -94,16 +70,18 @@ export function splitId(id: string) {
 	return segs;
 }
 
-export function getIdFilter(id: string) {
+export let filterThought = (t: ThoughtInsert) => filterId(getId(t));
+
+export let filterId = (id: string) => {
 	let { ms, by_id, in_id } = splitId(id);
 	return and(
 		ms ? eq(thoughtsTable.ms, +ms) : isNull(thoughtsTable.ms),
 		by_id ? eq(thoughtsTable.by_id, +by_id) : isNull(thoughtsTable.by_id),
 		in_id ? eq(thoughtsTable.in_id, +in_id) : isNull(thoughtsTable.in_id),
 	);
-}
+};
 
-export function dropThoughtsTableInDev() {
+export function dropThoughtsTableInOpfsInDev() {
 	let { sql } = new SQLocalDrizzle('mindapp.db');
 	if (dev) {
 		console.warn(
@@ -125,6 +103,8 @@ export async function gsdb() {
 	return gs.db;
 }
 
+type Database = LibSQLDatabase | SqliteRemoteDatabase;
+
 export async function addThought(t: ThoughtInsert) {
 	if (typeof t.in_id === 'number') {
 		if (!t.by_id) throw new Error('Missing by_id');
@@ -133,16 +113,17 @@ export async function addThought(t: ThoughtInsert) {
 	if (!(t.tags || []).every((t) => t.length === t.trim().length))
 		throw new Error('Every tag must be trimmed');
 	let ms = Date.now();
+	// gs.accounts[0].currentSpaceId
 	await (await gsdb()).insert(thoughtsTable).values({ ...t, ms });
 	return ms;
 }
 
-// let readOnlyTags = new Set([' edited:<ms>', ' deleted']);
+// let systemTags = new Set([' edited:<ms>', ' deleted']);
 export function divideTags(thought: ThoughtInsert) {
 	let authorTags: string[] = [];
-	let readOnlyTags: string[] = [];
-	(thought.tags || []).forEach((t) => (t[0] === ' ' ? readOnlyTags : authorTags).push(t));
-	return { authorTags, readOnlyTags };
+	let systemTags: string[] = [];
+	(thought.tags || []).forEach((t) => (t[0] === ' ' ? systemTags : authorTags).push(t));
+	return { authorTags, systemTags };
 }
 
 export async function editThought(t: ThoughtInsert) {
@@ -154,14 +135,14 @@ export async function editThought(t: ThoughtInsert) {
 	}
 	let originalThought = await getThought(getId(t));
 	if (!originalThought) throw new Error('Original thought not found');
-	let { readOnlyTags } = divideTags(originalThought);
+	let { systemTags } = divideTags(originalThought);
 	let { authorTags } = divideTags(t);
 	if (!authorTags.every((t) => t.length === t.trim().length))
 		throw new Error('Every tag must be trimmed');
 
 	let tags = sortUniArr([
 		` edited:${Date.now()}`,
-		...readOnlyTags.filter((t) => !t.startsWith(' edited:')),
+		...systemTags.filter((t) => !t.startsWith(' edited:')),
 		...authorTags,
 	]);
 	await (
@@ -169,9 +150,11 @@ export async function editThought(t: ThoughtInsert) {
 	)
 		.update(thoughtsTable)
 		.set({ ...t, tags })
-		.where(getIdFilter(getId(t)));
+		.where(filterThought(t));
 	return tags;
 }
+
+export async function updateThought(id: string) {}
 
 export async function deleteThought(id: string) {
 	let s = splitId(id);
@@ -188,10 +171,10 @@ export async function deleteThought(id: string) {
 				body: null,
 				tags: [' deleted'],
 			})
-			.where(getIdFilter(id));
+			.where(filterId(id));
 		return { soft: true };
 	} else {
-		await (await gsdb()).delete(thoughtsTable).where(getIdFilter(id));
+		await (await gsdb()).delete(thoughtsTable).where(filterId(id));
 		return { soft: false };
 	}
 }
@@ -209,7 +192,7 @@ export async function getThoughtChildren(id: string, limit = -1) {
 }
 
 export async function getThought(id: string): Promise<ThoughtSelect | undefined> {
-	return (await (await gsdb()).select().from(thoughtsTable).where(getIdFilter(id)).limit(1))[0];
+	return (await (await gsdb()).select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
 }
 
 async function getRootThought(thought: ThoughtSelect) {
@@ -298,14 +281,15 @@ export let loadThoughts = async (q: {
 	let auxThoughts: Record<string, ThoughtSelect> = {};
 	let baseFilters = [
 		isNotNull(thoughtsTable.ms),
+		// ...(spaceId === undefined ? [] : [isNotNull(thoughtsTable.by_id)]),
 		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
 		// not(like(thoughtsTable.tags, `%" private"%`)),
-		or(...idsInclude.map((id) => getIdFilter(id))),
+		or(...idsInclude.map((id) => filterId(id))),
 		or(...byIdsInclude.map((id) => eq(thoughtsTable.by_id, id))),
 		or(...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
 		or(...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`))),
 		...idsExclude.map((id) => {
-			let filter = getIdFilter(id);
+			let filter = filterId(id);
 			return filter ? not(filter) : undefined;
 		}),
 		...byIdsExclude.map((id) => not(eq(thoughtsTable.by_id, id))),

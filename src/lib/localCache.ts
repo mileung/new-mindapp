@@ -1,15 +1,16 @@
 import { z } from 'zod';
 import { SpaceSchema } from './spaces';
-import { PersonaSchema } from './accounts';
-import { getIdFilter, gsdb, thoughtsTable, type ThoughtInsert } from './thoughts';
+import { AccountSchema } from './accounts';
+import { filterId, gsdb, type ThoughtInsert } from './thoughts';
 import { and, isNull } from 'drizzle-orm';
 import { m } from './paraglide/messages';
 import { gs } from './globalState.svelte';
+import { thoughtsTable } from './thoughts-table';
 
 export let LocalCacheSchema = z
 	.object({
 		spaces: z.record(z.number(), SpaceSchema),
-		accounts: z.array(PersonaSchema),
+		accounts: z.array(AccountSchema),
 	})
 	.strict();
 
@@ -43,6 +44,7 @@ let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 		in_id: undefined,
 		body: JSON.stringify(localCache),
 	}) as ThoughtInsert;
+
 export async function initLocalCache() {
 	return (
 		await (await gsdb())
@@ -63,7 +65,7 @@ export async function getLocalCache() {
 				// Not sure if I'll use tags or to_id to organize multiple author-less meta thoughts...
 				isNull(thoughtsTable.tags),
 				isNull(thoughtsTable.to_id),
-				getIdFilter('__'),
+				filterId('__'),
 			),
 		);
 	if (!localCacheRow) localCacheRow = await initLocalCache();
@@ -101,7 +103,7 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 	)
 		.update(thoughtsTable)
 		.set(makeLocalCacheThoughtInsert(newLocalCache))
-		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), getIdFilter('__')));
+		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), filterId('__')));
 }
 
 export async function deleteLocalCache() {

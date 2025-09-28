@@ -47,9 +47,9 @@
 
 	let id = $derived(getId(p.thought));
 	let when = $derived(formatMs(p.thought.ms || 0));
-	let { authorTags, readOnlyTags } = $derived(divideTags(p.thought));
+	let { authorTags, systemTags } = $derived(divideTags(p.thought));
 	let editMs = $derived.by(() => {
-		let editedTag = readOnlyTags.find((t) => t.startsWith(' edited:'));
+		let editedTag = systemTags.find((t) => t.startsWith(' edited:'));
 		let editMs = editedTag ? +editedTag.slice(8) : null;
 		return editMs;
 	});

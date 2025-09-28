@@ -8,8 +8,16 @@ if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
 if (!dev && !env.DATABASE_AUTH_TOKEN) throw new Error('DATABASE_AUTH_TOKEN is not set');
 
 const client = createClient({
-	url: env.DATABASE_URL,
-	authToken: env.DATABASE_AUTH_TOKEN,
+	// url: env.DATABASE_URL,
+	// authToken: env.DATABASE_AUTH_TOKEN,
+	...(env.TURSO_DATABASE_URL && env.TURSO_AUTH_TOKEN
+		? {
+				url: env.TURSO_DATABASE_URL,
+				authToken: env.TURSO_AUTH_TOKEN,
+			}
+		: {
+				url: 'file:global-test.db',
+			}),
 });
 
-export const db = drizzle(client, { schema });
+export const tdb = drizzle(client, { schema });
