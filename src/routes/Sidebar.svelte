@@ -53,10 +53,10 @@
 		browserExtensionAdded = !!window.mindappBrowserExtensionAdded;
 	});
 
-	let changeCurrentSpace = (inId: string) => {
-		goto(`/__${inId}`);
+	let changeCurrentSpace = (inMs: number | '') => {
+		goto(`/__${inMs}`);
 		updateLocalCache((lc) => {
-			lc.accounts[0].currentSpaceId = inId;
+			lc.accounts[0].currentSpaceMs = inMs;
 			return lc;
 		});
 	};
@@ -74,16 +74,16 @@
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts[0]) {
 			page.state.modalId = undefined;
-			let urlPath = `/__${gs.accounts[0].currentSpaceId}?q=${q}`;
+			let urlPath = `/__${gs.accounts[0].currentSpaceMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else goto(urlPath);
 		}
 	};
 
 	$effect(() => {
-		// console.log(gs.accounts[0]?.currentSpaceId);
+		// console.log(gs.accounts[0]?.currentSpaceMs);
 		// console.log(gs.accounts[0]?.id);
-		// console.log($inspect(gs.accounts[0]?.spaceIds));
+		// console.log($inspect(gs.accounts[0]?.spaceMss));
 	});
 </script>
 
@@ -95,15 +95,15 @@
 				if (accountMenuOpen || spaceMenuOpen) {
 					accountMenuOpen = spaceMenuOpen = false;
 				} else {
-					gs.writerMode ? (gs.writerMode = '') : goto(`/__${gs.accounts[0].currentSpaceId}`);
+					gs.writerMode ? (gs.writerMode = '') : goto(`/__${gs.accounts[0].currentSpaceMs}`);
 				}
 			}
 			if (e.ctrlKey && e.altKey && e.key === 'Tab') {
-				let currentSpaceIdIndex = gs.accounts[0].spaceIds.indexOf(gs.accounts[0].currentSpaceId);
-				let newSpaceIdIndex = currentSpaceIdIndex + (e.shiftKey ? -1 : 1);
-				if (newSpaceIdIndex < 0) newSpaceIdIndex = gs.accounts[0].spaceIds.length - 1;
-				if (newSpaceIdIndex >= gs.accounts[0].spaceIds.length) newSpaceIdIndex = 0;
-				changeCurrentSpace(gs.accounts[0].spaceIds[newSpaceIdIndex]);
+				let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
+				let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
+				if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
+				if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length) newSpaceMsIndex = 0;
+				changeCurrentSpace(gs.accounts[0].spaceMss[newSpaceMsIndex]);
 			}
 		}
 	}}
@@ -129,7 +129,7 @@
 					{#if accountMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else}
-						<AccountIcon id={`${gs.accounts[0]?.id ?? ''}`} />
+						<AccountIcon id={`_${gs.accounts[0]?.ms ?? ''}_`} />
 					{/if}
 				</button>
 				<button
@@ -142,7 +142,7 @@
 					{#if spaceMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else}
-						<SpaceIcon id={`${gs.accounts[0]?.currentSpaceId ?? ''}`} />
+						<SpaceIcon id={`__${gs.accounts[0]?.currentSpaceMs ?? ''}`} />
 					{/if}
 				</button>
 			{/if}
@@ -243,7 +243,7 @@
 						{#if !i}
 							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
 						{/if}
-						<AccountIcon id={a.id} />
+						<AccountIcon id={`_${a.ms}_`} />
 						{(() => {
 							let accountJson = gs.thoughts[a.id]?.body;
 							if (accountJson) {
@@ -279,34 +279,34 @@
 					<IconPuzzle class="h-6 w-9" />
 					<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
 				</a>
-				{#each gs.accounts[0]?.spaceIds || [] as id}
-					<div class={`flex ${id === gs.accounts[0].currentSpaceId ? 'bg-bg5' : ''} hover:bg-bg5`}>
+				{#each gs.accounts[0]?.spaceMss || [] as ms}
+					<div class={`flex ${ms === gs.accounts[0].currentSpaceMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<a
-							href={`/__${id ?? ''}`}
+							href={`/__${ms ?? ''}`}
 							class={`flex-1 fx gap-1 p-2 h-12`}
 							onclick={(e) => {
 								e.preventDefault();
 								spaceMenuOpen = false;
-								changeCurrentSpace(id);
+								changeCurrentSpace(ms);
 							}}
 						>
-							{#if id === gs.accounts[0].currentSpaceId}
+							{#if ms === gs.accounts[0].currentSpaceMs}
 								<div class="absolute left-0 h-12 w-0.5 bg-hl1"></div>
 							{/if}
-							<SpaceIcon {id} class="h-6 w-9" />
+							<SpaceIcon id={`__${ms}`} class="h-6 w-9" />
 							<p class="font-medium">
-								{!id
+								{!ms
 									? m.local()
-									: id === '0'
+									: ms === 0
 										? m.personal()
-										: id === '1'
+										: ms === 1
 											? m.global()
-											: gs.spaces[id]?.id}
+											: gs.spaces[ms]?.ms}
 							</p>
 						</a>
-						<!-- {#if i === gs.accounts[0]?.currentSpaceId}
+						<!-- {#if i === gs.accounts[0]?.currentSpaceMs}
 							<button class="text-fg2 hover:text-fg1 p-2">
-								{#if gs.spaces[gs.accounts[0]?.currentSpaceId!]?.nested}
+								{#if gs.spaces[gs.accounts[0]?.currentSpaceMs!]?.nested}
 									<IconListTree />
 								{:else}
 									<IconList />

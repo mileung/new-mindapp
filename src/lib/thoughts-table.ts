@@ -6,21 +6,21 @@ export let thoughtsTable = sqliteTable(
 		ms: integer('ms'),
 		tags: text('tags', { mode: 'json' }).$type<string[]>(),
 		body: text('body'),
-		by_id: integer('by_id'),
+		by_ms: integer('by_ms'),
 		to_id: text('to_id'),
-		in_id: integer('in_id'),
+		in_ms: integer('in_ms'),
 	},
 	(table) => [
 		// https://orm.drizzle.team/docs/indexes-letraints#composite-primary-key
 		primaryKey({
 			name: 'thought_id',
-			columns: [table.ms, table.by_id, table.in_id],
+			columns: [table.ms, table.by_ms, table.in_ms],
 		}),
 		index('ms_idx').on(table.ms),
 		index('tags_idx').on(table.tags),
 		index('body_idx').on(table.body),
-		index('by_id_idx').on(table.by_id),
+		index('by_ms_idx').on(table.by_ms),
 		index('to_id_idx').on(table.to_id),
-		index('in_id_idx').on(table.in_id),
+		index('in_ms_idx').on(table.in_ms),
 	],
 );

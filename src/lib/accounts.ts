@@ -9,10 +9,10 @@ export let currentPersona = () => {
 
 export let AccountSchema = z
 	.object({
-		id: z.string(),
-		currentSpaceId: z.string(),
+		ms: z.literal('').or(z.number()),
+		currentSpaceMs: z.literal('').or(z.number()),
 		spacesPinnedThrough: z.number(),
-		spaceIds: z.array(z.string()),
+		spaceMss: z.array(z.literal('').or(z.number())),
 		tags: z.array(z.string()),
 	})
 	.strict();

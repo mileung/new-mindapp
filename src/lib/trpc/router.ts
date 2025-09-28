@@ -41,7 +41,6 @@ async function email(config: { from: string; to: string; subject: string; html: 
 	// return result;
 }
 
-// let sessionId = event.cookies.get('sessionId');
 export const router = t.router({
 	auth: t.router({
 		sendOtp: t.procedure
@@ -136,10 +135,12 @@ export const router = t.router({
 		.input(
 			z.object({
 				//
-				email: z.string().email(),
 			}),
 		)
-		.mutation(async ({ input }) => {
+		.mutation(async ({ input, ctx }) => {
+			let sessionId = ctx.event.cookies.get('sessionId');
+			console.log('sessionId:', sessionId);
+
 			return { success: true };
 		}),
 });

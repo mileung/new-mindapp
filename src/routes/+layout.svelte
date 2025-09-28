@@ -54,7 +54,7 @@
 
 	function goToCurrentSpace() {
 		gs.accounts[0] &&
-			goto(`/__${gs.accounts[0].currentSpaceId}`, {
+			goto(`/__${gs.accounts[0].currentSpaceMs}`, {
 				replaceState: true,
 				keepFocus: true,
 			});

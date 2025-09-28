@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
-	import { page } from '$app/state';
 	import { formatMs } from '$lib/time';
 	import Highlight from './Highlight.svelte';
 	let p: { id: string; depth: number } = $props();
@@ -8,12 +7,12 @@
 
 <a
 	target="_blank"
-	href={`/${p.id}`}
+	href={'/' + p.id}
 	class={`relative border-l-2 border-hl-cite p-1 m-1 w-fit block text-sm font-bold text-fg2 hover:text-fg1 ${!((p.depth + 1) % 2) ? 'bg-bg1' : 'bg-bg3'}`}
 	onclick={(e) => {
 		if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 			e.preventDefault();
-			pushState(`/${p.id}`, { modalId: p.id });
+			pushState('/' + p.id, { modalId: p.id });
 		}
 	}}
 >

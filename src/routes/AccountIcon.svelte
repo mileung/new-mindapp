@@ -8,8 +8,8 @@
 	} = $props();
 </script>
 
-{#if p.id}
-	<Identicon data={p.id} class={p.class} />
-{:else}
+{#if p.id === '__'}
 	<IconUserFilled class={`text-fg1 ${p.class}`} />
+{:else}
+	<Identicon data={p.id} class={p.class} />
 {/if}

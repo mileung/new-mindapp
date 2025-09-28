@@ -54,12 +54,12 @@
 				{#if !p.nested && p.thought.to_id}
 					<div class="relative fx">
 						<a
-							href={`/${p.thought.to_id}`}
+							href={'/' + p.thought.to_id}
 							class="group fx gap-0.5 text-sm hover:text-fg3 truncate"
 							onclick={(e) => {
 								if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 									e.preventDefault();
-									pushState(`/${p.thought.to_id}`, { modalId: p.thought.to_id! });
+									pushState('/' + p.thought.to_id, { modalId: p.thought.to_id! });
 								}
 							}}
 						>

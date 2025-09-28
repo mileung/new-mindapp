@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/globalState.svelte';
 	import { getLocalCache } from '$lib/localCache';
@@ -17,6 +18,12 @@
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
 	import { asc } from 'drizzle-orm';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
+
+	let setAccountsAndSpaces = async () => {
+		let localCache = await getLocalCache();
+		gs.accounts = localCache.accounts;
+		gs.spaces = localCache.spaces;
+	};
 </script>
 
 <div class="p-2 space-y-2 w-full max-w-xl">
@@ -44,16 +51,17 @@
 						)
 							.select()
 							.from(thoughtsTable) // TODO: explicitly make rows with null ms cols come first or last?
-							// TODO: Also had this idea to export rows based on in_id or ms range
+							// TODO: Also had this idea to export rows based on in_ms or ms range
 							.orderBy(asc(thoughtsTable.ms))
 					).map(
 						(r) =>
 							({
-								by_id: r.by_id || undefined,
-								to_id: r.to_id || undefined,
+								ms: r.ms || undefined,
 								tags: r.tags || undefined,
 								body: r.body || undefined,
-								ms: r.ms || undefined,
+								by_ms: r.by_ms || undefined,
+								to_id: r.to_id || undefined,
+								in_ms: r.in_ms || undefined,
 							}) as ThoughtSelect,
 					),
 				),
@@ -69,6 +77,7 @@
 			input.onchange = async (event) => {
 				let file = (event.target as HTMLInputElement).files?.[0];
 				if (file) {
+					console.time('import_time');
 					let text = await file.text();
 					try {
 						let importedThoughts: ThoughtInsert[] = JSON.parse(text);
@@ -85,15 +94,15 @@
 							);
 							let inserts: ThoughtInsert[] = [];
 							let updates: ThoughtInsert[] = [];
-
-							// TODO: insert where it dne, if it does update it
 							results.forEach(([thought, exists]) => (exists ? updates : inserts).push(thought));
 							await Promise.all([
 								...inserts.map((i) => db.insert(thoughtsTable).values(i)),
 								...updates.map((u) => db.update(thoughtsTable).set(u).where(filterThought(u))),
 							]);
-							alert(m.dataSuccessfullyMerged());
+							console.timeEnd('import_time');
+							setAccountsAndSpaces();
 							gs.feeds['/__'] = undefined;
+							alert(m.dataSuccessfullyMerged());
 						} else {
 							alert(m.invalidJsonFile());
 						}
@@ -111,19 +120,21 @@
 	<button
 		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
 		onclick={async () => {
-			let a = Math.floor(Math.random() * 90) + 10;
-			let b = Math.floor(Math.random() * 90) + 10;
-			let sum = prompt(m.enterTheSumOfAAndBToIrreversiblyDeleteAllLocalData({ a, b }));
-			if (!sum) return;
-			if (a + b !== +sum) return alert(m.incorrect());
+			let requireSumPrompt = !dev;
+			// requireSumPrompt = true;
+			if (requireSumPrompt) {
+				let a = Math.floor(Math.random() * 90) + 10;
+				let b = Math.floor(Math.random() * 90) + 10;
+				let sum = prompt(m.enterTheSumOfAAndBToIrreversiblyDeleteAllLocalData({ a, b }));
+				if (!sum) return;
+				if (a + b !== +sum) return alert(m.incorrect());
+			}
 			const { deleteDatabaseFile } = new SQLocalDrizzle('mindapp.db');
 			gs.feeds = {};
 			await deleteDatabaseFile();
 			alert(m.localDataDeleted());
 			await initLocalDb();
-			let localCache = await getLocalCache();
-			gs.accounts = localCache.accounts;
-			gs.spaces = localCache.spaces;
+			setAccountsAndSpaces();
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalData()}</button
 	>
 </div>

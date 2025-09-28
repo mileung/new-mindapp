@@ -60,41 +60,41 @@
 
 <div class="text-sm fx h-5 text-fg2 max-w-full">
 	<a
-		href={`/${id}`}
+		href={'/' + id}
 		title={whenVerbose}
 		class={`font-bold ${when.length > 9 ? 'truncate' : ''} text-fg2 hover:text-fg1 h-7 xy`}
 		onclick={(e) => {
 			if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 				e.preventDefault();
-				pushState(`/${id}`, { modalId: id });
+				pushState('/' + id, { modalId: id });
 			}
 		}}
 	>
 		{when}{editMs ? ' *' : ''}
 	</a>
 	<a
-		href={`/__${p.thought.in_id ?? ''}?q=by:${p.thought.by_id || ''}`}
+		href={`/__${p.thought.in_ms ?? ''}?q=by:${p.thought.by_ms || ''}`}
 		class={`h-6 pl-2 pr-1 truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
-			gs.thoughts[p.thought.by_id ?? ''] ? '' : 'italic'
+			gs.thoughts[p.thought.by_ms ?? ''] ? '' : 'italic'
 		}`}
 	>
-		<AccountIcon id={`${p.thought.by_id ?? ''}`} class="h-3.5 w-3.5 mr-0.5" />
+		<AccountIcon id={`_${p.thought.by_ms ?? ''}_`} class="h-3.5 w-3.5 mr-0.5" />
 		<!-- TODO: names for users -->
 		<p class="whitespace-nowrap truncate">
-			{p.thought.by_id ? gs.thoughts[p.thought.by_id!]?.body || m.noName() : m.anon()}
+			{p.thought.by_ms ? gs.thoughts[p.thought.by_ms!]?.body || m.noName() : m.anon()}
 		</p>
 	</a>
 	<a
-		href={`/__${p.thought.in_id ?? ''}`}
+		href={`/__${p.thought.in_ms ?? ''}`}
 		class={`h-6 px-1 mr-auto truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
-			p.thought.in_id ? '' : 'italic'
+			p.thought.in_ms ? '' : 'italic'
 		}`}
 	>
 		<div class="xy pr-1 h-5 w-5">
-			<SpaceIcon id={`${p.thought.by_id ?? ''}`} />
+			<SpaceIcon id={`__${p.thought.in_ms ?? ''}`} />
 		</div>
-		<p class={`whitespace-nowrap truncate ${gs.thoughts[p.thought.in_id || ''] ? '' : 'italic'}`}>
-			{p.thought.in_id ? gs.thoughts[p.thought.in_id || '']?.body || p.thought.in_id : 'Local'}
+		<p class={`whitespace-nowrap truncate ${gs.thoughts[p.thought.in_ms || ''] ? '' : 'italic'}`}>
+			{p.thought.in_ms ? gs.thoughts[p.thought.in_ms || '']?.body || p.thought.in_ms : 'Local'}
 		</p>
 	</a>
 	<button class="h-7 w-6 xy hover:text-fg1" onclick={handleCopyClick}>
@@ -189,7 +189,7 @@
 			{#each authorTags as tag}
 				<!-- TODO: Why does using leading-4 cause parent to scroll? -->
 				<a
-					href={`/__${gs.accounts[0].currentSpaceId}?q=${encodeURIComponent(`[${tag}]`)}`}
+					href={`/__${gs.accounts[0].currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
 					class="px-1 font-bold leading-5 text-fg2 hover:text-fg1"
 				>
 					{tag}

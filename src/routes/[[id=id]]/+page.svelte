@@ -4,7 +4,7 @@
 
 	let searchedText = $derived(page.url.searchParams.get('q') || '');
 	let idParam = $derived(page.state.modalId || page.params.id || '');
-	let useModal = $derived(page.state.modalId || searchedText || !idParam.startsWith('__'));
+	let useModal = $derived(!!(page.state.modalId || searchedText || !idParam.startsWith('__')));
 </script>
 
 {#if page.url.pathname === '/' || idParam}
@@ -12,6 +12,6 @@
 		<Feed modal {searchedText} {idParam} />
 	{/if}
 	<div class={useModal ? 'hidden' : 'min-h-screen'}>
-		<Feed hidden={!!page.state.modalId} {idParam} searchedText="" />
+		<Feed hidden={useModal} {idParam} searchedText="" />
 	</div>
 {/if}

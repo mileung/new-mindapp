@@ -29,8 +29,9 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
+	import { trpc } from '$lib/trpc/client';
 
-	let byIdsRegex = /(^|\s)\/\d*($|\s)/g;
+	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
 	let container: HTMLDivElement;
 	let lastRootLatestIdsWithSameMs: string[] = [];
@@ -44,7 +45,7 @@
 	let oldestFirst = $derived(false);
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
 	let personalSpaceRequiresLogin = $derived(
-		splitId(p.idParam || '').in_id === '0' && (!gs.accounts[0] || !gs.accounts[0].id),
+		splitId(p.idParam || '').in_ms === '0' && (!gs.accounts[0] || !gs.accounts[0].ms),
 	);
 	let allowNewWriting = $derived(!p.modal && !personalSpaceRequiresLogin);
 
@@ -76,6 +77,10 @@
 		// 	$state.snapshot(gs.thoughts),
 		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
+		if (p.idParam === '__1') {
+			trpc().getFeed.mutate({});
+			return;
+		}
 		if (fromMs === null) return e.detail.complete();
 		if (!p.idParam || personalSpaceRequiresLogin) return;
 		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
@@ -89,10 +94,10 @@
 			// TODO: Instead of set theory, implement tag groups
 			let ids = getIds(p.searchedText);
 			let tagsInclude = getTags(p.searchedText);
-			let byIdsInclude = p.searchedText.match(byIdsRegex)?.map((a) => +a.slice(1));
+			let byMssInclude = p.searchedText.match(byMssRegex)?.map((a) => +a.slice(1));
 			let searchedTextNoTagsOrAuthors = p.searchedText
 				.replace(bracketRegex, ' ')
-				.replace(byIdsRegex, ' ');
+				.replace(byMssRegex, ' ');
 			let quotes = (searchedTextNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
 				match.slice(1, -1),
 			);
@@ -130,7 +135,7 @@
 				nested,
 				fromMs,
 				tagsInclude,
-				byIdsInclude,
+				byMssInclude,
 				bodyIncludes,
 				idsExclude: [
 					// TODO: if oldestFirst, exclude the newest root ids with the same ms
@@ -210,7 +215,7 @@
 			thought.tags = await editThought(thought);
 		} else {
 			thought = {
-				// in_id: // TODO: gs.spaces[currentSpace].id
+				// in_ms: // TODO: gs.spaces[currentSpace].id
 				to_id: gs.writerMode[0] === 'to' ? gs.writerMode[1] : null,
 				tags: tags.length ? sortUniArr(tags) : null,
 				body: body.trim() || null,
@@ -274,7 +279,7 @@
 	{#if p.modal}
 		<button
 			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
-			onclick={() => goto(`/__${gs.accounts[0].currentSpaceId}`)}
+			onclick={() => goto(`/__${gs.accounts[0].currentSpaceMs}`)}
 		>
 			<IconX class="w-8" />
 		</button>
@@ -317,12 +322,12 @@
 	{/if}
 	{#if viewPostToastId}
 		<a
-			href={`/${viewPostToastId}`}
+			href={'/' + viewPostToastId}
 			class="fx z-50 fixed h-10 pl-2 font-semibold bottom-2 self-center bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
 			onclick={(e) => {
 				if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 					e.preventDefault();
-					pushState(`/${viewPostToastId}`, { modalId: viewPostToastId });
+					pushState('/' + viewPostToastId, { modalId: viewPostToastId });
 				}
 			}}
 		>

@@ -54,7 +54,8 @@
 	onMount(() => {
 		tagsIpt.focus();
 		window.addEventListener('keydown', (e) => {
-			!tagsIptFocused &&
+			gs.writerMode &&
+				!tagsIptFocused &&
 				!textInputFocused() &&
 				!e.altKey &&
 				(!e.ctrlKey || (e.ctrlKey && e.key === 'v')) &&

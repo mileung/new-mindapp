@@ -20,14 +20,13 @@ export let defaultLocalCache: LocalCache = {
 	spaces: {},
 	accounts: [
 		{
-			id: '',
-			currentSpaceId: '',
+			ms: '',
+			currentSpaceMs: '',
 			spacesPinnedThrough: 0,
-			// sequentialSpaceIds:[],
-			spaceIds: [
+			spaceMss: [
 				'', // local space id - everything local
-				'0', // personal space id - everything private in cloud
-				'1', // global space id - everything public in cloud
+				0, // personal space id - everything private in cloud
+				1, // global space id - everything public in cloud
 				// users can make additional spaces with custom privacy
 			],
 			tags: [],
@@ -39,9 +38,9 @@ let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 	({
 		ms: undefined,
 		tags: undefined,
-		by_id: undefined,
+		by_ms: undefined,
 		to_id: undefined,
-		in_id: undefined,
+		in_ms: undefined,
 		body: JSON.stringify(localCache),
 	}) as ThoughtInsert;
 
@@ -113,9 +112,9 @@ export async function deleteLocalCache() {
 			and(
 				isNull(thoughtsTable.ms),
 				isNull(thoughtsTable.tags),
-				isNull(thoughtsTable.by_id),
+				isNull(thoughtsTable.by_ms),
 				isNull(thoughtsTable.to_id),
-				isNull(thoughtsTable.in_id),
+				isNull(thoughtsTable.in_ms),
 			),
 		);
 }
