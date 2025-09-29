@@ -246,7 +246,7 @@
 	});
 </script>
 
-<div class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col min-h-screen">
+<div class="relative bg-bg1 flex flex-col min-h-screen">
 	{#if personalSpaceRequiresLogin}
 		<div class="xy fy gap-2 flex-1">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
