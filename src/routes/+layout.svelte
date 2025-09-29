@@ -5,7 +5,6 @@
 	import { gs } from '$lib/globalState.svelte';
 	import { getLocalCache } from '$lib/localCache';
 	import { setTheme } from '$lib/theme';
-	import { initLocalDb } from '$lib/thoughts';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import html2md from 'html-to-md';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
@@ -13,6 +12,7 @@
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
+	import { initLocalDb } from '$lib/local-db';
 	let p: { data: LayoutData; children: Snippet } = $props();
 	onMount(async () => {
 		const savedTheme = localStorage.getItem('theme');

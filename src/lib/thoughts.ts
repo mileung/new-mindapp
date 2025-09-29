@@ -13,41 +13,13 @@ import {
 	notLike,
 	or,
 } from 'drizzle-orm';
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { gs } from './globalState.svelte';
-import { sortUniArr } from './js';
-import { m } from './paraglide/messages';
-import { thoughtsTable } from './thoughts-table';
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-
-// https://sqlocal.dev/guide/introduction
-export async function initLocalDb() {
-	let { sql } = new SQLocalDrizzle('mindapp.db');
-	try {
-		await sql`
-			PRAGMA journal_mode=WAL;
-			CREATE TABLE IF NOT EXISTS thoughts (
-				ms INTEGER,
-				tags TEXT,
-				body TEXT,
-				by_ms INTEGER,
-				to_id TEXT,
-				in_ms INTEGER,
-				CONSTRAINT thought_id PRIMARY KEY (ms, by_ms, in_ms)
-			);
-			CREATE INDEX IF NOT EXISTS ms_idx ON thoughts (ms);
-			CREATE INDEX IF NOT EXISTS tags_idx ON thoughts (tags);
-			CREATE INDEX IF NOT EXISTS body_idx ON thoughts (body);
-			CREATE INDEX IF NOT EXISTS by_ms_idx ON thoughts (by_ms);
-			CREATE INDEX IF NOT EXISTS to_id_idx ON thoughts (to_id);
-			CREATE INDEX IF NOT EXISTS in_ms_idx ON thoughts (in_ms);
-	`;
-	} catch (error) {
-		console.log('error:', error);
-	}
-}
+import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
+import { SQLocalDrizzle } from 'sqlocal/drizzle';
+import { sortUniArr } from './js';
+import { gsdb } from './local-db';
+import { thoughtsTable } from './thoughts-table';
 
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
 export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
@@ -91,21 +63,11 @@ export function dropThoughtsTableInOpfsInDev() {
 	}
 }
 
-export async function gsdb() {
-	let attempts = 0;
-	while (!gs.db) {
-		if (++attempts > 88) {
-			alert(m.localDatabaseTimedOut());
-			throw new Error(m.localDatabaseTimedOut());
-		}
-		await new Promise((res) => setTimeout(res, 100));
-	}
-	return gs.db;
-}
-
 type Database = LibSQLDatabase | SqliteRemoteDatabase;
 
-export async function addThought(t: ThoughtInsert) {
+export let addThought = async (t: ThoughtInsert) => _addThought(t);
+
+export let _addThought = async (t: ThoughtInsert) => {
 	if (typeof t.in_ms === 'number') {
 		if (!t.by_ms) throw new Error('Missing by_ms');
 		// TODO: Verify user by_ms is logged and has access to space in_ms
@@ -116,7 +78,7 @@ export async function addThought(t: ThoughtInsert) {
 	// gs.accounts[0].currentSpaceMs
 	await (await gsdb()).insert(thoughtsTable).values({ ...t, ms });
 	return ms;
-}
+};
 
 // let systemTags = new Set([' edited:<ms>', ' deleted']);
 export function divideTags(thought: ThoughtInsert) {
@@ -126,7 +88,9 @@ export function divideTags(thought: ThoughtInsert) {
 	return { authorTags, systemTags };
 }
 
-export async function editThought(t: ThoughtInsert) {
+export let editThought = async (t: ThoughtInsert) => _editThought(t);
+
+export let _editThought = async (t: ThoughtInsert) => {
 	if (!t.ms) throw new Error('Missing ms');
 	if (t.tags?.[0] === ' deleted') throw new Error('Cannot edit deleted thoughts');
 	if (typeof t.in_ms === 'number') {
@@ -152,11 +116,27 @@ export async function editThought(t: ThoughtInsert) {
 		.set({ ...t, tags })
 		.where(filterThought(t));
 	return tags;
-}
+};
 
-export async function updateThought(id: string) {}
+// export async function updateThought(id: string) {}
 
-export async function deleteThought(id: string) {
+// TODO: paginate children when there's too many with fromMs
+// Reddit does this - HN does not
+let getThoughtChildren = async (id: string, limit = -1) => _getThoughtChildren(id, limit);
+
+let _getThoughtChildren = async (id: string, limit = -1) => {
+	let children = await (await gsdb())
+		.select()
+		.from(thoughtsTable)
+		.where(eq(thoughtsTable.to_id, id))
+		.orderBy(desc(thoughtsTable.ms))
+		.limit(limit);
+	return children;
+};
+
+export let deleteThought = async (id: string) => _deleteThought(id);
+
+export let _deleteThought = async (id: string) => {
 	let s = splitId(id);
 	if (s.in_ms) {
 		if (!s.by_ms) throw new Error('Missing by_ms');
@@ -177,30 +157,22 @@ export async function deleteThought(id: string) {
 		await (await gsdb()).delete(thoughtsTable).where(filterId(id));
 		return { soft: false };
 	}
-}
+};
 
-// TODO: paginate children when there's too many with fromMs
-// Reddit does this - HN does not
-export async function getThoughtChildren(id: string, limit = -1) {
-	let children = await (await gsdb())
-		.select()
-		.from(thoughtsTable)
-		.where(eq(thoughtsTable.to_id, id))
-		.orderBy(desc(thoughtsTable.ms))
-		.limit(limit);
-	return children;
-}
+export let getThought = async (id: string) => _getThought(id);
 
-export async function getThought(id: string): Promise<ThoughtSelect | undefined> {
+export let _getThought = async (id: string): Promise<ThoughtSelect | undefined> => {
 	return (await (await gsdb()).select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
-}
+};
 
-async function getRootThought(thought: ThoughtSelect) {
+let getRootThought = async (thought: ThoughtSelect) => _getRootThought(thought);
+
+let _getRootThought = async (thought: ThoughtSelect) => {
 	let rootThought = thought;
 	// let interThoughts: Record<string, ThoughtSelect> = {};
 	while (rootThought?.to_id) {
 		// interThoughts[getId(thought)] = rootThought;
-		let toThought = await getThought(rootThought.to_id);
+		let toThought = await _getThought(rootThought.to_id);
 		if (toThought) rootThought = toThought;
 	}
 	return {
@@ -208,15 +180,19 @@ async function getRootThought(thought: ThoughtSelect) {
 		// TODO: maybe make loading thoughts more efficient by not getting rows that have already been gotten?
 		// interThoughts
 	};
-}
+};
 
 export let getIds = (str = '') => [...str.matchAll(idsRegex)].map((match) => match[0].trim());
 
-async function expandThought(thought: ThoughtSelect): Promise<{
+let expandThought = async (thought: ThoughtSelect) => _expandThought(thought);
+
+let _expandThought = async (
+	thought: ThoughtSelect,
+): Promise<{
 	citedIds: string[];
 	byMss: (null | number)[];
 	nestedThought: ThoughtNested;
-}> {
+}> => {
 	let citedIds = getIds(thought.body || '');
 	let byMss = [thought.by_ms];
 	let children: ThoughtNested[] = await Promise.all(
@@ -232,10 +208,13 @@ async function expandThought(thought: ThoughtSelect): Promise<{
 		byMss,
 		nestedThought: { ...thought, ...(children.length ? { children } : {}) },
 	};
-}
+};
 
 export let rootsPerLoad = 15;
-export let loadThoughts = async (q: {
+
+export let loadThoughts = async (q: Parameters<typeof _loadThoughts>[0]) => _loadThoughts(q);
+
+export let _loadThoughts = async (q: {
 	rpc?: boolean;
 	spaceMs?: number;
 	nested?: boolean;

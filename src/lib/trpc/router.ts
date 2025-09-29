@@ -10,6 +10,7 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { minute, second } from '../time';
+import { isValidEmail } from '$lib/server/security';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -47,11 +48,7 @@ export const router = t.router({
 			.input(z.object({ email: z.string().email() }))
 			.mutation(async ({ input }) => {
 				let { email } = input;
-
-				console.log('tdb:', tdb);
-				console.log('email:', email);
-				if (email.length > 254) throw new Error('invalid email');
-
+				if (!isValidEmail(email)) throw new Error('invalid email');
 				let otp = ('' + Math.random()).slice(-6);
 				if (dev) {
 					console.log('otp:', otp);
@@ -100,7 +97,9 @@ export const router = t.router({
 					console.log('t:', t);
 					let { otp, strike = 0 } = JSON.parse(t.body!);
 					if (input.otp === otp) {
-						ctx.event.cookies.set('sessionId', uuidv4(), {
+						// await (tdb).delete(thoughtsTable).where(filterThought(t));
+						let sessionId = uuidv4();
+						ctx.event.cookies.set('sessionId', sessionId, {
 							httpOnly: true,
 							secure: true,
 							path: '/',
@@ -140,6 +139,7 @@ export const router = t.router({
 		.mutation(async ({ input, ctx }) => {
 			let sessionId = ctx.event.cookies.get('sessionId');
 			console.log('sessionId:', sessionId);
+			console.log(ctx.event.cookies.getAll());
 
 			return { success: true };
 		}),

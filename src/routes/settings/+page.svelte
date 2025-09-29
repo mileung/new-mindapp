@@ -2,14 +2,13 @@
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/globalState.svelte';
+	import { gsdb, initLocalDb } from '$lib/local-db';
 	import { getLocalCache } from '$lib/localCache';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		filterThought,
 		getId,
 		getThought,
-		gsdb,
-		initLocalDb,
 		ThoughtInsertSchema,
 		type ThoughtInsert,
 		type ThoughtSelect,
@@ -101,7 +100,7 @@
 							]);
 							console.timeEnd('import_time');
 							setAccountsAndSpaces();
-							gs.feeds['/__'] = undefined;
+							gs.feeds = {};
 							alert(m.dataSuccessfullyMerged());
 						} else {
 							alert(m.invalidJsonFile());

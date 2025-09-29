@@ -1,11 +1,12 @@
 import { z } from 'zod';
 import { SpaceSchema } from './spaces';
 import { AccountSchema } from './accounts';
-import { filterId, gsdb, type ThoughtInsert } from './thoughts';
+import { filterId, type ThoughtInsert } from './thoughts';
 import { and, isNull } from 'drizzle-orm';
 import { m } from './paraglide/messages';
 import { gs } from './globalState.svelte';
 import { thoughtsTable } from './thoughts-table';
+import { gsdb } from './local-db';
 
 export let LocalCacheSchema = z
 	.object({
