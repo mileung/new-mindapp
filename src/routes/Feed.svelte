@@ -29,7 +29,7 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
-	import { trpc } from '$lib/trpc/client';
+	// import { trpc } from '$lib/trpc/client';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
@@ -78,7 +78,7 @@
 		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
 		if (p.idParam === '__1') {
-			trpc().getFeed.mutate({});
+			// trpc().getFeed.mutate({});
 			return;
 		}
 		if (fromMs === null) return e.detail.complete();
