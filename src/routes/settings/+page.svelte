@@ -140,7 +140,6 @@
 			{m.importJsonFile()}
 		</button>
 	{/if}
-	<div class="h-0.5 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.dangerZone()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
 	<button
