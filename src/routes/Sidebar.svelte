@@ -245,7 +245,7 @@
 						{/if}
 						<AccountIcon id={`_${a.ms}_`} />
 						{(() => {
-							let accountJson = gs.thoughts[a.id]?.body;
+							let accountJson = gs.thoughts[`_${a.ms}_`]?.body;
 							if (accountJson) {
 								let obj = JSON.parse(accountJson);
 								return obj + '';
@@ -295,13 +295,13 @@
 							{/if}
 							<SpaceIcon id={`__${ms}`} class="h-6 w-9" />
 							<p class="font-medium">
-								{!ms
-									? m.local()
-									: ms === 0
-										? m.personal()
-										: ms === 1
-											? m.global()
-											: gs.spaces[ms]?.ms}
+								{ms === 0
+									? m.personal()
+									: ms === 1
+										? m.global()
+										: ms
+											? gs.spaces[ms]?.ms
+											: m.local()}
 							</p>
 						</a>
 						<!-- {#if i === gs.accounts[0]?.currentSpaceMs}

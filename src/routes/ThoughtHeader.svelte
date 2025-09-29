@@ -94,7 +94,13 @@
 			<SpaceIcon id={`__${p.thought.in_ms ?? ''}`} />
 		</div>
 		<p class={`whitespace-nowrap truncate ${gs.thoughts[p.thought.in_ms || ''] ? '' : 'italic'}`}>
-			{p.thought.in_ms ? gs.thoughts[p.thought.in_ms || '']?.body || p.thought.in_ms : 'Local'}
+			{p.thought.in_ms === 0
+				? m.personal()
+				: p.thought.in_ms === 1
+					? m.global()
+					: p.thought.in_ms
+						? gs.spaces[p.thought.in_ms]?.ms
+						: m.local()}
 		</p>
 	</a>
 	<button class="h-7 w-6 xy hover:text-fg1" onclick={handleCopyClick}>

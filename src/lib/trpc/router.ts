@@ -1,5 +1,5 @@
 import { dev } from '$app/environment';
-// import { tdb } from '$lib/server/db';
+import { tdb } from '$lib/server/db';
 import { filterThought, type ThoughtInsert } from '$lib/thoughts';
 import { thoughtsTable } from '$lib/thoughts-table';
 import type { Context } from '$lib/trpc/context';
@@ -67,7 +67,7 @@ export const router = t.router({
 					tags: [` otp:${email}`],
 					body: JSON.stringify({ otp }),
 				};
-				// await tdb.insert(thoughtsTable).values(t);
+				await tdb.insert(thoughtsTable).values(t);
 				return { success: true };
 			}),
 		verifyOtp: t.procedure
@@ -86,48 +86,47 @@ export const router = t.router({
 					// account?: Account;
 					success?: any;
 				}> => {
-					// let t = (
-					// 	await tdb
-					// 		.select()
-					// 		.from(thoughtsTable)
-					// 		.where(eq(thoughtsTable.tags, [` otp:${input.email}`]))
-					// 		.orderBy(desc(thoughtsTable.ms))
-					// )[0];
+					let t = (
+						await tdb
+							.select()
+							.from(thoughtsTable)
+							.where(eq(thoughtsTable.tags, [` otp:${input.email}`]))
+							.orderBy(desc(thoughtsTable.ms))
+					)[0];
 
-					// console.log('t:', t);
-					// let { otp, strike = 0 } = JSON.parse(t.body!);
-					// if (input.otp === otp) {
-					// 	// await (tdb).delete(thoughtsTable).where(filterThought(t));
-					// 	let sessionId = uuidv4();
-					// 	ctx.event.cookies.set('sessionId', sessionId, {
-					// 		httpOnly: true,
-					// 		secure: true,
-					// 		path: '/',
-					// 		maxAge: 60 * 60 * 24 * 7, // 1 week
-					// 		sameSite: 'lax',
-					// 	});
-					// 	return {
-					// 		// account: {
-					// 		success: {
-					// 			// id: '',
-					// 			// id: user.id,
-					// 			// email: user.email,
-					// 		},
-					// 	};
-					// }
-					// strike++;
-					// if (strike > 2) {
-					// 	tdb.delete(thoughtsTable).where(filterThought(t));
-					// } else {
-					// 	tdb
-					// 		.update(thoughtsTable)
-					// 		.set({
-					// 			body: JSON.stringify({ otp, strike }),
-					// 		})
-					// 		.where(filterThought(t));
-					// }
-					// return { strike };
-					return { strike: 1 };
+					console.log('t:', t);
+					let { otp, strike = 0 } = JSON.parse(t.body!);
+					if (input.otp === otp) {
+						// await (tdb).delete(thoughtsTable).where(filterThought(t));
+						let sessionId = uuidv4();
+						ctx.event.cookies.set('sessionId', sessionId, {
+							httpOnly: true,
+							secure: true,
+							path: '/',
+							maxAge: 60 * 60 * 24 * 7, // 1 week
+							sameSite: 'lax',
+						});
+						return {
+							// account: {
+							success: {
+								// id: '',
+								// id: user.id,
+								// email: user.email,
+							},
+						};
+					}
+					strike++;
+					if (strike > 2) {
+						tdb.delete(thoughtsTable).where(filterThought(t));
+					} else {
+						tdb
+							.update(thoughtsTable)
+							.set({
+								body: JSON.stringify({ otp, strike }),
+							})
+							.where(filterThought(t));
+					}
+					return { strike };
 				},
 			),
 	}),

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
-	// import { trpc } from '$lib/trpc/client';
+	import { trpc } from '$lib/trpc/client';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 
 	let val = $state('');
@@ -24,21 +24,21 @@
 					e.preventDefault();
 					try {
 						if (email) {
-							// let res = await trpc().auth.verifyOtp.mutate({
-							// 	email,
-							// 	otp: val,
-							// });
-							// console.log('res:', res);
-							// if (res.success) {
-							// 	//
-							// } else if (res.strike === 3) {
-							// 	alert(m.tooManyFailedAttempts());
-							// 	email = val = '';
-							// }
+							let res = await trpc().auth.verifyOtp.mutate({
+								email,
+								otp: val,
+							});
+							console.log('res:', res);
+							if (res.success) {
+								//
+							} else if (res.strike === 3) {
+								alert(m.tooManyFailedAttempts());
+								email = val = '';
+							}
 						} else {
-							// email = val.trim().toLowerCase();
-							// let res = await trpc().auth.sendOtp.mutate({ email });
-							// console.log('res:', res);
+							email = val.trim().toLowerCase();
+							let res = await trpc().auth.sendOtp.mutate({ email });
+							console.log('res:', res);
 							val = '';
 						}
 					} catch (error) {

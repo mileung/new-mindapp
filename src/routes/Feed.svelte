@@ -29,11 +29,10 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
-	// import { trpc } from '$lib/trpc/client';
+	import { trpc } from '$lib/trpc/client';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
-	let container: HTMLDivElement;
 	let lastRootLatestIdsWithSameMs: string[] = [];
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
 
@@ -78,7 +77,7 @@
 		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
 		if (p.idParam === '__1') {
-			// trpc().getFeed.mutate({});
+			trpc().getFeed.mutate({});
 			return;
 		}
 		if (fromMs === null) return e.detail.complete();
@@ -247,7 +246,7 @@
 	});
 </script>
 
-<div bind:this={container} class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col min-h-screen">
+<div class="relative pt-9 xs:pt-0 bg-bg1 flex flex-col min-h-screen">
 	{#if personalSpaceRequiresLogin}
 		<div class="xy fy gap-2 flex-1">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
