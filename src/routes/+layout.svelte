@@ -40,6 +40,8 @@
 			gs.spaces = localCache.spaces;
 		} catch (error) {
 			console.log('error:', error);
+			gs.localDbFailed = true;
+			goto('/settings');
 		}
 	});
 

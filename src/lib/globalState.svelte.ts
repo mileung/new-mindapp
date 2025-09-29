@@ -6,6 +6,7 @@ import type { Account } from './accounts';
 export type FeedSequence = [...string[], number | null]; // Strings are ids. Ending number is the fromMs. Ending null is the feed has terminated
 
 class GlobalState {
+	localDbFailed = $state(false);
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
 	spaces = $state<Record<string, undefined | Space>>({});

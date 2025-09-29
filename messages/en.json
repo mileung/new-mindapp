@@ -5,7 +5,7 @@
 	"areYouSureYouWantToDeleteThisThought": "Are you sure you want to delete this thought?",
 	"noThoughtsFound": "No thoughts found",
 	"theme": "Theme",
-	"manageData": "Manage data",
+	"manageLocalDatabase": "Manage local database",
 	"light": "Light",
 	"dark": "Dark",
 	"personal": "Personal",
@@ -16,8 +16,9 @@
 	"localDatabaseTimedOut": "Local database timed out",
 	"dangerZone": "Danger zone",
 	"pageNotFound": "Page Not Found",
-	"downloadLocalData": "Download local data",
-	"deleteLocalData": "Delete local data",
+	"downloadDbFile": "Download db file",
+	"downloadJsonFile": "Download JSON file",
+	"deleteLocalDatabase": "Delete local database",
 	"dataSuccessfullyMerged": "Data successfully merged",
 	"incorrect": "Incorrect",
 	"local": "Local",
@@ -47,8 +48,9 @@
 	"tooManyFailedAttempts": "Too many failed attempts",
 	"youTubeThumbnail": "YouTube Thumbnail",
 	"shareThought": "Share thought...",
-	"localDataDeleted": "Local data deleted",
+	"localDatabaseDeleted": "Local database deleted",
 	"addBrowserExtension": "Add Browser Extension",
-	"importLocalData": "Import local data",
-	"enterTheSumOfAAndBToIrreversiblyDeleteAllLocalData": "Enter the sum of {a} and {b} to irreversibly delete all local data"
+	"importJsonFile": "Import JSON file",
+	"enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase": "Enter the sum of {a} and {b} to irreversibly delete your local database",
+	"somethingIsWrongWithYourLocalDatabase___": "Something is wrong with your local database. You may download it as a file and try parsing the data. After that you can delete the local database and restore the new one from a JSON file."
 }
