@@ -44,6 +44,9 @@ async function email(config: { from: string; to: string; subject: string; html: 
 
 export const router = t.router({
 	auth: t.router({
+		signOut: t.procedure.input(z.object({})).mutation(async () => {
+			//
+		}),
 		sendOtp: t.procedure
 			.input(z.object({ email: z.string().email() }))
 			.mutation(async ({ input }) => {

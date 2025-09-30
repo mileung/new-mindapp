@@ -3,8 +3,8 @@
 	import { page } from '$app/state';
 	import { unsaveTagInPersona } from '$lib/accounts';
 	import { textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/globalState.svelte';
-	import { updateLocalCache } from '$lib/localCache';
+	import { gs } from '$lib/global-state.svelte';
+	import { updateLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
 	import { bracketRegex } from '$lib/tags';
 	import {

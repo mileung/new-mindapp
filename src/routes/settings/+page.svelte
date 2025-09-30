@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { gsdb, initLocalDb } from '$lib/local-db';
-	import { getLocalCache } from '$lib/localCache';
+	import { getLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		filterThought,

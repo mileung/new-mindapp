@@ -1,4 +1,4 @@
-import { gs } from './globalState.svelte';
+import { gs } from './global-state.svelte';
 
 export let getSystemTheme = () =>
 	window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';

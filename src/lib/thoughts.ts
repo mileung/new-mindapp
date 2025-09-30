@@ -260,6 +260,7 @@ export let _loadThoughts = async (q: {
 	let auxThoughts: Record<string, ThoughtSelect> = {};
 	let baseFilters = [
 		isNotNull(thoughtsTable.ms),
+		// or(gte(thoughtsTable.in_ms, 0), isNull(thoughtsTable.in_ms)),
 		// ...(spaceMs === undefined ? [] : [isNotNull(thoughtsTable.by_ms)]),
 		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
 		// not(like(thoughtsTable.tags, `%" private"%`)),

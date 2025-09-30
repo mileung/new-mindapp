@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getId, type ThoughtNested } from '$lib/thoughts';
 	import { IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';

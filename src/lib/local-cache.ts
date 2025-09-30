@@ -4,7 +4,7 @@ import { AccountSchema } from './accounts';
 import { filterId, type ThoughtInsert } from './thoughts';
 import { and, isNull } from 'drizzle-orm';
 import { m } from './paraglide/messages';
-import { gs } from './globalState.svelte';
+import { gs } from './global-state.svelte';
 import { thoughtsTable } from './thoughts-table';
 import { gsdb } from './local-db';
 

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 
 	let p: {
 		id?: string;

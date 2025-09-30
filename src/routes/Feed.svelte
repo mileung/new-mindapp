@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { goto, pushState } from '$app/navigation';
 	import { textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { sortUniArr } from '$lib/js';
-	import { updateLocalCache } from '$lib/localCache';
+	import { updateLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
 	import { bracketRegex, getTags } from '$lib/tags';
 	import {

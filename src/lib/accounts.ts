@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { gs } from './globalState.svelte';
+import { gs } from './global-state.svelte';
 import { sortUniArr } from './js';
-import { updateLocalCache } from './localCache';
+import { updateLocalCache } from './local-cache';
 
 export let currentPersona = () => {
 	return gs.accounts[0]!;

@@ -2,8 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
-	import { gs } from '$lib/globalState.svelte';
-	import { getLocalCache } from '$lib/localCache';
+	import { gs } from '$lib/global-state.svelte';
+	import { getLocalCache } from '$lib/local-cache';
 	import { setTheme } from '$lib/theme';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import html2md from 'html-to-md';

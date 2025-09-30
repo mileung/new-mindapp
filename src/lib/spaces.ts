@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { gs } from './globalState.svelte';
+import { gs } from './global-state.svelte';
 
 export let SpaceSchema = z
 	.object({

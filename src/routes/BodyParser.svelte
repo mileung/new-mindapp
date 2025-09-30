@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { isStringifiedRecord } from '$lib/js';
 	import { idsRegex, type ThoughtInsert } from '$lib/thoughts';
 	import CitedThought from './CitedThought.svelte';

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { pushState } from '$app/navigation';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/thoughts';

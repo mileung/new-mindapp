@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { unsaveTagInPersona } from '$lib/accounts';
 	import { textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/globalState.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import type { ThoughtSelect } from '$lib/thoughts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';

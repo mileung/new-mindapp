@@ -1,5 +1,5 @@
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { gs } from './globalState.svelte';
+import { gs } from './global-state.svelte';
 import { m } from './paraglide/messages';
 
 // https://sqlocal.dev/guide/introduction
