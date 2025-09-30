@@ -8,7 +8,7 @@
 	import {
 		filterThought,
 		getId,
-		getThought,
+		getThoughtById,
 		ThoughtInsertSchema,
 		type ThoughtInsert,
 		type ThoughtSelect,
@@ -27,9 +27,11 @@
 </script>
 
 <div class="p-2 space-y-2 w-full max-w-lg">
-	{#if gs.localDbFailed}
+	{#if gs.localDbFailed || gs.localCacheInvalid}
 		<p class="text-red-500 border-red-500 border-2 p-2">
-			{m.somethingIsWrongWithYourLocalDatabase___()}
+			{gs.localDbFailed
+				? m.somethingIsWrongWithYourLocalDatabase___()
+				: m.somethingIsWrongWithYourLocalCache___()}
 		</p>
 	{/if}
 
@@ -79,12 +81,12 @@
 						).map(
 							(r) =>
 								({
-									ms: r.ms || undefined,
-									tags: r.tags || undefined,
-									body: r.body || undefined,
-									by_ms: r.by_ms || undefined,
-									to_id: r.to_id || undefined,
-									in_ms: r.in_ms || undefined,
+									ms: r.ms === null ? undefined : r.ms,
+									tags: r.tags === null ? undefined : r.tags,
+									body: r.body === null ? undefined : r.body,
+									by_ms: r.by_ms === null ? undefined : r.by_ms,
+									to_id: r.to_id === null ? undefined : r.to_id,
+									in_ms: r.in_ms === null ? undefined : r.in_ms,
 								}) as ThoughtSelect,
 						),
 					),
@@ -112,7 +114,7 @@
 								// TODO: make importing local data faster
 								let results = await Promise.all(
 									importedThoughts.map(
-										async (thought) => [thought, !!(await getThought(getId(thought)))] as const,
+										async (thought) => [thought, !!(await getThoughtById(getId(thought)))] as const,
 									),
 								);
 								let inserts: ThoughtInsert[] = [];

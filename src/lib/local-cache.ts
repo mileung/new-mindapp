@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { SpaceSchema } from './spaces';
-import { AccountSchema } from './accounts';
-import { filterId, type ThoughtInsert } from './thoughts';
-import { and, isNull } from 'drizzle-orm';
+import { AccountSchema, type Account } from './accounts';
+import { filterId, filterThought, type ThoughtInsert } from './thoughts';
+import { and, eq, isNull } from 'drizzle-orm';
 import { m } from './paraglide/messages';
 import { gs } from './global-state.svelte';
 import { thoughtsTable } from './thoughts-table';
@@ -37,11 +37,8 @@ export let defaultLocalCache: LocalCache = {
 
 let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 	({
-		ms: undefined,
-		tags: undefined,
-		by_ms: undefined,
-		to_id: undefined,
-		in_ms: undefined,
+		by_ms: 0,
+		tags: [' local-cache'],
 		body: JSON.stringify(localCache),
 	}) as ThoughtInsert;
 
@@ -54,27 +51,17 @@ export async function initLocalCache() {
 	)[0];
 }
 
+let localCacheFilter = filterThought({
+	by_ms: 0, // When by_ms === 0, that's a system thought.
+	tags: [' local-cache'],
+});
+
 export async function getLocalCache() {
-	let [localCacheRow] = await (
-		await gsdb()
-	)
-		.select()
-		.from(thoughtsTable)
-		.where(
-			and(
-				// Not sure if I'll use tags or to_id to organize multiple author-less meta thoughts...
-				isNull(thoughtsTable.tags),
-				isNull(thoughtsTable.to_id),
-				filterId('__'),
-			),
-		);
+	let [localCacheRow] = await (await gsdb()).select().from(thoughtsTable).where(localCacheFilter);
 	if (!localCacheRow) localCacheRow = await initLocalCache();
 	let localCache: LocalCache = JSON.parse(localCacheRow.body!);
 	if (!LocalCacheSchema.safeParse(localCache).success) {
-		window.alert(m.resettingInvalidLocalCache());
-		await deleteLocalCache();
-		localCacheRow = await initLocalCache();
-		localCache = JSON.parse(localCacheRow.body!);
+		throw new Error('Invalid localCache');
 	}
 	return localCache;
 }
@@ -98,24 +85,12 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 
 	gs.accounts = newLocalCache.accounts;
 	gs.spaces = newLocalCache.spaces;
-	await (
-		await gsdb()
-	)
+	await (await gsdb())
 		.update(thoughtsTable)
 		.set(makeLocalCacheThoughtInsert(newLocalCache))
-		.where(and(isNull(thoughtsTable.tags), isNull(thoughtsTable.to_id), filterId('__')));
+		.where(localCacheFilter);
 }
 
 export async function deleteLocalCache() {
-	await (await gsdb())
-		.delete(thoughtsTable)
-		.where(
-			and(
-				isNull(thoughtsTable.ms),
-				isNull(thoughtsTable.tags),
-				isNull(thoughtsTable.by_ms),
-				isNull(thoughtsTable.to_id),
-				isNull(thoughtsTable.in_ms),
-			),
-		);
+	await (await gsdb()).delete(thoughtsTable).where(localCacheFilter);
 }

@@ -29,7 +29,7 @@ export let ThoughtSelectSchema = createSelectSchema(thoughtsTable);
 
 type IdSegments = Pick<ThoughtInsert, 'ms' | 'by_ms' | 'in_ms'>;
 export let getId = (thought: IdSegments) =>
-	`${thought.ms || ''}_${thought.by_ms || ''}_${thought.in_ms || ''}`;
+	`${thought.ms ?? ''}_${thought.by_ms ?? ''}_${thought.in_ms ?? ''}`;
 
 export let idRegex = /^\d*_\d*_\d*$/;
 export let idsRegex = /(^|\s)\d*_\d*_\d*($|\s)/g;
@@ -42,14 +42,20 @@ export function splitId(id: string) {
 	return segs;
 }
 
-export let filterThought = (t: ThoughtInsert) => filterId(getId(t));
-
 export let filterId = (id: string) => {
 	let { ms, by_ms, in_ms } = splitId(id);
+	return filterThought({
+		ms: ms === '' ? null : +ms,
+		by_ms: by_ms === '' ? null : +by_ms,
+		in_ms: in_ms === '' ? null : +in_ms,
+	});
+};
+
+export let filterThought = (t: ThoughtInsert) => {
 	return and(
-		ms ? eq(thoughtsTable.ms, +ms) : isNull(thoughtsTable.ms),
-		by_ms ? eq(thoughtsTable.by_ms, +by_ms) : isNull(thoughtsTable.by_ms),
-		in_ms ? eq(thoughtsTable.in_ms, +in_ms) : isNull(thoughtsTable.in_ms),
+		typeof t.ms === 'number' ? eq(thoughtsTable.ms, t.ms) : isNull(thoughtsTable.ms),
+		typeof t.by_ms === 'number' ? eq(thoughtsTable.by_ms, t.by_ms) : isNull(thoughtsTable.by_ms),
+		typeof t.in_ms === 'number' ? eq(thoughtsTable.in_ms, t.in_ms) : isNull(thoughtsTable.in_ms),
 	);
 };
 
@@ -88,6 +94,12 @@ export function divideTags(thought: ThoughtInsert) {
 	return { authorTags, systemTags };
 }
 
+export let getThoughtById = async (id: string) => _getThoughtById(id);
+
+export let _getThoughtById = async (id: string): Promise<ThoughtSelect | undefined> => {
+	return (await (await gsdb()).select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
+};
+
 export let editThought = async (t: ThoughtInsert) => _editThought(t);
 
 export let _editThought = async (t: ThoughtInsert) => {
@@ -97,7 +109,7 @@ export let _editThought = async (t: ThoughtInsert) => {
 		if (!t.by_ms) throw new Error('Missing by_ms');
 		// TODO: Verify user by_ms is logged and has access to space in_ms
 	}
-	let originalThought = await getThought(getId(t));
+	let originalThought = await getThoughtById(getId(t));
 	if (!originalThought) throw new Error('Original thought not found');
 	let { systemTags } = divideTags(originalThought);
 	let { authorTags } = divideTags(t);
@@ -159,12 +171,6 @@ export let _deleteThought = async (id: string) => {
 	}
 };
 
-export let getThought = async (id: string) => _getThought(id);
-
-export let _getThought = async (id: string): Promise<ThoughtSelect | undefined> => {
-	return (await (await gsdb()).select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
-};
-
 let getRootThought = async (thought: ThoughtSelect) => _getRootThought(thought);
 
 let _getRootThought = async (thought: ThoughtSelect) => {
@@ -172,7 +178,7 @@ let _getRootThought = async (thought: ThoughtSelect) => {
 	// let interThoughts: Record<string, ThoughtSelect> = {};
 	while (rootThought?.to_id) {
 		// interThoughts[getId(thought)] = rootThought;
-		let toThought = await _getThought(rootThought.to_id);
+		let toThought = await _getThoughtById(rootThought.to_id);
 		if (toThought) rootThought = toThought;
 	}
 	return {
@@ -319,7 +325,7 @@ export let _loadThoughts = async (q: {
 
 	await Promise.all(
 		[...new Set([...citedIds, ...(nested ? toIds : [])])].map((id) => {
-			return getThought(id).then((thought) => {
+			return getThoughtById(id).then((thought) => {
 				if (thought) {
 					auxThoughts[id] = thought;
 					byMss.push(auxThoughts[id].by_ms);
@@ -329,7 +335,7 @@ export let _loadThoughts = async (q: {
 	);
 	// await Promise.all(
 	// 	[...new Set(byMss)].map((id) => {
-	// 		if (id) return getThought().then((a) => a && (authors[id] = a));
+	// 		if (id) return getThoughtById().then((a) => a && (authors[id] = a));
 	// 	}),
 	// );
 

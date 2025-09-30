@@ -34,10 +34,16 @@
 			const { driver, batchDriver } = new SQLocalDrizzle('mindapp.db');
 			gs.db = drizzle(driver, batchDriver);
 			// await deleteLocalCache()
-			let localCache = await getLocalCache();
-			// console.log('localCache:', localCache);
-			gs.accounts = localCache.accounts;
-			gs.spaces = localCache.spaces;
+			try {
+				let localCache = await getLocalCache();
+				console.log('localCache:', localCache);
+				gs.accounts = localCache.accounts;
+				gs.spaces = localCache.spaces;
+			} catch (error) {
+				console.log('error:', error);
+				gs.localCacheInvalid = true;
+				goto('/settings');
+			}
 		} catch (error) {
 			console.log('error:', error);
 			gs.localDbFailed = true;
