@@ -42,6 +42,7 @@
 	"email": "Email",
 	"continue": "Continue",
 	"oneTimePasscode": "One-time passcode",
+	"incorrectOneTimePasscode": "Incorrect one-time passcode",
 	"signInToUseThisSpace": "Sign in to use this space",
 	"userGuide": "User Guide",
 	"signIn": "Sign in",

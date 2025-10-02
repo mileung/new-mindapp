@@ -20,6 +20,12 @@
 			['light', 'dark', 'system'].includes(savedTheme!) ? (savedTheme as typeof gs.theme) : 'system'
 		)!;
 
+		if (page.url.pathname === '/') {
+			goto(`/__${localStorage.getItem('currentSpaceMs') || ''}`, {
+				replaceState: true,
+			});
+		}
+
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', function () {
 				// unregister service workers at chrome://serviceworker-internals
@@ -36,12 +42,12 @@
 			// await deleteLocalCache()
 			try {
 				let localCache = await getLocalCache();
-				console.log('localCache:', localCache);
+				// console.log('localCache:', localCache);
 				gs.accounts = localCache.accounts;
 				gs.spaces = localCache.spaces;
 			} catch (error) {
 				console.log('error:', error);
-				gs.localCacheInvalid = true;
+				gs.invalidLocalCache = true;
 				goto('/settings');
 			}
 		} catch (error) {
@@ -60,19 +66,8 @@
 		}
 	});
 
-	function goToCurrentSpace() {
-		gs.accounts[0] &&
-			goto(`/__${gs.accounts[0].currentSpaceMs}`, {
-				replaceState: true,
-				keepFocus: true,
-			});
-	}
-	$effect(() => {
-		page.url.pathname === '/' && goToCurrentSpace();
-	});
 	$effect(() => {
 		if (page.url.searchParams.get('extension') !== null) {
-			goToCurrentSpace();
 			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
 			window.addEventListener('message', (event) => {
 				if (event.source !== window) return;
@@ -111,6 +106,7 @@
 							}
 						: scrape(url, externalDomString);
 
+					gs.writerMode = 'new';
 					gs.writerTags = scrapedInfo?.tags || [];
 					gs.writerBody = `${scrapedInfo?.headline}\n${scrapedInfo?.url || url}\n\n`;
 				}

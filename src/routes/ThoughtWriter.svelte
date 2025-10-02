@@ -27,7 +27,7 @@
 
 	let writtenTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(gs.writerTagVal.trim());
-	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
+	let allTagsSet = $derived(new Set(gs.accounts[0]?.allTags || []));
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
@@ -117,7 +117,7 @@
 		class="bg-bg4 w-full px-2 h-9 text-lg"
 		placeholder={m.tags()}
 		onfocus={() => (tagsIptFocused = true)}
-		onblur={() => (tagsIptFocused = false)}
+		onblur={(e) => (tagsIptFocused = false)}
 		onpaste={(e) => {
 			let pastedText = e.clipboardData?.getData('text') || '';
 			let pastedTags = pastedText.split(/\r?\n/);

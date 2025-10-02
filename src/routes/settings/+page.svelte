@@ -27,7 +27,7 @@
 </script>
 
 <div class="p-2 space-y-2 w-full max-w-lg">
-	{#if gs.localDbFailed || gs.localCacheInvalid}
+	{#if gs.localDbFailed || gs.invalidLocalCache}
 		<p class="text-red-500 border-red-500 border-2 p-2">
 			{gs.localDbFailed
 				? m.somethingIsWrongWithYourLocalDatabase___()
@@ -162,8 +162,8 @@
 			alert(m.localDatabaseDeleted());
 			await initLocalDb();
 			setAccountsAndSpaces();
-			// TODO: not great to assume the new local db works after deleting the old one
-			gs.localDbFailed = false;
+			// TODO: not great to assume the new local db works after deleting the old one - same for localCache
+			gs.localDbFailed = gs.invalidLocalCache = false;
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
 </div>

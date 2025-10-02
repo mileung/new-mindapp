@@ -35,7 +35,7 @@
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
-	let allTagsSet = $derived(new Set(gs.accounts[0]?.tags || []));
+	let allTagsSet = $derived(new Set(gs.accounts[0]?.allTags || []));
 	let suggestedTags = $derived.by(() => {
 		if (!searchIptFocused || !tagFilter) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
@@ -55,6 +55,7 @@
 
 	let changeCurrentSpace = (inMs: number | '') => {
 		goto(`/__${inMs}`);
+		localStorage.setItem('currentSpaceMs', '' + inMs);
 		updateLocalCache((lc) => {
 			lc.accounts[0].currentSpaceMs = inMs;
 			return lc;

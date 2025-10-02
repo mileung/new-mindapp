@@ -1,12 +1,11 @@
 import { z } from 'zod';
-import { SpaceSchema } from './spaces';
-import { AccountSchema, type Account } from './accounts';
-import { filterId, filterThought, type ThoughtInsert } from './thoughts';
-import { and, eq, isNull } from 'drizzle-orm';
-import { m } from './paraglide/messages';
+import { AccountSchema } from './accounts';
 import { gs } from './global-state.svelte';
-import { thoughtsTable } from './thoughts-table';
 import { gsdb } from './local-db';
+import { m } from './paraglide/messages';
+import { SpaceSchema } from './spaces';
+import { filterThought, type ThoughtInsert } from './thoughts';
+import { thoughtsTable } from './thoughts-table';
 
 export let LocalCacheSchema = z
 	.object({
@@ -30,14 +29,13 @@ export let defaultLocalCache: LocalCache = {
 				1, // global space id - everything public in cloud
 				// users can make additional spaces with custom privacy
 			],
-			tags: [],
+			allTags: [],
 		},
 	],
 };
 
 let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 	({
-		by_ms: 0,
 		tags: [' local-cache'],
 		body: JSON.stringify(localCache),
 	}) as ThoughtInsert;
@@ -52,7 +50,6 @@ export async function initLocalCache() {
 }
 
 let localCacheFilter = filterThought({
-	by_ms: 0, // When by_ms === 0, that's a system thought.
 	tags: [' local-cache'],
 });
 

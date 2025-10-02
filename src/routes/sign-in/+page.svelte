@@ -28,17 +28,15 @@
 								email,
 								otp: val,
 							});
-							console.log('res:', res);
-							if (res.success) {
-								//
-							} else if (res.strike === 3) {
+							if (res.account) {
+								console.log('res.account:', res.account);
+							} else if (res.strike! > 2) {
 								alert(m.tooManyFailedAttempts());
 								email = val = '';
-							}
+							} else alert(m.incorrectOneTimePasscode());
 						} else {
 							email = val.trim().toLowerCase();
-							let res = await trpc().auth.sendOtp.mutate({ email });
-							console.log('res:', res);
+							await trpc().auth.sendOtp.mutate({ email });
 							val = '';
 						}
 					} catch (error) {
@@ -53,8 +51,8 @@
 					required
 					{...email
 						? {
-								maxlength: 6,
-								minlength: 6,
+								maxlength: 8,
+								minlength: 8,
 								inputmode: 'numeric',
 								oninput: (e) => {
 									val = e.currentTarget.value.replace(/[^0-9]/g, '');

@@ -10,13 +10,6 @@ let mindappNewUrl = 'https://new.mindapp.cc';
 let mindappOldDevUrl = 'http://localhost:1234';
 let mindappOldUrl = 'https://mindapp.cc';
 
-if (['localhost:8888', 'new.mindapp.cc', 'mindapp.cc'].includes(location.host)) {
-	let script = document.createElement('script');
-	script.src = '/mindapp-inject.js';
-	(document.head || document.documentElement).appendChild(script);
-	script.onload = () => script.remove();
-}
-
 if (
 	[mindappNewDevUrl, mindappNewUrl, mindappOldDevUrl, mindappOldUrl].some((url) =>
 		location.href.startsWith(url),

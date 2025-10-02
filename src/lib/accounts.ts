@@ -13,7 +13,8 @@ export let AccountSchema = z
 		currentSpaceMs: z.literal('').or(z.number()),
 		spacesPinnedThrough: z.number(),
 		spaceMss: z.array(z.literal('').or(z.number())),
-		tags: z.array(z.string()),
+		allTags: z.array(z.string()),
+		email: z.string().optional(),
 	})
 	.strict();
 
@@ -21,7 +22,7 @@ export type Account = z.infer<typeof AccountSchema>;
 
 export async function unsaveTagInPersona(tag: string) {
 	await updateLocalCache((lc) => {
-		lc.accounts[0].tags = sortUniArr([...gs.accounts[0]!.tags].filter((t) => t !== tag));
+		lc.accounts[0].allTags = sortUniArr([...gs.accounts[0]!.allTags].filter((t) => t !== tag));
 		return lc;
 	});
 }

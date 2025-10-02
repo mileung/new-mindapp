@@ -1,16 +1,17 @@
 import { dev } from '$app/environment';
+import { AccountSchema, type Account } from '$lib/accounts';
 import { tdb } from '$lib/server/db';
-import { filterThought, type ThoughtInsert } from '$lib/thoughts';
+import { isValidEmail } from '$lib/server/security';
+import { type ThoughtInsert } from '$lib/thoughts';
 import { thoughtsTable } from '$lib/thoughts-table';
 import type { Context } from '$lib/trpc/context';
 import type { RequestEvent } from '@sveltejs/kit';
 import { initTRPC } from '@trpc/server';
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
-import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { minute, second } from '../time';
-import { isValidEmail } from '$lib/server/security';
+import { randomBytes } from 'crypto';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -52,7 +53,7 @@ export const router = t.router({
 			.mutation(async ({ input }) => {
 				let { email } = input;
 				if (!isValidEmail(email)) throw new Error('invalid email');
-				let otp = ('' + Math.random()).slice(-6);
+				let otp = ('' + Math.random()).slice(-8);
 				if (dev) {
 					console.log('otp:', otp);
 				} else {
@@ -77,7 +78,7 @@ export const router = t.router({
 			.input(
 				z.object({
 					email: z.string().email(),
-					otp: z.string().length(6),
+					otp: z.string().length(8),
 				}),
 			)
 			.mutation(
@@ -86,50 +87,93 @@ export const router = t.router({
 					ctx,
 				}): Promise<{
 					strike?: number;
-					// account?: Account;
-					success?: any;
+					account?: Account;
 				}> => {
-					let t = (
-						await tdb
-							.select()
-							.from(thoughtsTable)
-							.where(eq(thoughtsTable.tags, [` otp:${input.email}`]))
-							.orderBy(desc(thoughtsTable.ms))
-					)[0];
+					let now = Date.now();
+					let otpFilter = and(
+						eq(thoughtsTable.tags, [` otp:${input.email}`]),
+						isNull(thoughtsTable.in_ms),
+						isNull(thoughtsTable.by_ms),
+					);
+					let otpThoughts = await tdb
+						.select()
+						.from(thoughtsTable)
+						.where(otpFilter)
+						.orderBy(desc(thoughtsTable.ms));
+					let otpThought = otpThoughts[0];
+					// console.log('otpThought:', otpThought);
+					if (!otpThought) throw new Error('otpThought dne');
+					let { otp, strike = 0 } = JSON.parse(otpThought.body!);
+					console.log('otp:', otp);
+					console.log('strike:', strike);
+					if (input.otp !== otp) {
+						strike++;
+						if (strike > 2) {
+							await tdb.delete(thoughtsTable).where(otpFilter);
+						} else {
+							await tdb
+								.update(thoughtsTable)
+								.set({
+									body: JSON.stringify({ otp, strike }),
+								})
+								.where(otpFilter);
+						}
+						return { strike };
+					}
 
-					console.log('t:', t);
-					let { otp, strike = 0 } = JSON.parse(t.body!);
-					if (input.otp === otp) {
-						// await (tdb).delete(thoughtsTable).where(filterThought(t));
-						let sessionId = uuidv4();
-						ctx.event.cookies.set('sessionId', sessionId, {
-							httpOnly: true,
-							secure: true,
-							path: '/',
-							maxAge: 60 * 60 * 24 * 7, // 1 week
-							sameSite: 'lax',
-						});
-						return {
-							// account: {
-							success: {
-								// id: '',
-								// id: user.id,
-								// email: user.email,
-							},
-						};
+					await tdb.delete(thoughtsTable).where(otpFilter);
+
+					let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+					let sessionId = [...Array(64)]
+						.map((_) => chars[Math.round(Math.random() * chars.length)])
+						.join('');
+
+					ctx.event.cookies.set('sessionId', sessionId, {
+						httpOnly: true,
+						secure: true,
+						path: '/',
+						maxAge: 60 * 60 * 24 * 7, // 1 week
+						sameSite: 'lax',
+					});
+					let accountTags = [` email:${input.email}`];
+					let accountThoughts = await tdb
+						.select()
+						.from(thoughtsTable)
+						.where(eq(thoughtsTable.tags, accountTags));
+					if (accountThoughts.length > 1) throw new Error('Multiple accounts found');
+					let accountThought = accountThoughts[0];
+					if (!accountThought) {
+						accountThought = (
+							await tdb
+								.insert(thoughtsTable)
+								.values({
+									ms: now,
+									tags: accountTags,
+									body: JSON.stringify({
+										currentSpaceMs: 0,
+										spacesPinnedThrough: 0,
+										spaceMss: ['', 0, 1],
+										allTags: [],
+									} satisfies Omit<Account, 'ms'>),
+								})
+								.returning()
+						)[0];
 					}
-					strike++;
-					if (strike > 2) {
-						tdb.delete(thoughtsTable).where(filterThought(t));
-					} else {
-						tdb
-							.update(thoughtsTable)
-							.set({
-								body: JSON.stringify({ otp, strike }),
-							})
-							.where(filterThought(t));
-					}
-					return { strike };
+					// console.log('accountThought:', accountThought);
+					let account: Account = {
+						ms: accountThought.ms,
+						email: accountThought.tags![0].split(' email:')[1],
+						...JSON.parse(accountThought.body!),
+					};
+					if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
+
+					// console.log('account:', account);
+					await tdb.insert(thoughtsTable).values({
+						ms: now,
+						tags: [` session:${sessionId}`],
+					});
+
+					return { account };
 				},
 			),
 	}),

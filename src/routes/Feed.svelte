@@ -196,8 +196,8 @@
 
 	let submitThought = async (tags: string[], body: string) => {
 		await updateLocalCache((lc) => {
-			lc.accounts[0].tags = sortUniArr([
-				...gs.accounts[0]!.tags,
+			lc.accounts[0].allTags = sortUniArr([
+				...gs.accounts[0]!.allTags,
 				...tags.filter((t) => t[0] !== ' '),
 			]);
 			return lc;
