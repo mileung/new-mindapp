@@ -285,6 +285,7 @@
 							? ''
 							: 'hidden xs:flex h-full flex-col'
 				}`}
+				onclick={() => setTimeout(() => (spaceMenuOpen = false), 0)}
 			>
 				<div
 					id="mindapp-extension"
@@ -308,7 +309,6 @@
 						class={`fx h-10 px-2 gap-2 ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
 						onclick={(e) => {
 							e.preventDefault();
-							spaceMenuOpen = false;
 							changeCurrentSpace(ms);
 						}}
 					>

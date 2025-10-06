@@ -66,6 +66,7 @@
 		<button
 			class="xy px-2 py-1 bg-sky-400/20 hover:bg-sky-400/30 text-sky-500"
 			onclick={async () => {
+				alert('hi');
 				exportTextAsFile(
 					`mindapp-${Date.now()}.json`,
 					JSON.stringify(
