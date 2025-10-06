@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getId, type ThoughtInsert } from '$lib/thoughts';
+	import { getId, type ThoughtInsert } from '$lib/types/thoughts';
 	import BodyParser from './BodyParser.svelte';
 	import ThoughtHeader from './ThoughtHeader.svelte';
 	import Highlight from './Highlight.svelte';

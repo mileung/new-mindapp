@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { gs } from '$lib/global-state.svelte';
 	import { isStringifiedRecord } from '$lib/js';
-	import { idsRegex, type ThoughtInsert } from '$lib/thoughts';
+	import { idsRegex, type ThoughtInsert } from '$lib/types/thoughts';
 	import CitedThought from './CitedThought.svelte';
 	import Markdown from './Markdown.svelte';
 	import MiniCitedThought from './MiniCitedThought.svelte';
@@ -42,8 +42,5 @@
 		<pre>{JSON.stringify(JSON.parse(str), null, 2)}</pre>
 	{:else}
 		<Markdown text={str} />
-		<!-- <div class="prose max-w-none dark:prose-invert">
-			<SvelteMarkdown source={str.replace(/\n/g, '\n\n')} renderers={{ link: MarkdownLink }} />
-		</div> -->
 	{/if}
 {/each}

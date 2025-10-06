@@ -1,17 +1,23 @@
 import { dev } from '$app/environment';
-import { AccountSchema, type Account } from '$lib/accounts';
 import { tdb } from '$lib/server/db';
 import { isValidEmail } from '$lib/server/security';
-import { type ThoughtInsert } from '$lib/thoughts';
-import { thoughtsTable } from '$lib/thoughts-table';
 import type { Context } from '$lib/trpc/context';
+import { AccountSchema, type Account } from '$lib/types/accounts';
+import {
+	makeSessionId,
+	makeSessionRowFilter,
+	makeSessionRowInsert,
+	setSessionIdCookie,
+	type Session,
+} from '$lib/types/sessions';
+import { thoughtsTable } from '$lib/types/thoughts-table';
 import type { RequestEvent } from '@sveltejs/kit';
 import { initTRPC } from '@trpc/server';
-import { and, desc, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
-import { minute, second } from '../time';
-import { randomBytes } from 'crypto';
+import { minute, second, week } from '../time';
+import { OtpSchema, type Otp } from '$lib/types/otp';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -35,7 +41,7 @@ let makeLimiter = (pings: number, minutes: number) => {
 const logLimiter = makeLimiter(100, 1);
 
 const emailLimiter = makeLimiter(3, 5);
-async function email(config: { from: string; to: string; subject: string; html: string }) {
+async function sendEmail(config: { from: string; to: string; subject: string; html: string }) {
 	// const { err } = await emailLimiter.ping();
 	// if (err) throw new Error(err);
 	// const resend = new Resend(env.RESEND_API_KEY);
@@ -49,13 +55,13 @@ export const router = t.router({
 			//
 		}),
 		sendOtp: t.procedure
-			.input(z.object({ email: z.string().email() }))
+			.input(z.object({ email: z.string() })) //
 			.mutation(async ({ input }) => {
 				let { email } = input;
 				if (!isValidEmail(email)) throw new Error('invalid email');
-				let otp = ('' + Math.random()).slice(-8);
+				let pin = ('' + Math.random()).slice(-8);
 				if (dev) {
-					console.log('otp:', otp);
+					console.log('pin:', pin);
 				} else {
 					// await resend.emails.send({
 					// 	from: 'noreply@yourdomain.com',
@@ -65,20 +71,20 @@ export const router = t.router({
 					// });
 				}
 
-				let now = Date.now();
-				let t: ThoughtInsert = {
-					ms: now,
-					tags: [` otp:${email}`],
-					body: JSON.stringify({ otp }),
-				};
-				await tdb.insert(thoughtsTable).values(t);
-				return { success: true };
+				let ms = Date.now();
+				await tdb.insert(thoughtsTable).values({
+					ms,
+					tags: [' otp'],
+					body: JSON.stringify({ email, pin, strike: 0 } satisfies Otp),
+				});
+				return { ms };
 			}),
 		verifyOtp: t.procedure
 			.input(
 				z.object({
+					ms: z.number(),
 					email: z.string().email(),
-					otp: z.string().length(8),
+					pin: z.string().length(8),
 				}),
 			)
 			.mutation(
@@ -90,60 +96,62 @@ export const router = t.router({
 					account?: Account;
 				}> => {
 					let now = Date.now();
-					let otpFilter = and(
-						eq(thoughtsTable.tags, [` otp:${input.email}`]),
+					let otpRowFilter = and(
+						eq(thoughtsTable.ms, input.ms),
+						eq(thoughtsTable.tags, [` otp`]),
 						isNull(thoughtsTable.in_ms),
 						isNull(thoughtsTable.by_ms),
 					);
-					let otpThoughts = await tdb
+					let otpRows = await tdb
 						.select()
 						.from(thoughtsTable)
-						.where(otpFilter)
+						.where(otpRowFilter)
 						.orderBy(desc(thoughtsTable.ms));
-					let otpThought = otpThoughts[0];
-					// console.log('otpThought:', otpThought);
-					if (!otpThought) throw new Error('otpThought dne');
-					let { otp, strike = 0 } = JSON.parse(otpThought.body!);
-					console.log('otp:', otp);
-					console.log('strike:', strike);
-					if (input.otp !== otp) {
-						strike++;
-						if (strike > 2) {
-							await tdb.delete(thoughtsTable).where(otpFilter);
+					let otpRow = otpRows[0];
+					if (!otpRow) throw new Error('otpRow dne');
+					let otp: Otp = JSON.parse(otpRow.body!);
+					if (!OtpSchema.safeParse(otp).success) throw new Error('Invalid OTP');
+					// console.log('otp:', otp);
+					if (input.email !== otp.email) {
+						throw new Error('Invalid email');
+					}
+					if (input.pin !== otp.pin) {
+						otp.strike++;
+						if (otp.strike > 2) {
+							await tdb
+								.delete(thoughtsTable)
+								.where(
+									or(
+										otpRowFilter,
+										and(
+											lt(thoughtsTable.ms, now - 5 * minute),
+											eq(thoughtsTable.tags, [` otp`]),
+											isNull(thoughtsTable.in_ms),
+											isNull(thoughtsTable.by_ms),
+										),
+									),
+								);
 						} else {
 							await tdb
 								.update(thoughtsTable)
-								.set({
-									body: JSON.stringify({ otp, strike }),
-								})
-								.where(otpFilter);
+								.set({ body: JSON.stringify(otp) })
+								.where(otpRowFilter);
 						}
-						return { strike };
+						return { strike: otp.strike };
 					}
 
-					await tdb.delete(thoughtsTable).where(otpFilter);
+					await tdb.delete(thoughtsTable).where(otpRowFilter);
 
-					let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-					let sessionId = [...Array(64)]
-						.map((_) => chars[Math.round(Math.random() * chars.length)])
-						.join('');
-
-					ctx.event.cookies.set('sessionId', sessionId, {
-						httpOnly: true,
-						secure: true,
-						path: '/',
-						maxAge: 60 * 60 * 24 * 7, // 1 week
-						sameSite: 'lax',
-					});
 					let accountTags = [` email:${input.email}`];
-					let accountThoughts = await tdb
+					let accountRows = await tdb
 						.select()
 						.from(thoughtsTable)
 						.where(eq(thoughtsTable.tags, accountTags));
-					if (accountThoughts.length > 1) throw new Error('Multiple accounts found');
-					let accountThought = accountThoughts[0];
-					if (!accountThought) {
-						accountThought = (
+
+					if (accountRows.length > 1) throw new Error('Multiple accounts found');
+					let accountRow = accountRows[0];
+					if (!accountRow) {
+						accountRow = (
 							await tdb
 								.insert(thoughtsTable)
 								.values({
@@ -159,19 +167,48 @@ export const router = t.router({
 								.returning()
 						)[0];
 					}
-					// console.log('accountThought:', accountThought);
+					// console.log('accountRow:', accountRow);
 					let account: Account = {
-						ms: accountThought.ms,
-						email: accountThought.tags![0].split(' email:')[1],
-						...JSON.parse(accountThought.body!),
+						ms: accountRow.ms,
+						email: accountRow.tags![0].split(' email:')[1],
+						...JSON.parse(accountRow.body!),
 					};
 					if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
 
 					// console.log('account:', account);
-					await tdb.insert(thoughtsTable).values({
-						ms: now,
-						tags: [` session:${sessionId}`],
-					});
+
+					let { sessionMs, sessionCode, sessionId } = makeSessionId();
+					setSessionIdCookie(ctx.event, sessionId);
+					await tdb.insert(thoughtsTable).values(
+						makeSessionRowInsert(
+							sessionMs, //
+							sessionCode,
+							[
+								...new Set([
+									accountRow.ms!, //
+									...(ctx.session ? ctx.session.accountMss : []),
+								]),
+							],
+						),
+					);
+					if (ctx.session) {
+						let sessionId = ctx.event.cookies.get('sessionId');
+						let [sMs] = (sessionId || '').split('-');
+						let sessionMs = +sMs || 0;
+						await tdb
+							.delete(thoughtsTable)
+							.where(
+								or(
+									makeSessionRowFilter(sessionMs),
+									and(
+										isNull(thoughtsTable.by_ms),
+										isNull(thoughtsTable.in_ms),
+										lt(thoughtsTable.ms, now - week),
+										eq(thoughtsTable.tags, [' session']),
+									),
+								),
+							);
+					}
 
 					return { account };
 				},
@@ -184,10 +221,6 @@ export const router = t.router({
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			let sessionId = ctx.event.cookies.get('sessionId');
-			console.log('sessionId:', sessionId);
-			console.log(ctx.event.cookies.getAll());
-
 			return { success: true };
 		}),
 });

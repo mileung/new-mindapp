@@ -1,12 +1,12 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { unsaveTagInPersona } from '$lib/accounts';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { updateLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
-	import { bracketRegex } from '$lib/tags';
+	import { unsaveTagInPersona, type Account } from '$lib/types/accounts';
+	import { updateLocalCache } from '$lib/types/local-cache';
+	import { bracketRegex } from '$lib/types/thoughts';
 	import {
 		IconHelpSquareRounded,
 		IconPuzzle,
@@ -16,9 +16,9 @@
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
-	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
+	import { onMount } from 'svelte';
 
 	let searchIpt: HTMLInputElement;
 	let searchA: HTMLAnchorElement;
@@ -28,14 +28,14 @@
 	let xFocused = $state(false);
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
-	let browserExtensionAdded = $state(true);
 	let tagIndex = $state(-1);
 	let accountMenuOpen = $state(false);
 	let spaceMenuOpen = $state(false);
+	let hideExtensionLink = $state(false);
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
-	let allTagsSet = $derived(new Set(gs.accounts[0]?.allTags || []));
+	let allTagsSet = $derived(new Set(gs.accounts ? gs.accounts[0].allTags : []));
 	let suggestedTags = $derived.by(() => {
 		if (!searchIptFocused || !tagFilter) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
@@ -44,13 +44,35 @@
 			.concat(tagFilter);
 		return [...new Set(arr)];
 	});
-	$effect(() => {
-		!allTagsSet.size && (xFocused = false);
-	});
 
 	onMount(() => {
-		// @ts-ignore
-		browserExtensionAdded = !!window.mindappBrowserExtensionAdded;
+		let handler = (e: KeyboardEvent) => {
+			if (!textInputFocused()) {
+				e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
+				if (e.key === 'Escape') {
+					if (accountMenuOpen || spaceMenuOpen) {
+						accountMenuOpen = spaceMenuOpen = false;
+					} else {
+						gs.writerMode
+							? (gs.writerMode = '')
+							: gs.accounts && goto(`/__${gs.accounts[0].currentSpaceMs}`);
+					}
+				}
+				if (e.ctrlKey && e.altKey && e.key === 'Tab' && gs.accounts) {
+					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
+					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
+					if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
+					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length) newSpaceMsIndex = 0;
+					changeCurrentSpace(gs.accounts[0].spaceMss[newSpaceMsIndex]);
+				}
+			}
+		};
+		window.addEventListener('keydown', handler);
+		return () => window.removeEventListener('keydown', handler);
+	});
+
+	$effect(() => {
+		!allTagsSet.size && (xFocused = false);
 	});
 
 	let changeCurrentSpace = (inMs: number | '') => {
@@ -73,7 +95,7 @@
 
 	let searchInput = (e: KeyboardEvent) => {
 		let q = encodeURIComponent(searchVal.trim());
-		if (q && gs.accounts[0]) {
+		if (q && gs.accounts) {
 			page.state.modalId = undefined;
 			let urlPath = `/__${gs.accounts[0].currentSpaceMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
@@ -85,38 +107,22 @@
 		// console.log(gs.accounts[0]?.currentSpaceMs);
 		// console.log(gs.accounts[0]?.id);
 		// console.log($inspect(gs.accounts[0]?.spaceMss));
+		// console.log('page.url.pathname:', page.url.pathname);
 	});
 </script>
 
-<svelte:window
-	on:keydown={(e) => {
-		if (!textInputFocused()) {
-			e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
-			if (e.key === 'Escape') {
-				if (accountMenuOpen || spaceMenuOpen) {
-					accountMenuOpen = spaceMenuOpen = false;
-				} else {
-					gs.writerMode ? (gs.writerMode = '') : goto(`/__${gs.accounts[0].currentSpaceMs}`);
-				}
-			}
-			if (e.ctrlKey && e.altKey && e.key === 'Tab') {
-				let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
-				let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
-				if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
-				if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length) newSpaceMsIndex = 0;
-				changeCurrentSpace(gs.accounts[0].spaceMss[newSpaceMsIndex]);
-			}
-		}
-	}}
-/>
-
+<!-- TODO: remember scroll position and ThoughtDrop states (open, parsed, etc) when switching spaces without flickering -->
 <!-- TODO: header should go up off screen on scroll down for <xs screens -->
 <div class="hidden xs:block w-[var(--w-sidebar)]"></div>
 <aside class="top-0 fixed block w-screen xs:h-screen xs:w-[var(--w-sidebar)] z-50 bg-bg2">
 	<div class="h-full flex-1 flex flex-col">
 		<div class="flex">
 			{#if searchIptFocused && tagFilter}
-				<button class="h-9 w-9 xy hover:bg-bg5 text-fg1" onclick={() => searchIpt.blur()}>
+				<button
+					class="h-9 w-9 xy hover:bg-bg5 text-fg1"
+					onmousedown={(e) => e.preventDefault()}
+					onclick={() => (searchVal = '')}
+				>
 					<IconX class="h-6 w-6" />
 				</button>
 			{:else}
@@ -129,7 +135,7 @@
 				>
 					{#if accountMenuOpen}
 						<IconX class="h-6 w-6" />
-					{:else}
+					{:else if gs.accounts}
 						<AccountIcon id={`_${gs.accounts[0]?.ms ?? ''}_`} />
 					{/if}
 				</button>
@@ -142,8 +148,8 @@
 				>
 					{#if spaceMenuOpen}
 						<IconX class="h-6 w-6" />
-					{:else}
-						<SpaceIcon id={`__${gs.accounts[0]?.currentSpaceMs ?? ''}`} />
+					{:else if gs.accounts}
+						<SpaceIcon id={`__${gs.accounts[0].currentSpaceMs}`} />
 					{/if}
 				</button>
 			{/if}
@@ -239,72 +245,80 @@
 				{/each}
 			</div>
 			<div class={`${accountMenuOpen ? '' : 'hidden'}`} onclick={() => (accountMenuOpen = false)}>
-				{#each gs.accounts as a, i}
-					<a class={`relative fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
+				{#each gs.accounts || [] as a, i}
+					<button
+						class={`relative fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
+						onclick={() => {
+							goto(`/__${a.currentSpaceMs}`, {});
+							updateLocalCache((lc) => {
+								lc.accounts = [lc.accounts[i], ...lc.accounts.filter((_, k) => k !== i)];
+								return lc;
+							});
+						}}
+					>
 						{#if !i}
 							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
 						{/if}
-						<AccountIcon id={`_${a.ms}_`} />
+						<AccountIcon id={`_${a.ms}_`} class="h-full" />
 						{(() => {
 							let accountJson = gs.thoughts[`_${a.ms}_`]?.body;
 							if (accountJson) {
-								let obj = JSON.parse(accountJson);
-								return obj + '';
+								// parseType
+								let a: Account = JSON.parse(accountJson);
+								return a.ms;
 							}
 							return '';
 						})() || m.anon()}
-					</a>
+					</button>
 				{/each}
 				<a href="/sign-in" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
-				<a href="/settings" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
-					<IconSettings class="h-6 w-6" />
-					{m.settings()}
-				</a>
-				<a href="/user-guide" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
-					<IconHelpSquareRounded class="h-6 w-6" />
-					{m.userGuide()}
-				</a>
 			</div>
 			<div
-				class={`${spaceMenuOpen ? '' : `hidden ${accountMenuOpen || (searchIptFocused && tagFilter) ? '' : 'xs:block'}`}`}
+				class={`${
+					accountMenuOpen || //
+					(searchIptFocused && tagFilter)
+						? 'hidden'
+						: spaceMenuOpen
+							? ''
+							: 'hidden xs:flex h-full flex-col'
+				}`}
 			>
-				<a
+				<div
 					id="mindapp-extension"
-					target="_blank"
-					href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-					class={`fx gap-1 p-2 h-12 text-black bg-hl1 hover:bg-hl2`}
+					class={`flex h-12 text-black bg-hl1 hover:bg-hl2 ${hideExtensionLink ? 'hidden' : ''}`}
 				>
-					<IconPuzzle class="h-6 w-9" />
-					<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
-				</a>
-				{#each gs.accounts[0]?.spaceMss || [] as ms}
-					<div class={`flex ${ms === gs.accounts[0].currentSpaceMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
-						<a
-							href={`/__${ms ?? ''}`}
-							class={`flex-1 fx gap-1 p-2 h-12`}
-							onclick={(e) => {
-								e.preventDefault();
-								spaceMenuOpen = false;
-								changeCurrentSpace(ms);
-							}}
-						>
-							{#if ms === gs.accounts[0].currentSpaceMs}
-								<div class="absolute left-0 h-12 w-0.5 bg-hl1"></div>
-							{/if}
-							<SpaceIcon id={`__${ms}`} class="h-6 w-9" />
-							<p class="font-medium">
-								{ms === 0
-									? m.personal()
-									: ms === 1
-										? m.global()
-										: ms
-											? gs.spaces[ms]?.ms
-											: m.local()}
-							</p>
-						</a>
+					<a
+						target="_blank"
+						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
+						class="flex-1 fx h-12 pl-3 gap-2"
+					>
+						<IconPuzzle class="h-6" />
+						<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
+					</a>
+					<button class="xy w-8" onclick={() => (hideExtensionLink = true)}>
+						<IconX class="h-5" />
+					</button>
+				</div>
+				{#each gs.accounts ? gs.accounts[0].spaceMss : [] as ms}
+					<a
+						href={`/__${ms}`}
+						class={`fx h-10 px-2 gap-2 ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
+						onclick={(e) => {
+							e.preventDefault();
+							spaceMenuOpen = false;
+							changeCurrentSpace(ms);
+						}}
+					>
+						{#if ms === gs.accounts![0].currentSpaceMs}
+							<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
+						{/if}
+						<SpaceIcon id={`__${ms}`} class="h-6" />
+						<p class="font-medium">
+							{ms === 0 ? m.personal() : ms === 1 ? m.global() : ms ? gs.spaces[ms]?.ms : m.local()}
+						</p>
 						<!-- {#if i === gs.accounts[0]?.currentSpaceMs}
 							<button class="text-fg2 hover:text-fg1 p-2">
 								{#if gs.spaces[gs.accounts[0]?.currentSpaceMs!]?.nested}
@@ -314,12 +328,30 @@
 								{/if}
 							</button>
 						{/if} -->
-					</div>
+					</a>
 				{/each}
-				<!-- <a href="/add-space" class="fx gap-1 p-2 h-12 hover:bg-bg5">
-					<IconSquarePlus2 class="h-6 w-9" />
+				<!-- <a
+					href="/add-space"
+					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
+				>
+					<IconSquarePlus2 class="h-6" />
 					{m.addSpace()}
 				</a> -->
+				<div class="flex-1"></div>
+				<a
+					href="/user-guide"
+					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+				>
+					<IconHelpSquareRounded class="h-6" />
+					{m.userGuide()}
+				</a>
+				<a
+					href="/settings"
+					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
+				>
+					<IconSettings class="h-6" />
+					{m.settings()}
+				</a>
 			</div>
 		</div>
 	</div>

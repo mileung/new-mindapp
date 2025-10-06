@@ -1,15 +1,15 @@
 import { z } from 'zod';
 import { AccountSchema } from './accounts';
-import { gs } from './global-state.svelte';
-import { gsdb } from './local-db';
-import { m } from './paraglide/messages';
+import { gs } from '../global-state.svelte';
+import { gsdb } from '../local-db';
+import { m } from '../paraglide/messages';
 import { SpaceSchema } from './spaces';
 import { filterThought, type ThoughtInsert } from './thoughts';
 import { thoughtsTable } from './thoughts-table';
 
 export let LocalCacheSchema = z
 	.object({
-		spaces: z.record(z.number(), SpaceSchema),
+		spaces: z.record(z.number(), SpaceSchema.optional()),
 		accounts: z.array(AccountSchema),
 	})
 	.strict();
@@ -38,26 +38,33 @@ let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 	({
 		tags: [' local-cache'],
 		body: JSON.stringify(localCache),
-	}) as ThoughtInsert;
+	}) satisfies ThoughtInsert;
 
-export async function initLocalCache() {
-	return (
-		await (await gsdb())
-			.insert(thoughtsTable)
-			.values(makeLocalCacheThoughtInsert(defaultLocalCache))
-			.returning()
-	)[0];
-}
-
-let localCacheFilter = filterThought({
+let localCacheRowFilter = filterThought({
 	tags: [' local-cache'],
 });
 
 export async function getLocalCache() {
-	let [localCacheRow] = await (await gsdb()).select().from(thoughtsTable).where(localCacheFilter);
-	if (!localCacheRow) localCacheRow = await initLocalCache();
+	let [localCacheRow] = await (await gsdb())
+		.select()
+		.from(thoughtsTable)
+		.where(localCacheRowFilter);
+	if (!localCacheRow) {
+		localCacheRow = (
+			await (await gsdb())
+				.insert(thoughtsTable)
+				.values(makeLocalCacheThoughtInsert(defaultLocalCache))
+				.returning()
+		)[0];
+	}
 	let localCache: LocalCache = JSON.parse(localCacheRow.body!);
-	if (!LocalCacheSchema.safeParse(localCache).success) {
+	if (
+		!LocalCacheSchema.safeParse(localCache).success ||
+		!(
+			localCacheRow.tags?.length === 1 && //
+			localCacheRow.tags[0] === ' local-cache'
+		)
+	) {
 		throw new Error('Invalid localCache');
 	}
 	return localCache;
@@ -67,7 +74,7 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 	let pseudoOldLC = {
 		accounts: gs.accounts,
 		spaces: gs.spaces,
-	} as LocalCache;
+	} satisfies LocalCache;
 	let pseudoNewLC = updater(pseudoOldLC);
 	gs.accounts = pseudoNewLC.accounts;
 	gs.spaces = pseudoNewLC.spaces;
@@ -85,9 +92,9 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 	await (await gsdb())
 		.update(thoughtsTable)
 		.set(makeLocalCacheThoughtInsert(newLocalCache))
-		.where(localCacheFilter);
+		.where(localCacheRowFilter);
 }
 
 export async function deleteLocalCache() {
-	await (await gsdb()).delete(thoughtsTable).where(localCacheFilter);
+	await (await gsdb()).delete(thoughtsTable).where(localCacheRowFilter);
 }

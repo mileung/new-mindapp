@@ -4,7 +4,7 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/thoughts';
+	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/types/thoughts';
 	import { formatMs, minute } from '$lib/time';
 	import {
 		IconCheck,

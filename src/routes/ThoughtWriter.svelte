@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { unsaveTagInPersona } from '$lib/accounts';
+	import { unsaveTagInPersona } from '$lib/types/accounts';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import type { ThoughtSelect } from '$lib/thoughts';
+	import type { ThoughtSelect } from '$lib/types/thoughts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
@@ -27,7 +27,7 @@
 
 	let writtenTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(gs.writerTagVal.trim());
-	let allTagsSet = $derived(new Set(gs.accounts[0]?.allTags || []));
+	let allTagsSet = $derived(new Set(gs.accounts ? gs.accounts[0].allTags : []));
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');

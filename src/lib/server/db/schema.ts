@@ -1,3 +1,3 @@
-import { thoughtsTable } from '../../thoughts-table';
+import { thoughtsTable } from '../../types/thoughts-table';
 
 export { thoughtsTable };

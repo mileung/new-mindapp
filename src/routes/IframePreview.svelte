@@ -2,12 +2,13 @@
 	import { m } from '$lib/paraglide/messages';
 	import { IconX } from '@tabler/icons-svelte';
 
-	const ytRegex =
+	let ytRegex =
 		/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
 	let p: { uri: string } = $props();
 	let open = $state(false);
 	let videoId = $derived(p.uri.match(ytRegex)?.[1]);
+	let startTime = $derived(videoId ? p.uri.match(/[?&](?:t|start)=([0-9]+)/)?.[1] : 0);
 	let iframe = $state<HTMLIFrameElement>();
 	$effect(() => {
 		if (open) {
@@ -42,7 +43,7 @@
 			allowfullscreen
 			bind:this={iframe}
 			class="w-full max-h-[80vh] max-w-[calc(80vh*16/9)] aspect-video"
-			src={`https://www.youtube.com/embed/${videoId}`}
+			src={`https://www.youtube.com/embed/${videoId}?start=${startTime}`}
 			onkeydown={(e) => e.key === 'Escape' && (open = false)}
 		></iframe>
 	{/if}

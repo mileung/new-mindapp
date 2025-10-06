@@ -116,11 +116,9 @@ export function isRecord(value: unknown) {
 }
 
 export function isStringifiedRecord(value?: string) {
-	if (!value) return false;
 	try {
-		const obj = JSON.parse(value);
-		return isRecord(obj);
-	} catch (error) {}
+		return isRecord(JSON.parse(value!));
+	} catch (e) {}
 	return false;
 }
 

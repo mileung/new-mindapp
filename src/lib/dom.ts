@@ -1,7 +1,5 @@
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
-// externalDom
-// url
 export function scrape(externalUrl: string, externalDomString: string) {
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
 

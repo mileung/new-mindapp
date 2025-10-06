@@ -1,10 +1,14 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
+	import { updateLocalCache } from '$lib/types/local-cache';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 
 	let val = $state('');
 	let email = $state('');
+	let otpMs = $state(0);
 </script>
 
 <div class="xy h-screen p-5 min-h-fit">
@@ -12,7 +16,7 @@
 		<div class="min-h-52">
 			{#if email}
 				<p class="text-3xl sm:text-4xl font-black">Check your inbox</p>
-				<p class="mt-2 text-lg sm:text-xl">Enter the one-time passcode we sent to</p>
+				<p class="mt-2 text-lg sm:text-xl">Enter the one-time pin we sent to</p>
 				<p class="font-bold break-all">{email}</p>
 			{:else}
 				<p class="text-4xl sm:text-5xl font-black">Organize today</p>
@@ -26,17 +30,25 @@
 						if (email) {
 							let res = await trpc().auth.verifyOtp.mutate({
 								email,
-								otp: val,
+								pin: val,
+								ms: otpMs,
 							});
-							if (res.account) {
-								console.log('res.account:', res.account);
+							let { account } = res;
+							if (account) {
+								updateLocalCache((lc) => {
+									if (gs.accounts) {
+										lc.accounts = [account, ...gs.accounts.filter((a) => a.ms !== account.ms)];
+									}
+									return lc;
+								});
+								goto(`/__${account.currentSpaceMs}`, {});
 							} else if (res.strike! > 2) {
 								alert(m.tooManyFailedAttempts());
 								email = val = '';
-							} else alert(m.incorrectOneTimePasscode());
+							} else alert(m.incorrectOneTimePin());
 						} else {
 							email = val.trim().toLowerCase();
-							await trpc().auth.sendOtp.mutate({ email });
+							otpMs = (await trpc().auth.sendOtp.mutate({ email })).ms;
 							val = '';
 						}
 					} catch (error) {
@@ -58,7 +70,7 @@
 									val = e.currentTarget.value.replace(/[^0-9]/g, '');
 									// TODO: prevent the "Please lengthen this text" thing from showing up as the user is trying to correct a submitted invalid input
 								},
-								placeholder: m.oneTimePasscode(),
+								placeholder: m.oneTimePin(),
 							}
 						: {
 								type: 'email',

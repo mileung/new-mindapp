@@ -1,13 +1,14 @@
 <script lang="ts">
-	import { goto, pushState } from '$app/navigation';
+	import { pushState } from '$app/navigation';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
 	import { sortUniArr } from '$lib/js';
-	import { updateLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
-	import { bracketRegex, getTags } from '$lib/tags';
+	import { trpc } from '$lib/trpc/client';
+	import { updateLocalCache } from '$lib/types/local-cache';
 	import {
 		addThought,
+		bracketRegex,
 		editThought,
 		getId,
 		getIds,
@@ -16,7 +17,7 @@
 		rootsPerLoad,
 		splitId,
 		type ThoughtNested,
-	} from '$lib/thoughts';
+	} from '$lib/types/thoughts';
 	import {
 		IconChevronRight,
 		IconCornerUpLeft,
@@ -29,7 +30,7 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
-	import { trpc } from '$lib/trpc/client';
+	import { page } from '$app/state';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
@@ -44,19 +45,22 @@
 	let oldestFirst = $derived(false);
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
 	let personalSpaceRequiresLogin = $derived(
-		splitId(p.idParam || '').in_ms === '0' && (!gs.accounts[0] || !gs.accounts[0].ms),
+		splitId(p.idParam || '').in_ms === '0' && //
+			gs.accounts?.[0].ms === '',
 	);
 	let allowNewWriting = $derived(!p.modal && !personalSpaceRequiresLogin);
 
 	onMount(() => {
-		window.addEventListener('keydown', (e) => {
+		const handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
 				if (e.key === 'n' && !gs.writerMode && allowNewWriting) {
 					e.preventDefault();
 					gs.writerMode = 'new';
 				}
 			}
-		});
+		};
+		window.addEventListener('keydown', handler);
+		return () => window.removeEventListener('keydown', handler);
 	});
 
 	let scrollToHighlight = () => {
@@ -65,6 +69,10 @@
 			document.querySelector('#m' + id) || //
 			document.querySelector('.m' + id);
 		e?.scrollIntoView({ block: 'start' });
+	};
+
+	let getTags = (input?: string) => {
+		return (input?.match(bracketRegex) || []).map((match) => match.slice(1, -1));
 	};
 
 	let loadMoreThoughts = async (e: InfiniteEvent) => {
@@ -76,7 +84,7 @@
 		// 	$state.snapshot(gs.thoughts),
 		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
-		if (p.idParam === '__1') {
+		if (p.idParam === '__0' || p.idParam === '__1') {
 			trpc().getFeed.mutate({});
 			return;
 		}
@@ -197,7 +205,7 @@
 	let submitThought = async (tags: string[], body: string) => {
 		await updateLocalCache((lc) => {
 			lc.accounts[0].allTags = sortUniArr([
-				...gs.accounts[0]!.allTags,
+				...gs.accounts![0].allTags,
 				...tags.filter((t) => t[0] !== ' '),
 			]);
 			return lc;
@@ -246,8 +254,8 @@
 	});
 </script>
 
-<div class="relative bg-bg1 flex flex-col min-h-screen">
-	{#if personalSpaceRequiresLogin}
+<div class={`flex flex-col overflow-scroll h-screen ${p.hidden ? 'hidden' : ''}`}>
+	{#if !!gs.accounts && personalSpaceRequiresLogin}
 		<div class="xy fy gap-2 flex-1">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
 			<a
@@ -261,11 +269,9 @@
 	{:else if p.idParam === '__' && !p.searchedText && feed && !feed.length}
 		welcome
 	{:else}
-		<div class="space-y-1 my-1">
-			{#each feed || [] as thought (getId(thought))}
-				<ThoughtDrop {...p} {nested} {thought} depth={0} />
-			{/each}
-		</div>
+		{#each feed || [] as thought (getId(thought))}
+			<ThoughtDrop {...p} {nested} {thought} depth={0} />
+		{/each}
 		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreThoughts}>
 			<p slot="noResults" class="m-2 text-xl text-fg2">
 				<!-- TODO: noResults shows after deleting the one and only thought then making another new thought in Local  -->
@@ -276,12 +282,12 @@
 		</InfiniteLoading>
 	{/if}
 	{#if p.modal}
-		<button
+		<a
+			href={`/__${splitId(spotId).in_ms}`}
 			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
-			onclick={() => goto(`/__${gs.accounts[0].currentSpaceMs}`)}
 		>
 			<IconX class="w-8" />
-		</button>
+		</a>
 	{:else if allowNewWriting}
 		<button
 			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"

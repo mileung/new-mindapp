@@ -32,11 +32,11 @@ export async function initLocalDb() {
 export async function gsdb() {
 	let attempts = 0;
 	while (!gs.db) {
-		if (++attempts > 88) {
+		if (++attempts > 888) {
 			alert(m.localDatabaseTimedOut());
 			throw new Error(m.localDatabaseTimedOut());
 		}
-		await new Promise((res) => setTimeout(res, 100));
+		await new Promise((res) => setTimeout(res, 42));
 	}
 	return gs.db;
 }

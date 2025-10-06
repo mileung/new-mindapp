@@ -3,17 +3,16 @@
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/global-state.svelte';
 	import { gsdb, initLocalDb } from '$lib/local-db';
-	import { getLocalCache } from '$lib/local-cache';
 	import { m } from '$lib/paraglide/messages';
+	import { getLocalCache } from '$lib/types/local-cache';
 	import {
 		filterThought,
 		getId,
 		getThoughtById,
 		ThoughtInsertSchema,
 		type ThoughtInsert,
-		type ThoughtSelect,
-	} from '$lib/thoughts';
-	import { thoughtsTable } from '$lib/thoughts-table';
+	} from '$lib/types/thoughts';
+	import { thoughtsTable } from '$lib/types/thoughts-table';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
 	import { asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
@@ -87,7 +86,7 @@
 									by_ms: r.by_ms === null ? undefined : r.by_ms,
 									to_id: r.to_id === null ? undefined : r.to_id,
 									in_ms: r.in_ms === null ? undefined : r.in_ms,
-								}) as ThoughtSelect,
+								}) satisfies ThoughtInsert,
 						),
 					),
 				);

@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { getId, type ThoughtNested } from '$lib/thoughts';
+	import { getId, type ThoughtNested } from '$lib/types/thoughts';
 	import { IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import BodyParser from './BodyParser.svelte';
 	import Self from './ThoughtDrop.svelte';
@@ -49,7 +49,7 @@
 		</button>
 	{/if}
 	<div class={`max-w-full bg-inherit flex-1 relative ${p.nested ? '' : 'px-2'}`}>
-		<div class="relative bg-inherit">
+		<div class="relative bg-inherit pb-1">
 			<div class="z-10 sticky top-9 xs:top-0 bg-inherit">
 				{#if !p.nested && p.thought.to_id}
 					<div class="relative fx">
@@ -88,7 +88,7 @@
 				<ThoughtHeader {...p} {parsed} onToggleParsed={() => (parsed = !parsed)} />
 			</div>
 			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.thought.to_id ? 'top-6' : ''}`} />
-			<div class={open ? 'pb-1 pr-1' : 'hidden'}>
+			<div class={open ? 'pr-1' : 'hidden'}>
 				{#if p.thought.body}
 					{#if parsed}
 						<BodyParser {...p} />

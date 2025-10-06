@@ -3,7 +3,7 @@
 }
 
 body {
-	@apply bg-bg1 text-fg1;
+	@apply bg-bg1 text-fg1 overflow-clip;
 }
 
 button,

@@ -3,10 +3,9 @@
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { getLocalCache } from '$lib/local-cache';
+	import { getLocalCache } from '$lib/types/local-cache';
 	import { setTheme } from '$lib/theme';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
-	import html2md from 'html-to-md';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
@@ -80,41 +79,20 @@
 							selectedHtmlString?: string;
 						}) || {};
 					if (!url || !externalDomString) return;
-					let scrapedInfo = selectedHtmlString
-						? {
-								headline: (() => {
-									if (!0) {
-										return selectedPlainText;
-									}
-									console.log('selectedHtmlString:', selectedHtmlString);
-									let fragment = new DOMParser().parseFromString(selectedHtmlString, 'text/html');
-									fragment.querySelectorAll('a[href]').forEach((a) => {
-										a.setAttribute('href', new URL(a.getAttribute('href') || '/', url).href);
-									});
-									console.log('fragment:', fragment.body.innerHTML);
-
-									// return fragment.body.textContent;
-									let markdown = html2md(fragment.body.innerHTML.replace(/\n/g, '<br/>'), {
-										skipTags: ['font'],
-										renderCustomTags: 'SKIP',
-									});
-									// console.log('markdown:', markdown);
-									return markdown;
-								})(),
-								tags: [],
-								url,
-							}
-						: scrape(url, externalDomString);
+					let scrapedInfo = scrape(url, externalDomString);
 
 					gs.writerMode = 'new';
-					gs.writerTags = scrapedInfo?.tags || [];
-					gs.writerBody = `${scrapedInfo?.headline}\n${scrapedInfo?.url || url}\n\n`;
+					gs.writerTags = scrapedInfo.tags || [];
+					// TODO: think of a better ux. Like when a user highlights and runs the mindapp shortcut, what should be prepopulated in the writer?
+					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
+					gs.writerBody = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
 				}
 			});
 		}
 	});
 </script>
 
+<!-- TODO: scroll feed even when on sidebar. Do not use multiple Sidebar instances.  -->
 <Sidebar />
 <div class="xs:pl-[var(--w-sidebar)] min-h-screen pt-9 xs:pt-0">
 	{@render p.children()}

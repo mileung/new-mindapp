@@ -17,8 +17,8 @@ import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { sortUniArr } from './js';
-import { gsdb } from './local-db';
+import { sortUniArr } from '../js';
+import { gsdb } from '../local-db';
 import { thoughtsTable } from './thoughts-table';
 
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
@@ -31,6 +31,7 @@ type IdSegments = Pick<ThoughtInsert, 'ms' | 'by_ms' | 'in_ms'>;
 export let getId = (thought: IdSegments) =>
 	`${thought.ms ?? ''}_${thought.by_ms ?? ''}_${thought.in_ms ?? ''}`;
 
+export let bracketRegex = /\[([^\[\]]+)]/g;
 export let idRegex = /^\d*_\d*_\d*$/;
 export let idsRegex = /(^|\s)\d*_\d*_\d*($|\s)/g;
 

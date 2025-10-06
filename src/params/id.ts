@@ -1,4 +1,4 @@
-import { isId } from '$lib/thoughts';
+import { isId } from '$lib/types/thoughts';
 import type { ParamMatcher } from '@sveltejs/kit';
 
 export const match = ((param: string) => {

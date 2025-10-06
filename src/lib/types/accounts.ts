@@ -1,11 +1,7 @@
 import { z } from 'zod';
-import { gs } from './global-state.svelte';
-import { sortUniArr } from './js';
+import { gs } from '../global-state.svelte';
+import { sortUniArr } from '../js';
 import { updateLocalCache } from './local-cache';
-
-export let currentPersona = () => {
-	return gs.accounts[0]!;
-};
 
 export let AccountSchema = z
 	.object({
@@ -22,7 +18,9 @@ export type Account = z.infer<typeof AccountSchema>;
 
 export async function unsaveTagInPersona(tag: string) {
 	await updateLocalCache((lc) => {
-		lc.accounts[0].allTags = sortUniArr([...gs.accounts[0]!.allTags].filter((t) => t !== tag));
+		if (gs.accounts) {
+			lc.accounts[0].allTags = sortUniArr([...gs.accounts[0]!.allTags].filter((t) => t !== tag));
+		}
 		return lc;
 	});
 }
