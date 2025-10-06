@@ -254,7 +254,9 @@
 	});
 </script>
 
-<div class={`flex flex-col overflow-scroll h-screen ${p.hidden ? 'hidden' : ''}`}>
+<div
+	class={`flex flex-col overflow-scroll h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}
+>
 	{#if !!gs.accounts && personalSpaceRequiresLogin}
 		<div class="xy fy gap-2 flex-1">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>

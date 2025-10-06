@@ -39,7 +39,7 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class="z-0 sticky top-9 xs:top-0 bg-inherit h-5 w-5 xy">
+			<div class="z-0 sticky top-0 bg-inherit h-5 w-5 xy">
 				{#if open}
 					<IconMinus class="w-4" />
 				{:else}
@@ -50,7 +50,7 @@
 	{/if}
 	<div class={`max-w-full bg-inherit flex-1 relative ${p.nested ? '' : 'px-2'}`}>
 		<div class="relative bg-inherit pb-1">
-			<div class="z-10 sticky top-9 xs:top-0 bg-inherit">
+			<div class="z-10 sticky top-0 bg-inherit">
 				{#if !p.nested && p.thought.to_id}
 					<div class="relative fx">
 						<a

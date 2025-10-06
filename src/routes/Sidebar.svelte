@@ -289,17 +289,23 @@
 			>
 				<div
 					id="mindapp-extension"
-					class={`flex h-12 text-black bg-hl1 hover:bg-hl2 ${hideExtensionLink ? 'hidden' : ''}`}
+					class={`flex text-black bg-hl1 hover:bg-hl2 ${hideExtensionLink ? 'hidden' : ''}`}
 				>
 					<a
 						target="_blank"
 						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-						class="flex-1 fx h-12 pl-3 gap-2"
+						class="flex-1 fx h-12 px-2 gap-2"
 					>
-						<IconPuzzle class="h-6" />
+						<div class="w-6"><IconPuzzle /></div>
 						<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
 					</a>
-					<button class="xy w-8" onclick={() => (hideExtensionLink = true)}>
+					<button
+						class="xy w-8"
+						onclick={(e) => {
+							hideExtensionLink = true;
+							e.stopPropagation();
+						}}
+					>
 						<IconX class="h-5" />
 					</button>
 				</div>
