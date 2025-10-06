@@ -47,7 +47,11 @@
 			} catch (error) {
 				console.log('error:', error);
 				alert(error);
-				gs.invalidLocalCache = true;
+				if (error === 'Invalid localCache') {
+					gs.invalidLocalCache = true;
+				} else {
+					gs.localDbFailed = true;
+				}
 				goto('/settings');
 			}
 		} catch (error) {
