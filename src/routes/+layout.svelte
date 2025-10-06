@@ -46,6 +46,7 @@
 				gs.spaces = localCache.spaces;
 			} catch (error) {
 				console.log('error:', error);
+				alert(error);
 				gs.invalidLocalCache = true;
 				goto('/settings');
 			}
