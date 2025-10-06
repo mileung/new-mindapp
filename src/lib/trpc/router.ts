@@ -1,6 +1,5 @@
 import { dev } from '$app/environment';
 import { tdb } from '$lib/server/db';
-import { isValidEmail } from '$lib/server/security';
 import type { Context } from '$lib/trpc/context';
 import { AccountSchema, type Account } from '$lib/types/accounts';
 import {
@@ -20,6 +19,11 @@ import { minute, second, week } from '../time';
 import { OtpSchema, type Otp } from '$lib/types/otp';
 
 export const t = initTRPC.context<Context>().create();
+
+let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export let isValidEmail = (email: string) => {
+	return email.length < 255 && emailRegex.test(email);
+};
 
 let makeLimiter = (pings: number, minutes: number) => {
 	const limiter = new RateLimiterMemory({

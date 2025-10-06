@@ -20,7 +20,7 @@ export async function createContext(event: RequestEvent) {
 	let sessionRows = await tdb.select().from(thoughtsTable).where(sessionRowFilter);
 
 	let session: undefined | Session;
-	if (!sessionCode || !sessionRows.length) {
+	if (!sessionRows.length) {
 		event.cookies.delete('sessionId', { path: '/' });
 	} else {
 		if (sessionRows.length > 1) throw new Error('Multiple sessions found');
