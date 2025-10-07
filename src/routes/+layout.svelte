@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { getLocalCache } from '$lib/types/local-cache';
+	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { setTheme } from '$lib/theme';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
@@ -12,7 +12,9 @@
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
 	import { initLocalDb } from '$lib/local-db';
+	import { trpc } from '$lib/trpc/client';
 	let p: { data: LayoutData; children: Snippet } = $props();
+
 	onMount(async () => {
 		const savedTheme = localStorage.getItem('theme');
 		gs.theme = (
@@ -22,6 +24,30 @@
 		if (page.url.pathname === '/') {
 			goto(`/__${localStorage.getItem('currentSpaceMs') || ''}`, {
 				replaceState: true,
+			});
+		}
+
+		if (page.url.searchParams.get('extension') !== null) {
+			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
+			window.addEventListener('message', (event) => {
+				if (event.source !== window) return;
+				if (event.data.type === '4-popup-receives-external-page-info') {
+					let { url, externalDomString, selectedPlainText, selectedHtmlString } =
+						(event.data.payload as {
+							url?: string;
+							externalDomString?: string;
+							selectedPlainText?: string;
+							selectedHtmlString?: string;
+						}) || {};
+					if (!url || !externalDomString) return;
+					let scrapedInfo = scrape(url, externalDomString);
+
+					gs.writerMode = 'new';
+					gs.writerTags = scrapedInfo.tags || [];
+					// TODO: think of a better ux. Like when a user highlights and runs the mindapp shortcut, what should be prepopulated in the writer?
+					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
+					gs.writerBody = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
+				}
 			});
 		}
 
@@ -44,6 +70,16 @@
 				// console.log('localCache:', localCache);
 				gs.accounts = localCache.accounts;
 				gs.spaces = localCache.spaces;
+
+				// TODO: show accounts that were signed but but need to be signed in again for some reason?
+				let stat = await trpc().auth.getAccountStates.mutate({
+					accountMss: gs.accounts.map((a) => a.ms).filter((n) => n !== ''),
+				});
+				let signedInMsSet = new Set(stat);
+				updateLocalCache((lc) => {
+					lc.accounts = lc.accounts.filter((a) => a.ms === '' || signedInMsSet.has(a.ms));
+					return lc;
+				});
 			} catch (error) {
 				console.log('error:', error);
 				alert(error);
@@ -67,32 +103,6 @@
 			window
 				?.matchMedia('(prefers-color-scheme: dark)')
 				?.addEventListener?.('change', () => setTheme('system'));
-		}
-	});
-
-	$effect(() => {
-		if (page.url.searchParams.get('extension') !== null) {
-			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
-			window.addEventListener('message', (event) => {
-				if (event.source !== window) return;
-				if (event.data.type === '4-popup-receives-external-page-info') {
-					let { url, externalDomString, selectedPlainText, selectedHtmlString } =
-						(event.data.payload as {
-							url?: string;
-							externalDomString?: string;
-							selectedPlainText?: string;
-							selectedHtmlString?: string;
-						}) || {};
-					if (!url || !externalDomString) return;
-					let scrapedInfo = scrape(url, externalDomString);
-
-					gs.writerMode = 'new';
-					gs.writerTags = scrapedInfo.tags || [];
-					// TODO: think of a better ux. Like when a user highlights and runs the mindapp shortcut, what should be prepopulated in the writer?
-					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
-					gs.writerBody = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
-				}
-			});
 		}
 	});
 </script>

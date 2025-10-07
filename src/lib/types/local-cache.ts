@@ -71,28 +71,30 @@ export async function getLocalCache() {
 }
 
 export async function updateLocalCache(updater: (old: LocalCache) => LocalCache) {
-	let pseudoOldLC = {
-		accounts: gs.accounts,
-		spaces: gs.spaces,
-	} satisfies LocalCache;
-	let pseudoNewLC = updater(pseudoOldLC);
-	gs.accounts = pseudoNewLC.accounts;
-	gs.spaces = pseudoNewLC.spaces;
-	// The above is to hide the delay of fetching the local cache
+	if (gs.accounts) {
+		let pseudoOldLC = {
+			accounts: gs.accounts,
+			spaces: gs.spaces,
+		} satisfies LocalCache;
+		let pseudoNewLC = updater(pseudoOldLC);
+		gs.accounts = pseudoNewLC.accounts;
+		gs.spaces = pseudoNewLC.spaces;
+		// The above is to hide the delay of fetching the local cache
 
-	let oldLocalCache = await getLocalCache();
-	let newLocalCache = updater(oldLocalCache);
+		let oldLocalCache = await getLocalCache();
+		let newLocalCache = updater(oldLocalCache);
 
-	if (!LocalCacheSchema.safeParse(newLocalCache).success) {
-		return window.alert(m.invalidLocalCacheUpdate());
+		if (!LocalCacheSchema.safeParse(newLocalCache).success) {
+			return window.alert(m.invalidLocalCacheUpdate());
+		}
+
+		gs.accounts = newLocalCache.accounts;
+		gs.spaces = newLocalCache.spaces;
+		await (await gsdb())
+			.update(thoughtsTable)
+			.set(makeLocalCacheThoughtInsert(newLocalCache))
+			.where(localCacheRowFilter);
 	}
-
-	gs.accounts = newLocalCache.accounts;
-	gs.spaces = newLocalCache.spaces;
-	await (await gsdb())
-		.update(thoughtsTable)
-		.set(makeLocalCacheThoughtInsert(newLocalCache))
-		.where(localCacheRowFilter);
 }
 
 export async function deleteLocalCache() {

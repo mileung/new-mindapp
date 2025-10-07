@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto, pushState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
@@ -16,9 +16,9 @@
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
+	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
-	import { onMount } from 'svelte';
 
 	let searchIpt: HTMLInputElement;
 	let searchA: HTMLAnchorElement;

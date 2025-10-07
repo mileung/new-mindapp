@@ -47,6 +47,7 @@
 	"userGuide": "User Guide",
 	"signIn": "Sign in",
 	"tooManyFailedAttempts": "Too many failed attempts",
+	"alreadySignedInWithThatEmail": "Already signed in with that email",
 	"youTubeThumbnail": "YouTube Thumbnail",
 	"shareThought": "Share thought...",
 	"localDatabaseDeleted": "Local database deleted",

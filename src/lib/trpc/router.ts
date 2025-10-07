@@ -58,6 +58,16 @@ export const router = t.router({
 		signOut: t.procedure.input(z.object({})).mutation(async () => {
 			//
 		}),
+		getAccountStates: t.procedure
+			.input(z.object({ accountMss: z.array(z.number()) }))
+			.mutation(async ({ input, ctx }) => {
+				let { accountMss } = input;
+				if (ctx.session) {
+					let signedInMsSet = new Set(ctx.session.accountMss);
+					return accountMss.filter((ms) => signedInMsSet.has(ms));
+				}
+				return [];
+			}),
 		sendOtp: t.procedure
 			.input(z.object({ email: z.string() })) //
 			.mutation(async ({ input }) => {

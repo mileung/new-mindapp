@@ -47,7 +47,23 @@
 								email = val = '';
 							} else alert(m.incorrectOneTimePin());
 						} else {
-							email = val.trim().toLowerCase();
+							let trimmedInput = val.trim().toLowerCase();
+							if (gs.accounts?.[0].email === trimmedInput) {
+								return alert(m.alreadySignedInWithThatEmail());
+							} else {
+								let signedInAccount = gs.accounts?.find((a) => a.email === trimmedInput);
+								if (signedInAccount) {
+									goto(`/__${signedInAccount.currentSpaceMs}`, {});
+									return updateLocalCache((lc) => {
+										lc.accounts = [
+											signedInAccount,
+											...lc.accounts.filter((a) => a.ms !== signedInAccount.ms),
+										];
+										return lc;
+									});
+								}
+							}
+							email = trimmedInput;
 							otpMs = (await trpc().auth.sendOtp.mutate({ email })).ms;
 							val = '';
 						}
