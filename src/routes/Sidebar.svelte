@@ -4,7 +4,7 @@
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { unsaveTagInPersona, type Account } from '$lib/types/accounts';
+	import { unsaveTagInPersona } from '$lib/types/accounts';
 	import { updateLocalCache } from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/thoughts';
 	import {
@@ -58,7 +58,7 @@
 							: gs.accounts && goto(`/__${gs.accounts[0].currentSpaceMs}`);
 					}
 				}
-				if (e.ctrlKey && e.altKey && e.key === 'Tab' && gs.accounts) {
+				if (e.altKey && e.key === 'Tab' && gs.accounts) {
 					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
 					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
@@ -247,7 +247,7 @@
 			<div class={`${accountMenuOpen ? '' : 'hidden'}`} onclick={() => (accountMenuOpen = false)}>
 				{#each gs.accounts || [] as a, i}
 					<button
-						class={`relative fx gap-1 p-2 h-10 w-full ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
+						class={`relative fx gap-1 p-2 h-10 w-full ${a.name ? '' : 'italic'} ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
 						onclick={() => {
 							goto(`/__${a.currentSpaceMs}`, {});
 							updateLocalCache((lc) => {
@@ -260,15 +260,7 @@
 							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
 						{/if}
 						<AccountIcon id={`_${a.ms}_`} class="h-full" />
-						{(() => {
-							let accountJson = gs.thoughts[`_${a.ms}_`]?.body;
-							if (accountJson) {
-								// parseType
-								let a: Account = JSON.parse(accountJson);
-								return a.ms;
-							}
-							return '';
-						})() || m.anon()}
+						{a.ms === '' ? m.anon() : a.name || m.noName()}
 					</button>
 				{/each}
 				<a href="/sign-in" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>

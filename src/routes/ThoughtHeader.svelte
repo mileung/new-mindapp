@@ -4,14 +4,11 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/types/thoughts';
 	import { formatMs, minute } from '$lib/time';
+	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/types/thoughts';
 	import {
 		IconCheck,
-		IconCopy,
 		IconCornerUpLeft,
-		IconCube,
-		IconCube3dSphere,
 		IconDots,
 		IconFingerprint,
 		IconPencil,
@@ -58,11 +55,12 @@
 	);
 </script>
 
-<div class="text-sm fx h-5 text-fg2 max-w-full">
+<div class="fx h-5 text-sm font-bold text-fg2">
+	{#if dev}<p class="mr-1">{id}</p>{/if}
 	<a
 		href={'/' + id}
 		title={whenVerbose}
-		class={`font-bold ${when.length > 9 ? 'truncate' : ''} text-fg2 hover:text-fg1 h-7 xy`}
+		class={`truncate hover:text-fg1 h-7 xy`}
 		onclick={(e) => {
 			if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 				e.preventDefault();
@@ -70,30 +68,32 @@
 			}
 		}}
 	>
-		{when}{editMs ? ' *' : ''}
+		<p class="truncate">
+			{when}{editMs ? ' *' : ''}
+		</p>
 	</a>
 	<a
 		href={`/__${p.thought.in_ms ?? ''}?q=by:${p.thought.by_ms || ''}`}
-		class={`h-6 pl-2 pr-1 truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
+		class={`truncate h-6 pl-1.5 pr-1 fx hover:text-fg1 ${
 			gs.thoughts[p.thought.by_ms ?? ''] ? '' : 'italic'
 		}`}
 	>
-		<AccountIcon id={`_${p.thought.by_ms ?? ''}_`} class="h-3.5 w-3.5 mr-0.5" />
+		<div class="h-3.5 w-3.5 mr-0.5 xy">
+			<AccountIcon id={`_${p.thought.by_ms ?? ''}_`} class="" />
+		</div>
 		<!-- TODO: names for users -->
-		<p class="whitespace-nowrap truncate">
+		<p class="truncate">
 			{p.thought.by_ms ? gs.thoughts[p.thought.by_ms!]?.body || m.noName() : m.anon()}
 		</p>
 	</a>
 	<a
 		href={`/__${p.thought.in_ms ?? ''}`}
-		class={`h-6 px-1 mr-auto truncate fx text-sm font-bold text-fg2 hover:text-fg1 ${
-			p.thought.in_ms ? '' : 'italic'
-		}`}
+		class={`truncate h-6 px-1 mr-auto fx hover:text-fg1 ${p.thought.in_ms ? '' : 'italic'}`}
 	>
-		<div class="xy pr-1 h-5 w-5">
+		<div class="h-3.5 w-3.5 mr-0.5 xy">
 			<SpaceIcon id={`__${p.thought.in_ms ?? ''}`} />
 		</div>
-		<p class={`whitespace-nowrap truncate ${gs.thoughts[p.thought.in_ms || ''] ? '' : 'italic'}`}>
+		<p class={`truncate ${gs.thoughts[p.thought.in_ms || ''] ? '' : 'italic'}`}>
 			{p.thought.in_ms === 0
 				? m.personal()
 				: p.thought.in_ms === 1
@@ -103,7 +103,7 @@
 						: m.local()}
 		</p>
 	</a>
-	<button class="h-7 w-6 xy hover:text-fg1" onclick={handleCopyClick}>
+	<!-- <button class="h-7 w-6 xy hover:text-fg1" onclick={handleCopyClick}>
 		{#if copyClicked}
 			<IconCheck class="h-4 w-4" />
 		{:else}
@@ -116,7 +116,7 @@
 		{:else}
 			<IconCube3dSphere class="h-4 w-4" />
 		{/if}
-	</button>
+	</button> -->
 	<button class="fx h-7 w-6 xy hover:text-fg1" onclick={handleFingerprintClick}>
 		{#if fingerprintClicked}
 			<IconCheck class="h-4 w-4" />
@@ -188,15 +188,14 @@
 		</div>
 	</div>
 </div>
-{#if dev}<p class="font-bold text-fg2">{id}</p>{/if}
 {#if authorTags.length}
 	<div class="overflow-hidden">
 		<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
 			{#each authorTags as tag}
 				<!-- TODO: Why does using leading-4 cause parent to scroll? -->
 				<a
-					href={`/__${gs.accounts[0].currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
-					class="px-1 font-bold leading-5 text-fg2 hover:text-fg1"
+					href={`/__${gs.accounts![0].currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+					class="font-bold text-fg2 px-1 leading-5 hover:text-fg1"
 				>
 					{tag}
 				</a>

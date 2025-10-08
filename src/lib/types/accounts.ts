@@ -11,6 +11,7 @@ export let AccountSchema = z
 		spaceMss: z.array(z.literal('').or(z.number())),
 		allTags: z.array(z.string()),
 		email: z.string().optional(),
+		name: z.string().optional(),
 	})
 	.strict();
 

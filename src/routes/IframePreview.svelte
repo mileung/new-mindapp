@@ -36,7 +36,8 @@
 	{/if}
 	{#if open}
 		<!-- TODO: add allow="autoplay" attribute and add ?autoplay=1 to url once you are able to focus the embedded player when it renders. That way keyboard shortcuts work without having to click pause and play first -->
-		<!-- TODO: ignore this ts error -->
+		<!-- TODO: play next youtube video when the current one ends -->
+		<!-- TODO: make a SafeIframe component to ignore this ts error -->
 		<!-- @ts-ignore -->
 		<iframe
 			credentialless

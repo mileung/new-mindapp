@@ -30,19 +30,15 @@
 	});
 </script>
 
-{#each result as tag}
-	{#if typeof tag === 'string'}
-		{#if tag}
-			<p class="whitespace-pre-wrap break-words inline font-medium">{tag}</p>
+<p class="whitespace-pre-wrap font-medium break-words">
+	{#each result as tag}
+		{#if typeof tag === 'string'}
+			{tag}
+		{:else if 'uri' in tag}
+			<a target="_blank" href={tag.uri} class="text-hl1 hover:text-hl2 hover:underline">
+				{tag.text}
+			</a>
+			<IframePreview uri={tag.uri} />
 		{/if}
-	{:else if 'uri' in tag}
-		<a
-			target="_blank"
-			href={tag.uri}
-			class="font-medium inline break-all text-hl1 text hover:text-hl2"
-		>
-			{tag.text}
-		</a>
-		<IframePreview uri={tag.uri} />
-	{/if}
-{/each}
+	{/each}
+</p>

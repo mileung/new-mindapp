@@ -3,16 +3,16 @@
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
+	import { initLocalDb } from '$lib/local-db';
 	import { setTheme } from '$lib/theme';
+	import { trpc } from '$lib/trpc/client';
+	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
-	import { initLocalDb } from '$lib/local-db';
-	import { trpc } from '$lib/trpc/client';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
@@ -71,15 +71,20 @@
 				gs.accounts = localCache.accounts;
 				gs.spaces = localCache.spaces;
 
-				// TODO: show accounts that were signed but but need to be signed in again for some reason?
-				let stat = await trpc().auth.getAccountStates.mutate({
-					accountMss: gs.accounts.map((a) => a.ms).filter((n) => n !== ''),
-				});
-				let signedInMsSet = new Set(stat);
-				updateLocalCache((lc) => {
-					lc.accounts = lc.accounts.filter((a) => a.ms === '' || signedInMsSet.has(a.ms));
-					return lc;
-				});
+				try {
+					// TODO: show accounts that were signed but but need to be signed in again for some reason?
+					let stat = await trpc().auth.getAccountStates.mutate({
+						accountMss: gs.accounts.map((a) => a.ms).filter((n) => n !== ''),
+					});
+					let signedInMsSet = new Set(stat);
+					updateLocalCache((lc) => {
+						lc.accounts = lc.accounts.filter((a) => a.ms === '' || signedInMsSet.has(a.ms));
+						return lc;
+					});
+				} catch (error) {
+					console.log('error:', error);
+					alert(error);
+				}
 			} catch (error) {
 				console.log('error:', error);
 				alert(error);

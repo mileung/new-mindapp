@@ -20,6 +20,8 @@ import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { sortUniArr } from '../js';
 import { gsdb } from '../local-db';
 import { thoughtsTable } from './thoughts-table';
+import { trpc } from '$lib/trpc/client';
+import type { GetFeedInput } from '$lib/trpc/router';
 
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
 export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
@@ -219,85 +221,65 @@ let _expandThought = async (
 
 export let rootsPerLoad = 15;
 
-export let loadThoughts = async (q: Parameters<typeof _loadThoughts>[0]) => _loadThoughts(q);
+export let loadThoughts = async (q: Parameters<typeof _loadThoughts>[1]) => {
+	// TODO: Search local and global spaces in one query
+	if (q.rpc) return trpc().getFeed.mutate(q);
+	return _loadThoughts(await gsdb(), q);
+};
 
-export let _loadThoughts = async (q: {
-	rpc?: boolean;
-	spaceMs?: number;
-	nested?: boolean;
-	oldestFirst?: boolean; // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
-	fromMs: number;
-	thoughtsBeyond?: number;
-	idsInclude?: string[];
-	idsExclude?: string[];
-	byMssInclude?: number[];
-	byMssExclude?: number[];
-	tagsInclude?: string[];
-	tagsExclude?: string[];
-	bodyIncludes?: string[];
-	bodyExcludes?: string[];
-}) => {
-	let {
-		rpc = false,
-		spaceMs,
-		nested = false,
-		oldestFirst = false,
-		fromMs,
-		idsInclude = [],
-		idsExclude = [],
-		byMssInclude = [],
-		byMssExclude = [],
-		tagsInclude = [],
-		tagsExclude = [],
-		bodyIncludes = [],
-		bodyExcludes = [],
-	} = q;
-	if (spaceMs === undefined) {
-		// TODO: query local sqlite db
-	} else {
-		// TODO: query Turso db
-	}
-
-	let idsExcludeSet = new Set(idsExclude);
-	let db = await gsdb();
+export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
+	let idsExcludeSet = new Set(q.idsExclude);
 	let roots: ThoughtNested[] = [];
 	let byMss: (null | number)[] = [];
 	let toIds: string[] = [];
 	let citedIds: string[] = [];
 	let auxThoughts: Record<string, ThoughtSelect> = {};
-	let baseFilters = [
+	let conditions = [
 		isNotNull(thoughtsTable.ms),
-		// or(gte(thoughtsTable.in_ms, 0), isNull(thoughtsTable.in_ms)),
-		// ...(spaceMs === undefined ? [] : [isNotNull(thoughtsTable.by_ms)]),
-		(oldestFirst ? gte : lte)(thoughtsTable.ms, fromMs),
-		// not(like(thoughtsTable.tags, `%" private"%`)),
-		or(...idsInclude.map((id) => filterId(id))),
-		or(...byMssInclude.map((id) => eq(thoughtsTable.by_ms, id))),
-		or(...tagsInclude.map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
-		or(...bodyIncludes.map((term) => like(thoughtsTable.body, `%${term}%`))),
-		...idsExclude.map((id) => {
+		...(q.rpc ? [isNotNull(thoughtsTable.by_ms), isNotNull(thoughtsTable.in_ms)] : []),
+
+		(q.oldestFirst ? gte : lte)(thoughtsTable.ms, q.fromMs),
+
+		or(...(q.idsInclude || []).map((id) => filterId(id))),
+		...(q.idsExclude || []).map((id) => {
 			let filter = filterId(id);
 			return filter ? not(filter) : undefined;
 		}),
-		...byMssExclude.map((id) => not(eq(thoughtsTable.by_ms, id))),
-		...tagsExclude.map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
-		...bodyExcludes.map((term) => notLike(thoughtsTable.body, `%${term}%`)),
+
+		or(
+			...(q.byMssInclude || []).map((id) =>
+				id === '' ? isNull(thoughtsTable.by_ms) : eq(thoughtsTable.by_ms, id),
+			),
+		),
+		...(q.byMssExclude || []).map((id) =>
+			id === '' ? isNotNull(thoughtsTable.ms) : not(eq(thoughtsTable.by_ms, id)),
+		),
+
+		or(...(q.tagsInclude || []).map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
+		...(q.tagsExclude || []).map((tag) => notLike(thoughtsTable.tags, `%"${tag}"%`)),
+
+		or(...(q.bodyIncludes || []).map((term) => like(thoughtsTable.body, `%${term}%`))),
+		...(q.bodyExcludes || []).map((term) => notLike(thoughtsTable.body, `%${term}%`)),
 	];
 
-	if (nested) {
+	console.log('q:', q);
+	if (q.nested) {
 		let offset = 0;
 		while (true) {
 			let [currentRow] = await db
 				.select()
 				.from(thoughtsTable)
-				.where(and(...baseFilters))
-				.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
+				.where(and(...conditions))
+				.orderBy((q.oldestFirst ? asc : desc)(thoughtsTable.ms))
 				.limit(1)
 				.offset(offset++);
 			if (!currentRow) break;
 			let {
 				rootThought, //interThoughts
 			} = await getRootThought(currentRow);
+
+			// console.log('currentRow:', currentRow);
+
 			if (
 				!idsExcludeSet.has(getId(rootThought)) &&
 				!roots.find((root) => getId(root) === getId(rootThought))
@@ -313,8 +295,8 @@ export let _loadThoughts = async (q: {
 		roots = await db
 			.select()
 			.from(thoughtsTable)
-			.where(and(...baseFilters))
-			.orderBy((oldestFirst ? asc : desc)(thoughtsTable.ms))
+			.where(and(...conditions))
+			.orderBy((q.oldestFirst ? asc : desc)(thoughtsTable.ms))
 			.limit(rootsPerLoad);
 
 		// TODO: I shouldn't have to add a bang to r.to_id!. TypeScript bug? Don't want to use typeof i==='string' in filter
@@ -325,7 +307,7 @@ export let _loadThoughts = async (q: {
 	}
 
 	await Promise.all(
-		[...new Set([...citedIds, ...(nested ? toIds : [])])].map((id) => {
+		[...new Set([...citedIds, ...(q.nested ? toIds : [])])].map((id) => {
 			return getThoughtById(id).then((thought) => {
 				if (thought) {
 					auxThoughts[id] = thought;

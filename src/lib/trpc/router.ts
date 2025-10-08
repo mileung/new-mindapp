@@ -2,21 +2,21 @@ import { dev } from '$app/environment';
 import { tdb } from '$lib/server/db';
 import type { Context } from '$lib/trpc/context';
 import { AccountSchema, type Account } from '$lib/types/accounts';
+import { OtpSchema, type Otp } from '$lib/types/otp';
 import {
 	makeSessionId,
 	makeSessionRowFilter,
 	makeSessionRowInsert,
 	setSessionIdCookie,
-	type Session,
 } from '$lib/types/sessions';
 import { thoughtsTable } from '$lib/types/thoughts-table';
 import type { RequestEvent } from '@sveltejs/kit';
-import { initTRPC } from '@trpc/server';
+import { initTRPC, type inferRouterInputs } from '@trpc/server';
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
 import { minute, second, week } from '../time';
-import { OtpSchema, type Otp } from '$lib/types/otp';
+import { _loadThoughts } from '$lib/types/thoughts';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -75,7 +75,8 @@ export const router = t.router({
 				if (!isValidEmail(email)) throw new Error('invalid email');
 				let pin = ('' + Math.random()).slice(-8);
 				if (dev) {
-					console.log('pin:', pin);
+					pin = '00000000';
+					// console.log('pin:', pin);
 				} else {
 					// await resend.emails.send({
 					// 	from: 'noreply@yourdomain.com',
@@ -112,7 +113,7 @@ export const router = t.router({
 					let now = Date.now();
 					let otpRowFilter = and(
 						eq(thoughtsTable.ms, input.ms),
-						eq(thoughtsTable.tags, [` otp`]),
+						eq(thoughtsTable.tags, [' otp']),
 						isNull(thoughtsTable.in_ms),
 						isNull(thoughtsTable.by_ms),
 					);
@@ -139,7 +140,7 @@ export const router = t.router({
 										otpRowFilter,
 										and(
 											lt(thoughtsTable.ms, now - 5 * minute),
-											eq(thoughtsTable.tags, [` otp`]),
+											eq(thoughtsTable.tags, [' otp']),
 											isNull(thoughtsTable.in_ms),
 											isNull(thoughtsTable.by_ms),
 										),
@@ -191,20 +192,6 @@ export const router = t.router({
 
 					// console.log('account:', account);
 
-					let { sessionMs, sessionCode, sessionId } = makeSessionId();
-					setSessionIdCookie(ctx.event, sessionId);
-					await tdb.insert(thoughtsTable).values(
-						makeSessionRowInsert(
-							sessionMs, //
-							sessionCode,
-							[
-								...new Set([
-									accountRow.ms!, //
-									...(ctx.session ? ctx.session.accountMss : []),
-								]),
-							],
-						),
-					);
 					if (ctx.session) {
 						let sessionId = ctx.event.cookies.get('sessionId');
 						let [sMs] = (sessionId || '').split('-');
@@ -224,6 +211,22 @@ export const router = t.router({
 							);
 					}
 
+					let { sessionMs, sessionCode, sessionId } = makeSessionId();
+					setSessionIdCookie(ctx.event, sessionId);
+
+					await tdb.insert(thoughtsTable).values(
+						makeSessionRowInsert(
+							sessionMs, //
+							sessionCode,
+							[
+								...new Set([
+									accountRow.ms!, //
+									...(ctx.session?.accountMss || []),
+								]),
+							],
+						),
+					);
+
 					return { account };
 				},
 			),
@@ -231,14 +234,31 @@ export const router = t.router({
 	getFeed: t.procedure
 		.input(
 			z.object({
-				//
+				rpc: z.boolean().optional(),
+				nested: z.boolean().optional(),
+				oldestFirst: z.boolean().optional(), // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
+				fromMs: z.number(),
+				idsInclude: z.array(z.string()).optional(),
+				idsExclude: z.array(z.string()).optional(),
+				mssInclude: z.array(z.literal('').or(z.number())).optional(),
+				mssExclude: z.array(z.literal('').or(z.number())).optional(),
+				byMssInclude: z.array(z.literal('').or(z.number())).optional(),
+				byMssExclude: z.array(z.literal('').or(z.number())).optional(),
+				inMssInclude: z.array(z.literal('').or(z.number())).optional(),
+				inMssExclude: z.array(z.literal('').or(z.number())).optional(),
+				tagsInclude: z.array(z.string()).optional(),
+				tagsExclude: z.array(z.string()).optional(),
+				bodyIncludes: z.array(z.string()).optional(),
+				bodyExcludes: z.array(z.string()).optional(),
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			return { success: true };
+			// return _loadThoughts(tdb,input)
 		}),
 });
 
 // https://trpc.io/docs/server/server-side-calls
 export const createCaller = t.createCallerFactory(router);
 export type Router = typeof router;
+
+export type GetFeedInput = inferRouterInputs<Router>['getFeed'];

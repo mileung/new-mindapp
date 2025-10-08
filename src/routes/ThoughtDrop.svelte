@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { pushState } from '$app/navigation';
-	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { getId, type ThoughtNested } from '$lib/types/thoughts';
 	import { IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import BodyParser from './BodyParser.svelte';
+	import Highlight from './Highlight.svelte';
 	import Self from './ThoughtDrop.svelte';
 	import ThoughtHeader from './ThoughtHeader.svelte';
-	import Highlight from './Highlight.svelte';
 
 	let p: {
 		thought: ThoughtNested;
@@ -27,7 +26,7 @@
 	let deletedToThought = $derived(toThought?.tags?.[0] === ' deleted');
 </script>
 
-<div bind:this={container} id={'m' + id} class={`relative flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
+<div bind:this={container} id={'m' + id} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if p.nested}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -48,8 +47,8 @@
 			</div>
 		</button>
 	{/if}
-	<div class={`max-w-full bg-inherit flex-1 relative ${p.nested ? '' : 'px-2'}`}>
-		<div class="relative bg-inherit pb-1">
+	<div class={`bg-inherit flex-1 ${p.nested ? 'max-w-[calc(100%-1.25rem)]' : 'px-2'}`}>
+		<div class="bg-inherit pb-1">
 			<div class="z-10 sticky top-0 bg-inherit">
 				{#if !p.nested && p.thought.to_id}
 					<div class="relative fx">

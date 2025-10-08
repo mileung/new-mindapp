@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
@@ -65,7 +66,7 @@
 							}
 							email = trimmedInput;
 							otpMs = (await trpc().auth.sendOtp.mutate({ email })).ms;
-							val = '';
+							val = dev ? '00000000' : '';
 						}
 					} catch (error) {
 						console.log('error:', error);

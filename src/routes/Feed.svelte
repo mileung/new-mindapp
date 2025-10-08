@@ -4,7 +4,6 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { sortUniArr } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { trpc } from '$lib/trpc/client';
 	import { updateLocalCache } from '$lib/types/local-cache';
 	import {
 		addThought,
@@ -30,7 +29,6 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
-	import { page } from '$app/state';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
@@ -84,19 +82,29 @@
 		// 	$state.snapshot(gs.thoughts),
 		// );
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
-		if (p.idParam === '__0' || p.idParam === '__1') {
-			trpc().getFeed.mutate({});
-			return;
-		}
 		if (fromMs === null) return e.detail.complete();
 		if (!p.idParam || personalSpaceRequiresLogin) return;
 		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
 
 		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
 		let thoughts: Awaited<ReturnType<typeof loadThoughts>>;
+		let { ms, by_ms, in_ms } = splitId(p.idParam);
+		let mssInclude: ('' | number)[] = [ms === '' ? '' : +ms];
+		let byMssInclude: ('' | number)[] = [by_ms === '' ? '' : +by_ms];
+		let inMssInclude: ('' | number)[] = [in_ms === '' ? '' : +in_ms];
+		// mssInclude,
+		// byMssInclude,
+		// inMssInclude,
+
+		let rpc = in_ms !== '';
 
 		if (spotId) {
-			thoughts = await loadThoughts({ nested, fromMs, idsInclude: [spotId] });
+			thoughts = await loadThoughts({
+				rpc,
+				nested,
+				fromMs,
+				idsInclude: [spotId],
+			});
 		} else {
 			// TODO: Instead of set theory, implement tag groups
 			let ids = getIds(p.searchedText);
@@ -139,6 +147,7 @@
 					});
 
 			thoughts = await loadThoughts({
+				rpc,
 				nested,
 				fromMs,
 				tagsInclude,
@@ -254,11 +263,9 @@
 	});
 </script>
 
-<div
-	class={`flex flex-col overflow-scroll h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}
->
+<div class={`overflow-y-scroll h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}>
 	{#if !!gs.accounts && personalSpaceRequiresLogin}
-		<div class="xy fy gap-2 flex-1">
+		<div class="h-screen xy fy gap-2">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
 			<a
 				href="/sign-in"
