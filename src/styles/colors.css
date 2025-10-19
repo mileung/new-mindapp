@@ -1,5 +1,9 @@
 @layer base {
 	:root {
+		--local: #f49090;
+		--personal: #93ce93;
+		--global: #7cc0dd;
+
 		--bg1: #fafaf8;
 		--bg2: #f6f5f2;
 		--bg3: #f2f1ed;
@@ -17,10 +21,6 @@
 		--fg1: #2c353a;
 		--fg2: #6d6d69;
 		--fg3: #000;
-
-		--local: #f86262;
-		--personal: #6aa84f;
-		--global: #4a90a4;
 	}
 
 	.dark {
@@ -41,9 +41,5 @@
 		--fg1: #e8e8e7;
 		--fg2: #a5a5a4;
 		--fg3: #fff;
-
-		--local: #ff9999;
-		--personal: #a2d39b;
-		--global: #6fc3df;
 	}
 }

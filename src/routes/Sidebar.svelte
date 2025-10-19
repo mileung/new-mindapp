@@ -3,15 +3,18 @@
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
+	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { unsaveTagInPersona } from '$lib/types/accounts';
 	import { updateLocalCache } from '$lib/types/local-cache';
+	import { changeCurrentSpace } from '$lib/types/spaces';
 	import { bracketRegex } from '$lib/types/thoughts';
 	import {
 		IconHelpSquareRounded,
 		IconPuzzle,
 		IconSearch,
 		IconSettings,
+		IconSquarePlus2,
 		IconUserPlus,
 		IconX,
 	} from '@tabler/icons-svelte';
@@ -58,7 +61,7 @@
 							: gs.accounts && goto(`/__${gs.accounts[0].currentSpaceMs}`);
 					}
 				}
-				if (e.altKey && e.key === 'Tab' && gs.accounts) {
+				if (e.metaKey && e.key === 'Tab' && gs.accounts) {
 					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
 					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
@@ -74,15 +77,6 @@
 	$effect(() => {
 		!allTagsSet.size && (xFocused = false);
 	});
-
-	let changeCurrentSpace = (inMs: number | '') => {
-		goto(`/__${inMs}`);
-		localStorage.setItem('currentSpaceMs', '' + inMs);
-		updateLocalCache((lc) => {
-			lc.accounts[0].currentSpaceMs = inMs;
-			return lc;
-		});
-	};
 
 	let addTagToSearchInput = (tag: string) => {
 		searchVal = `${searchVal
@@ -104,6 +98,7 @@
 	};
 
 	$effect(() => {
+		// console.log($inspect(gs.accounts?.[0]));
 		// console.log(gs.accounts[0]?.currentSpaceMs);
 		// console.log(gs.accounts[0]?.id);
 		// console.log($inspect(gs.accounts[0]?.spaceMss));
@@ -136,7 +131,7 @@
 					{#if accountMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else if gs.accounts}
-						<AccountIcon id={`_${gs.accounts[0]?.ms ?? ''}_`} />
+						<AccountIcon id={`_${gs.accounts[0]?.ms ?? ''}_`} class="h-6 w-6" />
 					{/if}
 				</button>
 				<button
@@ -149,7 +144,7 @@
 					{#if spaceMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else if gs.accounts}
-						<SpaceIcon id={`__${gs.accounts[0].currentSpaceMs}`} />
+						<SpaceIcon id={`__${gs.accounts[0].currentSpaceMs}`} class="h-6 w-6" />
 					{/if}
 				</button>
 			{/if}
@@ -215,7 +210,7 @@
 				{#if tagFilter}
 					<p class="ml-1 mt-1 text-sm text-fg2">{m.tags()}</p>
 				{/if}
-				{#each suggestedTags as tag, i}
+				{#each suggestedTags as tag, i (tag)}
 					<div
 						class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}
 						onmousedown={(e) => e.preventDefault()}
@@ -244,26 +239,31 @@
 					</div>
 				{/each}
 			</div>
-			<div class={`${accountMenuOpen ? '' : 'hidden'}`} onclick={() => (accountMenuOpen = false)}>
-				{#each gs.accounts || [] as a, i}
+			<div
+				class={`${accountMenuOpen ? 'flex flex-col' : 'hidden'}`}
+				onclick={() => (accountMenuOpen = false)}
+			>
+				{#each gs.accounts || [] as a, i (a.ms)}
 					<button
-						class={`relative fx gap-1 p-2 h-10 w-full ${a.name ? '' : 'italic'} ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
+						class={`fx min-h-10 h-10 px-2 gap-2 font-medium ${a.name ? '' : 'italic'} ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
 						onclick={() => {
-							goto(`/__${a.currentSpaceMs}`, {});
+							page.params.id && goto(`/__${a.currentSpaceMs}`, {});
 							updateLocalCache((lc) => {
-								lc.accounts = [lc.accounts[i], ...lc.accounts.filter((_, k) => k !== i)];
+								lc.accounts = [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)];
 								return lc;
 							});
 						}}
 					>
 						{#if !i}
-							<div class="absolute left-0 h-full w-0.5 bg-hl1"></div>
+							<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
 						{/if}
-						<AccountIcon id={`_${a.ms}_`} class="h-full" />
-						{a.ms === '' ? m.anon() : a.name || m.noName()}
+						<div class="xy h-6 w-6">
+							<AccountIcon id={`_${a.ms}_`} class="h-6 w-6" />
+						</div>
+						{a.ms === '' ? m.anon() : a.name || identikana(a.ms)}
 					</button>
 				{/each}
-				<a href="/sign-in" class={`fx gap-1 p-2 h-10 w-full hover:bg-bg5`}>
+				<a href="/sign-in" class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
@@ -301,10 +301,10 @@
 						<IconX class="h-5" />
 					</button>
 				</div>
-				{#each gs.accounts ? gs.accounts[0].spaceMss : [] as ms}
+				{#each gs.accounts?.[0].spaceMss || [] as ms (ms)}
 					<a
 						href={`/__${ms}`}
-						class={`fx h-10 px-2 gap-2 ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
+						class={`fx min-h-10 h-10 px-2 gap-2 ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
 						onclick={(e) => {
 							e.preventDefault();
 							changeCurrentSpace(ms);
@@ -313,7 +313,7 @@
 						{#if ms === gs.accounts![0].currentSpaceMs}
 							<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
 						{/if}
-						<SpaceIcon id={`__${ms}`} class="h-6" />
+						<SpaceIcon id={`__${ms}`} class="h-6 w-6" />
 						<p class="font-medium">
 							{ms === 0 ? m.personal() : ms === 1 ? m.global() : ms ? gs.spaces[ms]?.ms : m.local()}
 						</p>
@@ -328,26 +328,26 @@
 						{/if} -->
 					</a>
 				{/each}
-				<!-- <a
+				<a
 					href="/add-space"
-					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
+					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
 				>
-					<IconSquarePlus2 class="h-6" />
+					<IconSquarePlus2 class="h-6 w-6" />
 					{m.addSpace()}
-				</a> -->
+				</a>
 				<div class="flex-1"></div>
 				<a
 					href="/user-guide"
-					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
-					<IconHelpSquareRounded class="h-6" />
+					<IconHelpSquareRounded class="h-6 w-6" />
 					{m.userGuide()}
 				</a>
 				<a
 					href="/settings"
-					class={`fx h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
+					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
 				>
-					<IconSettings class="h-6" />
+					<IconSettings class="h-6 w-6" />
 					{m.settings()}
 				</a>
 			</div>

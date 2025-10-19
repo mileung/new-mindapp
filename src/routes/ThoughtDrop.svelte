@@ -48,7 +48,7 @@
 		</button>
 	{/if}
 	<div class={`bg-inherit flex-1 ${p.nested ? 'max-w-[calc(100%-1.25rem)]' : 'px-2'}`}>
-		<div class="bg-inherit pb-1">
+		<div class="relative bg-inherit pb-1">
 			<div class="z-10 sticky top-0 bg-inherit">
 				{#if !p.nested && p.thought.to_id}
 					<div class="relative fx">

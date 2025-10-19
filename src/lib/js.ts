@@ -1,3 +1,4 @@
+import { toUpperCase } from 'zod/v4';
 import { minute, second } from './time';
 
 export function sortObjectProps(obj: Record<string, any>): Record<string, any> {
@@ -7,7 +8,7 @@ export function sortObjectProps(obj: Record<string, any>): Record<string, any> {
 		Object.keys(obj)
 			.sort()
 			.forEach((key) => {
-				const temp = obj[key];
+				let temp = obj[key];
 				delete obj[key]; // Remove the original key-value pair
 				// Recursively sort if the value is an object
 				obj[key] = typeof temp === 'object' && temp !== null ? sortObjectProps(temp) : temp; // Assign sorted value or original value
@@ -49,11 +50,11 @@ export function copyToClipboard(text: string): void {
 			.then(() => true)
 			.catch(() => false);
 	} else {
-		const textArea = document.createElement('textarea');
+		let textArea = document.createElement('textarea');
 		textArea.value = text;
 		document.body.appendChild(textArea);
 		textArea.select();
-		const success = document.execCommand('copy');
+		let success = document.execCommand('copy');
 		document.body.removeChild(textArea);
 		Promise.resolve(success);
 	}
@@ -63,7 +64,7 @@ export function copyToClipboard(text: string): void {
 export function simpleHash(string: string) {
 	let hash = 5381; // Prime number as initial value
 	for (let i = 0; i < string.length; i++) {
-		const char = string.charCodeAt(i);
+		let char = string.charCodeAt(i);
 		hash = (hash << 5) + hash + char; // 33 * hash + char
 		hash = hash & 0x7fffffff; // Keep it positive and within 31 bits
 	}
@@ -77,7 +78,7 @@ export function poll(
 	maxInterval: number = minute,
 ) {
 	let currentInterval = initialInterval;
-	const executePoll = async () => {
+	let executePoll = async () => {
 		if (await callback()) return;
 		currentInterval = Math.min(maxInterval, incrementFunction(currentInterval));
 		setTimeout(executePoll, currentInterval);
@@ -91,8 +92,8 @@ export function debounce<T extends (...args: any[]) => any>(
 ): (...args: Parameters<T>) => void {
 	let timeout: NodeJS.Timeout | null = null;
 	return function (this: any, ...args: Parameters<T>): void {
-		const context = this;
-		const later = function () {
+		let context = this;
+		let later = function () {
 			timeout = null;
 			func.apply(context, args);
 		};
@@ -101,7 +102,7 @@ export function debounce<T extends (...args: any[]) => any>(
 	};
 }
 
-export const throttle = <T extends unknown[]>(callback: (...args: T) => void, delay: number) => {
+export let throttle = <T extends unknown[]>(callback: (...args: T) => void, delay: number) => {
 	let isWaiting = false;
 	return (...args: T) => {
 		if (isWaiting) return;
@@ -122,7 +123,7 @@ export function isStringifiedRecord(value?: string) {
 	return false;
 }
 
-export const sortUniArr = (a: string[]) => {
+export let sortUniArr = (a: string[]) => {
 	return [...new Set(a)].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
 };
 
@@ -137,4 +138,41 @@ export function clone<T>(obj: T): T {
 		return Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, clone(value)])) as T;
 	}
 	return obj;
+}
+
+// prettier-ignore
+let KATAKANA = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
+
+// prettier-ignore
+let ROMAJI_MAP: Record<string, string> = {
+  ア: "a", イ: "i", ウ: "u", エ: "e", オ: "o",
+  カ: "ka", キ: "ki", ク: "ku", ケ: "ke", コ: "ko",
+  サ: "sa", シ: "shi", ス: "su", セ: "se", ソ: "so",
+  タ: "ta", チ: "chi", ツ: "tsu", テ: "te", ト: "to",
+  ナ: "na", ニ: "ni", ヌ: "nu", ネ: "ne", ノ: "no",
+  ハ: "ha", ヒ: "hi", フ: "fu", ヘ: "he", ホ: "ho",
+  マ: "ma", ミ: "mi", ム: "mu", メ: "me", モ: "mo",
+  ヤ: "ya", ユ: "yu", ヨ: "yo",
+  ラ: "ra", リ: "ri", ル: "ru", レ: "re", ロ: "ro",
+  ワ: "wa", ヲ: "wo", ン: "n"
+};
+
+export function identikana(input: string | number, romanized = true): string {
+	// input = '' + Math.random();
+	let str = String(input);
+	let hash = 5381;
+	for (let i = 0; i < str.length; i++) hash = ((hash << 5) + hash + str.charCodeAt(i)) & 0xffffffff;
+
+	let seq: string[] = [];
+	for (let i = 0; i < 3; i++) {
+		let seed = ((hash ^ (i * 2654435761)) >>> 0) * 1103515245 + 12345;
+		let kana = KATAKANA[(seed >>> 0) % KATAKANA.length];
+		seq.push(kana);
+		hash = seed >>> 0;
+	}
+
+	if (!romanized) return seq.join('');
+	return seq
+		.map((k, i) => (!i ? ROMAJI_MAP[k][0].toUpperCase() + ROMAJI_MAP[k].slice(1) : ROMAJI_MAP[k]))
+		.join('');
 }

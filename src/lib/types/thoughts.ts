@@ -1,4 +1,6 @@
 import { dev } from '$app/environment';
+import { trpc } from '$lib/trpc/client';
+import type { GetFeedInput, GetFeedOutput } from '$lib/trpc/router';
 import {
 	and,
 	asc,
@@ -20,8 +22,6 @@ import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { sortUniArr } from '../js';
 import { gsdb } from '../local-db';
 import { thoughtsTable } from './thoughts-table';
-import { trpc } from '$lib/trpc/client';
-import type { GetFeedInput } from '$lib/trpc/router';
 
 export type ThoughtInsert = typeof thoughtsTable.$inferInsert;
 export type ThoughtSelect = typeof thoughtsTable.$inferSelect;
@@ -39,10 +39,19 @@ export let idsRegex = /(^|\s)\d*_\d*_\d*($|\s)/g;
 
 export let isId = (str = '') => idRegex.test(str);
 
+export let getIds = (str = '') => [...str.matchAll(idsRegex)].map((match) => match[0].trim());
+
 export function splitId(id: string) {
 	let s = id.split('_', 3);
-	let segs = { ms: s[0], by_ms: s[1], in_ms: s[2] };
-	return segs;
+	return { ms: s[0] || '', by_ms: s[1] || '', in_ms: s[2] || '' };
+}
+
+// let systemTags = new Set([' edited:<ms>', ' deleted']);
+export function divideTags(thought: ThoughtInsert) {
+	let authorTags: string[] = [];
+	let systemTags: string[] = [];
+	(thought.tags || []).forEach((t) => (t[0] === ' ' ? systemTags : authorTags).push(t));
+	return { authorTags, systemTags };
 }
 
 export let filterId = (id: string) => {
@@ -72,47 +81,43 @@ export function dropThoughtsTableInOpfsInDev() {
 	}
 }
 
-type Database = LibSQLDatabase | SqliteRemoteDatabase;
+type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
-export let addThought = async (t: ThoughtInsert) => _addThought(t);
+export let addThought = async (t: ThoughtInsert, useRpc: boolean) => {
+	return useRpc ? trpc().addThought.mutate(t) : _addThought(await gsdb(), t);
+};
 
-export let _addThought = async (t: ThoughtInsert) => {
+export let _addThought = async (db: Database, t: ThoughtInsert) => {
 	if (typeof t.in_ms === 'number') {
 		if (!t.by_ms) throw new Error('Missing by_ms');
-		// TODO: Verify user by_ms is logged and has access to space in_ms
 	}
 	if (!(t.tags || []).every((t) => t.length === t.trim().length))
 		throw new Error('Every tag must be trimmed');
 	let ms = Date.now();
 	// gs.accounts[0].currentSpaceMs
-	await (await gsdb()).insert(thoughtsTable).values({ ...t, ms });
+	await db.insert(thoughtsTable).values({ ...t, ms });
 	return ms;
 };
 
-// let systemTags = new Set([' edited:<ms>', ' deleted']);
-export function divideTags(thought: ThoughtInsert) {
-	let authorTags: string[] = [];
-	let systemTags: string[] = [];
-	(thought.tags || []).forEach((t) => (t[0] === ' ' ? systemTags : authorTags).push(t));
-	return { authorTags, systemTags };
-}
-
-export let getThoughtById = async (id: string) => _getThoughtById(id);
-
-export let _getThoughtById = async (id: string): Promise<ThoughtSelect | undefined> => {
-	return (await (await gsdb()).select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
+export let _getThoughtById = async (
+	db: Database,
+	id: string,
+): Promise<ThoughtSelect | undefined> => {
+	return (await db.select().from(thoughtsTable).where(filterId(id)).limit(1))[0];
 };
 
-export let editThought = async (t: ThoughtInsert) => _editThought(t);
+export let editThought = async (t: ThoughtInsert, useRpc: boolean) => {
+	return useRpc ? trpc().editThought.mutate(t) : _editThought(await gsdb(), t);
+};
 
-export let _editThought = async (t: ThoughtInsert) => {
+export let _editThought = async (db: Database, t: ThoughtInsert) => {
 	if (!t.ms) throw new Error('Missing ms');
 	if (t.tags?.[0] === ' deleted') throw new Error('Cannot edit deleted thoughts');
 	if (typeof t.in_ms === 'number') {
 		if (!t.by_ms) throw new Error('Missing by_ms');
 		// TODO: Verify user by_ms is logged and has access to space in_ms
 	}
-	let originalThought = await getThoughtById(getId(t));
+	let originalThought = await _getThoughtById(db, getId(t));
 	if (!originalThought) throw new Error('Original thought not found');
 	let { systemTags } = divideTags(originalThought);
 	let { authorTags } = divideTags(t);
@@ -124,9 +129,7 @@ export let _editThought = async (t: ThoughtInsert) => {
 		...systemTags.filter((t) => !t.startsWith(' edited:')),
 		...authorTags,
 	]);
-	await (
-		await gsdb()
-	)
+	await db
 		.update(thoughtsTable)
 		.set({ ...t, tags })
 		.where(filterThought(t));
@@ -137,10 +140,8 @@ export let _editThought = async (t: ThoughtInsert) => {
 
 // TODO: paginate children when there's too many with fromMs
 // Reddit does this - HN does not
-let getThoughtChildren = async (id: string, limit = -1) => _getThoughtChildren(id, limit);
-
-let _getThoughtChildren = async (id: string, limit = -1) => {
-	let children = await (await gsdb())
+let _getThoughtChildren = async (db: Database, id: string, limit = -1) => {
+	let children = await db
 		.select()
 		.from(thoughtsTable)
 		.where(eq(thoughtsTable.to_id, id))
@@ -149,18 +150,18 @@ let _getThoughtChildren = async (id: string, limit = -1) => {
 	return children;
 };
 
-export let deleteThought = async (id: string) => _deleteThought(id);
+export let deleteThought = async (id: string, useRpc: boolean) => {
+	return useRpc ? trpc().deleteThought.mutate(id) : _deleteThought(await gsdb(), id);
+};
 
-export let _deleteThought = async (id: string) => {
+export let _deleteThought = async (db: Database, id: string) => {
 	let s = splitId(id);
 	if (s.in_ms) {
 		if (!s.by_ms) throw new Error('Missing by_ms');
 		// TODO: Verify user by_ms is logged and has access to space in_ms
 	}
-	if ((await getThoughtChildren(id, 1)).length) {
-		await (
-			await gsdb()
-		)
+	if ((await _getThoughtChildren(db, id, 1)).length) {
+		await db
 			.update(thoughtsTable)
 			.set({
 				body: null,
@@ -169,19 +170,17 @@ export let _deleteThought = async (id: string) => {
 			.where(filterId(id));
 		return { soft: true };
 	} else {
-		await (await gsdb()).delete(thoughtsTable).where(filterId(id));
+		await db.delete(thoughtsTable).where(filterId(id));
 		return { soft: false };
 	}
 };
 
-let getRootThought = async (thought: ThoughtSelect) => _getRootThought(thought);
-
-let _getRootThought = async (thought: ThoughtSelect) => {
+let _getRootThought = async (db: Database, thought: ThoughtSelect) => {
 	let rootThought = thought;
 	// let interThoughts: Record<string, ThoughtSelect> = {};
 	while (rootThought?.to_id) {
 		// interThoughts[getId(thought)] = rootThought;
-		let toThought = await _getThoughtById(rootThought.to_id);
+		let toThought = await _getThoughtById(db, rootThought.to_id);
 		if (toThought) rootThought = toThought;
 	}
 	return {
@@ -191,11 +190,8 @@ let _getRootThought = async (thought: ThoughtSelect) => {
 	};
 };
 
-export let getIds = (str = '') => [...str.matchAll(idsRegex)].map((match) => match[0].trim());
-
-let expandThought = async (thought: ThoughtSelect) => _expandThought(thought);
-
 let _expandThought = async (
+	db: Database,
 	thought: ThoughtSelect,
 ): Promise<{
 	citedIds: string[];
@@ -205,8 +201,8 @@ let _expandThought = async (
 	let citedIds = getIds(thought.body || '');
 	let byMss = [thought.by_ms];
 	let children: ThoughtNested[] = await Promise.all(
-		(await getThoughtChildren(getId(thought))).map(async (t) => {
-			let exp = await expandThought(t);
+		(await _getThoughtChildren(db, getId(thought))).map(async (t) => {
+			let exp = await _expandThought(db, t);
 			citedIds.push(...exp.citedIds);
 			byMss.push(...exp.byMss);
 			return exp.nestedThought;
@@ -221,24 +217,49 @@ let _expandThought = async (
 
 export let rootsPerLoad = 15;
 
-export let loadThoughts = async (q: Parameters<typeof _loadThoughts>[1]) => {
+export let getFeed = async (q: Parameters<typeof _getFeed>[1]) => {
 	// TODO: Search local and global spaces in one query
-	if (q.rpc) return trpc().getFeed.mutate(q);
-	return _loadThoughts(await gsdb(), q);
+	return q.useRpc ? trpc().getFeed.mutate(q) : _getFeed(await gsdb(), q);
 };
 
-export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
+export let _getFeed = async (db: Database, q: GetFeedInput): Promise<GetFeedOutput> => {
 	let idsExcludeSet = new Set(q.idsExclude);
 	let roots: ThoughtNested[] = [];
 	let byMss: (null | number)[] = [];
 	let toIds: string[] = [];
 	let citedIds: string[] = [];
 	let auxThoughts: Record<string, ThoughtSelect> = {};
-	let conditions = [
-		isNotNull(thoughtsTable.ms),
-		...(q.rpc ? [isNotNull(thoughtsTable.by_ms), isNotNull(thoughtsTable.in_ms)] : []),
 
+	// console.log('q.inMssInclude:', q.inMssInclude);
+	if (q.useRpc && !q.inMssInclude?.length) throw new Error('Must include at least one inMs');
+
+	let andConditions = [
+		isNotNull(thoughtsTable.ms),
+		...(q.useRpc ? [isNotNull(thoughtsTable.by_ms), isNotNull(thoughtsTable.in_ms)] : []),
 		(q.oldestFirst ? gte : lte)(thoughtsTable.ms, q.fromMs),
+
+		or(
+			...(q.inMssInclude || []).map((ms) =>
+				ms === ''
+					? q.useRpc
+						? (() => {
+								throw new Error('inMss cannot include "" when useRpc');
+							})()
+						: isNull(thoughtsTable.in_ms)
+					: !ms
+						? and(
+								eq(thoughtsTable.in_ms, 0),
+								eq(
+									thoughtsTable.by_ms,
+									q.callerMs ||
+										(() => {
+											throw new Error('Missing callerMs');
+										})(),
+								),
+							)
+						: eq(thoughtsTable.in_ms, ms),
+			),
+		),
 
 		or(...(q.idsInclude || []).map((id) => filterId(id))),
 		...(q.idsExclude || []).map((id) => {
@@ -247,12 +268,13 @@ export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
 		}),
 
 		or(
-			...(q.byMssInclude || []).map((id) =>
-				id === '' ? isNull(thoughtsTable.by_ms) : eq(thoughtsTable.by_ms, id),
+			...(q.byMssInclude || []).map((ms) =>
+				ms === '' ? isNull(thoughtsTable.by_ms) : eq(thoughtsTable.by_ms, ms),
 			),
 		),
-		...(q.byMssExclude || []).map((id) =>
-			id === '' ? isNotNull(thoughtsTable.ms) : not(eq(thoughtsTable.by_ms, id)),
+
+		...(q.byMssExclude || []).map((ms) =>
+			ms === '' ? isNotNull(thoughtsTable.ms) : not(eq(thoughtsTable.by_ms, ms)),
 		),
 
 		or(...(q.tagsInclude || []).map((tag) => like(thoughtsTable.tags, `%"${tag}"%`))),
@@ -262,21 +284,21 @@ export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
 		...(q.bodyExcludes || []).map((term) => notLike(thoughtsTable.body, `%${term}%`)),
 	];
 
-	console.log('q:', q);
+	// console.log('q:', q);
 	if (q.nested) {
 		let offset = 0;
 		while (true) {
 			let [currentRow] = await db
 				.select()
 				.from(thoughtsTable)
-				.where(and(...conditions))
+				.where(and(...andConditions))
 				.orderBy((q.oldestFirst ? asc : desc)(thoughtsTable.ms))
 				.limit(1)
 				.offset(offset++);
 			if (!currentRow) break;
 			let {
 				rootThought, //interThoughts
-			} = await getRootThought(currentRow);
+			} = await _getRootThought(db, currentRow);
 
 			// console.log('currentRow:', currentRow);
 
@@ -284,7 +306,7 @@ export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
 				!idsExcludeSet.has(getId(rootThought)) &&
 				!roots.find((root) => getId(root) === getId(rootThought))
 			) {
-				let et = await expandThought(rootThought);
+				let et = await _expandThought(db, rootThought);
 				citedIds.push(...et.citedIds);
 				byMss.push(...et.byMss);
 				roots.push(et.nestedThought);
@@ -295,7 +317,7 @@ export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
 		roots = await db
 			.select()
 			.from(thoughtsTable)
-			.where(and(...conditions))
+			.where(and(...andConditions))
 			.orderBy((q.oldestFirst ? asc : desc)(thoughtsTable.ms))
 			.limit(rootsPerLoad);
 
@@ -308,7 +330,7 @@ export let _loadThoughts = async (db: Database, q: GetFeedInput) => {
 
 	await Promise.all(
 		[...new Set([...citedIds, ...(q.nested ? toIds : [])])].map((id) => {
-			return getThoughtById(id).then((thought) => {
+			return _getThoughtById(db, id).then((thought) => {
 				if (thought) {
 					auxThoughts[id] = thought;
 					byMss.push(auxThoughts[id].by_ms);

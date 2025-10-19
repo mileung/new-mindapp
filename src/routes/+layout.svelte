@@ -13,6 +13,8 @@
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
+	import { splitId } from '$lib/types/thoughts';
+	import { changeCurrentSpace } from '$lib/types/spaces';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
@@ -71,6 +73,20 @@
 				gs.accounts = localCache.accounts;
 				gs.spaces = localCache.spaces;
 
+				if (page.params.id) {
+					let { in_ms } = splitId(page.params.id);
+					let parsedInMs = /^\d+$/.test(in_ms) ? +in_ms : ('' as const);
+					if (parsedInMs !== gs.accounts[0].currentSpaceMs) {
+						if (page.params.id.startsWith('__')) {
+							changeCurrentSpace(parsedInMs);
+						} else if (!gs.accounts[0].spaceMss.includes(parsedInMs)) {
+							// If you visit the url for thought in a space you are not in, this should change the current space to local and maybe it'll be there locally saved
+							changeCurrentSpace('', true);
+							// TODO: Show the option to join the space
+						}
+					}
+				}
+
 				try {
 					// TODO: show accounts that were signed but but need to be signed in again for some reason?
 					let stat = await trpc().auth.getAccountStates.mutate({
@@ -88,7 +104,7 @@
 			} catch (error) {
 				console.log('error:', error);
 				alert(error);
-				if (error === 'Invalid localCache') {
+				if (String(error) === 'Error: Invalid localCache') {
 					gs.invalidLocalCache = true;
 				} else {
 					gs.localDbFailed = true;

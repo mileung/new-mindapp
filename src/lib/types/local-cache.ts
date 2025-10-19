@@ -22,7 +22,6 @@ export let defaultLocalCache: LocalCache = {
 		{
 			ms: '',
 			currentSpaceMs: '',
-			spacesPinnedThrough: 0,
 			spaceMss: [
 				'', // local space id - everything local
 				0, // personal space id - everything private in cloud
@@ -58,6 +57,7 @@ export async function getLocalCache() {
 		)[0];
 	}
 	let localCache: LocalCache = JSON.parse(localCacheRow.body!);
+
 	if (
 		!LocalCacheSchema.safeParse(localCache).success ||
 		!(
@@ -65,6 +65,9 @@ export async function getLocalCache() {
 			localCacheRow.tags[0] === ' local-cache'
 		)
 	) {
+		LocalCacheSchema.safeParse(localCache).error?.issues.forEach((issue) => {
+			console.log(`Key: ${issue.path.join('.')}, Message: ${issue.message}`);
+		});
 		throw new Error('Invalid localCache');
 	}
 	return localCache;

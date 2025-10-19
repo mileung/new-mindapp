@@ -2,10 +2,16 @@
 	import { dev } from '$app/environment';
 	import { pushState } from '$app/navigation';
 	import { gs } from '$lib/global-state.svelte';
-	import { copyToClipboard } from '$lib/js';
+	import { copyToClipboard, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
-	import { deleteThought, divideTags, getId, type ThoughtInsert } from '$lib/types/thoughts';
+	import {
+		deleteThought,
+		divideTags,
+		getId,
+		splitId,
+		type ThoughtInsert,
+	} from '$lib/types/thoughts';
 	import {
 		IconCheck,
 		IconCornerUpLeft,
@@ -17,6 +23,7 @@
 	} from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
+	import { page } from '$app/state';
 
 	let xBtn = $state<HTMLButtonElement>();
 	let trashBtn = $state<HTMLButtonElement>();
@@ -56,11 +63,11 @@
 </script>
 
 <div class="fx h-5 text-sm font-bold text-fg2">
-	{#if dev}<p class="mr-1">{id}</p>{/if}
+	<!-- {#if dev}<p class="truncate mr-1">{id}</p>{/if} -->
 	<a
 		href={'/' + id}
 		title={whenVerbose}
-		class={`truncate hover:text-fg1 h-7 xy`}
+		class={`truncate pr-1 hover:text-fg1 h-7 xy`}
 		onclick={(e) => {
 			if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 				e.preventDefault();
@@ -74,25 +81,23 @@
 	</a>
 	<a
 		href={`/__${p.thought.in_ms ?? ''}?q=by:${p.thought.by_ms || ''}`}
-		class={`truncate h-6 pl-1.5 pr-1 fx hover:text-fg1 ${
+		class={`truncate h-6 px-1 fx gap-1 hover:text-fg1 ${
 			gs.thoughts[p.thought.by_ms ?? ''] ? '' : 'italic'
 		}`}
 	>
-		<div class="h-3.5 w-3.5 mr-0.5 xy">
-			<AccountIcon id={`_${p.thought.by_ms ?? ''}_`} class="" />
-		</div>
+		<AccountIcon id={`_${p.thought.by_ms ?? ''}_`} class="min-h-4 min-w-4 max-h-4 max-w-4" />
 		<!-- TODO: names for users -->
 		<p class="truncate">
-			{p.thought.by_ms ? gs.thoughts[p.thought.by_ms!]?.body || m.noName() : m.anon()}
+			{p.thought.by_ms
+				? gs.thoughts[p.thought.by_ms!]?.body || identikana(p.thought.by_ms)
+				: m.anon()}
 		</p>
 	</a>
 	<a
 		href={`/__${p.thought.in_ms ?? ''}`}
-		class={`truncate h-6 px-1 mr-auto fx hover:text-fg1 ${p.thought.in_ms ? '' : 'italic'}`}
+		class={`truncate h-6 px-1 fx gap-1 hover:text-fg1 ${p.thought.in_ms ? '' : 'italic'}`}
 	>
-		<div class="h-3.5 w-3.5 mr-0.5 xy">
-			<SpaceIcon id={`__${p.thought.in_ms ?? ''}`} />
-		</div>
+		<SpaceIcon id={`__${p.thought.in_ms ?? ''}`} class="min-h-4 min-w-4 max-h-4 max-w-4" />
 		<p class={`truncate ${gs.thoughts[p.thought.in_ms || ''] ? '' : 'italic'}`}>
 			{p.thought.in_ms === 0
 				? m.personal()
@@ -156,7 +161,9 @@
 								Date.now() - (p.thought.ms || 0) < minute ||
 								confirm(m.areYouSureYouWantToDeleteThisThought());
 							if (!ok) return;
-							let { soft } = await deleteThought(id);
+
+							let useRpc = splitId(page.state.modalId || page.params.id || '').in_ms !== '';
+							let { soft } = await deleteThought(id, useRpc);
 							gs.thoughts[id] = soft
 								? {
 										...gs.thoughts[id],

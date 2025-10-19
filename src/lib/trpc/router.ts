@@ -11,18 +11,36 @@ import {
 } from '$lib/types/sessions';
 import { thoughtsTable } from '$lib/types/thoughts-table';
 import type { RequestEvent } from '@sveltejs/kit';
-import { initTRPC, type inferRouterInputs } from '@trpc/server';
+import { initTRPC, type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
 import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
 import { minute, second, week } from '../time';
-import { _loadThoughts } from '$lib/types/thoughts';
+import {
+	_addThought,
+	_deleteThought,
+	_editThought,
+	_getFeed,
+	_getThoughtById,
+	splitId,
+	ThoughtInsertSchema,
+	type ThoughtInsert,
+	type ThoughtNested,
+	type ThoughtSelect,
+} from '$lib/types/thoughts';
 
 export const t = initTRPC.context<Context>().create();
 
 let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 export let isValidEmail = (email: string) => {
 	return email.length < 255 && emailRegex.test(email);
+};
+
+let verifyCaller = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
+	if (typeof inMs !== 'number' || inMs < 0) throw new Error('Invalid inMs');
+	if (typeof byMs !== 'number' || inMs < 0) throw new Error('Invalid byMs');
+	if (!ctx.session?.accountMss.includes(byMs)) throw new Error('Unauthorized by_ms');
+	// TODO: Verify user by_ms has access to space in_ms
 };
 
 let makeLimiter = (pings: number, minutes: number) => {
@@ -154,9 +172,7 @@ export const router = t.router({
 						}
 						return { strike: otp.strike };
 					}
-
 					await tdb.delete(thoughtsTable).where(otpRowFilter);
-
 					let accountTags = [` email:${input.email}`];
 					let accountRows = await tdb
 						.select()
@@ -174,7 +190,6 @@ export const router = t.router({
 									tags: accountTags,
 									body: JSON.stringify({
 										currentSpaceMs: 0,
-										spacesPinnedThrough: 0,
 										spaceMss: ['', 0, 1],
 										allTags: [],
 									} satisfies Omit<Account, 'ms'>),
@@ -231,10 +246,39 @@ export const router = t.router({
 				},
 			),
 	}),
+	addThought: t.procedure.input(ThoughtInsertSchema).mutation(
+		async ({
+			input: t,
+			ctx, //
+		}) => {
+			verifyCaller(ctx, t.by_ms, t.in_ms);
+			return _addThought(tdb, t);
+		},
+	),
+	editThought: t.procedure.input(ThoughtInsertSchema).mutation(
+		async ({
+			input: t,
+			ctx, //
+		}) => {
+			verifyCaller(ctx, t.by_ms, t.in_ms);
+			return _editThought(tdb, t);
+		},
+	),
+	deleteThought: t.procedure.input(z.string()).mutation(
+		async ({
+			input,
+			ctx, //
+		}) => {
+			let { by_ms, in_ms } = splitId(input);
+			verifyCaller(ctx, +by_ms, +in_ms);
+			return _deleteThought(tdb, input);
+		},
+	),
 	getFeed: t.procedure
 		.input(
 			z.object({
-				rpc: z.boolean().optional(),
+				callerMs: z.number().optional(),
+				useRpc: z.boolean().optional(),
 				nested: z.boolean().optional(),
 				oldestFirst: z.boolean().optional(), // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
 				fromMs: z.number(),
@@ -252,9 +296,20 @@ export const router = t.router({
 				bodyExcludes: z.array(z.string()).optional(),
 			}),
 		)
-		.mutation(async ({ input, ctx }) => {
-			// return _loadThoughts(tdb,input)
-		}),
+		.mutation(
+			async ({
+				input: q,
+				ctx,
+			}): Promise<{
+				roots: ThoughtNested[];
+				auxThoughts: Record<string, ThoughtSelect>;
+			}> => {
+				if (q.callerMs && !ctx.session?.accountMss.includes(q.callerMs))
+					throw new Error('Unauthorized callerMs');
+
+				return _getFeed(tdb, q);
+			},
+		),
 });
 
 // https://trpc.io/docs/server/server-side-calls
@@ -262,3 +317,10 @@ export const createCaller = t.createCallerFactory(router);
 export type Router = typeof router;
 
 export type GetFeedInput = inferRouterInputs<Router>['getFeed'];
+export type GetFeedOutput = inferRouterOutputs<Router>['getFeed'];
+export type AddThoughtInput = inferRouterInputs<Router>['addThought'];
+export type AddThoughtOutput = inferRouterOutputs<Router>['addThought'];
+export type EditThoughtInput = inferRouterInputs<Router>['editThought'];
+export type EditThoughtOutput = inferRouterOutputs<Router>['editThought'];
+export type DeleteThoughtInput = inferRouterInputs<Router>['deleteThought'];
+export type DeleteThoughtOutput = inferRouterOutputs<Router>['deleteThought'];

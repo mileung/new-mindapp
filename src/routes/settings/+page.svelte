@@ -8,7 +8,7 @@
 	import {
 		filterThought,
 		getId,
-		getThoughtById,
+		_getThoughtById,
 		ThoughtInsertSchema,
 		type ThoughtInsert,
 	} from '$lib/types/thoughts';
@@ -32,6 +32,17 @@
 				? m.somethingIsWrongWithYourLocalDatabase___()
 				: m.somethingIsWrongWithYourLocalCache___()}
 		</p>
+	{/if}
+
+	<p class="text-xl font-bold">{m.account()}</p>
+	<div class="h-0.5 w-full bg-bg8"></div>
+	{#if gs.accounts}
+		{#if !gs.accounts[0].ms}
+			<p>{m.anon()}</p>
+		{:else}
+			<p>{m.id()}: <span class="font-medium">_{gs.accounts[0].ms}_</span></p>
+			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
+		{/if}
 	{/if}
 
 	<p class="text-xl font-bold">{m.theme()}</p>
@@ -113,7 +124,8 @@
 								// TODO: make importing local data faster
 								let results = await Promise.all(
 									importedThoughts.map(
-										async (thought) => [thought, !!(await getThoughtById(getId(thought)))] as const,
+										async (thought) =>
+											[thought, !!(await _getThoughtById(db, getId(thought)))] as const,
 									),
 								);
 								let inserts: ThoughtInsert[] = [];

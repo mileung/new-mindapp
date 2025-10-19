@@ -9,10 +9,10 @@
 		addThought,
 		bracketRegex,
 		editThought,
+		getFeed,
 		getId,
 		getIds,
 		idsRegex,
-		loadThoughts,
 		rootsPerLoad,
 		splitId,
 		type ThoughtNested,
@@ -36,14 +36,27 @@
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
 
 	let viewPostToastId = $state('');
-
-	let makeFeedId = (id = '', q = '') => `/${id}?q=${q}`;
-	let identifier = $derived(makeFeedId(p.idParam, p.searchedText));
+	let splitIdParam = $derived(splitId(p.idParam || ''));
+	let useRpc = $derived(splitIdParam.in_ms !== '');
+	$effect(() => {
+		if (gs.accounts) {
+			localStorage.setItem('callerMs', '' + gs.accounts[0].ms);
+		}
+	});
+	let identifier = $derived(
+		gs.accounts
+			? JSON.stringify({
+					callerMs: p.idParam !== '__' && p.idParam !== '__1' ? gs.accounts[0].ms : '',
+					idParam: p.idParam,
+					searchedText: p.searchedText,
+				})
+			: null,
+	);
 	let nested = $derived(true); // TODO: linear
 	let oldestFirst = $derived(false);
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
 	let personalSpaceRequiresLogin = $derived(
-		splitId(p.idParam || '').in_ms === '0' && //
+		splitIdParam.in_ms === '0' && //
 			gs.accounts?.[0].ms === '',
 	);
 	let allowNewWriting = $derived(!p.modal && !personalSpaceRequiresLogin);
@@ -76,32 +89,41 @@
 	let loadMoreThoughts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
 		// console.log(
-		// 	'loadMoreThoughts',
+		// 	'loadMoreThoughts:',
 		// 	identifier,
-		// 	$state.snapshot(gs.feeds[identifier]),
-		// 	$state.snapshot(gs.thoughts),
+		// 	// $state.snapshot(gs.feeds[identifier]),
+		// 	// $state.snapshot(gs.thoughts),
 		// );
+
+		if (!gs.accounts || !identifier || !p.idParam || personalSpaceRequiresLogin) return;
+
 		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
 		if (fromMs === null) return e.detail.complete();
-		if (!p.idParam || personalSpaceRequiresLogin) return;
 		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
 
+		// while (!gs.accounts) await new Promise((res) => setTimeout(res, 42));
+
 		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
-		let thoughts: Awaited<ReturnType<typeof loadThoughts>>;
-		let { ms, by_ms, in_ms } = splitId(p.idParam);
-		let mssInclude: ('' | number)[] = [ms === '' ? '' : +ms];
-		let byMssInclude: ('' | number)[] = [by_ms === '' ? '' : +by_ms];
-		let inMssInclude: ('' | number)[] = [in_ms === '' ? '' : +in_ms];
+		let thoughts: Awaited<ReturnType<typeof getFeed>>;
+		let strIsNum = (s: string) => /^\d+$/.test(s);
+		// let mssInclude: ('' | number)[] = [ms === '' ? '' : +ms];
+		// let byMssInclude: ('' | number)[] = [by_ms === '' ? '' : +by_ms];
+		let niMsIsNum = strIsNum(splitIdParam.in_ms);
+		if (!niMsIsNum && splitIdParam.in_ms !== '') throw new Error('Invalid in_ms');
+
+		let callerMs = gs.accounts[0].ms || undefined;
+		// console.log('callerMs:', callerMs);
+		let inMssInclude = [niMsIsNum ? +splitIdParam.in_ms : ('' as const)];
+		// console.log('inMssInclude:', inMssInclude);
 		// mssInclude,
 		// byMssInclude,
-		// inMssInclude,
-
-		let rpc = in_ms !== '';
 
 		if (spotId) {
-			thoughts = await loadThoughts({
-				rpc,
+			thoughts = await getFeed({
+				useRpc,
+				callerMs,
 				nested,
+				inMssInclude,
 				fromMs,
 				idsInclude: [spotId],
 			});
@@ -146,12 +168,14 @@
 						return ids;
 					});
 
-			thoughts = await loadThoughts({
-				rpc,
+			thoughts = await getFeed({
+				useRpc,
+				callerMs,
 				nested,
 				fromMs,
-				tagsInclude,
+				inMssInclude,
 				byMssInclude,
+				tagsInclude,
 				bodyIncludes,
 				idsExclude: [
 					// TODO: if oldestFirst, exclude the newest root ids with the same ms
@@ -212,6 +236,7 @@
 	};
 
 	let submitThought = async (tags: string[], body: string) => {
+		if (!gs.accounts || !identifier) return;
 		await updateLocalCache((lc) => {
 			lc.accounts[0].allTags = sortUniArr([
 				...gs.accounts![0].allTags,
@@ -228,16 +253,23 @@
 				tags,
 				body,
 			};
-			thought.tags = await editThought(thought);
+			thought.tags = await editThought(thought, useRpc);
 		} else {
+			let inMs = gs.accounts[0]?.currentSpaceMs;
 			thought = {
-				// in_ms: // TODO: gs.spaces[currentSpace].id
+				by_ms: gs.accounts?.[0].ms || null,
+				in_ms: inMs === '' ? null : inMs,
 				to_id: gs.writerMode[0] === 'to' ? gs.writerMode[1] : null,
 				tags: tags.length ? sortUniArr(tags) : null,
 				body: body.trim() || null,
 				childIds: [],
 			};
-			thought.ms = await addThought(thought);
+			try {
+				thought.ms = await addThought(thought, useRpc);
+			} catch (error) {
+				console.log(error);
+				return alert(error);
+			}
 		}
 		let tid = getId(thought);
 		gs.thoughts = { ...gs.thoughts, [tid]: thought };
@@ -252,7 +284,7 @@
 	};
 
 	let feed = $derived(
-		gs.feeds[identifier]?.map((tid) => gs.thoughts[tid || '']).filter((t) => !!t),
+		gs.feeds[identifier || '']?.map((tid) => gs.thoughts[tid || '']).filter((t) => !!t),
 	);
 
 	let scrolledToSpotId = $state(false);
@@ -263,7 +295,9 @@
 	});
 </script>
 
-<div class={`overflow-y-scroll h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}>
+<div
+	class={`overflow-y-scroll flex flex-col h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}
+>
 	{#if !!gs.accounts && personalSpaceRequiresLogin}
 		<div class="h-screen xy fy gap-2">
 			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>

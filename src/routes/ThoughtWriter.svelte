@@ -62,7 +62,7 @@
 				(!e.metaKey || (e.metaKey && e.key === 'v')) &&
 				((e.key.length === 1 && e.key !== '/') ||
 					['Backspace', 'Delete', 'Space'].includes(e.key)) &&
-				tagsIpt.focus();
+				tagsIpt?.focus();
 		});
 	});
 
@@ -225,10 +225,8 @@
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
-		{#if gs.writerBody}
-			<button class="xy bg-hl1 h-8 w-8 absolute bottom-1 right-1 text-black" onclick={submit}>
-				<IconArrowUp class="h-9 w-9" />
-			</button>
-		{/if}
+		<button class="xy bg-hl1 h-8 w-8 absolute bottom-1 right-1 text-black" onclick={submit}>
+			<IconArrowUp class="h-9 w-9" />
+		</button>
 	</div>
 </div>

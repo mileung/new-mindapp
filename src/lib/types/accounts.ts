@@ -7,7 +7,6 @@ export let AccountSchema = z
 	.object({
 		ms: z.literal('').or(z.number()),
 		currentSpaceMs: z.literal('').or(z.number()),
-		spacesPinnedThrough: z.number(),
 		spaceMss: z.array(z.literal('').or(z.number())),
 		allTags: z.array(z.string()),
 		email: z.string().optional(),

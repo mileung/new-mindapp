@@ -10,7 +10,7 @@ class GlobalState {
 	localDbFailed = $state(false);
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
-	spaces = $state<Record<string, undefined | Space>>({});
+	spaces = $state<Record<number, undefined | Space>>({});
 	accounts = $state<undefined | Account[]>();
 	feeds = $state<Record<string, undefined | FeedSequence>>({});
 	thoughts = $state<Record<string, undefined | null | ThoughtNested>>({});

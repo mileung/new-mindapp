@@ -16,12 +16,12 @@
 	<div class="w-full max-w-sm">
 		<div class="min-h-52">
 			{#if email}
-				<p class="text-3xl sm:text-4xl font-black">Check your inbox</p>
-				<p class="mt-2 text-lg sm:text-xl">Enter the one-time pin we sent to</p>
+				<p class="text-3xl sm:text-4xl font-black">{m.checkYourInbox()}</p>
+				<p class="mt-2 text-lg sm:text-xl">{m.enterTheOneTimePinWeSentTo()}</p>
 				<p class="font-bold break-all">{email}</p>
 			{:else}
-				<p class="text-4xl sm:text-5xl font-black">Organize today</p>
-				<p class="mt-3 text-xl sm:text-2xl font-extrabold">Sign in</p>
+				<p class="text-4xl sm:text-5xl font-black">{m.organizeToday()}</p>
+				<p class="mt-3 text-xl sm:text-2xl font-extrabold">{m.signIn()}</p>
 			{/if}
 			<form
 				class="mt-4 gap-2 fy items-start"
@@ -106,7 +106,7 @@
 					>
 					{#if email}
 						<button onclick={() => (email = val = '')} class="text-fg2 hover:text-fg1"
-							>Change email</button
+							>{m.changeEmail()}</button
 						>
 					{/if}
 				</div>
