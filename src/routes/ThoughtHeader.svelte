@@ -63,7 +63,7 @@
 </script>
 
 <div class="fx h-5 text-sm font-bold text-fg2">
-	<!-- {#if dev}<p class="truncate mr-1">{id}</p>{/if} -->
+	{#if dev}<p class="truncate mr-1">{id}</p>{/if}
 	<a
 		href={'/' + id}
 		title={whenVerbose}

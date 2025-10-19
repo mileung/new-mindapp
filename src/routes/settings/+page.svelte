@@ -11,6 +11,8 @@
 		_getThoughtById,
 		ThoughtInsertSchema,
 		type ThoughtInsert,
+		overwriteLocalThought,
+		insertLocalThought,
 	} from '$lib/types/thoughts';
 	import { thoughtsTable } from '$lib/types/thoughts-table';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
@@ -129,11 +131,13 @@
 									),
 								);
 								let inserts: ThoughtInsert[] = [];
-								let updates: ThoughtInsert[] = [];
-								results.forEach(([thought, exists]) => (exists ? updates : inserts).push(thought));
+								let overwrites: ThoughtInsert[] = [];
+								results.forEach(([thought, exists]) =>
+									(exists ? overwrites : inserts).push(thought),
+								);
 								await Promise.all([
-									...inserts.map((i) => db.insert(thoughtsTable).values(i)),
-									...updates.map((u) => db.update(thoughtsTable).set(u).where(filterThought(u))),
+									...inserts.map((i) => insertLocalThought(i)),
+									...overwrites.map((o) => overwriteLocalThought(o)),
 								]);
 								console.timeEnd('import_time');
 								setAccountsAndSpaces();

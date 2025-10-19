@@ -83,11 +83,20 @@ export function dropThoughtsTableInOpfsInDev() {
 
 type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
+export let insertLocalThought = async (t: ThoughtInsert) => {
+	(await gsdb()).insert(thoughtsTable).values(t);
+};
+
+export let overwriteLocalThought = async (t: ThoughtInsert) => {
+	await (await gsdb()).update(thoughtsTable).set(t).where(filterThought(t));
+};
+
 export let addThought = async (t: ThoughtInsert, useRpc: boolean) => {
 	return useRpc ? trpc().addThought.mutate(t) : _addThought(await gsdb(), t);
 };
 
 export let _addThought = async (db: Database, t: ThoughtInsert) => {
+	console.log('_addThought');
 	if (typeof t.in_ms === 'number') {
 		if (!t.by_ms) throw new Error('Missing by_ms');
 	}

@@ -13,6 +13,8 @@
 		getId,
 		getIds,
 		idsRegex,
+		insertLocalThought,
+		overwriteLocalThought,
 		rootsPerLoad,
 		splitId,
 		type ThoughtNested,
@@ -37,19 +39,26 @@
 
 	let viewPostToastId = $state('');
 	let splitIdParam = $derived(splitId(p.idParam || ''));
-	let useRpc = $derived(splitIdParam.in_ms !== '');
+	let inLocal = $derived(splitIdParam.in_ms === '');
 	$effect(() => {
 		if (gs.accounts) {
 			localStorage.setItem('callerMs', '' + gs.accounts[0].ms);
 		}
 	});
+	let makeFeedIdentifier = (callerMs: number | string, idParam: string, searchedText: string) => {
+		return JSON.stringify({
+			callerMs,
+			idParam,
+			searchedText,
+		});
+	};
 	let identifier = $derived(
-		gs.accounts
-			? JSON.stringify({
-					callerMs: p.idParam !== '__' && p.idParam !== '__1' ? gs.accounts[0].ms : '',
-					idParam: p.idParam,
-					searchedText: p.searchedText,
-				})
+		gs.accounts && p.idParam
+			? makeFeedIdentifier(
+					p.idParam !== '__' && p.idParam !== '__1' ? gs.accounts[0].ms : '',
+					p.idParam,
+					p.searchedText,
+				)
 			: null,
 	);
 	let nested = $derived(true); // TODO: linear
@@ -108,19 +117,19 @@
 		let strIsNum = (s: string) => /^\d+$/.test(s);
 		// let mssInclude: ('' | number)[] = [ms === '' ? '' : +ms];
 		// let byMssInclude: ('' | number)[] = [by_ms === '' ? '' : +by_ms];
-		let niMsIsNum = strIsNum(splitIdParam.in_ms);
-		if (!niMsIsNum && splitIdParam.in_ms !== '') throw new Error('Invalid in_ms');
+		let inMsIsNum = strIsNum(splitIdParam.in_ms);
+		if (!inMsIsNum && splitIdParam.in_ms !== '') throw new Error('Invalid in_ms');
 
 		let callerMs = gs.accounts[0].ms || undefined;
 		// console.log('callerMs:', callerMs);
-		let inMssInclude = [niMsIsNum ? +splitIdParam.in_ms : ('' as const)];
+		let inMssInclude = [...(inMsIsNum ? [+splitIdParam.in_ms] : [])];
 		// console.log('inMssInclude:', inMssInclude);
 		// mssInclude,
 		// byMssInclude,
 
 		if (spotId) {
 			thoughts = await getFeed({
-				useRpc,
+				useRpc: !inLocal,
 				callerMs,
 				nested,
 				inMssInclude,
@@ -169,7 +178,7 @@
 					});
 
 			thoughts = await getFeed({
-				useRpc,
+				useRpc: !inLocal,
 				callerMs,
 				nested,
 				fromMs,
@@ -253,7 +262,17 @@
 				tags,
 				body,
 			};
-			thought.tags = await editThought(thought, useRpc);
+			let updateInCloud = async () => {
+				thought.tags = await editThought(thought, true);
+				await overwriteLocalThought(thought);
+			};
+			if (inLocal) {
+				Number.isInteger(thought.in_ms)
+					? updateInCloud()
+					: (thought.tags = await editThought(thought, false));
+			} else updateInCloud();
+
+			// TODO: Come up with a ui/ux for saving thoughts locally
 		} else {
 			let inMs = gs.accounts[0]?.currentSpaceMs;
 			thought = {
@@ -265,7 +284,13 @@
 				childIds: [],
 			};
 			try {
-				thought.ms = await addThought(thought, useRpc);
+				thought.ms = await addThought(thought, !inLocal);
+				if (!inLocal) await insertLocalThought(thought);
+				let localFeedId = makeFeedIdentifier('', '__', '');
+				gs.feeds[localFeedId] = [
+					getId(thought), //
+					...(gs.feeds[localFeedId]! || []),
+				];
 			} catch (error) {
 				console.log(error);
 				return alert(error);
