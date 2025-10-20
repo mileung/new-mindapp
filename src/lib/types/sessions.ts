@@ -7,7 +7,7 @@ import { thoughtsTable } from './thoughts-table';
 
 export let SessionSchema = z
 	.object({
-		sessionCode: z.string(),
+		code: z.string(),
 		accountMss: z.array(z.number()),
 		// TODO: Security based on IP address? IPs can be easily spoofed so idk if it's worth implementing.
 	})
@@ -36,7 +36,7 @@ export let makeSessionRowInsert = (
 	({
 		ms: sessionMs,
 		tags: [' session'],
-		body: JSON.stringify({ sessionCode, accountMss } satisfies Session),
+		body: JSON.stringify({ code: sessionCode, accountMss } satisfies Session),
 	}) satisfies ThoughtInsert;
 
 export let setSessionIdCookie = (event: RequestEvent, sessionId: string) => {

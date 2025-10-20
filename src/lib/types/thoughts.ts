@@ -56,14 +56,14 @@ export function divideTags(thought: ThoughtInsert) {
 
 export let filterId = (id: string) => {
 	let { ms, by_ms, in_ms } = splitId(id);
-	return filterThought({
+	return filterThoughtById({
 		ms: ms === '' ? null : +ms,
 		by_ms: by_ms === '' ? null : +by_ms,
 		in_ms: in_ms === '' ? null : +in_ms,
 	});
 };
 
-export let filterThought = (t: ThoughtInsert) => {
+export let filterThoughtById = (t: Pick<ThoughtInsert, 'ms' | 'by_ms' | 'in_ms'>) => {
 	return and(
 		typeof t.ms === 'number' ? eq(thoughtsTable.ms, t.ms) : isNull(thoughtsTable.ms),
 		typeof t.by_ms === 'number' ? eq(thoughtsTable.by_ms, t.by_ms) : isNull(thoughtsTable.by_ms),
@@ -88,7 +88,7 @@ export let insertLocalThought = async (t: ThoughtInsert) => {
 };
 
 export let overwriteLocalThought = async (t: ThoughtInsert) => {
-	await (await gsdb()).update(thoughtsTable).set(t).where(filterThought(t));
+	await (await gsdb()).update(thoughtsTable).set(t).where(filterThoughtById(t));
 };
 
 export let addThought = async (t: ThoughtInsert, useRpc: boolean) => {
@@ -96,14 +96,12 @@ export let addThought = async (t: ThoughtInsert, useRpc: boolean) => {
 };
 
 export let _addThought = async (db: Database, t: ThoughtInsert) => {
-	console.log('_addThought');
 	if (typeof t.in_ms === 'number') {
 		if (!t.by_ms) throw new Error('Missing by_ms');
 	}
 	if (!(t.tags || []).every((t) => t.length === t.trim().length))
 		throw new Error('Every tag must be trimmed');
 	let ms = Date.now();
-	// gs.accounts[0].currentSpaceMs
 	await db.insert(thoughtsTable).values({ ...t, ms });
 	return ms;
 };
@@ -141,7 +139,7 @@ export let _editThought = async (db: Database, t: ThoughtInsert) => {
 	await db
 		.update(thoughtsTable)
 		.set({ ...t, tags })
-		.where(filterThought(t));
+		.where(filterThoughtById(t));
 	return tags;
 };
 

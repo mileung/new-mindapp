@@ -5,32 +5,9 @@
 		size?: number;
 	} = $props();
 
-	let gridSize = p.size ?? 5;
-	let data = p.data || '';
-	// data = '' + Math.random();
-
-	let halfWidth = Math.ceil(gridSize / 2);
-	let hash = data.split('').reduce((acc, char, idx) => {
-		return ((acc << 5) - acc + char.charCodeAt(0) * (idx + 1)) | 0;
-	}, 0);
-
 	let largePrimeNumber = 2654435761;
-	let bits = Array.from({ length: gridSize * halfWidth }, (_, i) => {
-		let seed = (hash ^ (i * largePrimeNumber)) >>> 0;
-		let charCode1 = data.charCodeAt(i % Math.max(data.length, 1)) || 0;
-		let charCode2 = data.charCodeAt((i * 7) % Math.max(data.length, 1)) || 0;
-		let charCode3 = data.charCodeAt((i * 13) % Math.max(data.length, 1)) || 0;
-		let combined = (seed ^ charCode1 ^ charCode2 ^ charCode3) >>> 0;
-		return ((combined >> i % 8) & 1) === 1;
-	});
-
-	let grid = Array.from({ length: gridSize }, (_, row) =>
-		Array.from({ length: gridSize }, (_, col) => {
-			let mirrorCol = col < halfWidth ? col : gridSize - 1 - col;
-			return bits[row * halfWidth + mirrorCol];
-		}),
-	);
-
+	let size = 100;
+	let padding = 10;
 	let colors = [
 		'fill-red-400',
 		'fill-orange-400',
@@ -41,12 +18,40 @@
 		'fill-pink-400',
 	];
 
-	let colorIndex = (hash >>> 0) % colors.length;
-	let fillColor = colors[colorIndex];
+	let gridSize = $derived(p.size ?? 5);
+	let data = $derived(p.data || '');
+	// data = '' + Math.random();
 
-	let size = 100;
-	let padding = 10;
-	let cellSize = (size - padding * 2) / gridSize;
+	let halfWidth = $derived(Math.ceil(gridSize / 2));
+	let hash = $derived(
+		data.split('').reduce((acc, char, idx) => {
+			return ((acc << 5) - acc + char.charCodeAt(0) * (idx + 1)) | 0;
+		}, 0),
+	);
+
+	let bits = $derived(
+		Array.from({ length: gridSize * halfWidth }, (_, i) => {
+			let seed = (hash ^ (i * largePrimeNumber)) >>> 0;
+			let charCode1 = data.charCodeAt(i % Math.max(data.length, 1)) || 0;
+			let charCode2 = data.charCodeAt((i * 7) % Math.max(data.length, 1)) || 0;
+			let charCode3 = data.charCodeAt((i * 13) % Math.max(data.length, 1)) || 0;
+			let combined = (seed ^ charCode1 ^ charCode2 ^ charCode3) >>> 0;
+			return ((combined >> i % 8) & 1) === 1;
+		}),
+	);
+
+	let grid = $derived(
+		Array.from({ length: gridSize }, (_, row) =>
+			Array.from({ length: gridSize }, (_, col) => {
+				let mirrorCol = col < halfWidth ? col : gridSize - 1 - col;
+				return bits[row * halfWidth + mirrorCol];
+			}),
+		),
+	);
+
+	let colorIndex = $derived((hash >>> 0) % colors.length);
+	let fillColor = $derived(colors[colorIndex]);
+	let cellSize = $derived((size - padding * 2) / gridSize);
 </script>
 
 <svg

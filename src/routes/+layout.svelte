@@ -6,15 +6,15 @@
 	import { initLocalDb } from '$lib/local-db';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
-	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
+	import { getLatestAllTags, getLocalCache, updateLocalCache } from '$lib/types/local-cache';
+	import { changeCurrentSpace } from '$lib/types/spaces';
+	import { splitId } from '$lib/types/thoughts';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import Sidebar from './Sidebar.svelte';
-	import { splitId } from '$lib/types/thoughts';
-	import { changeCurrentSpace } from '$lib/types/spaces';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
@@ -76,7 +76,7 @@
 				if (page.params.id) {
 					let { in_ms } = splitId(page.params.id);
 					let parsedInMs = /^\d+$/.test(in_ms) ? +in_ms : ('' as const);
-					if (parsedInMs !== gs.accounts[0].currentSpaceMs) {
+					if (parsedInMs !== gs.currentSpaceMs) {
 						if (page.params.id.startsWith('__')) {
 							changeCurrentSpace(parsedInMs);
 						} else if (!gs.accounts[0].spaceMss.includes(parsedInMs)) {
@@ -97,6 +97,7 @@
 						lc.accounts = lc.accounts.filter((a) => a.ms === '' || signedInMsSet.has(a.ms));
 						return lc;
 					});
+					getLatestAllTags();
 				} catch (error) {
 					console.log('error:', error);
 					alert(error);

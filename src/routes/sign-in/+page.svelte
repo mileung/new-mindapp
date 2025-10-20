@@ -42,7 +42,7 @@
 									}
 									return lc;
 								});
-								goto(`/__${account.currentSpaceMs}`, {});
+								goto(`/__${gs.currentSpaceMs}`, {});
 							} else if (res.strike! > 2) {
 								alert(m.tooManyFailedAttempts());
 								email = val = '';
@@ -54,7 +54,7 @@
 							} else {
 								let signedInAccount = gs.accounts?.find((a) => a.email === trimmedInput);
 								if (signedInAccount) {
-									goto(`/__${signedInAccount.currentSpaceMs}`, {});
+									goto(`/__${gs.currentSpaceMs}`, {});
 									return updateLocalCache((lc) => {
 										lc.accounts = [
 											signedInAccount,

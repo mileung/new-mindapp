@@ -1,13 +1,12 @@
+import { and, eq, isNull, like } from 'drizzle-orm';
 import { z } from 'zod';
-import { gs } from '../global-state.svelte';
-import { sortUniArr } from '../js';
-import { updateLocalCache } from './local-cache';
+import { thoughtsTable } from './thoughts-table';
 
 export let AccountSchema = z
 	.object({
 		ms: z.literal('').or(z.number()),
-		currentSpaceMs: z.literal('').or(z.number()),
-		spaceMss: z.array(z.literal('').or(z.number())),
+		spaceMss: z.array(z.literal('').or(z.number())).max(50),
+		allTagsMs: z.number().optional(),
 		allTags: z.array(z.string()),
 		email: z.string().optional(),
 		name: z.string().optional(),
@@ -16,11 +15,11 @@ export let AccountSchema = z
 
 export type Account = z.infer<typeof AccountSchema>;
 
-export async function unsaveTagInPersona(tag: string) {
-	await updateLocalCache((lc) => {
-		if (gs.accounts) {
-			lc.accounts[0].allTags = sortUniArr([...gs.accounts[0]!.allTags].filter((t) => t !== tag));
-		}
-		return lc;
-	});
-}
+export let filterAccountByMs = (ms: number) => {
+	return and(
+		eq(thoughtsTable.ms, ms),
+		isNull(thoughtsTable.by_ms),
+		isNull(thoughtsTable.in_ms),
+		like(thoughtsTable.tags, '[" email:%'),
+	);
+};

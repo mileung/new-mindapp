@@ -1,7 +1,8 @@
 import { dev } from '$app/environment';
+import { sortUniArr } from '$lib/js';
 import { tdb } from '$lib/server/db';
 import type { Context } from '$lib/trpc/context';
-import { AccountSchema, type Account } from '$lib/types/accounts';
+import { AccountSchema, filterAccountByMs, type Account } from '$lib/types/accounts';
 import { OtpSchema, type Otp } from '$lib/types/otp';
 import {
 	makeSessionId,
@@ -9,31 +10,42 @@ import {
 	makeSessionRowInsert,
 	setSessionIdCookie,
 } from '$lib/types/sessions';
-import { thoughtsTable } from '$lib/types/thoughts-table';
-import type { RequestEvent } from '@sveltejs/kit';
-import { initTRPC, type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
-import { and, desc, eq, isNull, lt, or } from 'drizzle-orm';
-import { RateLimiterMemory } from 'rate-limiter-flexible';
-import { z } from 'zod';
-import { minute, second, week } from '../time';
 import {
 	_addThought,
 	_deleteThought,
 	_editThought,
 	_getFeed,
-	_getThoughtById,
 	splitId,
 	ThoughtInsertSchema,
-	type ThoughtInsert,
 	type ThoughtNested,
 	type ThoughtSelect,
 } from '$lib/types/thoughts';
+import { thoughtsTable } from '$lib/types/thoughts-table';
+import type { RequestEvent } from '@sveltejs/kit';
+import { initTRPC, type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
+import { and, desc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
+import { z } from 'zod';
+import { minute, second, week } from '../time';
 
 export const t = initTRPC.context<Context>().create();
 
 let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 export let isValidEmail = (email: string) => {
 	return email.length < 255 && emailRegex.test(email);
+};
+
+let getAccountByMs = async (ms: number) => {
+	let accountRows = await tdb.select().from(thoughtsTable).where(filterAccountByMs(ms));
+	if (accountRows.length > 1) throw new Error('Multiple accounts found');
+	let accountRow = accountRows[0];
+	if (!accountRow) throw new Error('No account found');
+	let account: Omit<Account, 'email'> = {
+		ms: accountRow.ms,
+		// Omitting email until I need it
+		...JSON.parse(accountRow.body!),
+	};
+	return account;
 };
 
 let verifyCaller = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
@@ -73,8 +85,25 @@ async function sendEmail(config: { from: string; to: string; subject: string; ht
 
 export const router = t.router({
 	auth: t.router({
-		signOut: t.procedure.input(z.object({})).mutation(async () => {
-			//
+		signOut: t.procedure.input(z.number()).mutation(async ({ input, ctx }) => {
+			if (!ctx.session) throw new Error('Missing session');
+			let sessionId = ctx.event.cookies.get('sessionId');
+			let [sMs, sessionCode] = (sessionId || '').split('-');
+			let sessionMs = +sMs || 0;
+			let sessionRowFilter = makeSessionRowFilter(sessionMs);
+			let newAccountMss = ctx.session.accountMss.filter((ms) => ms !== input);
+			newAccountMss.length
+				? await tdb
+						.update(thoughtsTable)
+						.set(
+							makeSessionRowInsert(
+								sessionMs, //
+								sessionCode,
+								newAccountMss,
+							),
+						)
+						.where(sessionRowFilter)
+				: await tdb.delete(thoughtsTable).where(sessionRowFilter);
 		}),
 		getAccountStates: t.procedure
 			.input(z.object({ accountMss: z.array(z.number()) }))
@@ -131,9 +160,9 @@ export const router = t.router({
 					let now = Date.now();
 					let otpRowFilter = and(
 						eq(thoughtsTable.ms, input.ms),
-						eq(thoughtsTable.tags, [' otp']),
-						isNull(thoughtsTable.in_ms),
 						isNull(thoughtsTable.by_ms),
+						isNull(thoughtsTable.in_ms),
+						eq(thoughtsTable.tags, [' otp']),
 					);
 					let otpRows = await tdb
 						.select()
@@ -159,8 +188,8 @@ export const router = t.router({
 										and(
 											lt(thoughtsTable.ms, now - 5 * minute),
 											eq(thoughtsTable.tags, [' otp']),
-											isNull(thoughtsTable.in_ms),
 											isNull(thoughtsTable.by_ms),
+											isNull(thoughtsTable.in_ms),
 										),
 									),
 								);
@@ -177,7 +206,14 @@ export const router = t.router({
 					let accountRows = await tdb
 						.select()
 						.from(thoughtsTable)
-						.where(eq(thoughtsTable.tags, accountTags));
+						.where(
+							and(
+								isNotNull(thoughtsTable.ms),
+								isNull(thoughtsTable.by_ms),
+								isNull(thoughtsTable.in_ms),
+								eq(thoughtsTable.tags, accountTags),
+							),
+						);
 
 					if (accountRows.length > 1) throw new Error('Multiple accounts found');
 					let accountRow = accountRows[0];
@@ -189,10 +225,9 @@ export const router = t.router({
 									ms: now,
 									tags: accountTags,
 									body: JSON.stringify({
-										currentSpaceMs: 0,
 										spaceMss: ['', 0, 1],
-										allTags: [],
-									} satisfies Omit<Account, 'ms'>),
+										allTagsMs: 0,
+									} satisfies Omit<Account, 'ms' | 'allTags'>),
 								})
 								.returning()
 						)[0];
@@ -203,10 +238,24 @@ export const router = t.router({
 						email: accountRow.tags![0].split(' email:')[1],
 						...JSON.parse(accountRow.body!),
 					};
+
+					let allTagsRows = await tdb
+						.select()
+						.from(thoughtsTable)
+						.where(
+							and(
+								isNull(thoughtsTable.in_ms),
+								eq(thoughtsTable.by_ms, account.ms as number),
+								eq(thoughtsTable.tags, [' allTags']),
+							),
+						)
+						.orderBy(desc(thoughtsTable.ms));
+					if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
+					let allTagsRow = allTagsRows[0];
+					let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
+					account.allTags = allTags;
 					if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
-
 					// console.log('account:', account);
-
 					if (ctx.session) {
 						let sessionId = ctx.event.cookies.get('sessionId');
 						let [sMs] = (sessionId || '').split('-');
@@ -246,6 +295,97 @@ export const router = t.router({
 				},
 			),
 	}),
+	getAllTags: t.procedure
+		.input(
+			z.object({
+				callerMs: z.number(),
+				allTagsMs: z.number().optional(),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			verifyCaller(ctx, input.callerMs, 0);
+			let account = await getAccountByMs(input.callerMs);
+			if (!account.allTagsMs || account.allTagsMs === input.allTagsMs) return;
+			let allTagsRows = await tdb
+				.select()
+				.from(thoughtsTable)
+				.where(
+					and(
+						isNull(thoughtsTable.in_ms),
+						eq(thoughtsTable.by_ms, input.callerMs),
+						eq(thoughtsTable.tags, [' allTags']),
+					),
+				)
+				.orderBy(desc(thoughtsTable.ms));
+			if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
+			let allTagsRow = allTagsRows[0];
+			let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
+			return { allTags, allTagsMs: allTagsRow.ms! };
+		}),
+	updateAllTags: t.procedure
+		.input(
+			z.object({
+				callerMs: z.number(),
+				adding: z.array(z.string()),
+				removing: z.array(z.string()),
+			}),
+		)
+		.mutation(async ({ input, ctx }) => {
+			verifyCaller(ctx, input.callerMs, 0);
+			let now = Date.now();
+			let allTagsRows = await tdb
+				.select()
+				.from(thoughtsTable)
+				.where(
+					and(
+						isNull(thoughtsTable.in_ms),
+						eq(thoughtsTable.by_ms, input.callerMs),
+						eq(thoughtsTable.tags, [' allTags']),
+					),
+				)
+				.orderBy(desc(thoughtsTable.ms));
+			if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
+			let allTagsRow = allTagsRows[0];
+			let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
+			let removingSet = new Set(input.removing);
+			let newAllTags: string[] = sortUniArr([...allTags, ...input.adding]).filter(
+				(t) => !removingSet.has(t),
+			);
+
+			if (allTagsRow) {
+				await tdb
+					.update(thoughtsTable)
+					.set({
+						ms: now,
+						body: JSON.stringify(newAllTags),
+					})
+					.where(
+						and(
+							isNull(thoughtsTable.in_ms),
+							eq(thoughtsTable.by_ms, input.callerMs),
+							eq(thoughtsTable.tags, [' allTags']),
+						),
+					)
+					.returning();
+			} else {
+				await tdb.insert(thoughtsTable).values({
+					ms: now,
+					by_ms: input.callerMs,
+					body: JSON.stringify(newAllTags),
+					tags: [' allTags'],
+				});
+			}
+
+			let account = await getAccountByMs(input.callerMs);
+			await tdb
+				.update(thoughtsTable)
+				.set({
+					body: JSON.stringify({ ...account, allTagsMs: now } satisfies Account),
+				})
+				.where(filterAccountByMs(input.callerMs));
+
+			return { ms: now, allTags: newAllTags };
+		}),
 	addThought: t.procedure.input(ThoughtInsertSchema).mutation(
 		async ({
 			input: t,

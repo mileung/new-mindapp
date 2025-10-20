@@ -14,7 +14,7 @@ export let changeCurrentSpace = (inMs: number | '', noGo = false) => {
 	!noGo && goto(`/__${inMs}`);
 	localStorage.setItem('currentSpaceMs', '' + inMs);
 	updateLocalCache((lc) => {
-		lc.accounts[0].currentSpaceMs = inMs;
+		lc.currentSpaceMs = inMs;
 		return lc;
 	});
 };

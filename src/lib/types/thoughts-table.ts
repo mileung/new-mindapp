@@ -11,7 +11,7 @@ export let thoughtsTable = sqliteTable(
 		in_ms: integer('in_ms'),
 	},
 	(table) => [
-		// https://orm.drizzle.team/docs/indexes-letraints#composite-primary-key
+		// https://orm.drizzle.team/docs/indexes-constraints#composite-primary-key
 		primaryKey({
 			name: 'thought_id',
 			columns: [table.ms, table.by_ms, table.in_ms],

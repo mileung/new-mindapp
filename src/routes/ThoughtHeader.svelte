@@ -201,7 +201,7 @@
 			{#each authorTags as tag}
 				<!-- TODO: Why does using leading-4 cause parent to scroll? -->
 				<a
-					href={`/__${gs.accounts![0].currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+					href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
 					class="font-bold text-fg2 px-1 leading-5 hover:text-fg1"
 				>
 					{tag}

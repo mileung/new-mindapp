@@ -26,10 +26,12 @@ export async function createContext(event: RequestEvent) {
 		if (sessionRows.length > 1) throw new Error('Multiple sessions found');
 		let sessionRow = sessionRows[0];
 		let now = Date.now();
-		session = JSON.parse(sessionRow.body!);
+		try {
+			session = JSON.parse(sessionRow.body!);
+		} catch (error) {}
 		if (
 			now - sessionMs > week || //
-			session!.sessionCode !== sessionCode ||
+			session!.code !== sessionCode ||
 			!SessionSchema.safeParse(session).success ||
 			!(
 				sessionRow.tags?.length === 1 && //

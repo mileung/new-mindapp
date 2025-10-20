@@ -5,12 +5,17 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { unsaveTagInPersona } from '$lib/types/accounts';
-	import { updateLocalCache } from '$lib/types/local-cache';
+	import { trpc } from '$lib/trpc/client';
+	import {
+		getLatestAllTags,
+		unsaveTagInCurrentAccount,
+		updateLocalCache,
+	} from '$lib/types/local-cache';
 	import { changeCurrentSpace } from '$lib/types/spaces';
 	import { bracketRegex } from '$lib/types/thoughts';
 	import {
 		IconHelpSquareRounded,
+		IconLogout,
 		IconPuzzle,
 		IconSearch,
 		IconSettings,
@@ -56,16 +61,15 @@
 					if (accountMenuOpen || spaceMenuOpen) {
 						accountMenuOpen = spaceMenuOpen = false;
 					} else {
-						gs.writerMode
-							? (gs.writerMode = '')
-							: gs.accounts && goto(`/__${gs.accounts[0].currentSpaceMs}`);
+						gs.writerMode ? (gs.writerMode = '') : gs.accounts && goto(`/__${gs.currentSpaceMs}`);
 					}
 				}
 				if (e.metaKey && e.key === 'Tab' && gs.accounts) {
-					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.accounts[0].currentSpaceMs);
+					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.currentSpaceMs);
 					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
-					if (newSpaceMsIndex < 0) newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
-					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length) newSpaceMsIndex = 0;
+					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
+					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length)
+						newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
 					changeCurrentSpace(gs.accounts[0].spaceMss[newSpaceMsIndex]);
 				}
 			}
@@ -91,7 +95,7 @@
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts) {
 			page.state.modalId = undefined;
-			let urlPath = `/__${gs.accounts[0].currentSpaceMs}?q=${q}`;
+			let urlPath = `/__${gs.currentSpaceMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else goto(urlPath);
 		}
@@ -99,7 +103,7 @@
 
 	$effect(() => {
 		// console.log($inspect(gs.accounts?.[0]));
-		// console.log(gs.accounts[0]?.currentSpaceMs);
+		// console.log(gs.currentSpaceMs);
 		// console.log(gs.accounts[0]?.id);
 		// console.log($inspect(gs.accounts[0]?.spaceMss));
 		// console.log('page.url.pathname:', page.url.pathname);
@@ -144,7 +148,7 @@
 					{#if spaceMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else if gs.accounts}
-						<SpaceIcon id={`__${gs.accounts[0].currentSpaceMs}`} class="h-6 w-6" />
+						<SpaceIcon id={`__${gs.currentSpaceMs}`} class="h-6 w-6" />
 					{/if}
 				</button>
 			{/if}
@@ -161,7 +165,11 @@
 					if (e.key === 'Escape') setTimeout(() => searchIpt.blur(), 0);
 					if (e.key === 'Enter') {
 						let tag = suggestedTags[tagIndex];
-						xFocused ? unsaveTagInPersona(tag) : tag ? addTagToSearchInput(tag) : searchInput(e);
+						xFocused
+							? unsaveTagInCurrentAccount(tag)
+							: tag
+								? addTagToSearchInput(tag)
+								: searchInput(e);
 					}
 					if (e.key === 'Tab' && !tagFilter) return;
 					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
@@ -230,8 +238,8 @@
 						{#if allTagsSet.has(tag)}
 							<button
 								bind:this={unsaveTagXRefs[i]}
-								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 group-active/x:bg-bg8 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-								onclick={() => unsaveTagInPersona(tag)}
+								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+								onclick={() => unsaveTagInCurrentAccount(tag)}
 							>
 								<IconX class="h-5 w-5" />
 							</button>
@@ -244,26 +252,47 @@
 				onclick={() => (accountMenuOpen = false)}
 			>
 				{#each gs.accounts || [] as a, i (a.ms)}
-					<button
-						class={`fx min-h-10 h-10 px-2 gap-2 font-medium ${a.name ? '' : 'italic'} ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
-						onclick={() => {
-							page.params.id && goto(`/__${a.currentSpaceMs}`, {});
-							updateLocalCache((lc) => {
-								lc.accounts = [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)];
-								return lc;
-							});
-						}}
+					<div
+						class={`group/account flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}
+						onmousedown={(e) => e.preventDefault()}
 					>
-						{#if !i}
-							<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
+						<button
+							class={`fx min-h-10 h-10 px-2 gap-2 font-medium flex-1 ${a.name ? '' : 'italic'}`}
+							onclick={() => {
+								if (gs.accounts) {
+									updateLocalCache((lc) => {
+										lc.accounts = [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)];
+										return lc;
+									});
+									getLatestAllTags();
+								}
+							}}
+						>
+							{#if !i}
+								<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
+							{/if}
+							<div class="xy h-6 w-6">
+								<AccountIcon id={`_${a.ms}_`} class="h-6 w-6" />
+							</div>
+							{a.ms === '' ? m.anon() : a.name || identikana(a.ms)}
+						</button>
+						{#if a.ms}
+							<button
+								class={`${0 === i ? '' : 'pointer-fine:hidden'} group-hover/account:flex xy w-8 hover:bg-bg7 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+								onclick={async () => {
+									await trpc().auth.signOut.mutate(a.ms as number);
+									updateLocalCache((lc) => {
+										lc.accounts = [...lc.accounts.filter((acc) => acc.ms !== a.ms)];
+										return lc;
+									});
+								}}
+							>
+								<IconLogout class="h-5 w-5" />
+							</button>
 						{/if}
-						<div class="xy h-6 w-6">
-							<AccountIcon id={`_${a.ms}_`} class="h-6 w-6" />
-						</div>
-						{a.ms === '' ? m.anon() : a.name || identikana(a.ms)}
-					</button>
+					</div>
 				{/each}
-				<a href="/sign-in" class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5`}>
+				<a href="/sign-in" class={`fx min-h-10 h-10 px-2 gap-2 font-medium hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
@@ -286,10 +315,10 @@
 					<a
 						target="_blank"
 						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-						class="flex-1 fx h-12 px-2 gap-2"
+						class="flex-1 h-12 fx px-2 gap-2 font-medium leading-4.5"
 					>
 						<div class="w-6"><IconPuzzle /></div>
-						<p class="leading-4.5 font-medium">{m.addBrowserExtension()}</p>
+						{m.addBrowserExtension()}
 					</a>
 					<button
 						class="xy w-8"
@@ -301,51 +330,51 @@
 						<IconX class="h-5" />
 					</button>
 				</div>
-				{#each gs.accounts?.[0].spaceMss || [] as ms (ms)}
-					<a
-						href={`/__${ms}`}
-						class={`fx min-h-10 h-10 px-2 gap-2 ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
-						onclick={(e) => {
-							e.preventDefault();
-							changeCurrentSpace(ms);
-						}}
-					>
-						{#if ms === gs.accounts![0].currentSpaceMs}
-							<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
-						{/if}
-						<SpaceIcon id={`__${ms}`} class="h-6 w-6" />
-						<p class="font-medium">
+				{#if gs.accounts}
+					{#each gs.accounts[0].spaceMss || [] as ms (ms)}
+						<a
+							href={`/__${ms}`}
+							class={`fx min-h-10 h-10 px-2 gap-2 font-medium ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
+							onclick={(e) => {
+								e.preventDefault();
+								changeCurrentSpace(ms);
+							}}
+						>
+							{#if ms === gs.currentSpaceMs}
+								<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
+							{/if}
+							<SpaceIcon id={`__${ms}`} class="h-6 w-6" />
 							{ms === 0 ? m.personal() : ms === 1 ? m.global() : ms ? gs.spaces[ms]?.ms : m.local()}
-						</p>
-						<!-- {#if i === gs.accounts[0]?.currentSpaceMs}
+							<!-- {#if i === gs.currentSpaceMs}
 							<button class="text-fg2 hover:text-fg1 p-2">
-								{#if gs.spaces[gs.accounts[0]?.currentSpaceMs!]?.nested}
+								{#if gs.spaces[gs.currentSpaceMs!]?.nested}
 									<IconListTree />
 								{:else}
 									<IconList />
 								{/if}
 							</button>
 						{/if} -->
+						</a>
+					{/each}
+					<a
+						href="/add-space"
+						class={`fx min-h-10 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
+					>
+						<IconSquarePlus2 class="h-6 w-6" />
+						{m.addSpace()}
 					</a>
-				{/each}
-				<a
-					href="/add-space"
-					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
-				>
-					<IconSquarePlus2 class="h-6 w-6" />
-					{m.addSpace()}
-				</a>
+				{/if}
 				<div class="flex-1"></div>
 				<a
 					href="/user-guide"
-					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+					class={`fx min-h-10 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
 					<IconHelpSquareRounded class="h-6 w-6" />
 					{m.userGuide()}
 				</a>
 				<a
 					href="/settings"
-					class={`fx min-h-10 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
+					class={`fx min-h-10 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
 				>
 					<IconSettings class="h-6 w-6" />
 					{m.settings()}

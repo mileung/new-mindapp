@@ -6,7 +6,6 @@
 	import { m } from '$lib/paraglide/messages';
 	import { getLocalCache } from '$lib/types/local-cache';
 	import {
-		filterThought,
 		getId,
 		_getThoughtById,
 		ThoughtInsertSchema,
@@ -42,7 +41,7 @@
 		{#if !gs.accounts[0].ms}
 			<p>{m.anon()}</p>
 		{:else}
-			<p>{m.id()}: <span class="font-medium">_{gs.accounts[0].ms}_</span></p>
+			<p>{m.ms()}: <span class="font-medium">{gs.accounts[0].ms}</span></p>
 			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
 		{/if}
 	{/if}
@@ -142,6 +141,9 @@
 								console.timeEnd('import_time');
 								setAccountsAndSpaces();
 								gs.feeds = {};
+								if (await getLocalCache()) {
+									gs.invalidLocalCache = false;
+								}
 								alert(m.dataSuccessfullyMerged());
 							} else {
 								alert(m.invalidJsonFile());

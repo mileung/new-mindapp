@@ -4,7 +4,7 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { sortUniArr } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { updateLocalCache } from '$lib/types/local-cache';
+	import { updateAllTagsMs, updateLocalCache } from '$lib/types/local-cache';
 	import {
 		addThought,
 		bracketRegex,
@@ -31,6 +31,7 @@
 	import Highlight from './Highlight.svelte';
 	import ThoughtDrop from './ThoughtDrop.svelte';
 	import ThoughtWriter from './ThoughtWriter.svelte';
+	import { trpc } from '$lib/trpc/client';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
@@ -52,6 +53,7 @@
 			searchedText,
 		});
 	};
+	let localFeedId = makeFeedIdentifier('', '__', '');
 	let identifier = $derived(
 		gs.accounts && p.idParam
 			? makeFeedIdentifier(
@@ -61,6 +63,7 @@
 				)
 			: null,
 	);
+
 	let nested = $derived(true); // TODO: linear
 	let oldestFirst = $derived(false);
 	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
@@ -81,6 +84,13 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => window.removeEventListener('keydown', handler);
+	});
+
+	$effect(() => {
+		if (gs.writerMode === 'new' && gs.currentSpaceMs !== '' && !gs.accounts?.[0].ms) {
+			alert(m.signInToPostInThisSpace());
+			gs.writerMode = '';
+		}
 	});
 
 	let scrollToHighlight = () => {
@@ -246,13 +256,18 @@
 
 	let submitThought = async (tags: string[], body: string) => {
 		if (!gs.accounts || !identifier) return;
+		let allTagsCountBefore = gs.accounts[0].allTags.length;
 		await updateLocalCache((lc) => {
 			lc.accounts[0].allTags = sortUniArr([
-				...gs.accounts![0].allTags,
+				...lc.accounts![0].allTags,
 				...tags.filter((t) => t[0] !== ' '),
 			]);
 			return lc;
 		});
+		let allTagsCountAfter = gs.accounts[0].allTags.length;
+		if (allTagsCountBefore < allTagsCountAfter) {
+			await updateAllTagsMs({ adding: tags, removing: [] });
+		}
 
 		let thought: ThoughtNested;
 		if (gs.writerMode[0] === 'edit') {
@@ -274,7 +289,7 @@
 
 			// TODO: Come up with a ui/ux for saving thoughts locally
 		} else {
-			let inMs = gs.accounts[0]?.currentSpaceMs;
+			let inMs = gs.currentSpaceMs;
 			thought = {
 				by_ms: gs.accounts?.[0].ms || null,
 				in_ms: inMs === '' ? null : inMs,
@@ -286,11 +301,6 @@
 			try {
 				thought.ms = await addThought(thought, !inLocal);
 				if (!inLocal) await insertLocalThought(thought);
-				let localFeedId = makeFeedIdentifier('', '__', '');
-				gs.feeds[localFeedId] = [
-					getId(thought), //
-					...(gs.feeds[localFeedId]! || []),
-				];
 			} catch (error) {
 				console.log(error);
 				return alert(error);
@@ -300,8 +310,12 @@
 		gs.thoughts = { ...gs.thoughts, [tid]: thought };
 		if (nested && gs.writerMode[0] === 'to') {
 			gs.thoughts[gs.writerMode[1]]?.childIds?.unshift(tid);
-		} else if (gs.writerMode[0] !== 'edit') {
-			gs.feeds = { ...gs.feeds, [identifier]: [tid, ...gs.feeds[identifier]!] };
+		} else if (gs.writerMode === 'new') {
+			gs.feeds = {
+				...gs.feeds, //
+				[identifier]: [tid, ...gs.feeds[identifier]!],
+				[localFeedId]: [tid, ...(gs.feeds[localFeedId]! || [])],
+			};
 		}
 		gs.writerMode = '';
 		viewPostToastId = tid;

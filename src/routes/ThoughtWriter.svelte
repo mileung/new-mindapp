@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { unsaveTagInPersona } from '$lib/types/accounts';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { unsaveTagInCurrentAccount } from '$lib/types/local-cache';
 	import type { ThoughtSelect } from '$lib/types/thoughts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
@@ -140,7 +140,7 @@
 				} else setTimeout(() => tagsIpt.blur(), 0);
 			}
 			if (e.key === 'Enter') {
-				if (xFocused) unsaveTagInPersona(suggestedTags[tagIndex]);
+				if (xFocused) unsaveTagInCurrentAccount(suggestedTags[tagIndex]);
 				else e.metaKey ? submit() : addTag();
 			}
 			if (suggestingTags) {
@@ -207,7 +207,7 @@
 						<button
 							bind:this={unsaveTagXRefs[i]}
 							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-							onclick={() => unsaveTagInPersona(tag)}
+							onclick={() => unsaveTagInCurrentAccount(tag)}
 						>
 							<IconX class="h-5 w-5" />
 						</button>

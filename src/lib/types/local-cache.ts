@@ -1,14 +1,18 @@
+import { sortUniArr } from '$lib/js';
+import { trpc } from '$lib/trpc/client';
+import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { AccountSchema } from './accounts';
 import { gs } from '../global-state.svelte';
 import { gsdb } from '../local-db';
 import { m } from '../paraglide/messages';
+import { AccountSchema } from './accounts';
 import { SpaceSchema } from './spaces';
-import { filterThought, type ThoughtInsert } from './thoughts';
+import { type ThoughtInsert } from './thoughts';
 import { thoughtsTable } from './thoughts-table';
 
 export let LocalCacheSchema = z
 	.object({
+		currentSpaceMs: z.literal('').or(z.number()),
 		spaces: z.record(z.number(), SpaceSchema.optional()),
 		accounts: z.array(AccountSchema),
 	})
@@ -16,12 +20,12 @@ export let LocalCacheSchema = z
 
 export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
-export let defaultLocalCache: LocalCache = {
+let defaultLocalCache: LocalCache = {
+	currentSpaceMs: '',
 	spaces: {},
 	accounts: [
 		{
 			ms: '',
-			currentSpaceMs: '',
 			spaceMss: [
 				'', // local space id - everything local
 				0, // personal space id - everything private in cloud
@@ -39,9 +43,12 @@ let makeLocalCacheThoughtInsert = (localCache: LocalCache) =>
 		body: JSON.stringify(localCache),
 	}) satisfies ThoughtInsert;
 
-let localCacheRowFilter = filterThought({
-	tags: [' local-cache'],
-});
+let localCacheRowFilter = and(
+	isNull(thoughtsTable.ms),
+	isNull(thoughtsTable.by_ms),
+	isNull(thoughtsTable.in_ms),
+	eq(thoughtsTable.tags, [' local-cache']),
+);
 
 export async function getLocalCache() {
 	let [localCacheRow] = await (await gsdb())
@@ -56,7 +63,12 @@ export async function getLocalCache() {
 				.returning()
 		)[0];
 	}
-	let localCache: LocalCache = JSON.parse(localCacheRow.body!);
+	let localCache: LocalCache;
+	try {
+		localCache = JSON.parse(localCacheRow.body!);
+	} catch (error) {
+		throw new Error('Invalid localCache');
+	}
 
 	if (
 		!LocalCacheSchema.safeParse(localCache).success ||
@@ -76,10 +88,12 @@ export async function getLocalCache() {
 export async function updateLocalCache(updater: (old: LocalCache) => LocalCache) {
 	if (gs.accounts) {
 		let pseudoOldLC = {
+			currentSpaceMs: gs.currentSpaceMs,
 			accounts: gs.accounts,
 			spaces: gs.spaces,
 		} satisfies LocalCache;
 		let pseudoNewLC = updater(pseudoOldLC);
+		gs.currentSpaceMs = pseudoNewLC.currentSpaceMs;
 		gs.accounts = pseudoNewLC.accounts;
 		gs.spaces = pseudoNewLC.spaces;
 		// The above is to hide the delay of fetching the local cache
@@ -91,6 +105,7 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 			return window.alert(m.invalidLocalCacheUpdate());
 		}
 
+		gs.currentSpaceMs = newLocalCache.currentSpaceMs;
 		gs.accounts = newLocalCache.accounts;
 		gs.spaces = newLocalCache.spaces;
 		await (await gsdb())
@@ -103,3 +118,46 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 export async function deleteLocalCache() {
 	await (await gsdb()).delete(thoughtsTable).where(localCacheRowFilter);
 }
+
+export let unsaveTagInCurrentAccount = async (tag: string) => {
+	await updateLocalCache((lc) => {
+		lc.accounts[0].allTags = sortUniArr([...lc.accounts[0].allTags].filter((t) => t !== tag));
+		return lc;
+	});
+	await updateAllTagsMs({ adding: [], removing: [tag] });
+};
+
+export let updateAllTagsMs = async (update: { adding: string[]; removing: string[] }) => {
+	if (gs.accounts?.[0].ms) {
+		let res = await trpc().updateAllTags.mutate({
+			...update,
+			callerMs: gs.accounts[0].ms,
+		});
+		await updateLocalCache((lc) => {
+			lc.accounts[0].allTagsMs = res.ms;
+			let removingSet = new Set(update.removing);
+			lc.accounts[0].allTags = sortUniArr([...lc.accounts[0].allTags, ...update.adding]).filter(
+				(t) => !removingSet.has(t),
+			);
+			return lc;
+		});
+	}
+};
+
+export let getLatestAllTags = async () => {
+	if (gs.accounts?.[0].ms) {
+		let res = await trpc().getAllTags.query({
+			allTagsMs: gs.accounts[0].allTagsMs,
+			callerMs: gs.accounts[0].ms,
+		});
+		if (res) {
+			updateLocalCache((lc) => {
+				lc.accounts[0] = {
+					...lc.accounts[0],
+					...res,
+				};
+				return lc;
+			});
+		}
+	}
+};
