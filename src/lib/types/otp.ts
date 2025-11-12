@@ -5,6 +5,7 @@ export let OtpSchema = z
 		email: z.string(),
 		pin: z.string(),
 		strike: z.number(),
+		partCode: z.number(),
 	})
 	.strict();
 

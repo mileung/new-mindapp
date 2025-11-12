@@ -2,83 +2,101 @@
 	import { pushState } from '$app/navigation';
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { sortUniArr } from '$lib/js';
+	import { strIsInt } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { updateAllTagsMs, updateLocalCache } from '$lib/types/local-cache';
+	import { updateSavedTags, updateLocalCache } from '$lib/types/local-cache';
 	import {
-		addThought,
 		bracketRegex,
-		editThought,
-		getFeed,
 		getId,
-		getIds,
+		getToId,
 		idsRegex,
-		insertLocalThought,
-		overwriteLocalThought,
-		rootsPerLoad,
+		overwriteLocalPost,
 		splitId,
-		type ThoughtNested,
-	} from '$lib/types/thoughts';
+	} from '$lib/types/parts';
 	import {
 		IconChevronRight,
 		IconCornerUpLeft,
 		IconPencil,
 		IconPencilPlus,
+		IconClockUp,
 		IconX,
+		IconArchive,
+		IconMessage2Up,
+		IconListTree,
+		IconList,
+		IconSquareFilled,
+		IconMessage2Off,
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import Highlight from './Highlight.svelte';
-	import ThoughtDrop from './ThoughtDrop.svelte';
-	import ThoughtWriter from './ThoughtWriter.svelte';
-	import { trpc } from '$lib/trpc/client';
+	import PostBlock from './PostBlock.svelte';
+	import PostWriter from './PostWriter.svelte';
+	import { getCitedPostIds, getLastVersion, normalizeTags, type Post } from '$lib/types/posts';
+	import { getPostFeed, rootPostsPerLoad } from '$lib/types/posts/getPostFeed';
+	import { addPost } from '$lib/types/posts/addPost';
+	import { dev } from '$app/environment';
+	import { page } from '$app/state';
 
 	let byMssRegex = /(^|\s)\/_\d*_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
-	let lastRootLatestIdsWithSameMs: string[] = [];
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
 
 	let viewPostToastId = $state('');
 	let splitIdParam = $derived(splitId(p.idParam || ''));
-	let inLocal = $derived(splitIdParam.in_ms === '');
+	let inLocal = $derived(splitIdParam.in_ms === null);
 	$effect(() => {
 		if (gs.accounts) {
 			localStorage.setItem('callerMs', '' + gs.accounts[0].ms);
 		}
 	});
-	let makeFeedIdentifier = (callerMs: number | string, idParam: string, searchedText: string) => {
+	let makeFeedIdentifier = (callerMs: number | null, idParam: string, searchedText: string) => {
 		return JSON.stringify({
 			callerMs,
 			idParam,
 			searchedText,
 		});
 	};
-	let localFeedId = makeFeedIdentifier('', '__', '');
+	let localFeedId = makeFeedIdentifier(null, 'l_l_', '');
 	let identifier = $derived(
 		gs.accounts && p.idParam
 			? makeFeedIdentifier(
-					p.idParam !== '__' && p.idParam !== '__1' ? gs.accounts[0].ms : '',
+					p.idParam !== 'l_l_' && p.idParam !== 'l_l_1' ? gs.accounts[0].ms : null,
 					p.idParam,
 					p.searchedText,
 				)
-			: null,
+			: '',
 	);
 
-	let nested = $derived(true); // TODO: linear
-	let oldestFirst = $derived(false);
-	let spotId = $derived(p.idParam && p.idParam[0] !== '_' ? p.idParam : '');
+	let nested = $derived(page.url.searchParams.get('linear') === null);
+	let sortedBy = $derived.by<'updates' | 'new' | 'old'>(() => {
+		let params = page.url.searchParams;
+		let linear = params.get('linear') !== null;
+		if (params.get('new') !== null) return 'new';
+		if (params.get('old') !== null) return 'old';
+		return linear ? 'new' : 'updates';
+	});
+
+	let spotId = $derived(p.idParam && p.idParam[0] !== 'l' ? p.idParam : '');
 	let personalSpaceRequiresLogin = $derived(
-		splitIdParam.in_ms === '0' && //
-			gs.accounts?.[0].ms === '',
+		splitIdParam.in_ms === 0 && //
+			gs.accounts?.[0].ms === null,
 	);
 	let allowNewWriting = $derived(!p.modal && !personalSpaceRequiresLogin);
-
+	let timeGetPostFeed = dev;
 	onMount(() => {
+		if (timeGetPostFeed) gs.feeds = {};
 		const handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
-				if (e.key === 'n' && !gs.writerMode && allowNewWriting) {
+				if (
+					e.key === 'n' &&
+					!gs.writingNew &&
+					!gs.writingTo &&
+					!gs.writingEdit &&
+					allowNewWriting
+				) {
 					e.preventDefault();
-					gs.writerMode = 'new';
+					gs.writingNew = true;
 				}
 			}
 		};
@@ -87,14 +105,14 @@
 	});
 
 	$effect(() => {
-		if (gs.writerMode === 'new' && gs.currentSpaceMs !== '' && !gs.accounts?.[0].ms) {
+		if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
 			alert(m.signInToPostInThisSpace());
-			gs.writerMode = '';
+			gs.writingNew = gs.writingTo = gs.writingEdit = false;
 		}
 	});
 
 	let scrollToHighlight = () => {
-		let id = spotId || gs.writerMode[1];
+		let id = spotId || getId(gs.writingEdit || gs.writingTo || {});
 		let e =
 			document.querySelector('#m' + id) || //
 			document.querySelector('.m' + id);
@@ -105,40 +123,36 @@
 		return (input?.match(bracketRegex) || []).map((match) => match.slice(1, -1));
 	};
 
-	let loadMoreThoughts = async (e: InfiniteEvent) => {
+	let loadMorePosts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
 		// console.log(
-		// 	'loadMoreThoughts:',
+		// 	'loadMorePosts:',
 		// 	identifier,
 		// 	// $state.snapshot(gs.feeds[identifier]),
-		// 	// $state.snapshot(gs.thoughts),
+		// 	// $state.snapshot(gs.posts),
 		// );
 
+		// TODO: load locally saved postIds and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
+
 		if (!gs.accounts || !identifier || !p.idParam || personalSpaceRequiresLogin) return;
-
-		let fromMs = gs.feeds[identifier]?.slice(-1)[0];
-		if (fromMs === null) return e.detail.complete();
-		fromMs = typeof fromMs === 'number' ? fromMs : oldestFirst ? 0 : Number.MAX_SAFE_INTEGER;
-
-		// while (!gs.accounts) await new Promise((res) => setTimeout(res, 42));
-
-		// TODO: load locally saved roots and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a thought via the extension
-		let thoughts: Awaited<ReturnType<typeof getFeed>>;
-		let strIsNum = (s: string) => /^\d+$/.test(s);
-		// let mssInclude: ('' | number)[] = [ms === '' ? '' : +ms];
-		// let byMssInclude: ('' | number)[] = [by_ms === '' ? '' : +by_ms];
-		let inMsIsNum = strIsNum(splitIdParam.in_ms);
-		if (!inMsIsNum && splitIdParam.in_ms !== '') throw new Error('Invalid in_ms');
+		let lastPostId = (gs.feeds[identifier] || []).slice(-1)[0];
+		if (lastPostId === null) return e.detail.complete();
+		let feedPostIds = (gs.feeds[identifier] as string[]) || [];
+		let lastPostMs = lastPostId ? splitId(lastPostId).ms! : null;
+		let fromMs =
+			lastPostMs || sortedBy === 'old' //
+				? 0
+				: Number.MAX_SAFE_INTEGER;
+		// let mssInclude: ('' | number)[] = [ms === null ? '' : +ms];
+		// let byMssInclude: ('' | number)[] = [by_ms === null ? '' : +by_ms];
+		if (Number.isNaN(splitIdParam.in_ms)) throw new Error('Invalid in_ms');
+		let inMssInclude = splitIdParam.in_ms === null ? [] : [splitIdParam.in_ms];
+		// console.log('inMssInclude:', inMssInclude);
 
 		let callerMs = gs.accounts[0].ms || undefined;
-		// console.log('callerMs:', callerMs);
-		let inMssInclude = [...(inMsIsNum ? [+splitIdParam.in_ms] : [])];
-		// console.log('inMssInclude:', inMssInclude);
-		// mssInclude,
-		// byMssInclude,
-
+		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
 		if (spotId) {
-			thoughts = await getFeed({
+			postFeed = await getPostFeed({
 				useRpc: !inLocal,
 				callerMs,
 				nested,
@@ -148,7 +162,7 @@
 			});
 		} else {
 			// TODO: Instead of set theory, implement tag groups
-			let ids = getIds(p.searchedText);
+			let citedIds = getCitedPostIds(p.searchedText);
 			let tagsInclude = getTags(p.searchedText);
 			let byMssInclude = p.searchedText.match(byMssRegex)?.map((a) => +a.slice(1));
 			let searchedTextNoTagsOrAuthors = p.searchedText
@@ -157,9 +171,9 @@
 			let quotes = (searchedTextNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
 				match.slice(1, -1),
 			);
-			let bodyIncludes = [
+			let txtIncludes = [
 				...quotes,
-				...ids,
+				...citedIds,
 				...searchedTextNoTagsOrAuthors
 					.replace(quoteRegex, ' ')
 					.replace(idsRegex, ' ')
@@ -168,26 +182,16 @@
 					.map((s) => s.toLowerCase()),
 			];
 
-			let bumpedIdsOlderThanFromMs = oldestFirst
-				? []
-				: (
-						(gs.feeds[identifier] || []).filter((i) => {
-							if (typeof i !== 'string') return false;
-							let segs = splitId(i);
-							return +segs.ms < fromMs;
-						}) as string[]
-					).flatMap((i) => {
-						let ids: string[] = [];
-						let traverse = (i: string) => {
-							let segs = splitId(i);
-							+segs.ms < fromMs && ids.push(i);
-							gs.thoughts[i]?.childIds?.forEach((i) => traverse(i));
-						};
-						traverse(i);
-						return ids;
-					});
+			let lastRootLatestIdsWithSameMs: string[] = [lastPostId];
+			for (let i = feedPostIds.length - 2; i >= 0; i--) {
+				let id = feedPostIds[i];
+				if (splitId(id).ms === lastPostMs) {
+					lastRootLatestIdsWithSameMs.push(id);
+				} else break;
+			}
 
-			thoughts = await getFeed({
+			timeGetPostFeed && console.time('getPostFeed');
+			postFeed = await getPostFeed({
 				useRpc: !inLocal,
 				callerMs,
 				nested,
@@ -195,135 +199,166 @@
 				inMssInclude,
 				byMssInclude,
 				tagsInclude,
-				bodyIncludes,
-				idsExclude: [
-					// TODO: if oldestFirst, exclude the newest root ids with the same ms
-					...lastRootLatestIdsWithSameMs,
-					...bumpedIdsOlderThanFromMs,
-				],
+				txtIncludes,
+				idsExclude: [...lastRootLatestIdsWithSameMs],
 			});
+			timeGetPostFeed && console.timeEnd('getPostFeed');
 		}
-		let { roots, auxThoughts } = thoughts;
-		// console.log('thoughts:', thoughts);
-		let newThoughts: typeof gs.thoughts = {};
-		let lastRoot = roots.slice(-1)[0] as undefined | ThoughtNested;
-		let newFromMs = lastRoot?.ms;
-		let endReached = roots.length < rootsPerLoad;
-		let lastRootNestedIds: Record<number, string[]> = {};
+		let { postIds, postMap } = postFeed;
+		// console.log('postFeed:', postFeed);
 
-		let traverse = (t: ThoughtNested, rootId: string, helpGetNewFromMs = false) => {
-			let id = getId(t);
-			if (helpGetNewFromMs) {
-				lastRootNestedIds[t.ms!] = (lastRootNestedIds[t.ms!] || []).concat(id);
+		let postMapEntries = Object.entries(postMap);
+		for (let i = 0; i < postMapEntries.length; i++) {
+			let [id, post] = postMapEntries[i];
+			postMap[id].subIds = postMap[id].subIds || [];
+			// postMap[id].citeCount = postMap[id].citeCount || 0;
+			// postMap[id].replyCount = postMap[id].replyCount || 0;
+			let lastVersion = getLastVersion(postMap[id]);
+			postMap[id].history[lastVersion].tags = postMap[id].history[lastVersion].tags || [];
+			postMap[id].history[lastVersion].tags.sort();
+			// postMap[id].reactCount = postMap[id].reactCount || 0;
+			let toId = getToId(post);
+			if (toId) {
+				postMap[toId].subIds = postMap[toId].subIds || [];
+				postMap[toId].subIds.push(id);
 			}
-			for (let child of t.children || []) {
-				traverse(child, rootId, helpGetNewFromMs);
-			}
-			t.childIds =
-				t.children?.map((t) => {
-					let id = getId(t);
-					newThoughts[id] = t;
-					return id;
-				}) || [];
-			delete t.children;
-		};
-		roots.forEach((t, i) => {
-			let rootId = getId(t);
-			traverse(t, rootId, !endReached && !oldestFirst && i === roots.length - 1);
-			newThoughts[rootId] = t;
-		});
-		if (!oldestFirst) {
-			newFromMs = +Object.keys(lastRootNestedIds).sort((a, b) => +a - +b)[0];
-			lastRootLatestIdsWithSameMs = lastRootNestedIds[newFromMs] || [];
 		}
-		// console.log('gs.thoughts:', $state.snapshot(gs.thoughts));
-		// console.log('auxThoughts:', auxThoughts);
-		gs.thoughts = {
-			...auxThoughts,
-			// TODO: deep merge gs.thoughts with auxThoughts
-			// Sometimes auxThoughts will overwrite a thought is gs.thoughts, but auxThoughts don't have children - which is why auxThoughts goes above gs.thoughts - so to not delete the childIds in gs.thoughts
-			...gs.thoughts,
-			...newThoughts,
-		};
-		let newRootIds = roots.map(getId);
+		for (let i = 0; i < postMapEntries.length; i++) {
+			let [id] = postMapEntries[i];
+			postMap[id].subIds!.sort((a, b) => splitId(b).ms! - splitId(a).ms!);
+		}
+
+		let endReached = postIds.length < rootPostsPerLoad;
+		gs.posts = { ...gs.posts, ...postMap };
 		gs.feeds[identifier] = [
-			...((gs.feeds[identifier]?.slice(0, gs.feeds[identifier].length - 1) || []) as string[]),
-			...newRootIds,
-			endReached ? null : newFromMs!,
+			...(gs.feeds[identifier] || []),
+			...postIds,
+			...(endReached ? [null] : []),
 		];
 		endReached ? e.detail.complete() : e.detail.loaded();
 	};
 
-	let submitThought = async (tags: string[], body: string) => {
+	let submitPost = async (tags: string[], body: string) => {
 		if (!gs.accounts || !identifier) return;
-		let allTagsCountBefore = gs.accounts[0].allTags.length;
+		let savedTagsCountBefore = gs.accounts[0].savedTags.length;
 		await updateLocalCache((lc) => {
-			lc.accounts[0].allTags = sortUniArr([
-				...lc.accounts![0].allTags,
-				...tags.filter((t) => t[0] !== ' '),
-			]);
+			lc.accounts[0].savedTags = normalizeTags([...lc.accounts![0].savedTags, ...tags]);
 			return lc;
 		});
-		let allTagsCountAfter = gs.accounts[0].allTags.length;
-		if (allTagsCountBefore < allTagsCountAfter) {
-			await updateAllTagsMs({ adding: tags, removing: [] });
+		let savedTagsCountAfter = gs.accounts[0].savedTags.length;
+		if (savedTagsCountBefore < savedTagsCountAfter) {
+			// await updateSavedTags({ adding: tags, removing: [] });
 		}
 
-		let thought: ThoughtNested;
-		if (gs.writerMode[0] === 'edit') {
-			thought = {
-				childIds: [],
-				...gs.thoughts[gs.writerMode[1]],
-				tags,
-				body,
+		let post: Post;
+		if (gs.writingEdit) {
+			let postBeingEdited = gs.posts[getId(gs.writingEdit)]!;
+			post = {
+				...postBeingEdited,
+				history: { ...postBeingEdited.history },
 			};
-			let updateInCloud = async () => {
-				thought.tags = await editThought(thought, true);
-				await overwriteLocalThought(thought);
-			};
-			if (inLocal) {
-				Number.isInteger(thought.in_ms)
-					? updateInCloud()
-					: (thought.tags = await editThought(thought, false));
-			} else updateInCloud();
-
-			// TODO: Come up with a ui/ux for saving thoughts locally
+			// let updateInCloud = async () => {
+			// 	post.tags = await editPost(post, true);
+			// 	await overwriteLocalPost(post);
+			// };
+			// if (inLocal) {
+			// 	Number.isInteger(post.in_ms) ? updateInCloud() : (post.tags = await editPost(post, false));
+			// } else updateInCloud();
 		} else {
-			let inMs = gs.currentSpaceMs;
-			thought = {
-				by_ms: gs.accounts?.[0].ms || null,
-				in_ms: inMs === '' ? null : inMs,
-				to_id: gs.writerMode[0] === 'to' ? gs.writerMode[1] : null,
-				tags: tags.length ? sortUniArr(tags) : null,
-				body: body.trim() || null,
-				childIds: [],
+			post = {
+				...(gs.writingTo
+					? {
+							to_ms: gs.writingTo.ms,
+							to_by_ms: gs.writingTo.by_ms,
+							to_in_ms: gs.writingTo.in_ms,
+						}
+					: {}),
+				by_ms: gs.accounts[0].ms,
+				in_ms: gs.currentSpaceMs,
+				history: {
+					0: {
+						ms: -1,
+						tags: normalizeTags(tags),
+						body: body,
+					},
+				},
 			};
 			try {
-				thought.ms = await addThought(thought, !inLocal);
-				if (!inLocal) await insertLocalThought(thought);
+				// console.log('post:', post);
+				post.ms = (await addPost(post, !inLocal)).ms;
+				post.subIds = [];
+				// post.citeCount = 0;
+				// post.replyCount = 0;
+				// if (!inLocal) await addPost(post, false);
 			} catch (error) {
 				console.log(error);
 				return alert(error);
 			}
 		}
-		let tid = getId(thought);
-		gs.thoughts = { ...gs.thoughts, [tid]: thought };
-		if (nested && gs.writerMode[0] === 'to') {
-			gs.thoughts[gs.writerMode[1]]?.childIds?.unshift(tid);
-		} else if (gs.writerMode === 'new') {
+
+		// let lastVersion = getLastVersion(post);
+		// let currentCitedPostIds = getCitedPostIds(post.history[lastVersion].body || '');
+
+		// TODO: inc/dec tag count
+
+		// if (!lastVersion) {
+		// 	for (let i = 0; i < currentCitedPostIds.length; i++) {
+		// 		let postId = currentCitedPostIds[i];
+		// 		gs.posts[postId]!.citeCount!++;
+		// 	}
+		// } else {
+		// 	let previousCitedPostIds = getCitedPostIds(post.history[lastVersion - 1].body || '');
+		// 	for (let i = 0; i < previousCitedPostIds.length; i++) {
+		// 		let postId = previousCitedPostIds[i];
+		// 		if (!currentCitedPostIds.includes(postId)) {
+		// 			gs.posts[postId]!.citeCount!--;
+		// 		}
+		// 	}
+		// 	for (let i = 0; i < currentCitedPostIds.length; i++) {
+		// 		let postId = currentCitedPostIds[i];
+		// 		if (!previousCitedPostIds.includes(postId)) {
+		// 			gs.posts[postId]!.citeCount!++;
+		// 		}
+		// 	}
+		// }
+
+		let postId = getId(post);
+		gs.posts = { ...gs.posts, [postId]: post };
+		if (gs.writingTo) {
+			let toPostId = getToId(post);
+			nested && gs.posts[toPostId!]!.subIds!.unshift(postId);
+			// gs.posts[toPostId!]!.replyCount!++;
+		} else if (gs.writingNew) {
 			gs.feeds = {
-				...gs.feeds, //
-				[identifier]: [tid, ...gs.feeds[identifier]!],
-				[localFeedId]: [tid, ...(gs.feeds[localFeedId]! || [])],
+				...gs.feeds,
+				[identifier]: [postId, ...gs.feeds[identifier]!],
+				[localFeedId]: [postId, ...(gs.feeds[localFeedId]! || [])],
 			};
 		}
-		gs.writerMode = '';
-		viewPostToastId = tid;
-		setTimeout(() => (viewPostToastId = ''), 3000);
+		if (gs.writingNew || gs.writingTo) {
+			viewPostToastId = postId;
+			setTimeout(() => (viewPostToastId = ''), 3000);
+		}
+		gs.writingNew = gs.writingTo = gs.writingEdit = false;
+	};
+
+	let makeParams = (newNested: boolean, newSortedBy: 'updates' | 'new' | 'old') => {
+		let view = newNested ? '' : 'linear';
+		if (!newNested && newSortedBy === 'updates') newSortedBy = 'new';
+		if (!nested && newNested && newSortedBy === 'new') newSortedBy = 'updates';
+		let s = newNested
+			? newSortedBy === 'updates'
+				? ''
+				: newSortedBy //
+			: newSortedBy === 'new'
+				? ''
+				: newSortedBy;
+		let queryParams = `?${view}${view && s ? '&' : ''}${s}`;
+		return queryParams === '?' ? page.url.pathname : queryParams;
 	};
 
 	let feed = $derived(
-		gs.feeds[identifier || '']?.map((tid) => gs.thoughts[tid || '']).filter((t) => !!t),
+		gs.feeds[identifier]?.map((postId) => gs.posts[postId || 0]).filter((t) => !!t),
 	);
 
 	let scrolledToSpotId = $state(false);
@@ -339,7 +374,7 @@
 >
 	{#if !!gs.accounts && personalSpaceRequiresLogin}
 		<div class="h-screen xy fy gap-2">
-			<p class="text-2xl sm:text-3xl font-black">{m.signInToUseThisSpace()}</p>
+			<p class="text-2xl font-black">{m.signInToUseThisSpace()}</p>
 			<a
 				href="/sign-in"
 				class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
@@ -348,16 +383,52 @@
 				<IconChevronRight class="h-5" stroke={3} />
 			</a>
 		</div>
-	{:else if p.idParam === '__' && !p.searchedText && feed && !feed.length}
+	{:else if p.idParam === 'l_l_' && !p.searchedText && feed && !feed.length}
 		welcome
 	{:else}
-		{#each feed || [] as thought (getId(thought))}
-			<ThoughtDrop {...p} {nested} {thought} depth={0} />
+		<div class="flex min-h-9 text-fg2">
+			<a
+				href={makeParams(true, sortedBy)}
+				class={`fx pr-1.5 hover:text-fg1 ${nested ? 'text-fg1' : ''}`}
+			>
+				<IconListTree stroke={2.5} class="h-4" />Nested
+			</a>
+			<a
+				href={makeParams(false, sortedBy)}
+				class={`fx pr-1.5 hover:text-fg1 ${!nested ? 'text-fg1' : ''}`}
+			>
+				<IconList stroke={2.5} class="h-4" />Linear
+			</a>
+			<div class="xy mr-0.5">
+				<IconSquareFilled class="h-1.5 w-1.5" />
+			</div>
+			<a
+				href={makeParams(nested, 'updates')}
+				class={`${nested ? '' : 'inv isible'} relative fx pr-1.5 hover:text-fg1 ${sortedBy === 'updates' || (sortedBy === 'new' && !nested) ? 'text-fg1' : ''}`}
+			>
+				<IconMessage2Up stroke={2.5} class="h-4" />
+				Updates
+			</a>
+			<a
+				href={makeParams(nested, 'new')}
+				class={`fx pr-1.5 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
+			>
+				<IconClockUp stroke={2.5} class="h-4" />New
+			</a>
+			<a
+				href={makeParams(nested, 'old')}
+				class={`fx pr-1.5 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
+			>
+				<IconArchive stroke={2.5} class="h-4" />Old
+			</a>
+		</div>
+		{#each feed || [] as post (getId(post))}
+			<PostBlock {...p} {nested} {post} depth={0} />
 		{/each}
-		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreThoughts}>
+		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
 			<p slot="noResults" class="m-2 text-xl text-fg2">
-				<!-- TODO: noResults shows after deleting the one and only thought then making another new thought in Local  -->
-				{feed?.length ? m.endOfFeed() : m.noThoughtsFound()}
+				<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
+				{feed?.length ? m.endOfFeed() : m.noPostsFound()}
 			</p>
 			<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
 			<p slot="error" class="m-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
@@ -365,7 +436,7 @@
 	{/if}
 	{#if p.modal}
 		<a
-			href={`/__${splitId(spotId).in_ms}`}
+			href={`/l_l_${splitId(spotId).in_ms}`}
 			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
 		>
 			<IconX class="w-8" />
@@ -373,38 +444,45 @@
 	{:else if allowNewWriting}
 		<button
 			class="z-50 fixed xy right-1 text-black bottom-1 h-9 w-9 bg-hl1 hover:bg-hl2"
-			onclick={() => (gs.writerMode = 'new')}
+			onclick={() => (gs.writingNew = true)}
 		>
 			<IconPencilPlus class="h-9" />
 		</button>
 	{/if}
 
-	{#if gs.writerMode}
+	{#if gs.writingNew || gs.writingTo || gs.writingEdit}
 		<div class="flex-1"></div>
 		<div class="sticky bottom-0 z-50">
 			<div class="flex group bg-bg4 relative w-full">
-				<!-- TODO: save writer data so it persists after page refresh. If the thought it's editing or linking to is not on the feed, open it in a modal? -->
+				<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
 				<button class="truncate flex-1 h-8 pl-2 text-left fx gap-1" onclick={scrollToHighlight}>
-					{#if gs.writerMode[0] === 'to'}
+					{#if gs.writingTo}
 						<IconCornerUpLeft class="w-5" />
-					{:else if gs.writerMode === 'new'}
+					{:else if gs.writingNew}
 						<IconPencilPlus class="w-5" />
 					{:else}
 						<IconPencil class="w-5" />
 					{/if}
 					<p class="flex-1 truncate">
-						{gs.writerMode === 'new' ? m.newPost() : gs.thoughts[gs.writerMode[1]]!.body}
+						{gs.writingNew
+							? m.newPost()
+							: gs.posts[
+									gs.writingTo ? getId(gs.writingTo) : gs.writingEdit ? getId(gs.writingEdit) : ''
+									// TODO: get latest revision
+								]!.history[0].body}
 					</p>
 				</button>
 				<button
 					class="w-8 xy text-fg2 hover:bg-bg5 hover:text-fg1"
-					onclick={() => (gs.writerMode = '')}
+					onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = false)}
 				>
 					<IconX class="w-5" />
 				</button>
-				<Highlight id={gs.writerMode !== 'new' ? gs.writerMode[1] : ''} />
+				<Highlight
+					id={gs.writingTo ? getId(gs.writingTo) : gs.writingEdit ? getId(gs.writingEdit) : ''}
+				/>
 			</div>
-			<ThoughtWriter onSubmit={submitThought} />
+			<PostWriter onSubmit={submitPost} />
 		</div>
 	{/if}
 	{#if viewPostToastId}

@@ -2,15 +2,16 @@
 	import { pushState } from '$app/navigation';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { getId, type ThoughtNested } from '$lib/types/thoughts';
+	import { getId } from '$lib/types/parts';
 	import { IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import BodyParser from './BodyParser.svelte';
 	import Highlight from './Highlight.svelte';
-	import Self from './ThoughtDrop.svelte';
-	import ThoughtHeader from './ThoughtHeader.svelte';
+	import Self from './PostBlock.svelte';
+	import PostHeader from './PostHeader.svelte';
+	import { getLastVersion, type Post } from '$lib/types/posts';
 
 	let p: {
-		thought: ThoughtNested;
+		post: Post;
 		nested?: boolean;
 		depth: number;
 		boldTags?: string[];
@@ -19,11 +20,14 @@
 	let container: HTMLDivElement;
 	let open = $state(true);
 	let parsed = $state(true);
-	let id = $derived(getId(p.thought));
-	let toThought = $derived(gs.thoughts[p.thought.to_id || '']);
+	let id = $derived(getId(p.post));
+	// let toPost = $derived(gs.posts[p.post.toId || '']);
 	let evenBg = $derived(!(p.depth % 2));
-	let deleted = $derived(p.thought.tags?.[0] === ' deleted');
-	let deletedToThought = $derived(toThought?.tags?.[0] === ' deleted');
+	// let deleted = $derived(p.post.tags?.[0] === ' deleted');
+	// let deletedToPost = $derived(toPost?.tags?.[0] === ' deleted');
+	let latestVersion = $derived(getLastVersion(p.post));
+	let version = $state((() => latestVersion)());
+	let { tags, body } = $derived(p.post.history[version]);
 </script>
 
 <div bind:this={container} id={'m' + id} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
@@ -48,17 +52,17 @@
 		</button>
 	{/if}
 	<div class={`bg-inherit flex-1 ${p.nested ? 'max-w-[calc(100%-1.25rem)]' : 'px-2'}`}>
-		<div class="relative bg-inherit pb-1">
+		<div class={`relative bg-inherit ${open ? 'pb-2' : ''}`}>
 			<div class="z-10 sticky top-0 bg-inherit">
-				{#if !p.nested && p.thought.to_id}
+				<!-- {#if !p.nested && p.post.toId}
 					<div class="relative fx">
 						<a
-							href={'/' + p.thought.to_id}
+							href={'/' + p.post.toId}
 							class="group fx gap-0.5 text-sm hover:text-fg3 truncate"
 							onclick={(e) => {
 								if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 									e.preventDefault();
-									pushState('/' + p.thought.to_id, { modalId: p.thought.to_id! });
+									pushState('/' + p.post.toId, { modalId: p.post.toId! });
 								}
 							}}
 						>
@@ -66,46 +70,53 @@
 								class="self-end h-2.5 w-2.5 mt-1.5 border-t-2 border-l-2 border-fg2 group-hover:border-fg1"
 							></div>
 							<p
-								class={`flex-1 truncate ${deletedToThought ? 'text-fg2 font-bold italic text-xs' : ''}`}
+								class={`flex-1 truncate ${deletedToPost ? 'text-fg2 font-bold italic text-xs' : ''}`}
 							>
-								{deletedToThought ? m.deleted() : toThought?.body || p.thought.to_id}
+								{deletedToPost ? m.deleted() : toPost?.txt || p.post.toId}
 							</p>
 						</a>
 						<button
 							class="flex-1 fx justify-end text-fg2 hover:text-fg1"
 							onclick={() =>
-								(gs.writerMode =
-									gs.writerMode[0] === 'to' && gs.writerMode[1] === p.thought.to_id
+								(gs.writingTo =
+									gs.writingTo && getId(gs.writingTo) === getId(p.post.toId)
 										? ''
-										: ['to', p.thought.to_id!])}
+										: ['to', p.post.toId!])}
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
-						<Highlight id={p.thought.to_id} class="-left-2" />
+						<Highlight id={p.post.toId} class="-left-2" />
 					</div>
-				{/if}
-				<ThoughtHeader {...p} {parsed} onToggleParsed={() => (parsed = !parsed)} />
+				{/if} -->
+				<PostHeader
+					{...p}
+					{parsed}
+					onToggleParsed={() => (parsed = !parsed)}
+					{latestVersion}
+					{version}
+					onChangeVersion={(v) => (version = v)}
+				/>
 			</div>
-			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.thought.to_id ? 'top-6' : ''}`} />
+			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.post.to_ms ? 'top-6' : ''}`} />
 			<div class={open ? 'pr-1' : 'hidden'}>
-				{#if p.thought.body}
+				{#if body}
 					{#if parsed}
-						<BodyParser {...p} />
+						<BodyParser {body} depth={p.depth} />
 					{:else}
-						<p class="whitespace-pre-wrap break-all font-thin font-mono">{p.thought.body}</p>
+						<p class="whitespace-pre-wrap break-all font-thin font-mono">{body}</p>
 					{/if}
-				{:else if !p.thought.body}
-					<p class={`${deleted ? 'text-fg2 font-bold' : 'text-bg8 font-black'} italic text-xs`}>
-						{!p.thought.tags?.length ? m.blank() : deleted ? m.deleted() : ''}
-					</p>
+				{:else if !body}
+					<!-- <p class={`${deleted ? 'text-fg2 font-bold' : 'text-bg8 font-black'} italic text-xs`}>
+						{!p.post.tags?.length ? m.blank() : deleted ? m.deleted() : ''}
+					</p> -->
 				{/if}
 			</div>
 		</div>
-		{#if p.nested && p.thought.childIds?.length}
+		{#if p.nested && p.post.subIds?.length}
 			<div class={open ? '' : 'hidden'}>
-				{#each p.thought.childIds as id}
-					{#if gs.thoughts[id]}
-						<Self {...p} depth={p.depth + 1} thought={gs.thoughts[id]} />
+				{#each p.post.subIds as id}
+					{#if gs.posts[id]}
+						<Self {...p} depth={p.depth + 1} post={gs.posts[id]} />
 					{/if}
 				{/each}
 			</div>

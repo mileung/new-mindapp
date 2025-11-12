@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { gs } from '$lib/global-state.svelte';
 	import { isStringifiedRecord } from '$lib/js';
-	import { idsRegex, type ThoughtInsert } from '$lib/types/thoughts';
-	import CitedThought from './CitedThought.svelte';
+	import { idsRegex, type PartInsert } from '$lib/types/parts';
+	import type { Post } from '$lib/types/posts';
+	import CitedPost from './CitedPost.svelte';
 	import Markdown from './Markdown.svelte';
-	import MiniCitedThought from './MiniCitedThought.svelte';
+	import MiniCitedPost from './MiniCitedPost.svelte';
 
 	let p: {
-		thought: ThoughtInsert;
+		body: string;
 		depth: number;
 		miniCites?: boolean;
 	} = $props();
@@ -23,7 +24,7 @@
 		start < text.length && result.push(text.substring(start));
 		return result.map((s) => s.trim());
 	}
-	let bodySegs = $derived(separateMentions(p.thought.body || ''));
+	let bodySegs = $derived(separateMentions(p.body));
 	// $effect(() => {
 	// 	console.log(bodySegs);
 	// });
@@ -32,9 +33,9 @@
 {#each bodySegs as str, i}
 	{#if i % 2}
 		{#if p.miniCites}
-			<MiniCitedThought {...p} id={str} depth={p.depth + 1} />
-		{:else if gs.thoughts[str]}
-			<CitedThought {...p} thought={gs.thoughts[str]} depth={p.depth + 1} />
+			<MiniCitedPost {...p} id={str} depth={p.depth + 1} />
+		{:else if gs.posts[str]}
+			<CitedPost {...p} post={gs.posts[str]} depth={p.depth + 1} />
 		{:else}
 			<p>{str}</p>
 		{/if}

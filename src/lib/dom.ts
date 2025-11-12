@@ -7,6 +7,7 @@ export function scrape(externalUrl: string, externalDomString: string) {
 		string,
 		undefined | (() => { headline?: string; tags?: string[]; url?: string })
 	> = {
+		// TODO: IMDB for Movie genres https://www.imdb.com/title/tt1877832/
 		'www.perplexity.ai': () => {
 			return { headline: externalDom.querySelector('h1')?.innerText };
 		},
@@ -95,6 +96,7 @@ export function scrape(externalUrl: string, externalDomString: string) {
 			let url = externalUrl.slice(0, endI);
 			return { headline, url };
 		},
+		// TODO: make a better url matcher. Saving search results doesn't save title as expected, only when you're on a item page
 		'www.ebay.com': () => {
 			let headline = externalDom.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
 			let endI = Math.min(

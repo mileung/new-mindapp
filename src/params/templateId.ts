@@ -1,6 +1,7 @@
-import { isId } from '$lib/types/thoughts';
+// import { isTemplateId } from '$lib/types/parts';
 import type { ParamMatcher } from '@sveltejs/kit';
 
 export const match = ((param: string) => {
-	return isId(param);
+	// return isTemplateId(param);
+	return true;
 }) satisfies ParamMatcher;

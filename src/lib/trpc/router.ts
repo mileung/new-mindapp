@@ -1,56 +1,196 @@
 import { dev } from '$app/environment';
-import { sortUniArr } from '$lib/js';
-import { tdb } from '$lib/server/db';
+
+import { m } from '$lib/paraglide/messages';
+import { tdb, tdbDeleteNodesWhere, tdbNodesWhere, tdbUpdateNodes } from '$lib/server/db';
 import type { Context } from '$lib/trpc/context';
-import { AccountSchema, filterAccountByMs, type Account } from '$lib/types/accounts';
-import { OtpSchema, type Otp } from '$lib/types/otp';
+import { AccountSchema, type Account } from '$lib/types/accounts';
 import {
-	makeSessionId,
-	makeSessionRowFilter,
-	makeSessionRowInsert,
-	setSessionIdCookie,
-} from '$lib/types/sessions';
-import {
-	_addThought,
-	_deleteThought,
-	_editThought,
-	_getFeed,
+	assert1Row,
+	assertLt2Rows,
+	partCodes,
+	PartInsertSchema,
 	splitId,
-	ThoughtInsertSchema,
-	type ThoughtNested,
-	type ThoughtSelect,
-} from '$lib/types/thoughts';
-import { thoughtsTable } from '$lib/types/thoughts-table';
+	type PartSelect,
+} from '$lib/types/parts';
+import { partsTable } from '$lib/types/parts-table';
+import { OtpSchema, type Otp } from '$lib/types/otp';
+import { normalizeTags, PostSchema } from '$lib/types/posts';
+import { makeSessionRowFilter, makeSessionRowInsert } from '$lib/types/sessions';
 import type { RequestEvent } from '@sveltejs/kit';
-import { initTRPC, type inferRouterInputs, type inferRouterOutputs } from '@trpc/server';
-import { and, desc, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { initTRPC } from '@trpc/server';
+import * as argon2 from 'argon2';
+import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
-import { minute, second, week } from '../time';
+import { minute, second } from '../time';
+import { _getPostFeed, getPostFeedSchema } from '$lib/types/posts/getPostFeed';
+import { _deletePost } from '$lib/types/posts/deletePost';
+import { _editPost } from '$lib/types/posts/editPost';
+import { _addPost } from '$lib/types/posts/addPost';
 
 export const t = initTRPC.context<Context>().create();
 
 let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-export let isValidEmail = (email: string) => {
+let isValidEmail = (email: string) => {
 	return email.length < 255 && emailRegex.test(email);
 };
-
-let getAccountByMs = async (ms: number) => {
-	let accountRows = await tdb.select().from(thoughtsTable).where(filterAccountByMs(ms));
-	if (accountRows.length > 1) throw new Error('Multiple accounts found');
-	let accountRow = accountRows[0];
-	if (!accountRow) throw new Error('No account found');
-	let account: Omit<Account, 'email'> = {
-		ms: accountRow.ms,
-		// Omitting email until I need it
-		...JSON.parse(accountRow.body!),
-	};
-	return account;
+let assertEmail = (e: string) => {
+	if (!isValidEmail(e)) throw new Error('invalid email');
 };
 
-let verifyCaller = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
+let getEmailRow = async (email: string) => {
+	let emailRowsFilter = and(
+		isNotNull(partsTable.to_ms),
+		isNull(partsTable.to_by_ms),
+		isNull(partsTable.to_in_ms),
+		isNull(partsTable.ms),
+		isNull(partsTable.by_ms),
+		isNull(partsTable.in_ms),
+		eq(partsTable.code, partCodes.txtAsAccountEmailToAccountId),
+		eq(partsTable.txt, email),
+		isNull(partsTable.num),
+	);
+	let emailRows = await tdbNodesWhere(emailRowsFilter);
+	return assertLt2Rows(emailRows);
+};
+
+// let reduceRowsForAccount = (rows: PartSelect[]) =>
+// 	rows.reduce((a, r) => {
+// 		let prop = r.tag?.slice(1);
+// 		if (prop === 'account') a.ms = r.ms!;
+// 		else {
+// 			if (prop === 'name' || prop === 'email') {
+// 				a[prop] = r.txt!;
+// 				a[`${prop}Ms`] = r.ms!;
+// 			}
+// 			if (prop === 'spaceMss' || prop === 'savedTags') {
+// 				a[`${prop}Ms`] = r.ms!;
+// 				a[prop] = JSON.parse(r.txt!);
+// 			}
+// 		}
+// 		return a;
+// 	}, {} as Account);
+
+let getAccountByMs = async (ms: number, email?: string) => {
+	// let rowsForAccount = await tdbNodesWhere(
+	// 	or(
+	// 		and(
+	// 			isNull(partsTable.to_ms),
+	// 			isNull(partsTable.to_by_ms),
+	// 			isNull(partsTable.to_in_ms),
+	// 			eq(partsTable.ms, ms),
+	// 			isNull(partsTable.by_ms),
+	// 			isNull(partsTable.in_ms),
+	// 			eq(partsTable.code, partCodes.account),
+	// 			isNull(partsTable.txt),
+	// 		),
+	// 		and(
+	// 			isNull(partsTable.to_ms),
+	// 			isNull(partsTable.to_by_ms),
+	// 			isNull(partsTable.to_in_ms),
+	// 			isNotNull(partsTable.ms),
+	// 			isNull(partsTable.by_ms),
+	// 			eq(partsTable.in_ms, ms),
+	// 			// or(
+	// 			// 	eq(partsTable.code, ' spaceMss'),
+	// 			// 	eq(partsTable.code, ' savedTags'),
+	// 			// 	...(email ? [] : [eq(partsTable.code, ' email')]),
+	// 			// 	eq(partsTable.code, ' name'),
+	// 			// ),
+	// 			isNotNull(partsTable.txt),
+	// 		),
+	// 	),
+	// );
+	// @ts-ignore
+	let account: Account = {
+		email, // ...reduceRowsForAccount(rowsForAccount)
+	};
+	if (!AccountSchema.safeParse(account)) throw new Error(`Invalid account`);
+	return { account };
+};
+
+let sendOtp = async (email: string, partCode: number) => {
+	let pin = ('' + Math.random()).slice(-8);
+	if (dev) {
+		pin = '00000000';
+		// console.log('pin:', pin);
+	} else {
+		// await resend.emails.send({
+		// 	from: 'noreply@yourdomain.com',
+		// 	to: email,
+		// 	subject: 'Your Login Code',
+		// 	html: `${otp}`,
+		// });
+	}
+
+	let ms = Date.now();
+	// await tdbInsertNodes({
+	// 	ms,
+	// 	partCode,
+	// 	txt: email+':'+pin,
+	// 	num: 0
+	// });
+	return { otpMs: ms };
+};
+
+let checkOtp = async (
+	now: number,
+	deleteIfCorrect: boolean,
+	input: {
+		otpMs: number;
+		email: string;
+		pin: string;
+		partCode: number;
+	},
+): Promise<{ strike?: number }> => {
+	let otpRowsFilter = and(
+		isNull(partsTable.to_ms),
+		isNull(partsTable.to_by_ms),
+		isNull(partsTable.to_in_ms),
+		eq(partsTable.ms, input.otpMs),
+		isNull(partsTable.by_ms),
+		isNull(partsTable.in_ms),
+		eq(partsTable.code, input.partCode),
+		isNotNull(partsTable.txt),
+		// isNotNull(partsTable.num),
+	);
+	let otpRows = await tdbNodesWhere(otpRowsFilter);
+	// let otpRow = assert1Row(otpRows);
+	// let otp: Otp = JSON.parse(otpRow.txt!);
+	// if (!OtpSchema.safeParse(otp).success) throw new Error('Invalid OTP');
+	// // console.log('otp:', otp);
+	// if (input.email !== otp.email) throw new Error('Invalid email');
+	// if (input.partCode && input.partCode !== otp.partCode) throw new Error('Invalid purpose');
+	// if (input.pin !== otp.pin) {
+	// 	otp.strike++;
+	// 	if (otp.strike > 2) {
+	// 		await tdbDeleteNodesWhere(
+	// 			or(
+	// 				otpRowsFilter,
+	// 				and(
+	// 					isNull(partsTable.to_ms),
+	// 					isNull(partsTable.to_by_ms),
+	// 					isNull(partsTable.to_in_ms),
+	// 					lt(partsTable.ms, now - 5 * minute), //
+	// 					isNull(partsTable.by_ms),
+	// 					isNull(partsTable.in_ms),
+	// 					eq(partsTable.code, input.partCode),
+	// 					isNotNull(partsTable.txt),
+	// 				),
+	// 			),
+	// 		);
+	// 	} else {
+	// 		await tdbUpdateNodes({ txt: JSON.stringify(otp) }).where(otpRowsFilter);
+	// 	}
+	// 	return { strike: otp.strike };
+	// }
+	// deleteIfCorrect && (await tdbDeleteNodesWhere(otpRowsFilter));
+	return {};
+};
+
+let assertSessionIsAuthorized = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
+	if (typeof byMs !== 'number' || byMs < 0) throw new Error('Invalid byMs');
 	if (typeof inMs !== 'number' || inMs < 0) throw new Error('Invalid inMs');
-	if (typeof byMs !== 'number' || inMs < 0) throw new Error('Invalid byMs');
 	if (!ctx.session?.accountMss.includes(byMs)) throw new Error('Unauthorized by_ms');
 	// TODO: Verify user by_ms has access to space in_ms
 };
@@ -87,242 +227,272 @@ export const router = t.router({
 	auth: t.router({
 		signOut: t.procedure.input(z.number()).mutation(async ({ input, ctx }) => {
 			if (!ctx.session) throw new Error('Missing session');
-			let sessionId = ctx.event.cookies.get('sessionId');
-			let [sMs, sessionCode] = (sessionId || '').split('-');
-			let sessionMs = +sMs || 0;
-			let sessionRowFilter = makeSessionRowFilter(sessionMs);
-			let newAccountMss = ctx.session.accountMss.filter((ms) => ms !== input);
-			newAccountMss.length
-				? await tdb
-						.update(thoughtsTable)
-						.set(
-							makeSessionRowInsert(
-								sessionMs, //
-								sessionCode,
-								newAccountMss,
-							),
-						)
-						.where(sessionRowFilter)
-				: await tdb.delete(thoughtsTable).where(sessionRowFilter);
+			let sessionRowFilter = makeSessionRowFilter(ctx.session.id);
+			await tdbUpdateNodes(
+				makeSessionRowInsert(
+					ctx.session.id,
+					ctx.session.accountMss.filter((ms) => ms !== input),
+				),
+			).where(sessionRowFilter);
 		}),
-		getAccountStates: t.procedure
+		getSignedInMss: t.procedure
 			.input(z.object({ accountMss: z.array(z.number()) }))
 			.mutation(async ({ input, ctx }) => {
-				let { accountMss } = input;
-				if (ctx.session) {
-					let signedInMsSet = new Set(ctx.session.accountMss);
-					return accountMss.filter((ms) => signedInMsSet.has(ms));
-				}
-				return [];
+				let signedInMsSet = new Set(ctx.session?.accountMss);
+				return input.accountMss.filter((ms) => signedInMsSet.has(ms));
 			}),
 		sendOtp: t.procedure
-			.input(z.object({ email: z.string() })) //
-			.mutation(async ({ input }) => {
-				let { email } = input;
-				if (!isValidEmail(email)) throw new Error('invalid email');
-				let pin = ('' + Math.random()).slice(-8);
-				if (dev) {
-					pin = '00000000';
-					// console.log('pin:', pin);
-				} else {
-					// await resend.emails.send({
-					// 	from: 'noreply@yourdomain.com',
-					// 	to: email,
-					// 	subject: 'Your Login Code',
-					// 	html: `${otp}`,
-					// });
-				}
-
-				let ms = Date.now();
-				await tdb.insert(thoughtsTable).values({
-					ms,
-					tags: [' otp'],
-					body: JSON.stringify({ email, pin, strike: 0 } satisfies Otp),
-				});
-				return { ms };
-			}),
-		verifyOtp: t.procedure
 			.input(
 				z.object({
-					ms: z.number(),
-					email: z.string().email(),
-					pin: z.string().length(8),
+					email: z.string(),
+					partCode: z
+						.literal(partCodes.createAccountOtpWithPinColorEmailAndStrikeCount)
+						.or(z.literal(partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount)),
 				}),
 			)
-			.mutation(
-				async ({
-					input,
-					ctx,
-				}): Promise<{
-					strike?: number;
-					account?: Account;
-				}> => {
-					let now = Date.now();
-					let otpRowFilter = and(
-						eq(thoughtsTable.ms, input.ms),
-						isNull(thoughtsTable.by_ms),
-						isNull(thoughtsTable.in_ms),
-						eq(thoughtsTable.tags, [' otp']),
-					);
-					let otpRows = await tdb
-						.select()
-						.from(thoughtsTable)
-						.where(otpRowFilter)
-						.orderBy(desc(thoughtsTable.ms));
-					let otpRow = otpRows[0];
-					if (!otpRow) throw new Error('otpRow dne');
-					let otp: Otp = JSON.parse(otpRow.body!);
-					if (!OtpSchema.safeParse(otp).success) throw new Error('Invalid OTP');
-					// console.log('otp:', otp);
-					if (input.email !== otp.email) {
-						throw new Error('Invalid email');
-					}
-					if (input.pin !== otp.pin) {
-						otp.strike++;
-						if (otp.strike > 2) {
-							await tdb
-								.delete(thoughtsTable)
-								.where(
-									or(
-										otpRowFilter,
-										and(
-											lt(thoughtsTable.ms, now - 5 * minute),
-											eq(thoughtsTable.tags, [' otp']),
-											isNull(thoughtsTable.by_ms),
-											isNull(thoughtsTable.in_ms),
-										),
-									),
-								);
-						} else {
-							await tdb
-								.update(thoughtsTable)
-								.set({ body: JSON.stringify(otp) })
-								.where(otpRowFilter);
-						}
-						return { strike: otp.strike };
-					}
-					await tdb.delete(thoughtsTable).where(otpRowFilter);
-					let accountTags = [` email:${input.email}`];
-					let accountRows = await tdb
-						.select()
-						.from(thoughtsTable)
-						.where(
-							and(
-								isNotNull(thoughtsTable.ms),
-								isNull(thoughtsTable.by_ms),
-								isNull(thoughtsTable.in_ms),
-								eq(thoughtsTable.tags, accountTags),
-							),
-						);
+			.mutation(async ({ input }) => {
+				input.partCode;
+				let email = input.email.trim().toLowerCase();
+				assertEmail(email);
+				let accountRow = await getEmailRow(email);
+				if (
+					input.partCode === partCodes.createAccountOtpWithPinColorEmailAndStrikeCount &&
+					accountRow
+				)
+					throw new Error(m.anAccountWithThatEmailAlreadyExists());
+				// if (
+				// 	input.partCode === partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount &&
+				// 	!accountRow
+				// )
+				// 	throw new Error(m.accountDoesNotExist());
+				// return await sendOtp(email, input.partCode);
+			}),
+		checkOtp: t.procedure
+			.input(
+				z.object({
+					otpMs: z.number(),
+					pin: z.string().length(8),
+					email: z.string(),
+				}),
+			)
+			.mutation(async ({ input }) => {
+				assertEmail(input.email);
+				// return await checkOtp(Date.now(), false, input);
+			}),
+		createAccount: t.procedure
+			.input(
+				z.object({
+					name: z.string().min(0).max(88),
+					otpMs: z.number(),
+					pin: z.string().length(8),
+					email: z.string(),
+					password: z.string(),
+				}),
+			)
+			.mutation(async ({ input, ctx }) => {
+				assertEmail(input.email);
+				let ms = Date.now();
+				// let res = await checkOtp(ms, true, { ...input, purpose: 'create-account' });
+				// if (res.strike) throw new Error(`Otp check failed`);
+				// let emailRow = await getEmailRow(input.email);
+				// if (emailRow) throw new Error(m.anAccountWithThatEmailAlreadyExists());
+				// let rowsForAccount = await tdbInsertNodes([
+				// 	{
+				// 		ms,
+				// 		tag: ' account',
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		tag: ' pwHash',
+				// 		txt: await argon2.hash(input.password),
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		txt: ctx.clientId,
+				// 		tag: ' clientId',
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		tag: ' name',
+				// 		txt: input.name.trim(),
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		tag: ' email',
+				// 		txt: input.email,
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		tag: ' spaceMss',
+				// 		txt: JSON.stringify(['', 0, 1]),
+				// 	},
+				// 	{
+				// 		ms,
+				// 		to_ms: ms,
+				// 		tag: ' savedTags',
+				// 		txt: JSON.stringify([]),
+				// 	},
+				// ]).returning();
+				// console.log('rowsForAccount:', rowsForAccount);
+				// let account = reduceRowsForAccount(rowsForAccount);
+				// if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
+				// console.log('account:', account);
+				// if (ctx.session) {
+				// 	await tdbDeleteNodesWhere(makeSessionRowFilter(ctx.session.id));
+				// }
+				// await createSession(
+				// 	ctx,
+				// 	[
+				// 		...new Set([
+				// 			account.ms as number, //
+				// 			...(ctx.session?.accountMss || []),
+				// 		]),
+				// 	].sort(),
+				// );
+				// return { account };
+				return { account: {} };
+			}),
+		signIn: t.procedure
+			.input(
+				z.object({
+					otpMs: z.number().optional(),
+					pin: z.string().length(8).optional(),
+					email: z.string(),
+					password: z.string(),
+				}),
+			)
+			.mutation(async ({ input, ctx }) => {
+				// : Promise<{
+				// 	otpMs?: number;
+				// 	strike?: number;
+				// 	account?: any;
+				// }>
+				// let email = input.email.trim().toLowerCase();
+				// assertEmail(email);
+				// let emailRow = await getEmailRow(email);
+				// if (!emailRow) throw new Error(m.accountDoesNotExist());
+				// let accountMs = emailRow.in_ms!;
+				// let pwHashRows = await tdbNodesWhere(
+				// 	and(
+				// 		isNull(partsTable.to_ms),
+				// 		isNull(partsTable.to_by_ms),
+				// 		isNull(partsTable.to_in_ms),
+				// 		isNull(partsTable.ms),
+				// 		isNull(partsTable.by_ms),
+				// 		eq(partsTable.in_ms, accountMs),
+				// 		eq(partsTable.code, partCodes.accountPwHashToAccountId),
+				// 		isNotNull(partsTable.txt),
+				// 	),
+				// );
+				// let pwHashRow = assert1Row(pwHashRows);
+				// if (!(await argon2.verify(pwHashRow.txt!, input.password))) {
+				// 	throw new Error(m.invalidPassword());
+				// }
+				// let clientIdRows = await tdbNodesWhere(
+				// 	and(
+				// 		isNull(partsTable.to_ms),
+				// 		isNull(partsTable.to_by_ms),
+				// 		isNull(partsTable.to_in_ms),
+				// 		isNull(partsTable.ms),
+				// 		isNull(partsTable.by_ms),
+				// 		eq(partsTable.in_ms, accountMs),
+				// 		eq(partsTable.code, partCodes.txtAsClientIdToAccountId),
+				// 		eq(partsTable.txt, ctx.clientId),
+				// 	),
+				// );
+				// let clientIdRow = assertLt2Rows(clientIdRows);
+				// if (!clientIdRow) {
+				// 	if (input.otpMs && input.pin) {
+				// 		let res = await checkOtp(Date.now(), true, {
+				// 			...input,
+				// 			// TODO: Remove the next 2 lines without ts complaining
+				// 			otpMs: input.otpMs,
+				// 			pin: input.pin,
+				// 			partCode: partCodes.signInOtpWithPinColorEmailAndStrikeCount,
+				// 		});
+				// 		return res.strike ? res : await getAccountByMs(accountMs, email);
+				// 	} else return await sendOtp(email, partCodes.signInOtpWithPinColorEmailAndStrikeCount);
+				// }
+				// return await getAccountByMs(accountMs, email);
+			}),
+		resetPassword: t.procedure
+			.input(
+				z.object({
+					otpMs: z.number(),
+					pin: z.string().length(8),
+					email: z.string(),
+					password: z.string(),
+				}),
+			) //
+			.mutation(async ({ input }) => {
+				let email = input.email.trim().toLowerCase();
+				assertEmail(email);
+				let now = Date.now();
+				let res = await checkOtp(now, true, {
+					...input,
+					partCode: partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount,
+				});
+				if (res.strike) return res;
+				let accountRow = await getEmailRow(email);
+				// if (!accountRow) throw new Error(`accountRow dne`);
 
-					if (accountRows.length > 1) throw new Error('Multiple accounts found');
-					let accountRow = accountRows[0];
-					if (!accountRow) {
-						accountRow = (
-							await tdb
-								.insert(thoughtsTable)
-								.values({
-									ms: now,
-									tags: accountTags,
-									body: JSON.stringify({
-										spaceMss: ['', 0, 1],
-										allTagsMs: 0,
-									} satisfies Omit<Account, 'ms' | 'allTags'>),
-								})
-								.returning()
-						)[0];
-					}
-					// console.log('accountRow:', accountRow);
-					let account: Account = {
-						ms: accountRow.ms,
-						email: accountRow.tags![0].split(' email:')[1],
-						...JSON.parse(accountRow.body!),
-					};
-
-					let allTagsRows = await tdb
-						.select()
-						.from(thoughtsTable)
-						.where(
-							and(
-								isNull(thoughtsTable.in_ms),
-								eq(thoughtsTable.by_ms, account.ms as number),
-								eq(thoughtsTable.tags, [' allTags']),
-							),
-						)
-						.orderBy(desc(thoughtsTable.ms));
-					if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
-					let allTagsRow = allTagsRows[0];
-					let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
-					account.allTags = allTags;
-					if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
-					// console.log('account:', account);
-					if (ctx.session) {
-						let sessionId = ctx.event.cookies.get('sessionId');
-						let [sMs] = (sessionId || '').split('-');
-						let sessionMs = +sMs || 0;
-						await tdb
-							.delete(thoughtsTable)
-							.where(
-								or(
-									makeSessionRowFilter(sessionMs),
-									and(
-										isNull(thoughtsTable.by_ms),
-										isNull(thoughtsTable.in_ms),
-										lt(thoughtsTable.ms, now - week),
-										eq(thoughtsTable.tags, [' session']),
-									),
-								),
-							);
-					}
-
-					let { sessionMs, sessionCode, sessionId } = makeSessionId();
-					setSessionIdCookie(ctx.event, sessionId);
-
-					await tdb.insert(thoughtsTable).values(
-						makeSessionRowInsert(
-							sessionMs, //
-							sessionCode,
-							[
-								...new Set([
-									accountRow.ms!, //
-									...(ctx.session?.accountMss || []),
-								]),
-							],
-						),
-					);
-
-					return { account };
-				},
-			),
+				// await tdbUpdateNodes({
+				// 	tag: ' pwHash',
+				// 	txt: await argon2.hash(input.password),
+				// }).where(
+				// 	and(
+				// 		isNull(partsTable.to_ms),
+				// 		isNull(partsTable.to_by_ms),
+				// 		isNull(partsTable.to_in_ms),
+				// 		eq(partsTable.ms, accountRow.ms!),
+				// 		isNull(partsTable.by_ms),
+				// 		isNull(partsTable.in_ms),
+				// 		eq(partsTable.code, partCodes.account),
+				// 		isNull(partsTable.txt),
+				// 	),
+				// );
+			}),
 	}),
-	getAllTags: t.procedure
+	getAccountByMs: t.procedure
 		.input(
 			z.object({
 				callerMs: z.number(),
-				allTagsMs: z.number().optional(),
+				spaceMssMs: z.number().optional(),
+				savedTagsMs: z.number().optional(),
+				emailMs: z.number().optional(),
+				nameMs: z.number().optional(),
 			}),
 		)
 		.query(async ({ input, ctx }) => {
-			verifyCaller(ctx, input.callerMs, 0);
-			let account = await getAccountByMs(input.callerMs);
-			if (!account.allTagsMs || account.allTagsMs === input.allTagsMs) return;
-			let allTagsRows = await tdb
+			assertSessionIsAuthorized(ctx, input.callerMs, 0);
+			let { account } = await getAccountByMs(input.callerMs);
+			if (!account.savedTagsMs || account.savedTagsMs === input.savedTagsMs) return;
+			let savedTagsRows = await tdb
 				.select()
-				.from(thoughtsTable)
+				.from(partsTable)
 				.where(
 					and(
-						isNull(thoughtsTable.in_ms),
-						eq(thoughtsTable.by_ms, input.callerMs),
-						eq(thoughtsTable.tags, [' allTags']),
+						isNull(partsTable.to_ms),
+						isNull(partsTable.to_by_ms),
+						isNull(partsTable.to_in_ms),
+						isNull(partsTable.ms),
+						eq(partsTable.by_ms, input.callerMs),
+						isNull(partsTable.in_ms),
+						// eq(partsTable.code, ' savedTags'),
+						isNotNull(partsTable.txt),
 					),
-				)
-				.orderBy(desc(thoughtsTable.ms));
-			if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
-			let allTagsRow = allTagsRows[0];
-			let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
-			return { allTags, allTagsMs: allTagsRow.ms! };
+				);
+			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
+			let savedTagsRow = savedTagsRows[0];
+			let savedTags: string[] = savedTagsRow ? JSON.parse(savedTagsRow.txt!) : [];
+			return { savedTags, savedTagsMs: savedTagsRow.ms! };
 		}),
-	updateAllTags: t.procedure
+	updateSavedTags: t.procedure
 		.input(
 			z.object({
 				callerMs: z.number(),
@@ -331,136 +501,69 @@ export const router = t.router({
 			}),
 		)
 		.mutation(async ({ input, ctx }) => {
-			verifyCaller(ctx, input.callerMs, 0);
+			assertSessionIsAuthorized(ctx, input.callerMs, 0);
 			let now = Date.now();
-			let allTagsRows = await tdb
-				.select()
-				.from(thoughtsTable)
-				.where(
-					and(
-						isNull(thoughtsTable.in_ms),
-						eq(thoughtsTable.by_ms, input.callerMs),
-						eq(thoughtsTable.tags, [' allTags']),
-					),
-				)
-				.orderBy(desc(thoughtsTable.ms));
-			if (allTagsRows.length > 1) throw new Error('Multiple allTagsRows found');
-			let allTagsRow = allTagsRows[0];
-			let allTags: string[] = allTagsRow ? JSON.parse(allTagsRow.body!) : [];
+			let savedTagsRowFilter = and(
+				isNull(partsTable.to_ms),
+				isNull(partsTable.to_by_ms),
+				isNull(partsTable.to_in_ms),
+				isNull(partsTable.ms),
+				isNull(partsTable.by_ms),
+				eq(partsTable.in_ms, input.callerMs),
+				// eq(partsTable.code, ' savedTags'),
+				isNotNull(partsTable.txt),
+			);
+			let savedTagsRows = await tdbNodesWhere(savedTagsRowFilter);
+			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
+			let savedTagsRow = savedTagsRows[0];
+			if (!savedTagsRow) throw new Error('savedTagsRow dne');
+			let savedTags: string[] = JSON.parse(savedTagsRow.txt!);
 			let removingSet = new Set(input.removing);
-			let newAllTags: string[] = sortUniArr([...allTags, ...input.adding]).filter(
+			let newSavedTags: string[] = normalizeTags([...savedTags, ...input.adding]).filter(
 				(t) => !removingSet.has(t),
 			);
-
-			if (allTagsRow) {
-				await tdb
-					.update(thoughtsTable)
-					.set({
-						ms: now,
-						body: JSON.stringify(newAllTags),
-					})
-					.where(
-						and(
-							isNull(thoughtsTable.in_ms),
-							eq(thoughtsTable.by_ms, input.callerMs),
-							eq(thoughtsTable.tags, [' allTags']),
-						),
-					)
-					.returning();
-			} else {
-				await tdb.insert(thoughtsTable).values({
-					ms: now,
-					by_ms: input.callerMs,
-					body: JSON.stringify(newAllTags),
-					tags: [' allTags'],
-				});
-			}
-
-			let account = await getAccountByMs(input.callerMs);
-			await tdb
-				.update(thoughtsTable)
-				.set({
-					body: JSON.stringify({ ...account, allTagsMs: now } satisfies Account),
-				})
-				.where(filterAccountByMs(input.callerMs));
-
-			return { ms: now, allTags: newAllTags };
+			await tdbUpdateNodes({
+				ms: now,
+				txt: JSON.stringify(newSavedTags),
+			}).where(savedTagsRowFilter);
+			return { savedTagsMs: now };
 		}),
-	addThought: t.procedure.input(ThoughtInsertSchema).mutation(
+	addPost: t.procedure.input(PostSchema).mutation(
+		async ({
+			input: p,
+			ctx, //
+		}) => {
+			assertSessionIsAuthorized(ctx, p.by_ms, p.in_ms);
+			return _addPost(tdb, p);
+		},
+	),
+	editPost: t.procedure.input(PartInsertSchema).mutation(
 		async ({
 			input: t,
 			ctx, //
 		}) => {
-			verifyCaller(ctx, t.by_ms, t.in_ms);
-			return _addThought(tdb, t);
+			assertSessionIsAuthorized(ctx, t.by_ms, t.in_ms);
+			return _editPost(tdb, t);
 		},
 	),
-	editThought: t.procedure.input(ThoughtInsertSchema).mutation(
-		async ({
-			input: t,
-			ctx, //
-		}) => {
-			verifyCaller(ctx, t.by_ms, t.in_ms);
-			return _editThought(tdb, t);
-		},
-	),
-	deleteThought: t.procedure.input(z.string()).mutation(
+	deletePost: t.procedure.input(z.string()).mutation(
 		async ({
 			input,
 			ctx, //
 		}) => {
 			let { by_ms, in_ms } = splitId(input);
-			verifyCaller(ctx, +by_ms, +in_ms);
-			return _deleteThought(tdb, input);
+			assertSessionIsAuthorized(ctx, by_ms, in_ms);
+			return _deletePost(tdb, input);
 		},
 	),
-	getFeed: t.procedure
-		.input(
-			z.object({
-				callerMs: z.number().optional(),
-				useRpc: z.boolean().optional(),
-				nested: z.boolean().optional(),
-				oldestFirst: z.boolean().optional(), // TODO: implementing this will require more data analyzing to ensure the right fromMs is sent. e.g. What to do when appending a new thought to an oldest first feed and the newest thoughts haven't been fetched yet?
-				fromMs: z.number(),
-				idsInclude: z.array(z.string()).optional(),
-				idsExclude: z.array(z.string()).optional(),
-				mssInclude: z.array(z.literal('').or(z.number())).optional(),
-				mssExclude: z.array(z.literal('').or(z.number())).optional(),
-				byMssInclude: z.array(z.literal('').or(z.number())).optional(),
-				byMssExclude: z.array(z.literal('').or(z.number())).optional(),
-				inMssInclude: z.array(z.literal('').or(z.number())).optional(),
-				inMssExclude: z.array(z.literal('').or(z.number())).optional(),
-				tagsInclude: z.array(z.string()).optional(),
-				tagsExclude: z.array(z.string()).optional(),
-				bodyIncludes: z.array(z.string()).optional(),
-				bodyExcludes: z.array(z.string()).optional(),
-			}),
-		)
-		.mutation(
-			async ({
-				input: q,
-				ctx,
-			}): Promise<{
-				roots: ThoughtNested[];
-				auxThoughts: Record<string, ThoughtSelect>;
-			}> => {
-				if (q.callerMs && !ctx.session?.accountMss.includes(q.callerMs))
-					throw new Error('Unauthorized callerMs');
+	getPostFeed: t.procedure.input(getPostFeedSchema).mutation(async ({ input: q, ctx }) => {
+		if (q.callerMs && !ctx.session?.accountMss.includes(q.callerMs))
+			throw new Error('Unauthorized callerMs');
 
-				return _getFeed(tdb, q);
-			},
-		),
+		return _getPostFeed(tdb, q);
+	}),
 });
 
 // https://trpc.io/docs/server/server-side-calls
 export const createCaller = t.createCallerFactory(router);
 export type Router = typeof router;
-
-export type GetFeedInput = inferRouterInputs<Router>['getFeed'];
-export type GetFeedOutput = inferRouterOutputs<Router>['getFeed'];
-export type AddThoughtInput = inferRouterInputs<Router>['addThought'];
-export type AddThoughtOutput = inferRouterOutputs<Router>['addThought'];
-export type EditThoughtInput = inferRouterInputs<Router>['editThought'];
-export type EditThoughtOutput = inferRouterOutputs<Router>['editThought'];
-export type DeleteThoughtInput = inferRouterInputs<Router>['deleteThought'];
-export type DeleteThoughtOutput = inferRouterOutputs<Router>['deleteThought'];

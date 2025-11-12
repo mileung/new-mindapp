@@ -7,20 +7,21 @@
 	import { getLocalCache } from '$lib/types/local-cache';
 	import {
 		getId,
-		_getThoughtById,
-		ThoughtInsertSchema,
-		type ThoughtInsert,
-		overwriteLocalThought,
-		insertLocalThought,
-	} from '$lib/types/thoughts';
-	import { thoughtsTable } from '$lib/types/thoughts-table';
+		_selectNode,
+		PartInsertSchema,
+		type PartInsert,
+		overwriteLocalPost,
+	} from '$lib/types/parts';
+	import { partsTable } from '$lib/types/parts-table';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
 	import { asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
+	import AccountIcon from '../AccountIcon.svelte';
+	import { identikana } from '$lib/js';
 	let dbFilename = 'mindapp.db';
-	let setAccountsAndSpaces = async () => {
-		let localCache = await getLocalCache();
+	let setAccountsAndSpaces = () => {
+		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
 		gs.spaces = localCache.spaces;
 	};
@@ -41,6 +42,10 @@
 		{#if !gs.accounts[0].ms}
 			<p>{m.anon()}</p>
 		{:else}
+			<div class="fx h-10">
+				<AccountIcon class="h-10 w-10" ms={gs.accounts[0].ms} />
+				<p class="ml-2 font-medium text-lg">{identikana(gs.accounts[0].ms)}</p>
+			</div>
 			<p>{m.ms()}: <span class="font-medium">{gs.accounts[0].ms}</span></p>
 			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
 		{/if}
@@ -49,7 +54,11 @@
 	<p class="text-xl font-bold">{m.theme()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
-	<select name={m.theme()} class="w-full p-2 bg-bg5 hover:bg-bg7 text-fg1" bind:value={gs.theme}>
+	<select
+		name={m.theme()}
+		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+		bind:value={gs.theme}
+	>
 		<option value="system">{m.system()}</option>
 		<option value="light">{m.light()}</option>
 		<option value="dark">{m.dark()}</option>
@@ -80,27 +89,30 @@
 			onclick={async () => {
 				exportTextAsFile(
 					`mindapp-${Date.now()}.json`,
-					JSON.stringify(
-						(
+					JSON.stringify({
+						parts: (
 							await (
 								await gsdb()
 							)
 								.select()
-								.from(thoughtsTable) // TODO: explicitly make rows with null ms cols come first or last?
+								.from(partsTable) // TODO: explicitly make rows with null ms cols come first or last?
 								// TODO: Also had this idea to export rows based on in_ms or ms range
-								.orderBy(asc(thoughtsTable.ms))
+								.orderBy(asc(partsTable.ms))
 						).map(
 							(r) =>
 								({
+									to_ms: r.to_ms === null ? undefined : r.to_ms,
+									to_by_ms: r.to_by_ms === null ? undefined : r.to_by_ms,
+									to_in_ms: r.to_in_ms === null ? undefined : r.to_in_ms,
 									ms: r.ms === null ? undefined : r.ms,
-									tags: r.tags === null ? undefined : r.tags,
-									body: r.body === null ? undefined : r.body,
 									by_ms: r.by_ms === null ? undefined : r.by_ms,
-									to_id: r.to_id === null ? undefined : r.to_id,
 									in_ms: r.in_ms === null ? undefined : r.in_ms,
-								}) satisfies ThoughtInsert,
+									code: r.code === null ? undefined : r.code,
+									txt: r.txt === null ? undefined : r.txt,
+									num: r.num === null ? undefined : r.num,
+								}) satisfies PartInsert,
 						),
-					),
+					}),
 				);
 			}}><IconDownload class="w-5 mr-1" />{m.downloadJsonFile()}</button
 		>
@@ -116,34 +128,30 @@
 						console.time('import_time');
 						let text = await file.text();
 						try {
-							let importedThoughts: ThoughtInsert[] = JSON.parse(text);
+							let importedPosts: PartInsert[] = JSON.parse(text);
 							if (
-								Array.isArray(importedThoughts) &&
-								importedThoughts.every((item) => ThoughtInsertSchema.safeParse(item).success)
+								Array.isArray(importedPosts) &&
+								importedPosts.every((item) => PartInsertSchema.safeParse(item).success)
 							) {
 								let db = await gsdb();
 								// TODO: make importing local data faster
 								let results = await Promise.all(
-									importedThoughts.map(
-										async (thought) =>
-											[thought, !!(await _getThoughtById(db, getId(thought)))] as const,
+									importedPosts.map(
+										async (node) => [node, !!(await _selectNode(db, node))] as const,
 									),
 								);
-								let inserts: ThoughtInsert[] = [];
-								let overwrites: ThoughtInsert[] = [];
+								let inserts: PartInsert[] = [];
+								let overwrites: PartInsert[] = [];
 								results.forEach(([thought, exists]) =>
 									(exists ? overwrites : inserts).push(thought),
 								);
-								await Promise.all([
-									...inserts.map((i) => insertLocalThought(i)),
-									...overwrites.map((o) => overwriteLocalThought(o)),
-								]);
+								// await Promise.all([
+								// 	...inserts.map((i) => insertLocalPost(i)),
+								// 	...overwrites.map((o) => overwriteLocalPost(o)),
+								// ]);
 								console.timeEnd('import_time');
 								setAccountsAndSpaces();
 								gs.feeds = {};
-								if (await getLocalCache()) {
-									gs.invalidLocalCache = false;
-								}
 								alert(m.dataSuccessfullyMerged());
 							} else {
 								alert(m.invalidJsonFile());
@@ -161,6 +169,7 @@
 	{/if}
 	<p class="text-xl font-bold">{m.dangerZone()}</p>
 	<div class="h-0.5 w-full bg-bg8"></div>
+	<!-- TODO: reset local cache button -->
 	<button
 		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
 		onclick={async () => {
@@ -176,7 +185,7 @@
 			const { deleteDatabaseFile } = new SQLocalDrizzle(dbFilename);
 			gs.feeds = {};
 			await deleteDatabaseFile();
-			alert(m.localDatabaseDeleted());
+			!dev && alert(m.localDatabaseDeleted());
 			await initLocalDb();
 			setAccountsAndSpaces();
 			// TODO: not great to assume the new local db works after deleting the old one - same for localCache

@@ -2,7 +2,7 @@ import { PopupMessage } from './background';
 
 let dev = import.meta.env.VITE_ENV === 'DEV';
 chrome.runtime.onMessage.addListener((msg) => {
-	if (msg.type === 'context-menu-saves-thought') openPopup(true);
+	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type)) openPopup(true);
 });
 
 let mindappNewDevUrl = 'http://localhost:8888';
@@ -50,7 +50,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 	let selector =
 		urlSelectors[location.host + location.pathname]?.() || urlSelectors[location.host]?.();
 
-	let thoughtHeadline =
+	let txtHeadline =
 		// TODO: This doesn't return the highlighted text all the time - e.g. go to a reddit post and try highlighting the headline and clipping: https://www.reddit.com/r/videos/comments/10oak86/goldsmith_uses_chemistry_to_refine_indistinct/
 		(
 			window.getSelection()?.toString() ||
@@ -85,8 +85,8 @@ let openPopup = (openingNewMindapp?: boolean) => {
 			// https://news.ycombinator.com/item?id=31871577
 			// 431 Request Header Fields Too Large
 			// https://vitejs.dev/guide/troubleshooting.html#_431-request-header-fields-too-large
-			// TODO: thoughtHeadline.slice(0, 99999) or something to avoid 431
-			initialContent: `${thoughtHeadline}\n${selector?.url || location.href}\n\n`,
+			// TODO: txtHeadline.slice(0, 99999) or something to avoid 431
+			initialContent: `${txtHeadline}\n${selector?.url || location.href}\n\n`,
 			initialTags: selector?.tags,
 		}),
 	});

@@ -9,13 +9,13 @@
 	let size = 100;
 	let padding = 10;
 	let colors = [
-		'fill-red-400',
-		'fill-orange-400',
-		'fill-yellow-400',
-		'fill-green-400',
-		'fill-blue-400',
-		'fill-purple-400',
-		'fill-pink-400',
+		'fill-red-500',
+		'fill-orange-500',
+		'fill-yellow-500',
+		'fill-green-500',
+		'fill-blue-500',
+		'fill-purple-500',
+		'fill-pink-500',
 	];
 
 	let gridSize = $derived(p.size ?? 5);

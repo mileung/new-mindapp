@@ -3,8 +3,9 @@
 	"name": "Mindapp",
 	"version": "1.0.0",
 	"icons": { "1024": "mindapp-logo.png" },
-	"description": "Save thoughts with `Alt m`",
+	"description": "Save things with `Alt m`",
 	"permissions": ["contextMenus"],
+	"action": {},
 	"background": {
 		"service_worker": "background.js"
 	},

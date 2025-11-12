@@ -2,6 +2,6 @@
 	import AddAccount from '../AddAccount.svelte';
 </script>
 
-{#key 'si'}
-	<AddAccount signingIn />
+{#key 'rp'}
+	<AddAccount resettingPassword />
 {/key}

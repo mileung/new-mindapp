@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
+
 	import { m } from '$lib/paraglide/messages';
 	import { unsaveTagInCurrentAccount } from '$lib/types/local-cache';
-	import type { ThoughtSelect } from '$lib/types/thoughts';
+	import { getId, type PartSelect } from '$lib/types/parts';
+	import { getLastVersion, normalizeTags } from '$lib/types/posts';
 	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
@@ -13,7 +15,7 @@
 
 	let p: {
 		toId?: string;
-		thought?: ThoughtSelect;
+		thought?: PartSelect;
 		onSubmit: (tags: string[], body: string) => void;
 	} = $props();
 
@@ -27,11 +29,11 @@
 
 	let writtenTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(gs.writerTagVal.trim());
-	let allTagsSet = $derived(new Set(gs.accounts ? gs.accounts[0].allTags : []));
+	let savedTagsSet = $derived(new Set(gs.accounts ? gs.accounts[0].savedTags : []));
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
-		let arr = matchSorter([...allTagsSet], filter)
+		let arr = matchSorter([...savedTagsSet], filter)
 			.slice(0, 99)
 			.concat(tagFilter);
 		return [...new Set(arr)];
@@ -41,20 +43,21 @@
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
-		if (['to', 'edit'].includes(gs.writerMode[0])) tagsIpt.focus();
+		if (gs.writingTo || gs.writingEdit) tagsIpt.focus();
 	});
 	$effect(() => {
-		if (gs.writerMode[0] === 'edit') {
-			let t = gs.thoughts[gs.writerMode[1]];
-			gs.writerTags = t?.tags || [];
-			gs.writerBody = t?.body || '';
+		if (gs.writingEdit) {
+			let post = gs.posts[getId(gs.writingEdit)]!;
+			let lastHistory = post.history[getLastVersion(post)];
+			gs.writerTags = lastHistory.tags || [];
+			gs.writerBody = lastHistory.body || '';
 		}
 	});
 
 	onMount(() => {
 		tagsIpt.focus();
 		window.addEventListener('keydown', (e) => {
-			gs.writerMode &&
+			(gs.writingNew || gs.writingTo || gs.writingEdit) &&
 				!tagsIptFocused &&
 				!textInputFocused() &&
 				!e.altKey &&
@@ -68,7 +71,10 @@
 
 	let submit = () => {
 		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || gs.writerTagVal.trim();
-		p.onSubmit([...gs.writerTags, ...(otherTag ? [otherTag] : [])], gs.writerBody);
+		p.onSubmit(
+			normalizeTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])]),
+			gs.writerBody.trim(),
+		);
 		tagsIpt.blur();
 		bodyTa.blur();
 		gs.writerTags = [];
@@ -147,12 +153,14 @@
 				if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
 					if (e.key === 'Tab' && (!suggestedTags.length || tagIndex < 0)) return;
 					e.preventDefault();
+					// TODO: on up arrow and can't go up anymore, go to beginning of line
+					// TODO: on down arrow and can't go down anymore, go to end of line
 					if (tagIndex >= 0) {
 						if (e.key === 'Tab') {
 							xFocused = !xFocused;
 							if (!xFocused) return;
 						} else xFocused = false;
-					} else if (writtenTags.length) {
+					} else if (writtenTags.length && e.key === 'Tab') {
 						return undoTagRefs
 							.filter((r) => !!r)
 							.slice(-1)[0]
@@ -167,7 +175,7 @@
 				if ((e.key === 'Tab' && !e.shiftKey) || e.key === 'ArrowDown') {
 					e.preventDefault();
 					if (e.key === 'Tab' && tagIndex === suggestedTags.length - 1) {
-						if (allTagsSet.has(suggestedTags[tagIndex])) {
+						if (savedTagsSet.has(suggestedTags[tagIndex])) {
 							if (xFocused) return bodyTa.focus();
 						} else return bodyTa.focus();
 					}
@@ -203,7 +211,7 @@
 						{/if}
 						{tag}
 					</button>
-					{#if allTagsSet.has(tag)}
+					{#if savedTagsSet.has(tag)}
 						<button
 							bind:this={unsaveTagXRefs[i]}
 							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
@@ -218,7 +226,7 @@
 		<textarea
 			bind:this={bodyTa}
 			bind:value={gs.writerBody}
-			placeholder={m.shareThought()}
+			placeholder={m.expressYourself()}
 			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-11"
 			onkeydown={(e) => {
 				e.key === 'Escape' && setTimeout(() => bodyTa.blur(), 0);

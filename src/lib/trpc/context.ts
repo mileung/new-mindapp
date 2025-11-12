@@ -1,68 +1,57 @@
-import { tdb } from '$lib/server/db';
-import { day, week } from '$lib/time';
-import {
-	makeSessionId,
-	makeSessionRowFilter,
-	makeSessionRowInsert,
-	SessionSchema,
-	setSessionIdCookie,
-	type Session,
-} from '$lib/types/sessions';
-import { thoughtsTable } from '$lib/types/thoughts-table';
+import { makeRandomStr } from '$lib/js';
+import { tdbNodesWhere } from '$lib/server/db';
+import { month } from '$lib/time';
+import { makeSessionRowFilter, type Session } from '$lib/types/sessions';
 import type { RequestEvent } from '@sveltejs/kit';
 
 export async function createContext(event: RequestEvent) {
-	let sessionId = event.cookies.get('sessionId');
-	let [sMs, sessionCode] = (sessionId || '').split('-');
-	let sessionMs = +sMs || 0;
-
-	let sessionRowFilter = makeSessionRowFilter(sessionMs);
-	let sessionRows = await tdb.select().from(thoughtsTable).where(sessionRowFilter);
-
-	let session: undefined | Session;
-	if (!sessionRows.length) {
-		event.cookies.delete('sessionId', { path: '/' });
-	} else {
-		if (sessionRows.length > 1) throw new Error('Multiple sessions found');
-		let sessionRow = sessionRows[0];
-		let now = Date.now();
-		try {
-			session = JSON.parse(sessionRow.body!);
-		} catch (error) {}
-		if (
-			now - sessionMs > week || //
-			session!.code !== sessionCode ||
-			!SessionSchema.safeParse(session).success ||
-			!(
-				sessionRow.tags?.length === 1 && //
-				sessionRow.tags[0] === ' session'
-			)
-		) {
-			session = undefined;
-			event.cookies.delete('sessionId', { path: '/' });
-			await tdb.delete(thoughtsTable).where(sessionRowFilter);
-		} else if (now - sessionMs > day) {
-			let {
-				sessionMs: newSessionMs,
-				sessionCode: newSessionCode,
-				sessionId: newSessionId,
-			} = makeSessionId();
-			setSessionIdCookie(event, newSessionId);
-
-			await tdb
-				.update(thoughtsTable)
-				.set(
-					makeSessionRowInsert(
-						newSessionMs, //
-						newSessionCode,
-						session!.accountMss,
-					),
-				)
-				.where(sessionRowFilter);
-		}
+	let now = Date.now();
+	let clientId = event.cookies.get('clientId');
+	let clientIdMs = event.cookies.get('clientIdMS');
+	if (!clientId || !clientIdMs || now - +clientIdMs > month) {
+		clientId = clientId || makeRandomStr();
+		clientIdMs = `` + now;
+		let cookieParams = {
+			httpOnly: true,
+			secure: true,
+			path: '/',
+			maxAge: 60 * 60 * 24 * 365, // 1 year
+			sameSite: 'lax',
+		} as const;
+		event.cookies.set('clientId', clientId, cookieParams);
+		event.cookies.set('clientIdMs', clientIdMs, cookieParams);
 	}
 
-	return { event, session };
+	let sessionId = event.cookies.get('sessionId');
+	let session: undefined | Session;
+	if (sessionId) {
+		let sessionRowFilter = makeSessionRowFilter(sessionId);
+		let sessionRows = await tdbNodesWhere(sessionRowFilter);
+		// let sessionRow = assertLt2Rows(sessionRows);
+		// if (sessionRow) {
+		// 	session = {
+		// 		ms: sessionRow.ms!,
+		// 		id: sessionRow.tags![0].split(':')[1],
+		// 		accountMss: JSON.parse(sessionRow.txt!),
+		// 	};
+		// 	if (!SessionSchema.safeParse(session).success) throw new Error(`Invalid session`);
+		// 	if (now - session.ms > week) {
+		// 		session = undefined;
+		// 		event.cookies.delete('sessionId', { path: '/' });
+		// 		await tdbDeleteNodesWhere(sessionRowFilter);
+		// 	} else if (now - session.ms > day) {
+		// 		let newSessionId = makeRandomStr();
+		// 		setSessionIdCookie(event, newSessionId);
+		// 		await tdbUpdateNodes(makeSessionRowInsert(newSessionId, session!.accountMss)).where(
+		// 			sessionRowFilter,
+		// 		);
+		// 	}
+		// } else {
+		// 	event.cookies.delete('sessionId', { path: '/' });
+		// }
+	}
+
+	return { event, clientId, session };
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;

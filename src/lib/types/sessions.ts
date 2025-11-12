@@ -1,43 +1,30 @@
 import { day } from '$lib/time';
 import type { RequestEvent } from '@sveltejs/kit';
 import { z } from 'zod';
-import type { ThoughtInsert } from './thoughts';
-import { and, eq, isNull } from 'drizzle-orm';
-import { thoughtsTable } from './thoughts-table';
+import type { PartInsert } from './parts';
+import { and, eq, isNotNull, isNull } from 'drizzle-orm';
+import { partsTable } from './parts-table';
+import { makeRandomStr } from '$lib/js';
+import { tdb, tdbInsertNodes } from '$lib/server/db';
+import type { Context } from '$lib/trpc/context';
+import type { Account } from './accounts';
 
 export let SessionSchema = z
 	.object({
-		code: z.string(),
+		ms: z.number(),
+		id: z.string(),
 		accountMss: z.array(z.number()),
-		// TODO: Security based on IP address? IPs can be easily spoofed so idk if it's worth implementing.
 	})
 	.strict();
 
 export type Session = z.infer<typeof SessionSchema>;
 
-let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-export let makeSessionId = () => {
-	let sessionMs = Date.now() - Math.round(Math.random() * day);
-	let sessionCode = [...Array(64)]
-		.map((_) => chars[Math.round(Math.random() * chars.length)])
-		.join('');
-	return {
-		sessionMs,
-		sessionCode,
-		sessionId: `${sessionMs}-${sessionCode}`,
-	};
-};
-
-export let makeSessionRowInsert = (
-	sessionMs: number, //
-	sessionCode: string,
-	accountMss: number[],
-) =>
+export let makeSessionRowInsert = (sessionId: string, accountMss: number[]) =>
 	({
-		ms: sessionMs,
-		tags: [' session'],
-		body: JSON.stringify({ code: sessionCode, accountMss } satisfies Session),
-	}) satisfies ThoughtInsert;
+		ms: Date.now() - Math.round(Math.random() * day),
+		tags: [` session:${sessionId}`],
+		body: JSON.stringify(accountMss),
+	}) satisfies PartInsert;
 
 export let setSessionIdCookie = (event: RequestEvent, sessionId: string) => {
 	event.cookies.set('sessionId', sessionId, {
@@ -49,10 +36,20 @@ export let setSessionIdCookie = (event: RequestEvent, sessionId: string) => {
 	});
 };
 
-export let makeSessionRowFilter = (sessionMs: number) =>
+export let makeSessionRowFilter = (sessionId: string) =>
 	and(
-		isNull(thoughtsTable.by_ms),
-		isNull(thoughtsTable.in_ms),
-		eq(thoughtsTable.ms, sessionMs), //
-		eq(thoughtsTable.tags, [' session']),
+		isNull(partsTable.to_ms),
+		isNull(partsTable.to_by_ms),
+		isNull(partsTable.to_in_ms),
+		isNotNull(partsTable.ms),
+		isNull(partsTable.by_ms),
+		isNull(partsTable.in_ms),
+		eq(partsTable.tag, [` session:${sessionId}`]),
+		isNotNull(partsTable.txt),
 	);
+
+export let createSession = async (ctx: Context, accountMss: number[]) => {
+	let sessionId = makeRandomStr();
+	setSessionIdCookie(ctx.event, sessionId);
+	await tdbInsertNodes(makeSessionRowInsert(sessionId, accountMss));
+};

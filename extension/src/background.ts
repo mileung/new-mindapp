@@ -1,16 +1,22 @@
 chrome.runtime.onInstalled.addListener(() => {
 	chrome.contextMenus.create({
-		id: 'context-menu-saves-thought',
+		id: 'context-menu-clicked',
 		title: 'Mindapp (Alt m)',
 		contexts: ['all'],
 	});
 });
 
+chrome.action.onClicked.addListener((tab) => {
+	if (typeof tab.id === 'number') {
+		// Works on pdf pages. document.title is blank tho
+		// https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
+		chrome.tabs.sendMessage(tab.id, { type: 'extension-icon-clicked' });
+	}
+});
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-	// TODO: make it work on pdf pages
-	// https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
-	if (info.menuItemId === 'context-menu-saves-thought' && tab?.id) {
-		chrome.tabs.sendMessage(tab.id, { type: 'context-menu-saves-thought' });
+	if (info.menuItemId === 'context-menu-clicked' && typeof tab?.id === 'number') {
+		chrome.tabs.sendMessage(tab.id, { type: 'context-menu-clicked' });
 	}
 });
 

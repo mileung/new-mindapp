@@ -4,7 +4,7 @@
 
 	let searchedText = $derived(page.url.searchParams.get('q') || '');
 	let idParam = $derived(page.state.modalId || page.params.id || '');
-	let useModal = $derived(!!(page.state.modalId || searchedText || !idParam.startsWith('__')));
+	let useModal = $derived(!!(page.state.modalId || searchedText || !idParam.startsWith('l_l_')));
 </script>
 
 {#if page.url.pathname === '/' || idParam}

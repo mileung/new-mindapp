@@ -1,3 +1,3 @@
-import { thoughtsTable } from '../../types/thoughts-table';
+import { partsTable } from '../../types/parts-table';
 
-export { thoughtsTable };
+export { partsTable };
