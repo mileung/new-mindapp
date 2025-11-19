@@ -2,9 +2,11 @@ import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { gs } from './global-state.svelte';
 import { m } from './paraglide/messages';
 
+export let localDbFilename = 'mindapp.db';
+
 // https://sqlocal.dev/guide/introduction
 export async function initLocalDb() {
-	let { sql } = new SQLocalDrizzle('mindapp.db');
+	let { sql } = new SQLocalDrizzle(localDbFilename);
 	try {
 		await sql`
 			PRAGMA journal_mode=WAL;

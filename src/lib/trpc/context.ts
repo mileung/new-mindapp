@@ -1,5 +1,5 @@
 import { makeRandomStr } from '$lib/js';
-import { tdbNodesWhere } from '$lib/server/db';
+import { tdbPartsWhere } from '$lib/server/db';
 import { month } from '$lib/time';
 import { makeSessionRowFilter, type Session } from '$lib/types/sessions';
 import type { RequestEvent } from '@sveltejs/kit';
@@ -26,7 +26,7 @@ export async function createContext(event: RequestEvent) {
 	let session: undefined | Session;
 	if (sessionId) {
 		let sessionRowFilter = makeSessionRowFilter(sessionId);
-		let sessionRows = await tdbNodesWhere(sessionRowFilter);
+		let sessionRows = await tdbPartsWhere(sessionRowFilter);
 		// let sessionRow = assertLt2Rows(sessionRows);
 		// if (sessionRow) {
 		// 	session = {
@@ -38,11 +38,11 @@ export async function createContext(event: RequestEvent) {
 		// 	if (now - session.ms > week) {
 		// 		session = undefined;
 		// 		event.cookies.delete('sessionId', { path: '/' });
-		// 		await tdbDeleteNodesWhere(sessionRowFilter);
+		// 		await tdbDeletePartsWhere(sessionRowFilter);
 		// 	} else if (now - session.ms > day) {
 		// 		let newSessionId = makeRandomStr();
 		// 		setSessionIdCookie(event, newSessionId);
-		// 		await tdbUpdateNodes(makeSessionRowInsert(newSessionId, session!.accountMss)).where(
+		// 		await tdbUpdateParts(makeSessionRowInsert(newSessionId, session!.accountMss)).where(
 		// 			sessionRowFilter,
 		// 		);
 		// 	}

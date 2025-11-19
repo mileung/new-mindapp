@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { initLocalDb } from '$lib/local-db';
+	import { localDbFilename, initLocalDb } from '$lib/local-db';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
 	import {
@@ -12,7 +12,7 @@
 		updateLocalCache,
 		changeCurrentSpace,
 	} from '$lib/types/local-cache';
-	import { splitId } from '$lib/types/parts';
+	import { getSplitId } from '$lib/types/parts';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
@@ -70,17 +70,15 @@
 			});
 		}
 
-		// dropNodesTableInOpfsInDev();
-
 		try {
 			await initLocalDb();
-			const { driver, batchDriver } = new SQLocalDrizzle('mindapp.db');
+			const { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
 			gs.db = drizzle(driver, batchDriver);
 
 			try {
 				if (page.params.id) {
-					let { in_ms } = splitId(page.params.id);
-					if (in_ms !== gs.currentSpaceMs) {
+					let { in_ms } = getSplitId(page.params.id);
+					if ((in_ms === null || Number.isInteger(in_ms)) && in_ms !== gs.currentSpaceMs) {
 						if (page.params.id.startsWith('l_l_')) {
 							changeCurrentSpace(in_ms);
 						} else if (!gs.accounts[0].spaceMss.includes(in_ms)) {

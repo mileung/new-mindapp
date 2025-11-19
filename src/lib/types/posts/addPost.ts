@@ -18,21 +18,22 @@ import {
 	type PartInsert,
 	type PartSelect,
 	idsRegex,
-	splitId,
-	filterIdSegs,
-	filterIdSegsAsToIdSegs,
-	filterToIdSegs,
+	getSplitId,
+	filterSplitId,
+	filterSplitIdAsToSplitId,
+	filterToSplitId,
 	getToId,
-	filterToIdSegsAsIdSegs,
+	filterToSplitIdAsSplitId,
+	assertLt2Rows,
 } from '../parts';
-import { getCitedPostIds, normalizeTags, type Post } from '.';
+import { getCitedPostIds, bumpTagCountsBy1, normalizeTags, type Post } from '.';
 
 export let addPost = async (post: Post, useRpc: boolean) => {
 	return useRpc ? trpc().addPost.mutate(post) : _addPost(await gsdb(), post);
 };
 
 export let _addPost = async (db: Database, post: Post) => {
-	if (Object.keys(post.history).length !== 1 || !post.history['0'])
+	if (!post.history || Object.keys(post.history).length !== 1 || !post.history['0'])
 		throw new Error('History must have only version 0');
 	if (Number.isInteger(post.in_ms) && !post.by_ms) throw new Error('Missing by_ms');
 	let ms = Date.now();
@@ -50,63 +51,43 @@ export let _addPost = async (db: Database, post: Post) => {
 		num: 0,
 	};
 
-	let partsToInsert: PartInsert[] = [
-		postPart,
-		{
-			to_ms: ms,
-			to_by_ms: postPart.by_ms,
-			to_in_ms: postPart.in_ms,
-			ms,
-			by_ms: null,
-			in_ms: null,
-			code: partCodes.msWithNumAsVersionToPostId,
-			txt: null,
-			num: 0,
-		},
-		// ...[partCodes.numAsReplyCountToPostId, partCodes.numAsCiteCountToPostId].map((code) => ({
-		// 	to_ms: ms,
-		// 	to_by_ms: postPart.by_ms,
-		// 	to_in_ms: postPart.in_ms,
-		// 	ms: null,
-		// 	by_ms: null,
-		// 	in_ms: null,
-		// 	code,
-		// 	txt: null,
-		// 	num: 0,
-		// })),
-	];
+	let partsToInsert: PartInsert[] = [postPart];
+	let isChildPost = hasParent(post);
 
-	let isChild = hasParent(post);
-	let insertPriorityLevel = !isChild;
-	let postTags = normalizeTags(post.history['0'].tags || []);
-
-	if (isChild) {
-		if (post.in_ms !== post.to_in_ms) throw new Error(`in_ms must match to_in_ms`);
-		let parentPostIdToRootIdRows = await db
+	if (isChildPost) {
+		let parentPostIdToRootPostIdRows = await db
 			.select()
 			.from(partsTable)
 			.where(
 				and(
-					filterToIdSegsAsIdSegs(postPart),
+					filterToSplitIdAsSplitId(postPart),
 					eq(partsTable.code, partCodes.postIdWithNumAsDepthToRootPostId),
 					isNull(partsTable.txt),
 					isNotNull(partsTable.num),
 				),
 			);
-		let postIdToRootIdRow = assert1Row(parentPostIdToRootIdRows);
+		let parentPostIdToRootPostIdRow = assertLt2Rows(parentPostIdToRootPostIdRows);
+		let rootPostSplitId = parentPostIdToRootPostIdRow
+			? {
+					to_ms: parentPostIdToRootPostIdRow.to_ms,
+					to_by_ms: parentPostIdToRootPostIdRow.to_by_ms,
+					to_in_ms: parentPostIdToRootPostIdRow.to_in_ms,
+				}
+			: {
+					to_ms: postPart.to_ms,
+					to_by_ms: postPart.to_by_ms,
+					to_in_ms: postPart.to_in_ms,
+				};
 		partsToInsert.push({
-			to_ms: postIdToRootIdRow.to_ms,
-			to_by_ms: postIdToRootIdRow.to_by_ms,
-			to_in_ms: postIdToRootIdRow.to_in_ms,
+			...rootPostSplitId,
 			ms,
 			by_ms: postPart.by_ms,
 			in_ms: postPart.in_ms,
 			code: partCodes.postIdWithNumAsDepthToRootPostId,
 			txt: null,
-			num: postIdToRootIdRow.num! + 1,
+			num: (parentPostIdToRootPostIdRow?.num || 0) + 1,
 		});
-
-		let updatedPriorityLevelRow = await db
+		let updatedPriorityLevelRows = await db
 			.update(partsTable)
 			.set({
 				ms,
@@ -116,7 +97,7 @@ export let _addPost = async (db: Database, post: Post) => {
 			})
 			.where(
 				and(
-					filterToIdSegs(postIdToRootIdRow),
+					filterToSplitId(parentPostIdToRootPostIdRow || postPart),
 					isNotNull(partsTable.ms),
 					postPart.in_ms === null || postPart.in_ms === undefined
 						? isNull(partsTable.in_ms)
@@ -127,23 +108,18 @@ export let _addPost = async (db: Database, post: Post) => {
 				),
 			)
 			.returning();
-
-		insertPriorityLevel = !updatedPriorityLevelRow.length;
+		if (!updatedPriorityLevelRows?.length) {
+			partsToInsert.push({
+				...rootPostSplitId,
+				ms,
+				by_ms: postPart.by_ms,
+				in_ms: postPart.in_ms,
+				code: partCodes.postIdWithNumAsNestedUpdatesFeedPriorityToRootPostId,
+				txt: null,
+				num: ms,
+			});
+		}
 	} else {
-		partsToInsert.push({
-			to_ms: ms,
-			to_by_ms: postPart.by_ms,
-			to_in_ms: postPart.in_ms,
-			ms,
-			by_ms: postPart.by_ms,
-			in_ms: postPart.in_ms,
-			code: partCodes.postIdWithNumAsDepthToRootPostId,
-			txt: null,
-			num: 0,
-		});
-	}
-
-	insertPriorityLevel &&
 		partsToInsert.push({
 			to_ms: ms,
 			to_by_ms: postPart.by_ms,
@@ -155,10 +131,11 @@ export let _addPost = async (db: Database, post: Post) => {
 			txt: null,
 			num: ms,
 		});
-
-	let existingTagRows: PartSelect[] = [];
+	}
+	let postTags = normalizeTags(post.history['0'].tags || []);
+	let existingTagTxtRows: PartSelect[] = [];
 	if (postTags.length) {
-		let existingTagRows = await db
+		let existingTagTxtRows = await db
 			.select()
 			.from(partsTable)
 			.where(
@@ -169,22 +146,20 @@ export let _addPost = async (db: Database, post: Post) => {
 					post.in_ms === null || post.in_ms === undefined
 						? isNull(partsTable.in_ms)
 						: eq(partsTable.in_ms, post.in_ms),
-					eq(partsTable.code, partCodes.txtAsTagAndNumAsCount),
+					eq(partsTable.code, partCodes.tagTxtAndNumAsCount),
 					or(...postTags.map((t) => eq(partsTable.txt, t))),
 					isNotNull(partsTable.num),
 				),
 			);
 
-		let existingTagsDict: Record<string, PartInsert> = {};
-		for (let i = 0; i < existingTagRows.length; i++) {
-			let tagRow = existingTagRows[i];
-			existingTagsDict[tagRow.txt!] = tagRow;
+		let existingTagTxtRowsDict: Record<string, PartInsert> = {};
+		for (let i = 0; i < existingTagTxtRows.length; i++) {
+			let tagRow = existingTagTxtRows[i];
+			existingTagTxtRowsDict[tagRow.txt!] = tagRow;
 		}
-
 		for (let i = 0; i < postTags.length; i++) {
 			let tag = postTags[i];
-			let tagRow = existingTagsDict[tag];
-			console.log('tagRow:', tag, tagRow);
+			let tagRow = existingTagTxtRowsDict[tag];
 			let newTagsCount = 0;
 			if (!tagRow) {
 				tagRow = {
@@ -194,7 +169,7 @@ export let _addPost = async (db: Database, post: Post) => {
 					ms: ms + newTagsCount++,
 					by_ms: post.by_ms,
 					in_ms: post.in_ms,
-					code: partCodes.txtAsTagAndNumAsCount,
+					code: partCodes.tagTxtAndNumAsCount,
 					txt: tag,
 					num: 1,
 				};
@@ -207,108 +182,55 @@ export let _addPost = async (db: Database, post: Post) => {
 				ms: tagRow.ms,
 				by_ms: tagRow.by_ms,
 				in_ms: tagRow.in_ms,
-				code: partCodes.currentPostTxtAsBodyWithNumAsVersionToPostId,
+				code: partCodes.currentPostTagIdWithNumAsVersionToPostId,
 				num: 0,
 			});
 		}
-	}
-
-	let bodyTxt = post.history['0'].body;
-
-	let citedPostIds: string[] = [];
-	if (bodyTxt) {
-		citedPostIds = getCitedPostIds(bodyTxt);
-		// TODO: return citedPostMap to cover cases where user cites a post their feed hasn't fetched
+	} else {
 		partsToInsert.push({
 			to_ms: ms,
 			to_by_ms: postPart.by_ms,
 			to_in_ms: postPart.in_ms,
-			ms,
-			by_ms: postPart.by_ms,
-			in_ms: postPart.in_ms,
-			code: partCodes.currentPostTxtAsBodyWithNumAsVersionToPostId,
-			txt: bodyTxt,
+			ms: null,
+			by_ms: null,
+			in_ms: null,
+			code: partCodes.currentPostTagIdWithNumAsVersionToPostId,
 			num: 0,
-		} satisfies PartInsert);
+		});
 	}
 
-	console.log('citedPostIds:', citedPostIds);
-	console.log('existingTagRows:', existingTagRows);
-	let citedPostIdSegs = citedPostIds.map((id) => splitId(id));
+	let bodyTxt = (post.history['0'].body || '').trim();
+	let citedPostIds: string[] = bodyTxt ? getCitedPostIds(bodyTxt) : [];
+	// TODO: return citedPostMap to cover cases where user cites a post their feed hasn't fetched
 	partsToInsert.push(
-		...citedPostIdSegs.map((segs) => ({
-			to_ms: segs.ms,
-			to_by_ms: segs.by_ms,
-			to_in_ms: segs.in_ms,
+		{
+			to_ms: ms,
+			to_by_ms: postPart.by_ms,
+			to_in_ms: postPart.in_ms,
 			ms,
-			by_ms: postPart.by_ms,
-			in_ms: postPart.in_ms,
-			code: partCodes.postIdToCitedPostId,
-			txt: null,
-			num: null,
-		})),
+			by_ms: null,
+			in_ms: null,
+			code: partCodes.currentPostBodyTxtWithMsAndNumAsVersionToPostId,
+			txt: bodyTxt,
+			num: 0,
+		},
+		...citedPostIds.map((id) => {
+			let splitId = getSplitId(id);
+			return {
+				to_ms: splitId.ms,
+				to_by_ms: splitId.by_ms,
+				to_in_ms: splitId.in_ms,
+				ms,
+				by_ms: postPart.by_ms,
+				in_ms: postPart.in_ms,
+				code: partCodes.postIdToCitedPostId,
+				txt: null,
+				num: null,
+			};
+		}),
 	);
 
-	existingTagRows.length &&
-		(await db
-			.update(partsTable)
-			.set({ num: sql`${partsTable.num} + 1` })
-			.where(
-				and(
-					isNull(partsTable.to_ms),
-					isNull(partsTable.to_by_ms),
-					isNull(partsTable.to_in_ms),
-					or(
-						...existingTagRows.map((tagRow) =>
-							and(filterIdSegs(tagRow), eq(partsTable.txt, tagRow.txt!)),
-						),
-					),
-					eq(partsTable.code, partCodes.txtAsTagAndNumAsCount),
-					isNotNull(partsTable.num),
-				),
-			));
-
-	// await db
-	// 	.update(partsTable)
-	// 	.set({ num: sql`${partsTable.num} + 1` })
-	// 	.where(
-	// 		or(
-	// 			existingTagRows.length
-	// 				? and(
-	// 						isNull(partsTable.to_ms),
-	// 						isNull(partsTable.to_by_ms),
-	// 						isNull(partsTable.to_in_ms),
-	// 						or(
-	// 							...existingTagRows.map((tagRow) =>
-	// 								and(filterIdSegs(tagRow), eq(partsTable.txt, tagRow.txt!)),
-	// 							),
-	// 						),
-	// 						eq(partsTable.code, partCodes.txtAsTagAndNumAsCount),
-	// 						isNotNull(partsTable.num),
-	// 					)
-	// 				: undefined,
-	// 			citedPostIdSegs.length
-	// 				? and(
-	// 						or(...citedPostIdSegs.map((segs) => filterIdSegsAsToIdSegs(segs))),
-	// 						isNull(partsTable.ms),
-	// 						isNull(partsTable.by_ms),
-	// 						isNull(partsTable.in_ms),
-	// 						eq(partsTable.code, partCodes.numAsCiteCountToPostId),
-	// 						isNull(partsTable.txt),
-	// 						isNotNull(partsTable.num),
-	// 					)
-	// 				: undefined,
-	// 			and(
-	// 				filterToIdSegs(postPart),
-	// 				isNull(partsTable.ms),
-	// 				isNull(partsTable.by_ms),
-	// 				isNull(partsTable.in_ms),
-	// 				eq(partsTable.code, partCodes.numAsReplyCountToPostId),
-	// 				isNull(partsTable.txt),
-	// 				isNotNull(partsTable.num),
-	// 			),
-	// 		),
-	// 	);
+	bumpTagCountsBy1(db, existingTagTxtRows);
 
 	await db.insert(partsTable).values(partsToInsert);
 	// console.log('partsToInsert:', partsToInsert);

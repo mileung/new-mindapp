@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
-	import { gs } from '$lib/global-state.svelte';
-	import { gsdb, initLocalDb } from '$lib/local-db';
+	import { getUndefinedLocalFeedIds, gs } from '$lib/global-state.svelte';
+	import { localDbFilename, gsdb, initLocalDb } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocalCache } from '$lib/types/local-cache';
 	import {
@@ -19,7 +19,6 @@
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import AccountIcon from '../AccountIcon.svelte';
 	import { identikana } from '$lib/js';
-	let dbFilename = 'mindapp.db';
 	let setAccountsAndSpaces = () => {
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
@@ -72,7 +71,7 @@
 		<button
 			class="xy px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-500"
 			onclick={async () => {
-				const { getDatabaseFile } = new SQLocal(dbFilename);
+				const { getDatabaseFile } = new SQLocal(localDbFilename);
 				const databaseFile = await getDatabaseFile();
 				const fileUrl = URL.createObjectURL(databaseFile);
 				const a = document.createElement('a');
@@ -182,12 +181,21 @@
 				if (!sum) return;
 				if (a + b !== +sum) return alert(m.incorrect());
 			}
-			const { deleteDatabaseFile } = new SQLocalDrizzle(dbFilename);
-			gs.feeds = {};
-			await deleteDatabaseFile();
+
+			try {
+				// deleteDatabaseFile is slow and unreliable
+				// await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
+				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
+			} catch (e) {
+				console.log('error deleteDatabaseFile:', e);
+			}
 			!dev && alert(m.localDatabaseDeleted());
+			gs.feeds = { ...gs.feeds, ...getUndefinedLocalFeedIds() };
 			await initLocalDb();
 			setAccountsAndSpaces();
+
+			console.log('yes');
+
 			// TODO: not great to assume the new local db works after deleting the old one - same for localCache
 			gs.localDbFailed = gs.invalidLocalCache = false;
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button

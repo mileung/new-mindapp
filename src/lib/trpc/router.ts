@@ -1,16 +1,18 @@
 import { dev } from '$app/environment';
 
 import { m } from '$lib/paraglide/messages';
-import { tdb, tdbDeleteNodesWhere, tdbNodesWhere, tdbUpdateNodes } from '$lib/server/db';
+import { tdb, tdbDeletePartsWhere, tdbPartsWhere, tdbUpdateParts } from '$lib/server/db';
 import type { Context } from '$lib/trpc/context';
 import { AccountSchema, type Account } from '$lib/types/accounts';
 import {
 	assert1Row,
 	assertLt2Rows,
+	SplitIdSchema,
+	SplitIdToSplitIdSchema,
 	partCodes,
 	PartInsertSchema,
-	splitId,
-	type PartSelect,
+	PartSelectSchema,
+	getSplitId,
 } from '$lib/types/parts';
 import { partsTable } from '$lib/types/parts-table';
 import { OtpSchema, type Otp } from '$lib/types/otp';
@@ -23,10 +25,11 @@ import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
 import { minute, second } from '../time';
-import { _getPostFeed, getPostFeedSchema } from '$lib/types/posts/getPostFeed';
+import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
 import { _deletePost } from '$lib/types/posts/deletePost';
 import { _editPost } from '$lib/types/posts/editPost';
 import { _addPost } from '$lib/types/posts/addPost';
+import { _getPostHistory } from '$lib/types/posts/getPostHistory';
 
 export const t = initTRPC.context<Context>().create();
 
@@ -50,7 +53,7 @@ let getEmailRow = async (email: string) => {
 		eq(partsTable.txt, email),
 		isNull(partsTable.num),
 	);
-	let emailRows = await tdbNodesWhere(emailRowsFilter);
+	let emailRows = await tdbPartsWhere(emailRowsFilter);
 	return assertLt2Rows(emailRows);
 };
 
@@ -72,7 +75,7 @@ let getEmailRow = async (email: string) => {
 // 	}, {} as Account);
 
 let getAccountByMs = async (ms: number, email?: string) => {
-	// let rowsForAccount = await tdbNodesWhere(
+	// let rowsForAccount = await tdbPartsWhere(
 	// 	or(
 	// 		and(
 	// 			isNull(partsTable.to_ms),
@@ -124,7 +127,7 @@ let sendOtp = async (email: string, partCode: number) => {
 	}
 
 	let ms = Date.now();
-	// await tdbInsertNodes({
+	// await tdbInsertParts({
 	// 	ms,
 	// 	partCode,
 	// 	txt: email+':'+pin,
@@ -154,7 +157,7 @@ let checkOtp = async (
 		isNotNull(partsTable.txt),
 		// isNotNull(partsTable.num),
 	);
-	let otpRows = await tdbNodesWhere(otpRowsFilter);
+	let otpRows = await tdbPartsWhere(otpRowsFilter);
 	// let otpRow = assert1Row(otpRows);
 	// let otp: Otp = JSON.parse(otpRow.txt!);
 	// if (!OtpSchema.safeParse(otp).success) throw new Error('Invalid OTP');
@@ -164,7 +167,7 @@ let checkOtp = async (
 	// if (input.pin !== otp.pin) {
 	// 	otp.strike++;
 	// 	if (otp.strike > 2) {
-	// 		await tdbDeleteNodesWhere(
+	// 		await tdbDeletePartsWhere(
 	// 			or(
 	// 				otpRowsFilter,
 	// 				and(
@@ -180,11 +183,11 @@ let checkOtp = async (
 	// 			),
 	// 		);
 	// 	} else {
-	// 		await tdbUpdateNodes({ txt: JSON.stringify(otp) }).where(otpRowsFilter);
+	// 		await tdbUpdateParts({ txt: JSON.stringify(otp) }).where(otpRowsFilter);
 	// 	}
 	// 	return { strike: otp.strike };
 	// }
-	// deleteIfCorrect && (await tdbDeleteNodesWhere(otpRowsFilter));
+	// deleteIfCorrect && (await tdbDeletePartsWhere(otpRowsFilter));
 	return {};
 };
 
@@ -228,7 +231,7 @@ export const router = t.router({
 		signOut: t.procedure.input(z.number()).mutation(async ({ input, ctx }) => {
 			if (!ctx.session) throw new Error('Missing session');
 			let sessionRowFilter = makeSessionRowFilter(ctx.session.id);
-			await tdbUpdateNodes(
+			await tdbUpdateParts(
 				makeSessionRowInsert(
 					ctx.session.id,
 					ctx.session.accountMss.filter((ms) => ms !== input),
@@ -296,7 +299,7 @@ export const router = t.router({
 				// if (res.strike) throw new Error(`Otp check failed`);
 				// let emailRow = await getEmailRow(input.email);
 				// if (emailRow) throw new Error(m.anAccountWithThatEmailAlreadyExists());
-				// let rowsForAccount = await tdbInsertNodes([
+				// let rowsForAccount = await tdbInsertParts([
 				// 	{
 				// 		ms,
 				// 		tag: ' account',
@@ -343,7 +346,7 @@ export const router = t.router({
 				// if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
 				// console.log('account:', account);
 				// if (ctx.session) {
-				// 	await tdbDeleteNodesWhere(makeSessionRowFilter(ctx.session.id));
+				// 	await tdbDeletePartsWhere(makeSessionRowFilter(ctx.session.id));
 				// }
 				// await createSession(
 				// 	ctx,
@@ -377,7 +380,7 @@ export const router = t.router({
 				// let emailRow = await getEmailRow(email);
 				// if (!emailRow) throw new Error(m.accountDoesNotExist());
 				// let accountMs = emailRow.in_ms!;
-				// let pwHashRows = await tdbNodesWhere(
+				// let pwHashRows = await tdbPartsWhere(
 				// 	and(
 				// 		isNull(partsTable.to_ms),
 				// 		isNull(partsTable.to_by_ms),
@@ -393,7 +396,7 @@ export const router = t.router({
 				// if (!(await argon2.verify(pwHashRow.txt!, input.password))) {
 				// 	throw new Error(m.invalidPassword());
 				// }
-				// let clientIdRows = await tdbNodesWhere(
+				// let clientIdRows = await tdbPartsWhere(
 				// 	and(
 				// 		isNull(partsTable.to_ms),
 				// 		isNull(partsTable.to_by_ms),
@@ -441,7 +444,7 @@ export const router = t.router({
 				let accountRow = await getEmailRow(email);
 				// if (!accountRow) throw new Error(`accountRow dne`);
 
-				// await tdbUpdateNodes({
+				// await tdbUpdateParts({
 				// 	tag: ' pwHash',
 				// 	txt: await argon2.hash(input.password),
 				// }).where(
@@ -513,7 +516,7 @@ export const router = t.router({
 				// eq(partsTable.code, ' savedTags'),
 				isNotNull(partsTable.txt),
 			);
-			let savedTagsRows = await tdbNodesWhere(savedTagsRowFilter);
+			let savedTagsRows = await tdbPartsWhere(savedTagsRowFilter);
 			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
 			let savedTagsRow = savedTagsRows[0];
 			if (!savedTagsRow) throw new Error('savedTagsRow dne');
@@ -522,7 +525,7 @@ export const router = t.router({
 			let newSavedTags: string[] = normalizeTags([...savedTags, ...input.adding]).filter(
 				(t) => !removingSet.has(t),
 			);
-			await tdbUpdateNodes({
+			await tdbUpdateParts({
 				ms: now,
 				txt: JSON.stringify(newSavedTags),
 			}).where(savedTagsRowFilter);
@@ -537,7 +540,7 @@ export const router = t.router({
 			return _addPost(tdb, p);
 		},
 	),
-	editPost: t.procedure.input(PartInsertSchema).mutation(
+	editPost: t.procedure.input(PostSchema).mutation(
 		async ({
 			input: t,
 			ctx, //
@@ -546,22 +549,47 @@ export const router = t.router({
 			return _editPost(tdb, t);
 		},
 	),
-	deletePost: t.procedure.input(z.string()).mutation(
-		async ({
-			input,
-			ctx, //
-		}) => {
-			let { by_ms, in_ms } = splitId(input);
-			assertSessionIsAuthorized(ctx, by_ms, in_ms);
-			return _deletePost(tdb, input);
-		},
-	),
-	getPostFeed: t.procedure.input(getPostFeedSchema).mutation(async ({ input: q, ctx }) => {
+	deletePost: t.procedure
+		.input(
+			z.object({
+				postSplitIdToSplitId: SplitIdToSplitIdSchema,
+				version: z.number(),
+			}),
+		)
+		.mutation(
+			async ({
+				input,
+				ctx, //
+			}) => {
+				assertSessionIsAuthorized(
+					ctx,
+					input.postSplitIdToSplitId.by_ms,
+					input.postSplitIdToSplitId.in_ms,
+				);
+				return _deletePost(tdb, input.postSplitIdToSplitId, input.version);
+			},
+		),
+	getPostFeed: t.procedure.input(GetPostFeedSchema).mutation(async ({ input: q, ctx }) => {
 		if (q.callerMs && !ctx.session?.accountMss.includes(q.callerMs))
 			throw new Error('Unauthorized callerMs');
 
 		return _getPostFeed(tdb, q);
 	}),
+	getPostHistory: t.procedure
+		.input(
+			z.object({
+				postSplitIdToSplitId: SplitIdToSplitIdSchema,
+				version: z.number(),
+			}),
+		)
+		.mutation(async ({ input, ctx }) => {
+			assertSessionIsAuthorized(
+				ctx,
+				input.postSplitIdToSplitId.by_ms,
+				input.postSplitIdToSplitId.in_ms,
+			);
+			return _getPostHistory(tdb, input.postSplitIdToSplitId, input.version);
+		}),
 });
 
 // https://trpc.io/docs/server/server-side-calls

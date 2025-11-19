@@ -95,7 +95,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 			? baseUrl + '?extension'
 			: `${baseUrl}?${new URLSearchParams(JSON.parse(json)).toString()}`,
 		'_blank',
-		`width=700,height=500,top=0,left=99999999`,
+		`width=888,height=500,top=0,left=999999999`,
 	);
 };
 

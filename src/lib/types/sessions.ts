@@ -5,7 +5,7 @@ import type { PartInsert } from './parts';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 import { partsTable } from './parts-table';
 import { makeRandomStr } from '$lib/js';
-import { tdb, tdbInsertNodes } from '$lib/server/db';
+import { tdb, tdbInsertParts } from '$lib/server/db';
 import type { Context } from '$lib/trpc/context';
 import type { Account } from './accounts';
 
@@ -51,5 +51,5 @@ export let makeSessionRowFilter = (sessionId: string) =>
 export let createSession = async (ctx: Context, accountMss: number[]) => {
 	let sessionId = makeRandomStr();
 	setSessionIdCookie(ctx.event, sessionId);
-	await tdbInsertNodes(makeSessionRowInsert(sessionId, accountMss));
+	await tdbInsertParts(makeSessionRowInsert(sessionId, accountMss));
 };

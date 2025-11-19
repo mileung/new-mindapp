@@ -5,10 +5,18 @@
 	import { m } from '$lib/paraglide/messages';
 	import { unsaveTagInCurrentAccount } from '$lib/types/local-cache';
 	import { getId, type PartSelect } from '$lib/types/parts';
-	import { getLastVersion, normalizeTags } from '$lib/types/posts';
-	import { IconArrowUp, IconCircleXFilled, IconX } from '@tabler/icons-svelte';
+	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
+	import {
+		IconArrowUp,
+		IconCircleXFilled,
+		IconCornerUpLeft,
+		IconPencil,
+		IconPencilPlus,
+		IconX,
+	} from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
+	import Highlight from './Highlight.svelte';
 
 	let bodyTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;
@@ -43,20 +51,22 @@
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
-		if (gs.writingTo || gs.writingEdit) tagsIpt.focus();
+		if (gs.writingNew || gs.writingTo || gs.writingEdit) tagsIpt.focus();
 	});
 	$effect(() => {
 		if (gs.writingEdit) {
 			let post = gs.posts[getId(gs.writingEdit)]!;
-			let lastHistory = post.history[getLastVersion(post)];
-			gs.writerTags = lastHistory.tags || [];
-			gs.writerBody = lastHistory.body || '';
+			if (post.history !== null) {
+				let lastHistory = post.history[getLastVersion(post)!];
+				gs.writerTags = lastHistory?.tags || [];
+				gs.writerBody = lastHistory?.body || '';
+			}
 		}
 	});
 
 	onMount(() => {
 		tagsIpt.focus();
-		window.addEventListener('keydown', (e) => {
+		let handler = (e: KeyboardEvent) => {
 			(gs.writingNew || gs.writingTo || gs.writingEdit) &&
 				!tagsIptFocused &&
 				!textInputFocused() &&
@@ -65,8 +75,10 @@
 				(!e.metaKey || (e.metaKey && e.key === 'v')) &&
 				((e.key.length === 1 && e.key !== '/') ||
 					['Backspace', 'Delete', 'Space'].includes(e.key)) &&
-				tagsIpt?.focus();
-		});
+				tagsIpt.focus();
+		};
+		window.addEventListener('keydown', handler);
+		return () => window.removeEventListener('keydown', handler);
 	});
 
 	let submit = () => {
@@ -89,10 +101,42 @@
 			gs.writerTagVal = '';
 		}
 	};
+
+	let highlightedPostLastBody = $derived.by(() => {
+		let highlightedPost = gs.posts[getId(gs.writingTo || gs.writingEdit || {})];
+		return highlightedPost?.history?.[getLastVersion(highlightedPost)!]?.body;
+	});
 </script>
 
 <!-- TODO: draggable height -->
 <div class="">
+	<div class="flex group bg-bg4 relative w-full">
+		<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
+		<button
+			class="truncate flex-1 h-8 pl-2 text-left fx gap-1"
+			onclick={() => scrollToHighlight(getId(gs.writingEdit || gs.writingTo || {}))}
+		>
+			{#if gs.writingTo}
+				<IconCornerUpLeft class="w-5" />
+			{:else if gs.writingNew}
+				<IconPencilPlus class="w-5" />
+			{:else}
+				<IconPencil class="w-5" />
+			{/if}
+			<p class="flex-1 truncate">
+				{gs.writingNew ? m.newPost() : highlightedPostLastBody}
+			</p>
+		</button>
+		<button
+			class="w-8 xy text-fg2 hover:bg-bg5 hover:text-fg1"
+			onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = false)}
+		>
+			<IconX class="w-5" />
+		</button>
+		<Highlight
+			id={gs.writingTo ? getId(gs.writingTo) : gs.writingEdit ? getId(gs.writingEdit) : ''}
+		/>
+	</div>
 	<div
 		tabindex="-1"
 		class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${writtenTags.length ? '' : 'hidden'}`}
@@ -233,7 +277,10 @@
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
-		<button class="xy bg-hl1 h-8 w-8 absolute bottom-1 right-1 text-black" onclick={submit}>
+		<button
+			class="xy bg-hl1 hover:bg-hl2 h-8 w-8 absolute bottom-1 right-1 text-black"
+			onclick={submit}
+		>
 			<IconArrowUp class="h-9 w-9" />
 		</button>
 	</div>

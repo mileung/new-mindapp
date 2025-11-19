@@ -6,7 +6,7 @@ export const week = 7 * day;
 export const month = 30 * day;
 export const year = 365 * day;
 
-export function formatMs(ms: number, verbose = false): string {
+export function formatMs(ms: number, verbose = false, granular = false): string {
 	const now = Date.now();
 	const timeDiff = now - ms;
 	if (!verbose) {
@@ -29,7 +29,7 @@ export function formatMs(ms: number, verbose = false): string {
 	const days = String(date.getDate()).padStart(2, '0');
 	const hours = String(date.getHours()).padStart(2, '0');
 	const minutes = String(date.getMinutes()).padStart(2, '0');
-	if (verbose) {
+	if (verbose && granular) {
 		const seconds = String(date.getSeconds()).padStart(2, '0');
 		const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
 		return `${years}-${months}-${days} ${hours}:${minutes}:${seconds}.${milliseconds}`;

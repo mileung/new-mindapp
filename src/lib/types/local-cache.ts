@@ -77,16 +77,16 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 }
 
 export let updateSavedTags = async (update: { adding: string[]; removing: string[] }) => {
-	if (gs.accounts?.[0].ms) {
-		let res = await trpc().updateSavedTags.mutate({
-			...update,
-			callerMs: gs.accounts[0].ms,
-		});
-		await updateLocalCache((lc) => {
-			lc.accounts[0].savedTagsMs = res.savedTagsMs;
-			return lc;
-		});
-	}
+	// if (gs.accounts?.[0].ms) {
+	// 	let res = await trpc().updateSavedTags.mutate({
+	// 		...update,
+	// 		callerMs: gs.accounts[0].ms,
+	// 	});
+	// 	await updateLocalCache((lc) => {
+	// 		lc.accounts[0].savedTagsMs = res.savedTagsMs;
+	// 		return lc;
+	// 	});
+	// }
 	await updateLocalCache((lc) => {
 		let removingSet = new Set(update.removing);
 		lc.accounts[0].savedTags = normalizeTags([

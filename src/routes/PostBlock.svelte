@@ -2,13 +2,14 @@
 	import { pushState } from '$app/navigation';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { getId } from '$lib/types/parts';
+	import { getId, getSplitIdToSplitId, getToId } from '$lib/types/parts';
 	import { IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import BodyParser from './BodyParser.svelte';
 	import Highlight from './Highlight.svelte';
 	import Self from './PostBlock.svelte';
 	import PostHeader from './PostHeader.svelte';
 	import { getLastVersion, type Post } from '$lib/types/posts';
+	import { getPostHistory } from '$lib/types/posts/getPostHistory';
 
 	let p: {
 		post: Post;
@@ -21,19 +22,49 @@
 	let open = $state(true);
 	let parsed = $state(true);
 	let id = $derived(getId(p.post));
-	// let toPost = $derived(gs.posts[p.post.toId || '']);
 	let evenBg = $derived(!(p.depth % 2));
-	// let deleted = $derived(p.post.tags?.[0] === ' deleted');
-	// let deletedToPost = $derived(toPost?.tags?.[0] === ' deleted');
-	let latestVersion = $derived(getLastVersion(p.post));
-	let version = $state((() => latestVersion)());
-	let { tags, body } = $derived(p.post.history[version]);
+	let toPost = $derived(gs.posts[getToId(p.post) || '']);
+	let deletedToPost = $derived(toPost?.history === null);
+	let deleted = $derived(p.post.history === null);
+
+	let lastVersion = $derived(getLastVersion(p.post) || 0);
+	let version = $state((() => lastVersion)());
+	let body = $derived(p.post.history?.[version]?.body);
+	let tags = $derived(p.post.history?.[version]?.tags);
+
+	let changeVersion = async (i: number) => {
+		if (!p.post.history?.[i]) {
+			let { history } = await getPostHistory(
+				getSplitIdToSplitId(p.post),
+				i,
+				Number.isInteger(p.post.in_ms),
+			);
+			console.log('history:', history);
+			gs.posts[id] = {
+				...gs.posts[id]!,
+				history: {
+					...gs.posts[id]!.history,
+					...history,
+				},
+			};
+		}
+		// TODO: show loader?
+		version = i;
+	};
+
+	let oldLastVersion = (() => lastVersion)();
+	$effect(() => {
+		if (oldLastVersion !== lastVersion) {
+			changeVersion(lastVersion);
+			oldLastVersion = lastVersion;
+		}
+	});
 </script>
 
 <div bind:this={container} id={'m' + id} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if p.nested}
 		<button
-			class={`z-40 w-5 fy bg-inherit text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 			onclick={() => {
 				let distanceFromTop = container.getBoundingClientRect().top;
 				let willBeOpen = !open;
@@ -90,27 +121,46 @@
 				{/if} -->
 				<PostHeader
 					{...p}
+					{open}
+					{evenBg}
 					{parsed}
 					onToggleParsed={() => (parsed = !parsed)}
-					{latestVersion}
+					{lastVersion}
 					{version}
-					onChangeVersion={(v) => (version = v)}
+					onChangeVersion={(v) => changeVersion(v)}
 				/>
 			</div>
 			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.post.to_ms ? 'top-6' : ''}`} />
-			<div class={open ? 'pr-1' : 'hidden'}>
-				{#if body}
-					{#if parsed}
-						<BodyParser {body} depth={p.depth} />
-					{:else}
-						<p class="whitespace-pre-wrap break-all font-thin font-mono">{body}</p>
+			{#if open}
+				<div class="pr-1">
+					{#if tags?.length}
+						<div class="overflow-hidden">
+							<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
+								{#each tags as tag}
+									<!-- TODO: Why does using leading-4 cause parent to scroll? -->
+									<a
+										href={`/l_l_${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+										class="font-bold text-fg2 px-1 leading-5 hover:text-fg1"
+									>
+										{tag}
+									</a>
+								{/each}
+							</div>
+						</div>
 					{/if}
-				{:else if !body}
-					<!-- <p class={`${deleted ? 'text-fg2 font-bold' : 'text-bg8 font-black'} italic text-xs`}>
-						{!p.post.tags?.length ? m.blank() : deleted ? m.deleted() : ''}
-					</p> -->
-				{/if}
-			</div>
+					{#if body}
+						{#if parsed}
+							<BodyParser {body} depth={p.depth} />
+						{:else}
+							<p class="whitespace-pre-wrap break-all font-thin font-mono">{body}</p>
+						{/if}
+					{:else}
+						<p class={`text-fg2 font-bold italic`}>
+							{!tags?.length ? m.blank() : deleted ? m.deleted() : ''}
+						</p>
+					{/if}
+				</div>
+			{/if}
 		</div>
 		{#if p.nested && p.post.subIds?.length}
 			<div class={open ? '' : 'hidden'}>

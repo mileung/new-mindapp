@@ -18,36 +18,98 @@ import {
 	type PartInsert,
 	type PartSelect,
 	idsRegex,
-	splitId,
-	filterIdSegs,
-	filterIdSegsAsToIdSegs,
-	filterToIdSegs,
+	getSplitId,
+	filterSplitId,
+	filterSplitIdAsToSplitId,
+	filterToSplitId,
 	getToId,
-	filterToIdSegsAsIdSegs,
+	filterToSplitIdAsSplitId,
+	type SplitId,
+	type SplitIdToSplitId,
 } from '../parts';
 import type { Post } from '.';
 
-export let deletePost = async (id: string, useRpc: boolean) => {
-	return useRpc ? trpc().deletePost.mutate(id) : _deletePost(await gsdb(), id);
+export let deletePost = async (
+	postSplitIdToSplitId: SplitIdToSplitId,
+	version: number,
+	useRpc: boolean,
+) => {
+	return useRpc
+		? trpc().deletePost.mutate({ postSplitIdToSplitId, version })
+		: _deletePost(await gsdb(), postSplitIdToSplitId, version);
 };
 
-export let _deletePost = async (db: Database, id: string) => {
-	let s = splitId(id);
-	if (s.in_ms) {
-		if (!s.by_ms) throw new Error('Missing by_ms');
-		// TODO: Verify user by_ms is logged and has access to space in_ms
+export let _deletePost = async (
+	db: Database,
+	postSplitIdToSplitId: SplitIdToSplitId,
+	version: number,
+) => {
+	if (Number.isInteger(postSplitIdToSplitId.in_ms) && !postSplitIdToSplitId.by_ms)
+		throw new Error('Missing by_ms');
+
+	let postIdRowFilter = and(
+		filterToSplitId(postSplitIdToSplitId),
+		filterSplitId(postSplitIdToSplitId),
+		eq(partsTable.code, partCodes.postIdWithNumAsLastVersionToParentPostId),
+	);
+
+	let postIdRows: PartSelect[] = [];
+	let replyPostIdRows: PartSelect[] = [];
+	let postIdRowsAndReplyPostIdRows = await db
+		.select()
+		.from(partsTable)
+		.where(
+			or(
+				postIdRowFilter,
+				and(
+					filterSplitIdAsToSplitId(postSplitIdToSplitId),
+					eq(partsTable.code, partCodes.postIdWithNumAsLastVersionToParentPostId),
+				),
+			),
+		);
+
+	for (let i = 0; i < postIdRowsAndReplyPostIdRows.length; i++) {
+		let row = postIdRowsAndReplyPostIdRows[i];
+		if (
+			row.to_ms === postSplitIdToSplitId.to_ms &&
+			row.to_by_ms === postSplitIdToSplitId.to_by_ms &&
+			row.to_in_ms === postSplitIdToSplitId.to_in_ms &&
+			row.ms === postSplitIdToSplitId.ms &&
+			row.by_ms === postSplitIdToSplitId.by_ms &&
+			row.in_ms === postSplitIdToSplitId.in_ms
+		) {
+			postIdRows.push(row);
+		} else if (
+			row.to_ms === postSplitIdToSplitId.ms &&
+			row.to_by_ms === postSplitIdToSplitId.by_ms &&
+			row.to_in_ms === postSplitIdToSplitId.in_ms
+		) {
+			replyPostIdRows.push(row);
+		} else {
+			throw new Error(`Unknown row found`);
+		}
 	}
-	if ((await _getPostChildren(db, id, 1)).length) {
-		await db
-			.update(partsTable)
-			.set({
-				body: null,
-				tags: [' deleted'],
-			})
-			.where(filterId(id));
-		return { soft: true };
+
+	let postIdRow = assert1Row(postIdRows);
+	let lastVersion = postIdRow.num;
+	if (lastVersion) {
+		//
+	} else if (!version) {
+		let partRowsToPost = await db
+			.select()
+			.from(partsTable)
+			.where(filterSplitIdAsToSplitId(postSplitIdToSplitId));
+
+		console.log('partRowsToPost:', partRowsToPost);
 	} else {
-		await db.delete(partsTable).where(filterId(id));
-		return { soft: false };
+		throw new Error(`Post version dne`);
 	}
+
+	// if (replyPostIdRows.length) {
+	// 	await db.update(partsTable).set({ num: null }).where(postIdRowFilter);
+	// 	return { soft: true };
+	// } else {
+	// 	await db.delete(partsTable).where(or(postIdRowFilter));
+	// 	return { soft: false };
+	// }
 };

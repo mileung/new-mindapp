@@ -8,7 +8,7 @@
 
 @theme {
 	/* --w-sidebar: 100vw; */
-	--w-sidebar: max(12rem, min(17rem, 20vw));
+	--w-sidebar: max(10rem, min(17rem, 20vw));
 
 	--breakpoint-xs: 501px;
 

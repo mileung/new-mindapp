@@ -17,7 +17,7 @@ const client = createClient(
 
 export let tdb = drizzle(client, { schema });
 
-export let tdbInsertNodes = tdb.insert(schema.partsTable).values;
-export let tdbNodesWhere = tdb.select().from(schema.partsTable).where;
-export let tdbDeleteNodesWhere = tdb.delete(schema.partsTable).where;
-export let tdbUpdateNodes = tdb.update(schema.partsTable).set;
+export let tdbInsertParts = tdb.insert(schema.partsTable).values;
+export let tdbPartsWhere = tdb.select().from(schema.partsTable).where;
+export let tdbDeletePartsWhere = tdb.delete(schema.partsTable).where;
+export let tdbUpdateParts = tdb.update(schema.partsTable).set;

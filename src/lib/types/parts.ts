@@ -6,7 +6,7 @@ import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { z } from 'zod';
-import { gsdb } from '../local-db';
+import { localDbFilename, gsdb } from '../local-db';
 import { partsTable } from './parts-table';
 
 export type PartInsert = typeof partsTable.$inferInsert;
@@ -14,6 +14,40 @@ export type PartSelect = typeof partsTable.$inferSelect;
 
 export let PartInsertSchema = createInsertSchema(partsTable);
 export let PartSelectSchema = createSelectSchema(partsTable);
+
+export let SplitIdToSplitIdSchema = z.object({
+	to_ms: z.number().nullish(),
+	to_by_ms: z.number().nullish(),
+	to_in_ms: z.number().nullish(),
+	ms: z.number().nullish(),
+	by_ms: z.number().nullish(),
+	in_ms: z.number().nullish(),
+});
+
+export type SplitIdToSplitId = z.infer<typeof SplitIdToSplitIdSchema>;
+
+export let SplitIdSchema = z.object({
+	ms: z.number().nullish(),
+	by_ms: z.number().nullish(),
+	in_ms: z.number().nullish(),
+});
+
+export type SplitId = z.infer<typeof SplitIdSchema>;
+
+export let getSplitIdToSplitId = (idToSplitId: SplitIdToSplitId) => ({
+	to_ms: idToSplitId.to_ms,
+	to_by_ms: idToSplitId.to_by_ms,
+	to_in_ms: idToSplitId.to_in_ms,
+	ms: idToSplitId.ms,
+	by_ms: idToSplitId.by_ms,
+	in_ms: idToSplitId.in_ms,
+});
+
+export let getToSplitIdAsSplitId = (idToSplitId: SplitIdToSplitId) => ({
+	ms: idToSplitId.to_ms,
+	by_ms: idToSplitId.to_by_ms,
+	in_ms: idToSplitId.to_in_ms,
+});
 
 export let bracketRegex = /\[([^\[\]]+)]/g;
 export let templateIdRegex = /^(l|\d*)_(l|\d*)_(l|\d*)$/;
@@ -49,13 +83,10 @@ export let partCodes = uniqueMapVals({
 	currentPostTagIdWithNumAsVersionToPostId: 10,
 	exPostTagIdWithNumAsVersionToPostId: 11,
 
-	currentPostTxtAsBodyWithNumAsVersionToPostId: 20,
-	exPostTxtAsBodyWithNumAsVersionToPostId: 21,
+	currentPostBodyTxtWithMsAndNumAsVersionToPostId: 20,
+	exPostBodyTxtWithMsAndNumAsVersionToPostId: 21,
 
-	txtAsTagAndNumAsCount: 30,
-	msWithNumAsVersionToPostId: 31,
-	// numAsCiteCountToPostId: 32,
-	// numAsReplyCountToPostId: 33,
+	tagTxtAndNumAsCount: 30,
 
 	space: 40,
 	spaceNameToSpaceId: 41,
@@ -80,9 +111,10 @@ export let partCodes = uniqueMapVals({
 	sessionId: 70,
 
 	postIdWithNumAsNestedUpdatesFeedPriorityToRootPostId: 80,
+	// lonePostIdWithNumAsNestedUpdatesFeedPriority: 81,
 });
 
-export function splitId(id: string) {
+export function getSplitId(id: string) {
 	let s = id.split('_', 3);
 	return {
 		ms: s[0] ? +s[0] : null,
@@ -91,73 +123,65 @@ export function splitId(id: string) {
 	} as const;
 }
 
-export let filterId = (id: string) => filterIdSegs(splitId(id));
+export let getIdFilter = (id: string) => filterSplitId(getSplitId(id));
 
-export let filterIdSegs = (segs: PartInsert) => {
+export let filterSplitId = (splitId: SplitId) => {
 	return and(
-		segs.ms === null || segs.ms === undefined //
+		splitId.ms === null || splitId.ms === undefined //
 			? isNull(partsTable.ms)
-			: eq(partsTable.ms, segs.ms),
-		segs.by_ms === null || segs.by_ms === undefined
+			: eq(partsTable.ms, splitId.ms),
+		splitId.by_ms === null || splitId.by_ms === undefined
 			? isNull(partsTable.by_ms)
-			: eq(partsTable.by_ms, segs.by_ms),
-		segs.in_ms === null || segs.in_ms === undefined
+			: eq(partsTable.by_ms, splitId.by_ms),
+		splitId.in_ms === null || splitId.in_ms === undefined
 			? isNull(partsTable.in_ms)
-			: eq(partsTable.in_ms, segs.in_ms),
+			: eq(partsTable.in_ms, splitId.in_ms),
 	);
 };
 
-export let filterIdSegsAsToIdSegs = (segs: PartInsert) =>
+export let filterSplitIdAsToSplitId = (splitId: SplitId) =>
 	and(
-		segs.ms === null || segs.ms === undefined
+		splitId.ms === null || splitId.ms === undefined
 			? isNull(partsTable.to_ms)
-			: eq(partsTable.to_ms, segs.ms),
-		segs.by_ms === null || segs.by_ms === undefined
+			: eq(partsTable.to_ms, splitId.ms),
+		splitId.by_ms === null || splitId.by_ms === undefined
 			? isNull(partsTable.to_by_ms)
-			: eq(partsTable.to_by_ms, segs.by_ms),
-		segs.in_ms === null || segs.in_ms === undefined
+			: eq(partsTable.to_by_ms, splitId.by_ms),
+		splitId.in_ms === null || splitId.in_ms === undefined
 			? isNull(partsTable.to_in_ms)
-			: eq(partsTable.to_in_ms, segs.in_ms),
+			: eq(partsTable.to_in_ms, splitId.in_ms),
 	);
 
-export let filterToIdSegsAsIdSegs = (segs: PartInsert) =>
+export let filterToSplitIdAsSplitId = (splitIdToSplitId: SplitIdToSplitId) =>
 	and(
-		segs.to_ms === null || segs.to_ms === undefined
+		splitIdToSplitId.to_ms === null || splitIdToSplitId.to_ms === undefined
 			? isNull(partsTable.ms)
-			: eq(partsTable.ms, segs.to_ms),
-		segs.to_by_ms === null || segs.to_by_ms === undefined
+			: eq(partsTable.ms, splitIdToSplitId.to_ms),
+		splitIdToSplitId.to_by_ms === null || splitIdToSplitId.to_by_ms === undefined
 			? isNull(partsTable.by_ms)
-			: eq(partsTable.by_ms, segs.to_by_ms),
-		segs.to_in_ms === null || segs.to_in_ms === undefined
+			: eq(partsTable.by_ms, splitIdToSplitId.to_by_ms),
+		splitIdToSplitId.to_in_ms === null || splitIdToSplitId.to_in_ms === undefined
 			? isNull(partsTable.in_ms)
-			: eq(partsTable.in_ms, segs.to_in_ms),
+			: eq(partsTable.in_ms, splitIdToSplitId.to_in_ms),
 	);
 
-export let filterToIdSegs = (segs: PartInsert) =>
+export let filterToSplitId = (splitIdToSplitId: SplitIdToSplitId) =>
 	and(
-		segs.to_ms === null || segs.to_ms === undefined
+		splitIdToSplitId.to_ms === null || splitIdToSplitId.to_ms === undefined
 			? isNull(partsTable.to_ms)
-			: eq(partsTable.to_ms, segs.to_ms),
-		segs.by_ms === null || segs.by_ms === undefined
+			: eq(partsTable.to_ms, splitIdToSplitId.to_ms),
+		splitIdToSplitId.by_ms === null || splitIdToSplitId.by_ms === undefined
 			? isNull(partsTable.to_by_ms)
-			: eq(partsTable.to_by_ms, segs.by_ms),
-		segs.in_ms === null || segs.in_ms === undefined
+			: eq(partsTable.to_by_ms, splitIdToSplitId.by_ms),
+		splitIdToSplitId.in_ms === null || splitIdToSplitId.in_ms === undefined
 			? isNull(partsTable.to_in_ms)
-			: eq(partsTable.to_in_ms, segs.in_ms),
+			: eq(partsTable.to_in_ms, splitIdToSplitId.in_ms),
 	);
-
-export function dropNodesTableInOpfsInDev() {
-	let { sql } = new SQLocalDrizzle('mindapp.db');
-	if (dev) {
-		console.warn('Dropping parts table in development mode. This should NEVER run in production!');
-		dev && sql`DROP TABLE "parts";`;
-	}
-}
 
 export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
 export let overwriteLocalPost = async (t: PartInsert) => {
-	await (await gsdb()).update(partsTable).set(t).where(filterIdSegs(t));
+	await (await gsdb()).update(partsTable).set(t).where(filterSplitId(t));
 };
 
 export let hasParent = (part: PartInsert) => {
@@ -169,7 +193,7 @@ export let hasParent = (part: PartInsert) => {
 };
 
 export let _selectNode = async (db: Database, part: PartInsert) => {
-	return (await db.select().from(partsTable).where(filterIdSegs(part)))[0] as
+	return (await db.select().from(partsTable).where(filterSplitId(part)))[0] as
 		| undefined
 		| PartSelect;
 };

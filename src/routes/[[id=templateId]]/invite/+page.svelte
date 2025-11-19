@@ -3,13 +3,13 @@
 	import { spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { splitId } from '$lib/types/parts';
+	import { getSplitId } from '$lib/types/parts';
 	import { IconLinkPlus, IconSearch, IconUsersPlus } from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from '../../AccountIcon.svelte';
 	import { identikana } from '$lib/js';
 
-	let split = $derived(splitId(page.params.id || ''));
+	let split = $derived(getSplitId(page.params.id || ''));
 	let created = $derived(formatMs(split.in_ms!));
 
 	let searchIpt: HTMLInputElement;
@@ -37,7 +37,7 @@
 			// ...Array(19),
 		].map(() => +('' + Math.random()).slice(2));
 		let newFromMs = 0; //lastRoot?.ms;
-		let endReached = true; //rootPosts.length < rootPostsPerLoad;
+		let endReached = true; //rootPosts.length < postsPerLoad;
 		e.detail.loaded();
 		endReached ? e.detail.complete() : e.detail.loaded();
 	};

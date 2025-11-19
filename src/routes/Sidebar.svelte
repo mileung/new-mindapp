@@ -98,7 +98,7 @@
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts) {
 			page.state.modalId = undefined;
-			let urlPath = `/l_l_${gs.currentSpaceMs}?q=${q}`;
+			let urlPath = `/l_l_${gs.currentSpaceMs ?? ''}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else goto(urlPath);
 		}
@@ -208,11 +208,10 @@
 					}
 				}}
 			/>
-			<a
-				class="xy -ml-10 w-10 text-fg2 hover:text-fg1"
-				href={`/?q=${encodeURIComponent(searchVal)}`}
-			>
-				<IconSearch class="h-6 w-6" />
+			<a class="xy -ml-9 w-9 group" href={`/?q=${encodeURIComponent(searchVal)}`}>
+				<div class="xy h-8 w-8 group-hover:bg-bg5">
+					<IconSearch class="h-6 w-6" />
+				</div>
 			</a>
 		</div>
 		<div class="max-h-48 xs:max-h-none relative flex-1 overflow-scroll">

@@ -15,12 +15,12 @@ class GlobalState {
 	accounts = $state<undefined | Account[]>();
 	feeds = $state<Record<string, undefined | (null | string)[]>>({});
 	posts = $state<Record<string, undefined | null | Post>>({});
-	writingNew = $state(!false);
+	writingNew = $state(false);
 	writingEdit = $state<false | PartInsert>(false);
 	writingTo = $state<false | PartInsert>(false);
-	writerTags = $state<string[]>(['2000s']);
+	writerTags = $state<string[]>([]);
 	writerTagVal = $state('');
-	writerBody = $state('test');
+	writerBody = $state('');
 }
 
 export let gs = new GlobalState();
@@ -28,3 +28,35 @@ export let gs = new GlobalState();
 export let spaceMsToSpaceName = (ms: null | number) => {
 	return ms === 0 ? m.personal() : ms === 1 ? m.global() : ms ? gs.spaces[ms]?.ms : m.local();
 };
+
+export let makeFeedIdentifier = (p: {
+	view: 'nested' | 'linear';
+	sortedBy: 'bumped' | 'new' | 'old';
+	callerMs: number | null;
+	idParam: string;
+	searchedText: string;
+}) => {
+	return JSON.stringify(p);
+};
+
+export let getUndefinedLocalFeedIds = () =>
+	Object.fromEntries(
+		(
+			[
+				['nested', 'bumped'],
+				['nested', 'new'],
+				['nested', 'old'],
+				['linear', 'new'],
+				['linear', 'old'],
+			] as const
+		).map(([view, sortedBy]) => [
+			makeFeedIdentifier({
+				view,
+				sortedBy,
+				callerMs: null,
+				idParam: 'l_l_',
+				searchedText: '',
+			}),
+			undefined,
+		]),
+	);
