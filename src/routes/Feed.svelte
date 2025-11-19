@@ -28,6 +28,7 @@
 		IconSquareFilled,
 		IconMessage2Off,
 		IconFilter,
+		IconTags,
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
@@ -393,7 +394,7 @@
 		<!-- {:else if p.idParam === 'l_l_' && !p.searchedText && feed && !feed.length}
 		welcome -->
 	{:else}
-		<div class={`${spotId ? 'hidden' : ''} flex min-h-9 text-fg2 overflow-scroll`}>
+		<div class={`${spotId ? 'hidden' : ''} flex min-h-9 w-full text-fg2 overflow-scroll`}>
 			<a
 				href={makeParams('nested', sortedBy)}
 				class={`fx pr-1.5 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
@@ -428,12 +429,12 @@
 			>
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
-			<!-- <a
-				href={makeParams(nested, 'old')}
+			<a
+				href={`/l_l_${gs.currentSpaceMs ?? ''}/tags`}
 				class={`ml-auto fx pr-1.5 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
 			>
-				<IconFilter stroke={2.5} class="h-4" />Filter
-			</a> -->
+				<IconTags stroke={2.35} class="h-4.5" />Tags
+			</a>
 		</div>
 		{#each feed || [] as post (getId(post))}
 			<PostBlock {...p} {nested} {post} depth={0} />

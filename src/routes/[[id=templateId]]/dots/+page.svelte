@@ -17,7 +17,7 @@
 	import { identikana, strIsInt } from '$lib/js';
 
 	let split = $derived(getSplitId(page.params.id || ''));
-	let created = $derived(strIsInt(split.ms) ? formatMs(+split.ms) : null);
+	let created = $derived(formatMs(split.ms!));
 
 	let searchIpt: HTMLInputElement;
 	let searchVal = $state('');

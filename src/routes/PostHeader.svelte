@@ -107,10 +107,10 @@
 				}
 			}}
 		>
-			<div class={`truncate h-5 pr-1 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+			<div class={`truncate h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 				<AccountIcon ms={postByMs} class="mr-0.5 w-4 min-w-4" />
-				<!-- TODO: names for users -->
-				<p class="truncate">
+				<p class="truncate pr-1">
+					<!-- TODO: names for users -->
 					<!-- {postByMs ? getAccountName(...) || identikana(postByMs) : m.anon()} -->
 					{postByMs ? identikana(postByMs) : m.anon()}
 				</p>
@@ -120,11 +120,9 @@
 			href={`/l_l_${postInMs ?? ''}`}
 			class={`truncate fx group hover:text-fg1 ${postInMs ? '' : 'italic'}`}
 		>
-			<div
-				class={`truncate h-5 gap-1 pr-1 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
-			>
-				<SpaceIcon ms={postInMs} class="w-4 min-w-4" />
-				<p class={`truncate ${gs.posts[postInMs || ''] ? '' : 'italic'}`}>
+			<div class={`truncate h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+				<SpaceIcon ms={postInMs} class="mx-0.5 w-4 min-w-4" />
+				<p class="truncate pr-0.5">
 					{postInMs === 0
 						? m.personal()
 						: postInMs === 1
@@ -143,7 +141,7 @@
 				gs.writerBody = `${gs.writerBody}\n${postId}`;
 			}}
 		>
-			<div class={`h-5 pl-1 pr-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+			<div class={`h-5 px-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 				<IconSquarePlus2 stroke={2.5} class="w-4" />
 			</div>
 		</button>
