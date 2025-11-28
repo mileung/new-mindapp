@@ -1,37 +1,20 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { goto, pushState } from '$app/navigation';
+	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
 	import { getUndefinedLocalFeedIds, gs, makeFeedIdentifier } from '$lib/global-state.svelte';
-	import { strIsInt } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { updateSavedTags, updateLocalCache } from '$lib/types/local-cache';
-	import { hasParent, overwriteLocalPost } from '$lib/types/parts';
+	import { updateLocalCache, updateSavedTags } from '$lib/types/local-cache';
+	import { hasParent } from '$lib/types/parts';
 	import {
-		IconChevronRight,
-		IconCornerUpLeft,
-		IconPencil,
-		IconPencilPlus,
-		IconClockUp,
-		IconX,
-		IconArchive,
-		IconMessage2Up,
-		IconListTree,
-		IconList,
-		IconSquareFilled,
-		IconMessage2Off,
-		IconFilter,
-		IconTags,
-		IconBell,
-		IconInbox,
-		IconStack,
-		IconStack2,
-		IconCalendar,
-	} from '@tabler/icons-svelte';
-	import { onMount } from 'svelte';
-	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import Highlight from './Highlight.svelte';
-	import PostBlock from './PostBlock.svelte';
-	import PostWriter from './PostWriter.svelte';
+		getAtIdStr,
+		getIdStr,
+		idsRegex,
+		idStrAsIdObj,
+		zeros,
+		type IdObj,
+	} from '$lib/types/parts/partIds';
 	import {
 		getCitedPostIds,
 		getLastVersion,
@@ -39,26 +22,33 @@
 		scrollToHighlight,
 		type Post,
 	} from '$lib/types/posts';
+	import { addPost } from '$lib/types/posts/addPost';
+	import { editPost } from '$lib/types/posts/editPost';
 	import {
 		bracketRegex,
 		getPostFeed,
 		postsPerLoad,
 		type GetPostFeedQuery,
 	} from '$lib/types/posts/getPostFeed';
-	import { addPost } from '$lib/types/posts/addPost';
-	import { dev } from '$app/environment';
-	import { page } from '$app/state';
-	import { editPost } from '$lib/types/posts/editPost';
-	import PromptSignIn from './PromptSignIn.svelte';
-	import type { LayoutServerData } from './$types';
 	import {
-		getIdStr,
-		idStrAsIdObj,
-		getAtIdStr,
-		idsRegex,
-		zeros,
-		type IdObj,
-	} from '$lib/types/parts/partIds';
+		IconArchive,
+		IconChevronRight,
+		IconClockUp,
+		IconInbox,
+		IconList,
+		IconListTree,
+		IconMessage2Up,
+		IconPencilPlus,
+		IconSquareFilled,
+		IconStack2,
+		IconX,
+	} from '@tabler/icons-svelte';
+	import { onMount } from 'svelte';
+	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
+	import type { LayoutServerData } from './$types';
+	import PostBlock from './PostBlock.svelte';
+	import PostWriter from './PostWriter.svelte';
+	import PromptSignIn from './PromptSignIn.svelte';
 
 	let timeGetPostFeed = dev;
 	timeGetPostFeed = false;

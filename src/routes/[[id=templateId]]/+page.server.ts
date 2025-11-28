@@ -1,5 +1,3 @@
-import { error, redirect } from '@sveltejs/kit';
-
 export const load = async ({ url, params }) => {
 	// url.pathname
 	const isValid = false;

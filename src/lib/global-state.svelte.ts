@@ -1,9 +1,9 @@
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
+import { identikana, sortObjectProps } from './js';
 import { m } from './paraglide/messages';
 import type { Account } from './types/accounts';
 import type { Post } from './types/posts';
 import type { Space } from './types/spaces';
-import { identikana, sortObjectProps } from './js';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
@@ -52,6 +52,7 @@ export let getUndefinedLocalFeedIds = () =>
 				['nested', 'bumped'],
 				['nested', 'new'],
 				['nested', 'old'],
+				['flat', 'bumped'],
 				['flat', 'new'],
 				['flat', 'old'],
 			] as const

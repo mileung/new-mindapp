@@ -1,11 +1,11 @@
+import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
-import { and, asc, desc, eq, isNotNull, isNull } from 'drizzle-orm';
+import { and, asc, desc, isNotNull } from 'drizzle-orm';
 import { gsdb } from '../../local-db';
 import { getBaseInput, type BaseInput } from '../parts';
-import { pTable } from '../parts/partsTable';
-import { pt } from '../parts/partFilters';
 import { pc } from '../parts/partCodes';
-import type { Database } from '$lib/local-db';
+import { pt } from '../parts/partFilters';
+import { pTable } from '../parts/partsTable';
 
 export let getSpaceTags = async () => {
 	let baseInput = getBaseInput();

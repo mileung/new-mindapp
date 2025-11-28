@@ -3,24 +3,23 @@
 	import { page } from '$app/state';
 	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { localDbFilename, initLocalDb } from '$lib/local-db';
+	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
 	import {
-		refreshCurrentAccount,
-		getLocalCache,
-		updateLocalCache,
 		changeCurrentSpace,
+		getLocalCache,
+		refreshCurrentAccount,
+		updateLocalCache,
 	} from '$lib/types/local-cache';
 	import { getBaseInput } from '$lib/types/parts';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData, LayoutServerData } from './$types';
 	import Sidebar from './Sidebar.svelte';
-	import { strIsInt } from '$lib/js';
-	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {

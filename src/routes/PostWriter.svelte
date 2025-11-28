@@ -5,13 +5,13 @@
 	import { m } from '$lib/paraglide/messages';
 	import { unsaveTagInCurrentAccount } from '$lib/types/local-cache';
 	import { type PartSelect } from '$lib/types/parts';
+	import { getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
 		IconCornerUpLeft,
 		IconGripVertical,
-		IconMoodPlus,
 		IconPencil,
 		IconPencilPlus,
 		IconX,
@@ -19,7 +19,6 @@
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import Highlight from './Highlight.svelte';
-	import { getIdStr } from '$lib/types/parts/partIds';
 
 	let coreTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;

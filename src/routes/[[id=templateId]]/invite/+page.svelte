@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { getIdObj } from '$lib/types/parts';
-	import { IconLinkPlus, IconSearch, IconUsersPlus } from '@tabler/icons-svelte';
-	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
+	import { IconLinkPlus } from '@tabler/icons-svelte';
+	import { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from '../../AccountIcon.svelte';
-	import { identikana } from '$lib/js';
 
-	let split = $derived(getIdObj(page.params.id || ''));
-	let created = $derived(formatMs(split.in_ms!));
+	let paramIdObj = $derived(idStrAsIdObj(page.params.id || ''));
+	let created = $derived(formatMs(paramIdObj.in_ms!));
 
 	let searchIpt: HTMLInputElement;
 	let searchVal = $state('');
@@ -50,7 +50,7 @@
 	<div class="w-full max-w-sm">
 		<div class="text-xl font-bold">
 			<p class="text-3xl font-black">
-				{spaceMsToSpaceName(null)}
+				{spaceMsToSpaceName(0)}
 			</p>
 			<p class="mt-2">{m.expires()}</p>
 			<select

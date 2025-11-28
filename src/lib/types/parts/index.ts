@@ -4,9 +4,8 @@ import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { gsdb } from '../../local-db';
 import { pt } from './partFilters';
-import { getIdStr, zeros, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
+import { getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
 import { pTable } from './partsTable';
-import { pc } from './partCodes';
 
 export type PartInsert = typeof pTable.$inferInsert;
 export type PartSelect = typeof pTable.$inferSelect;

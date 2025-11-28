@@ -11,6 +11,7 @@
 		unsaveTagInCurrentAccount,
 		updateLocalCache,
 	} from '$lib/types/local-cache';
+	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import {
 		IconDotsVertical,
 		IconHelpSquareRounded,
@@ -27,7 +28,6 @@
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
-	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 
 	let searchIpt: HTMLInputElement;
 	let searchedText = $state(page.url.searchParams.get('q') || '');

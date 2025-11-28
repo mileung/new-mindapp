@@ -5,7 +5,8 @@
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
 	import { updateLocalCache } from '$lib/types/local-cache';
-	import { getBaseInput, pc } from '$lib/types/parts';
+	import { getBaseInput } from '$lib/types/parts';
+	import { pc } from '$lib/types/parts/partCodes';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 
 	let p: {

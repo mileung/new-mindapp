@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 	import {
 		IconCrown,
 		IconSearch,
@@ -12,11 +14,9 @@
 		IconUsersPlus,
 	} from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import AccountIcon from '../../AccountIcon.svelte';
-	import { identikana, strIsInt } from '$lib/js';
-	import PromptSignIn from '../../PromptSignIn.svelte';
 	import type { LayoutServerData } from '../../$types';
-	import { idStrAsIdObj } from '$lib/types/parts/partIds';
+	import AccountIcon from '../../AccountIcon.svelte';
+	import PromptSignIn from '../../PromptSignIn.svelte';
 
 	let split = $derived(idStrAsIdObj(page.params.id || ''));
 	let created = $derived(formatMs(split.ms!));

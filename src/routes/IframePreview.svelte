@@ -1,15 +1,6 @@
 <script lang="ts">
 	import { m } from '$lib/paraglide/messages';
-	import {
-		IconArrowsMaximize,
-		IconArrowsMinimize,
-		IconBoxAlignTopLeft,
-		IconMaximize,
-		IconMinimize,
-		IconSquare,
-		IconSquareMinus,
-		IconX,
-	} from '@tabler/icons-svelte';
+	import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-svelte';
 	import CredentiallessIframe from './CredentiallessIframe.svelte';
 
 	let ytRegex =

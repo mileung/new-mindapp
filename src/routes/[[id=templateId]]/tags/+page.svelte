@@ -3,11 +3,10 @@
 	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { getSpaceTags } from '$lib/types/spaces/getSpaceTags';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import type { LayoutServerData } from '../../$types';
 	import PromptSignIn from '../../PromptSignIn.svelte';
-	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 
 	let split = $derived(idStrAsIdObj(page.params.id || ''));
 	let created = $derived(formatMs(split.ms!));

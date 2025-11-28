@@ -3,9 +3,9 @@ import { z } from 'zod';
 import { gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
 import { AccountSchema, getDefaultAccount } from './accounts';
-import { SpaceSchema } from './spaces';
-import { normalizeTags } from './posts';
 import { getBaseInput } from './parts';
+import { normalizeTags } from './posts';
+import { SpaceSchema } from './spaces';
 
 let lcKey = 'localCache';
 

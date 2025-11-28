@@ -3,10 +3,10 @@ import { and, eq, or } from 'drizzle-orm';
 import { type Post } from '.';
 import { gsdb, type Database } from '../../local-db';
 import { assert1Row, type PartSelect } from '../parts';
-import { pTable } from '../parts/partsTable';
-import { getIdStr, type FullIdObj } from '../parts/partIds';
-import { pt } from '../parts/partFilters';
 import { pc } from '../parts/partCodes';
+import { pt } from '../parts/partFilters';
+import { getIdStr, type FullIdObj } from '../parts/partIds';
+import { pTable } from '../parts/partsTable';
 
 export let getPostHistory = async (fullPostId: FullIdObj, version: number, useRpc: boolean) => {
 	return useRpc

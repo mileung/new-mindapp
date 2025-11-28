@@ -208,5 +208,3 @@ let urlSelectors: Record<
 function getTitle() {
 	return document.querySelector('meta[name="title"]')?.getAttribute('content') || document.title;
 }
-
-export {};

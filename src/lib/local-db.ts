@@ -1,8 +1,8 @@
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { gs } from './global-state.svelte';
 import { m } from './paraglide/messages';
-import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 
 export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 

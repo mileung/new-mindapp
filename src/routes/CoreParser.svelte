@@ -2,9 +2,7 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { isStringifiedRecord } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { type PartInsert } from '$lib/types/parts';
 	import { idsRegex } from '$lib/types/parts/partIds';
-	import type { Post } from '$lib/types/posts';
 	import CitedPost from './CitedPost.svelte';
 	import Markdown from './Markdown.svelte';
 	import MiniCitedPost from './MiniCitedPost.svelte';
