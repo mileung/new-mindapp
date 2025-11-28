@@ -13,7 +13,7 @@ export function scrape(externalUrl: string, externalDomString: string) {
 		},
 		'www.reddit.com': () => {
 			let subreddit = externalUrl.match(/\/(r\/[^/]+)/)?.[1];
-			// TODO: get the post body as markdown
+			// TODO: get the post core as markdown
 			// e.g. https://www.reddit.com/r/UI_Design/comments/vzqe34/menu_knowledge_is_essential/
 			return { tags: subreddit ? [subreddit] : [] };
 		},

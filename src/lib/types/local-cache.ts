@@ -1,18 +1,17 @@
-import { goto } from '$app/navigation';
-
 import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
 import { gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
-import { AccountSchema } from './accounts';
+import { AccountSchema, getDefaultAccount } from './accounts';
 import { SpaceSchema } from './spaces';
 import { normalizeTags } from './posts';
+import { getBaseInput } from './parts';
 
 let lcKey = 'localCache';
 
 export let LocalCacheSchema = z
 	.object({
-		currentSpaceMs: z.number().nullish(),
+		currentSpaceMs: z.number(),
 		spaces: z.record(z.number(), SpaceSchema.optional()),
 		accounts: z.array(AccountSchema),
 	})
@@ -22,20 +21,9 @@ export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
 let getDefaultLocalCache = () =>
 	structuredClone({
-		currentSpaceMs: null,
+		currentSpaceMs: 0,
 		spaces: {},
-		accounts: [
-			{
-				ms: null,
-				spaceMss: [
-					null, // local space id - everything local
-					0, // personal space id - everything private in cloud
-					1, // global space id - everything public in cloud
-					// users can make additional spaces with custom privacy
-				],
-				savedTags: [],
-			},
-		],
+		accounts: [getDefaultAccount()],
 	} satisfies LocalCache);
 
 export function getLocalCache() {
@@ -71,22 +59,22 @@ export async function updateLocalCache(updater: (old: LocalCache) => LocalCache)
 		}
 		gs.currentSpaceMs = newLocalCache.currentSpaceMs;
 		gs.accounts = newLocalCache.accounts;
-		gs.spaces = newLocalCache.spaces;
+		gs.idToSpaceMap = newLocalCache.spaces;
 		localStorage.setItem(lcKey, JSON.stringify(newLocalCache));
 	}
 }
 
 export let updateSavedTags = async (update: { adding: string[]; removing: string[] }) => {
-	// if (gs.accounts?.[0].ms) {
-	// 	let res = await trpc().updateSavedTags.mutate({
-	// 		...update,
-	// 		callerMs: gs.accounts[0].ms,
-	// 	});
-	// 	await updateLocalCache((lc) => {
-	// 		lc.accounts[0].savedTagsMs = res.savedTagsMs;
-	// 		return lc;
-	// 	});
-	// }
+	if (gs.accounts?.[0].ms) {
+		let res = await trpc().updateSavedTags.mutate({
+			...getBaseInput(),
+			...update,
+		});
+		await updateLocalCache((lc) => {
+			lc.accounts[0].savedTagsMs = res.savedTagsMs;
+			return lc;
+		});
+	}
 	await updateLocalCache((lc) => {
 		let removingSet = new Set(update.removing);
 		lc.accounts[0].savedTags = normalizeTags([
@@ -103,28 +91,28 @@ export let unsaveTagInCurrentAccount = async (tag: string) => {
 
 export let refreshCurrentAccount = async () => {
 	if (gs.accounts?.[0].ms) {
-		let res = await trpc().getAccountByMs.query({
-			callerMs: gs.accounts[0].ms,
-			// spaceMssMs: gs.accounts[0].spaceMssMs,
-			// savedTagsMs: gs.accounts[0].savedTagsMs,
-			// emailMs: gs.accounts[0].emailMs,
-			// nameMs: gs.accounts[0].nameMs,
-		});
-		if (res) {
-			updateLocalCache((lc) => {
-				lc.accounts[0] = {
-					...lc.accounts[0],
-					...res,
-				};
-				return lc;
-			});
-		}
+		// let res = await trpc().getAccountByMs.query({
+		// 	byMs: gs.accounts[0].ms,
+		// 	inMs:0,
+		// 	// spaceMssMs: gs.accounts[0].spaceMssMs,
+		// 	// savedTagsMs: gs.accounts[0].savedTagsMs,
+		// 	// emailMs: gs.accounts[0].emailMs,
+		// 	// nameMs: gs.accounts[0].nameMs,
+		// });
+		// if (res) {
+		// 	updateLocalCache((lc) => {
+		// 		lc.accounts[0] = {
+		// 			...lc.accounts[0],
+		// 			...res,
+		// 		};
+		// 		return lc;
+		// 	});
+		// }
 	}
 };
 
-export let changeCurrentSpace = (inMs: number | null, noGo = false, dots = false) => {
-	!noGo && goto(`/l_l_${inMs ?? ''}${dots ? '/dots' : ''}`);
-	localStorage.setItem('currentSpaceMs', inMs === null ? '' : '' + inMs);
+export let changeCurrentSpace = (inMs: number) => {
+	localStorage.setItem('currentSpaceMs', '' + inMs);
 	updateLocalCache((lc) => {
 		lc.currentSpaceMs = inMs;
 		return lc;

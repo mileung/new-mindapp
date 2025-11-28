@@ -5,6 +5,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
 	import { updateLocalCache } from '$lib/types/local-cache';
+	import { getBaseInput, pc } from '$lib/types/parts';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 
 	let p: {
@@ -39,7 +40,8 @@
 			</a>
 		{:else}
 			<button
-				class="text-hl1 hover:text-hl2"
+				type="button"
+				class="text-fg2 hover:text-fg1"
 				onclick={(e) => {
 					e.preventDefault();
 					showingPw = !showingPw;
@@ -69,11 +71,11 @@
 		/>
 	{/if}
 {/snippet}
-{#snippet submitRow()}
+{#snippet continueAndChangeEmailBtn()}
 	<div class="mt-2 flex items-end w-full justify-between">
 		<button
 			type="submit"
-			class="fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
+			class="fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1 hover:border-hl2"
 		>
 			{m.continue()}
 			<IconChevronRight class="h-5" stroke={3} /></button
@@ -102,12 +104,13 @@
 				onsubmit={async (e) => {
 					e.preventDefault();
 					try {
-						let res = await trpc().auth.resetPassword.mutate({
-							email,
-							pin,
-							otpMs,
-							password,
-						});
+						// let res = await trpc().auth.resetPassword.mutate({
+						// 	email,
+						// 	pin,
+						// 	otpMs,
+						// 	password,
+						// });
+						// TODO: sign in
 					} catch (error) {
 						console.log('error:', error);
 						alert(error);
@@ -115,7 +118,7 @@
 				}}
 			>
 				{@render pwInputs()}
-				{@render submitRow()}
+				{@render continueAndChangeEmailBtn()}
 			</form>
 		{:else if otpMs}
 			<p class="text-3xl font-black">{m.checkYourInbox()}</p>
@@ -126,44 +129,51 @@
 				onsubmit={async (e) => {
 					e.preventDefault();
 					try {
+						let strike: undefined | number;
 						if (p.signingIn) {
-							let res = await trpc().auth.signIn.mutate({
+							let res = await trpc().auth.attemptSignIn.mutate({
+								...getBaseInput(),
 								email,
 								password,
 								otpMs,
 								pin,
 							});
-							console.log('res:', res);
+							strike = res?.strike;
 						} else if (p.creatingAccount) {
-							let res = await trpc().auth.createAccount.mutate({
+							let res = await trpc().auth.attemptCreateAccount.mutate({
+								...getBaseInput(),
 								name,
 								email,
 								password,
 								otpMs,
 								pin,
 							});
-							updateLocalCache((lc) => {
-								if (gs.accounts) {
-									lc.accounts = [
-										res.account,
-										...gs.accounts.filter((a) => a.ms !== res.account.ms),
-									];
-								}
-								return lc;
-							});
-							goto(`/l_l_${gs.currentSpaceMs}`, {});
+							strike = res?.strike;
+							let { account } = res;
+							if (account) {
+								updateLocalCache((lc) => {
+									lc.accounts = [account, ...lc.accounts.filter((a) => a.ms !== account.ms)];
+									return lc;
+								});
+								goto(`/l_l_${gs.currentSpaceMs}`, {});
+							}
 						} else if (p.resettingPassword) {
 							let res = await trpc().auth.checkOtp.mutate({
+								...getBaseInput(),
 								otpMs,
 								pin,
 								email,
+								partCode: pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
 							});
-							if (res?.strike) {
-								if (res.strike > 2) {
-									alert(m.tooManyFailedAttempts());
-									email = pin = '';
-								} else alert(m.incorrectOneTimePin());
-							} else resettingPassword = true;
+							strike = res?.strike;
+							if (!strike) resettingPassword = true;
+						}
+						console.log('strike:', strike);
+						if (strike) {
+							if (strike > 2) {
+								alert(m.tooManyFailedAttempts());
+								email = pin = '';
+							} else alert(m.incorrectOneTimePin());
 						}
 					} catch (error) {
 						console.log('error:', error);
@@ -184,7 +194,7 @@
 						// TODO: prevent the "Please lengthen this text" thing from showing up as the user is trying to correct a submitted invalid input
 					}}
 				/>
-				{@render submitRow()}
+				{@render continueAndChangeEmailBtn()}
 			</form>
 		{:else}
 			<p class="text-3xl font-black">
@@ -197,6 +207,7 @@
 			<form
 				class="mt-2"
 				onsubmit={async (e) => {
+					console.log('e:', e);
 					e.preventDefault();
 					try {
 						let normalizedEmail = email.trim().toLowerCase();
@@ -212,11 +223,11 @@
 								});
 								return goto(`/l_l_${gs.currentSpaceMs}`);
 							}
-							let res = await trpc().auth.signIn.mutate({
+							let res = await trpc().auth.attemptSignIn.mutate({
+								...getBaseInput(),
 								email: normalizedEmail,
 								password,
 							});
-							console.log('res:', res);
 							if (res.otpMs) {
 								otpMs = res.otpMs;
 								email = normalizedEmail;
@@ -224,10 +235,12 @@
 							}
 							return;
 						} else {
-							console.log('sendOtp');
 							let res = await trpc().auth.sendOtp.mutate({
+								...getBaseInput(),
 								email,
-								purpose: p.creatingAccount ? 'create-account' : 'reset-password',
+								partCode: p.creatingAccount
+									? pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount
+									: pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
 							});
 							name = name.trim();
 							otpMs = res.otpMs;
@@ -271,7 +284,7 @@
 						</a>
 					</p>
 				{/if}
-				{@render submitRow()}
+				{@render continueAndChangeEmailBtn()}
 			</form>
 		{/if}
 	</div>

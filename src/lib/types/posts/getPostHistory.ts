@@ -1,132 +1,103 @@
-import { dev } from '$app/environment';
-// import { tdb } from '$lib/server/db';
 import { trpc } from '$lib/trpc/client';
-import { and, asc, desc, eq, gte, isNotNull, isNull, like, lte, not, or, sql } from 'drizzle-orm';
-import type { LibSQLDatabase } from 'drizzle-orm/libsql';
-import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
-import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { z } from 'zod';
-import { gsdb } from '../../local-db';
-import { partsTable } from '../parts-table';
-import {
-	assert1Row,
-	getId,
-	hasParent,
-	partCodes,
-	type Database,
-	type PartInsert,
-	type PartSelect,
-	idsRegex,
-	getSplitId,
-	filterSplitId,
-	filterSplitIdAsToSplitId,
-	filterToSplitId,
-	getToId,
-	filterToSplitIdAsSplitId,
-	assertLt2Rows,
-	type SplitId,
-	type SplitIdToSplitId,
-} from '../parts';
-import { getCitedPostIds, normalizeTags, type Post } from '.';
+import { and, eq, or } from 'drizzle-orm';
+import { type Post } from '.';
+import { gsdb, type Database } from '../../local-db';
+import { assert1Row, type PartSelect } from '../parts';
+import { pTable } from '../parts/partsTable';
+import { getIdStr, type FullIdObj } from '../parts/partIds';
+import { pt } from '../parts/partFilters';
+import { pc } from '../parts/partCodes';
 
-export let getPostHistory = async (
-	postSplitIdToSplitId: SplitIdToSplitId,
-	version: number,
-	useRpc: boolean,
-) => {
+export let getPostHistory = async (fullPostId: FullIdObj, version: number, useRpc: boolean) => {
 	return useRpc
-		? trpc().getPostHistory.mutate({ postSplitIdToSplitId, version })
-		: _getPostHistory(await gsdb(), postSplitIdToSplitId, version);
+		? trpc().getPostHistory.mutate({ ...fullPostId, fullPostId, version })
+		: _getPostHistory(await gsdb(), fullPostId, version);
 };
 
-// TODO: paginate history versions
-export let _getPostHistory = async (
-	db: Database,
-	postSplitIdToSplitId: SplitIdToSplitId,
-	version: number,
-) => {
-	if (Number.isInteger(postSplitIdToSplitId.in_ms) && !postSplitIdToSplitId.by_ms)
-		throw new Error('Missing by_ms');
+// TODO: paginate history versions?
+export let _getPostHistory = async (db: Database, fullPostId: FullIdObj, version: number) => {
+	if (fullPostId.in_ms > 0 && !fullPostId.by_ms) throw new Error('Invalid by_ms');
 	let postSubParts = await db
 		.select()
-		.from(partsTable)
+		.from(pTable)
 		.where(
 			and(
-				filterSplitIdAsToSplitId(postSplitIdToSplitId),
+				pt.idAsAtId(fullPostId),
 				or(
 					...[
-						partCodes.currentPostTagIdWithNumAsVersionToPostId,
-						partCodes.currentPostBodyTxtWithMsAndNumAsVersionToPostId,
-						partCodes.exPostTagIdWithNumAsVersionToPostId,
-						partCodes.exPostBodyTxtWithMsAndNumAsVersionToPostId,
-					].map((code) => eq(partsTable.code, code)),
+						pc.currentPostTagIdWithNumAsVersionAtPostId,
+						pc.currentPostCoreIdWithNumAsVersionAtPostId,
+						pc.exPostTagIdWithNumAsVersionAtPostId,
+						pc.exPostCoreIdWithNumAsVersionAtPostId,
+					].map((code) => pt.code.eq(code)),
 				),
-				eq(partsTable.num, version),
+				eq(pTable.num, version),
 			),
 		);
 
 	let tagIdsSet = new Set<string>();
 	let tagIdRows: PartSelect[] = [];
-	let bodyRows: PartSelect[] = [];
+	let coreRows: PartSelect[] = [];
 
 	for (let i = 0; i < postSubParts.length; i++) {
 		let part = postSubParts[i];
 		if (
-			part.code === partCodes.currentPostTagIdWithNumAsVersionToPostId ||
-			part.code === partCodes.exPostTagIdWithNumAsVersionToPostId
+			part.code === pc.currentPostTagIdWithNumAsVersionAtPostId ||
+			part.code === pc.exPostTagIdWithNumAsVersionAtPostId
 		) {
-			let tagId = getId(part);
+			let tagId = getIdStr(part);
 			if (part.ms && !tagIdsSet.has(tagId)) {
 				tagIdsSet.add(tagId);
 				tagIdRows.push(part);
 			}
 		} else if (
-			part.code === partCodes.currentPostBodyTxtWithMsAndNumAsVersionToPostId ||
-			part.code === partCodes.exPostBodyTxtWithMsAndNumAsVersionToPostId
+			part.code === pc.currentPostCoreIdWithNumAsVersionAtPostId ||
+			part.code === pc.exPostCoreIdWithNumAsVersionAtPostId
 		) {
-			bodyRows.push(part);
+			coreRows.push(part);
 		}
 	}
-	assert1Row(bodyRows);
+	assert1Row(coreRows);
 	let tagRows = tagIdRows.length
 		? await db
 				.select()
-				.from(partsTable)
+				.from(pTable)
 				.where(
 					and(
-						or(...tagIdRows.map((row) => filterSplitId(row))),
-						isNull(partsTable.to_ms),
-						isNull(partsTable.to_by_ms),
-						isNull(partsTable.to_in_ms),
-						eq(partsTable.code, partCodes.tagTxtAndNumAsCount),
-						isNotNull(partsTable.txt),
-						eq(partsTable.num, version),
+						pt.at_ms.eq0,
+						pt.at_by_ms.eq0,
+						pt.at_in_ms.eq0,
+						or(...tagIdRows.map((row) => pt.id(row))),
+						pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+						pt.txt.isNotNull,
+						pt.num.isNotNull,
 					),
 				)
 		: [];
 
 	let parts = [...postSubParts, ...tagRows];
 	let tagIdToTxtMap: Record<string, string> = {};
-	let history: Post['history'] = { [version]: { ms: postSplitIdToSplitId.ms!, body: '' } };
+	let history: Post['history'] = {
+		[version]: { ms: fullPostId.ms!, tags: [], core: '' },
+	};
 
 	for (let i = 0; i < parts.length; i++) {
 		let part = parts[i];
 		if (
-			part.code === partCodes.currentPostTagIdWithNumAsVersionToPostId ||
-			part.code === partCodes.exPostTagIdWithNumAsVersionToPostId
+			part.code === pc.currentPostTagIdWithNumAsVersionAtPostId ||
+			part.code === pc.exPostTagIdWithNumAsVersionAtPostId
 		) {
-			if (part.ms !== null) {
-				history[version]!.tags = [getId(part), ...(history[version]!.tags || [])];
+			if (part.ms) {
+				history[version]!.tags = [getIdStr(part), ...(history[version]!.tags || [])];
 			}
 		} else if (
-			part.code === partCodes.currentPostBodyTxtWithMsAndNumAsVersionToPostId ||
-			part.code === partCodes.exPostBodyTxtWithMsAndNumAsVersionToPostId
+			part.code === pc.currentPostCoreIdWithNumAsVersionAtPostId ||
+			part.code === pc.exPostCoreIdWithNumAsVersionAtPostId
 		) {
-			history[version]!.body = part.txt;
+			history[version]!.core = part.txt || undefined;
 			history[version]!.ms = part.ms!;
-		} else if (part.code === partCodes.tagTxtAndNumAsCount) {
-			tagIdToTxtMap[getId(part)] = part.txt!;
+		} else if (part.code === pc.tagIdAndTxtWithNumAsCount) {
+			tagIdToTxtMap[getIdStr(part)] = part.txt!;
 		}
 	}
 

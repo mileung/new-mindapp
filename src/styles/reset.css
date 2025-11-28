@@ -38,3 +38,27 @@ a {
 	user-select: text;
 	-webkit-user-drag: none;
 }
+
+/* Standard modern browsers */
+body {
+	scrollbar-color: var(--scrollbar-color-thumb) transparent;
+	scrollbar-width: thin;
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) */
+body::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+body::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+body::-webkit-scrollbar-thumb {
+	background-color: var(--scrollbar-color-thumb);
+}
+
+body::-webkit-scrollbar-thumb:hover {
+	background-color: var(--scrollbar-color-thumb-hover);
+}

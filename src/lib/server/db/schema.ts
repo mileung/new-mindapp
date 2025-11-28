@@ -1,3 +1,3 @@
-import { partsTable } from '../../types/parts-table';
+import { pTable } from '../../types/parts/partsTable';
 
-export { partsTable };
+export { pTable as partsTable };

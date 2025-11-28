@@ -3,12 +3,12 @@
 	import Identicon from './Identicon.svelte';
 
 	let p: {
-		ms?: null | number;
+		ms: number;
 		class?: string;
 	} = $props();
 </script>
 
-{#if p.ms === null || p.ms === undefined}
+{#if p.ms === 0}
 	<IconUserFilled class={`text-fg1 ${p.class}`} />
 {:else}
 	<Identicon data={'' + p.ms} class={p.class} />

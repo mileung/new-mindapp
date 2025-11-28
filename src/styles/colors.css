@@ -1,7 +1,7 @@
 @layer base {
 	:root {
-		--local: #f49090;
-		--personal: #93ce93;
+		--local: #f17e7e;
+		--personal: #6ec96e;
 		--global: #7cc0dd;
 
 		--bg1: #fafaf8;
@@ -12,8 +12,8 @@
 		--bg6: #e3e2de;
 		--bg7: #deddd8;
 		--bg8: #d9d7d2;
-		--hl1: var(--color-cyan-500);
-		--hl2: var(--color-cyan-600);
+		--hl1: var(--color-sky-500);
+		--hl2: var(--color-sky-600);
 		--hl-link: var(--color-teal-400);
 		--hl-edit: var(--color-red-400);
 		--hl-spot: var(--color-yellow-400);
@@ -21,6 +21,9 @@
 		--fg1: #2c353a;
 		--fg2: #6d6d69;
 		--fg3: #000;
+
+		--scrollbar-color-thumb: rgba(0, 0, 0, 0.3);
+		--scrollbar-color-thumb-hover: rgba(0, 0, 0, 0.8);
 	}
 
 	.dark {
@@ -32,8 +35,8 @@
 		--bg6: #323234;
 		--bg7: #38383a;
 		--bg8: #3e3e40;
-		--hl1: var(--color-cyan-500);
-		--hl2: var(--color-cyan-400);
+		--hl1: var(--color-cyan-400);
+		--hl2: var(--color-cyan-300);
 		--hl-link: var(--color-teal-300);
 		--hl-edit: var(--color-red-300);
 		--hl-spot: var(--color-yellow-300);
@@ -41,5 +44,8 @@
 		--fg1: #e8e8e7;
 		--fg2: #a5a5a4;
 		--fg3: #fff;
+
+		--scrollbar-color-thumb: rgba(255, 255, 255, 0.5);
+		--scrollbar-color-thumb-hover: rgba(255, 255, 255, 0.8);
 	}
 }

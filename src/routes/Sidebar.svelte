@@ -5,14 +5,12 @@
 	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { trpc } from '$lib/trpc/client';
 	import {
 		changeCurrentSpace,
 		refreshCurrentAccount,
 		unsaveTagInCurrentAccount,
 		updateLocalCache,
 	} from '$lib/types/local-cache';
-	import { bracketRegex } from '$lib/types/parts';
 	import {
 		IconDotsVertical,
 		IconHelpSquareRounded,
@@ -21,6 +19,7 @@
 		IconSearch,
 		IconSettings,
 		IconSquarePlus2,
+		IconTags,
 		IconUserPlus,
 		IconX,
 	} from '@tabler/icons-svelte';
@@ -28,6 +27,7 @@
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
+	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 
 	let searchIpt: HTMLInputElement;
 	let searchedText = $state(page.url.searchParams.get('q') || '');
@@ -52,6 +52,7 @@
 			.concat(tagFilter);
 		return [...new Set(arr)];
 	});
+	let showSuggestedTags = $derived(searchIptFocused && tagFilter);
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
@@ -65,7 +66,7 @@
 					}
 				}
 				if (e.key === 'h') {
-					gs.accounts && goto(`/l_l_${gs.currentSpaceMs ?? ''}`);
+					gs.accounts && goto(`/l_l_${gs.currentSpaceMs}`);
 				}
 				if (e.metaKey && e.key === 'Tab' && gs.accounts) {
 					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.currentSpaceMs);
@@ -73,7 +74,9 @@
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length)
 						newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
-					changeCurrentSpace(gs.accounts[0].spaceMss[newSpaceMsIndex]);
+					let inMs = gs.accounts[0].spaceMss[newSpaceMsIndex];
+					changeCurrentSpace(inMs);
+					goto(`/l_l_${inMs}`);
 				}
 			}
 		};
@@ -98,7 +101,7 @@
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts) {
 			page.state.modalId = undefined;
-			let urlPath = `/l_l_${gs.currentSpaceMs ?? ''}?q=${q}`;
+			let urlPath = `/l_l_${gs.currentSpaceMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else goto(urlPath);
 		}
@@ -115,11 +118,13 @@
 
 <!-- TODO: remember scroll position and PostDrop states (open, parsed, etc) when switching spaces without flickering -->
 <!-- TODO: header should go up off screen on scroll down for <xs screens -->
-<div class="hidden xs:block w-[var(--w-sidebar)]"></div>
-<aside class="top-0 fixed block w-screen xs:h-screen xs:w-[var(--w-sidebar)] z-50 bg-bg2">
-	<div class="h-full flex-1 flex flex-col">
+
+<!-- <div class="b hidden xs:block w-[var(--w-sidebar)]"></div> -->
+
+<aside class="z-50 bottom-0 fixed block w-screen xs:h-screen xs:w-[var(--w-sidebar)] bg-bg2">
+	<div class="h-full flex-1 flex flex-col-reverse xs:flex-col">
 		<div class="flex h-9">
-			{#if searchIptFocused && tagFilter}
+			{#if showSuggestedTags}
 				<button
 					class="w-9 xy hover:bg-bg5 text-fg1"
 					onmousedown={(e) => e.preventDefault()}
@@ -151,7 +156,7 @@
 					{#if spaceMenuOpen}
 						<IconX class="h-6 w-6" />
 					{:else if gs.accounts}
-						<SpaceIcon ms={gs.currentSpaceMs} class="h-6 w-6" />
+						<SpaceIcon ms={gs.currentSpaceMs!} class="h-6 w-6" />
 					{/if}
 				</button>
 			{/if}
@@ -214,11 +219,13 @@
 				</div>
 			</a>
 		</div>
-		<div class="max-h-48 xs:max-h-none relative flex-1 overflow-scroll">
-			<div class={searchIptFocused && tagFilter ? '' : 'hidden'}>
-				{#if tagFilter}
+		<div
+			class={`${showSuggestedTags ? 'max-h-18' : 'max-h-38'} xs:max-h-none relative flex-1 overflow-scroll`}
+		>
+			<div class={showSuggestedTags ? '' : 'hidden'}>
+				<!-- {#if tagFilter}
 					<p class="ml-1 mt-1 text-sm text-fg2">{m.tags()}</p>
-				{/if}
+				{/if} -->
 				{#each suggestedTags as tag, i (tag)}
 					<div
 						class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}
@@ -279,13 +286,13 @@
 							<div class="xy h-6 w-6">
 								<AccountIcon ms={a.ms} class="h-6 w-6" />
 							</div>
-							{a.ms === null ? m.anon() : a.name || identikana(a.ms)}
+							{a.ms === 0 ? m.anon() : a.name || identikana(a.ms)}
 						</button>
 						{#if a.ms}
 							<button
 								class={`${0 === i ? '' : 'pointer-fine:hidden'} group-hover/account:flex xy w-8 hover:bg-bg7 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 								onclick={async () => {
-									await trpc().auth.signOut.mutate(a.ms as number);
+									// await trpc().auth.signOut.mutate({ ...a, inMs: 0 });
 									updateLocalCache((lc) => {
 										lc.accounts = [...lc.accounts.filter((acc) => acc.ms !== a.ms)];
 										return lc;
@@ -301,7 +308,7 @@
 			<div
 				class={`${
 					accountMenuOpen || //
-					(searchIptFocused && tagFilter)
+					showSuggestedTags
 						? 'hidden'
 						: spaceMenuOpen
 							? ''
@@ -336,15 +343,6 @@
 						<a href="/contacts" class="flex-1 xy hover:bg-bg5">
 							<IconAddressBook />
 						</a>
-						<a href="/calendar" class="flex-1 xy hover:bg-bg5">
-							<IconCalendar />
-						</a>
-						<a href="/notifications" class="flex-1 xy hover:bg-bg5">
-							<IconBell />
-						</a>
-						<a href="/add-space" class="flex-1 xy hover:bg-bg5">
-							<IconSquarePlus2 />
-						</a>
 					</div> -->
 					<a
 						href="/add-space"
@@ -355,16 +353,13 @@
 					</a>
 					{#each gs.accounts[0].spaceMss || [] as ms, i (ms)}
 						<div
-							class={`flex group/space ${`/l_l_${ms ?? ''}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
+							class={`flex group/space ${`/l_l_${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
 						>
 							<a
-								href={`/l_l_${ms ?? ''}`}
+								href={`/l_l_${ms}`}
 								class={`flex-1 fx min-h-10 h-10 px-2 gap-2 font-medium`}
 								onclick={(e) => {
-									if (!e.metaKey && !e.shiftKey) {
-										e.preventDefault();
-										changeCurrentSpace(ms);
-									}
+									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
 								}}
 							>
 								{#if ms === gs.currentSpaceMs}
@@ -372,22 +367,22 @@
 								{/if}
 								<SpaceIcon {ms} class="h-6 w-6" />
 								{spaceMsToSpaceName(ms)}
-								<!-- {#if i === gs.currentSpaceMs}
-							<button class="text-fg2 hover:text-fg1 p-2">
-								{#if gs.spaces[gs.currentSpaceMs!]?.nested}
-									<IconListTree />
-								{:else}
-									<IconList />
-								{/if}
-							</button>
-						{/if} -->
+							</a>
+							<!-- TODO: IconCalendar -->
+							<a
+								href={`/l_l_${ms}/tags`}
+								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
+								onclick={(e) => {
+									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
+								}}
+							>
+								<IconTags class="h-5" />
 							</a>
 							<a
-								href={`/l_l_${ms ?? ''}/dots`}
-								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg7`}
+								href={`/l_l_${ms}/dots`}
+								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
 								onclick={(e) => {
-									e.preventDefault();
-									changeCurrentSpace(ms, false, true);
+									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
 								}}
 							>
 								<IconDotsVertical class="h-5" />

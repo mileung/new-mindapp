@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import { minute, second } from './time';
 
 export function copyToClipboard(text: string): void {
@@ -120,3 +119,20 @@ export let strIsInt = (s: string) => /^\d+$/.test(s);
 let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
 export let makeRandomStr = (length = 64) =>
 	[...Array(length)].map((_) => chars[Math.round(Math.random() * chars.length)]).join('');
+
+export let sortObjectProps = (obj: Record<string, any>) => {
+	Object.keys(obj)
+		.sort()
+		.forEach((key) => {
+			const temp = obj[key];
+			delete obj[key];
+			obj[key] = temp;
+		});
+	return obj;
+};
+
+export let randomInt = (a = 0, b = 999999999) => {
+	const min = Math.min(a, b);
+	const max = Math.max(a, b);
+	return Math.floor(Math.random() * (max - min + 1)) + min;
+};

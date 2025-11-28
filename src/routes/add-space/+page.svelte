@@ -41,7 +41,7 @@
 				/> -->
 				<button
 					type="submit"
-					class="mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
+					class="mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1 hover:border-hl2"
 				>
 					{m.continue()}
 					<IconChevronRight class="h-5" stroke={3} /></button
@@ -78,7 +78,7 @@
 				/>
 				<button
 					type="submit"
-					class="mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1"
+					class="mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1 hover:border-hl2"
 				>
 					{m.continue()}
 					<IconChevronRight class="h-5" stroke={3} /></button

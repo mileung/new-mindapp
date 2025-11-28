@@ -1,202 +1,47 @@
-import { dev } from '$app/environment';
-
+import { makeRandomStr } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
-import { tdb, tdbDeletePartsWhere, tdbPartsWhere, tdbUpdateParts } from '$lib/server/db';
+import { tdb } from '$lib/server/db';
+import { day } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
-import { AccountSchema, type Account } from '$lib/types/accounts';
+import {
+	_getMyAccount,
+	_getEmailRow,
+	AccountSchema,
+	assertValidEmail,
+	filterAccountPwHashRow,
+	reduceAccountRows,
+	type Account,
+	sanitizeAccountForUser,
+} from '$lib/types/accounts';
+import { _checkOtp, _sendOtp } from '$lib/types/otp';
 import {
 	assert1Row,
 	assertLt2Rows,
-	SplitIdSchema,
-	SplitIdToSplitIdSchema,
-	partCodes,
-	PartInsertSchema,
-	PartSelectSchema,
-	getSplitId,
+	getBaseInput,
+	type BaseInput,
+	type PartSelect,
 } from '$lib/types/parts';
-import { partsTable } from '$lib/types/parts-table';
-import { OtpSchema, type Otp } from '$lib/types/otp';
 import { normalizeTags, PostSchema } from '$lib/types/posts';
-import { makeSessionRowFilter, makeSessionRowInsert } from '$lib/types/sessions';
+import { _addPost } from '$lib/types/posts/addPost';
+import { _deletePost } from '$lib/types/posts/deletePost';
+import { _editPost } from '$lib/types/posts/editPost';
+import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
+import { _getPostHistory } from '$lib/types/posts/getPostHistory';
+import { SessionSchema, setSessionKeyCookie, type Session } from '$lib/types/sessions';
+import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 import type { RequestEvent } from '@sveltejs/kit';
 import { initTRPC } from '@trpc/server';
 import * as argon2 from 'argon2';
-import { and, eq, isNotNull, isNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, isNull, lte } from 'drizzle-orm';
 import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { z } from 'zod';
 import { minute, second } from '../time';
-import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
-import { _deletePost } from '$lib/types/posts/deletePost';
-import { _editPost } from '$lib/types/posts/editPost';
-import { _addPost } from '$lib/types/posts/addPost';
-import { _getPostHistory } from '$lib/types/posts/getPostHistory';
+import { pt } from '$lib/types/parts/partFilters';
+import { pc } from '$lib/types/parts/partCodes';
+import { pTable } from '$lib/types/parts/partsTable';
+import { FullIdObjSchema, zeros } from '$lib/types/parts/partIds';
 
 export const t = initTRPC.context<Context>().create();
-
-let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-let isValidEmail = (email: string) => {
-	return email.length < 255 && emailRegex.test(email);
-};
-let assertEmail = (e: string) => {
-	if (!isValidEmail(e)) throw new Error('invalid email');
-};
-
-let getEmailRow = async (email: string) => {
-	let emailRowsFilter = and(
-		isNotNull(partsTable.to_ms),
-		isNull(partsTable.to_by_ms),
-		isNull(partsTable.to_in_ms),
-		isNull(partsTable.ms),
-		isNull(partsTable.by_ms),
-		isNull(partsTable.in_ms),
-		eq(partsTable.code, partCodes.txtAsAccountEmailToAccountId),
-		eq(partsTable.txt, email),
-		isNull(partsTable.num),
-	);
-	let emailRows = await tdbPartsWhere(emailRowsFilter);
-	return assertLt2Rows(emailRows);
-};
-
-// let reduceRowsForAccount = (rows: PartSelect[]) =>
-// 	rows.reduce((a, r) => {
-// 		let prop = r.tag?.slice(1);
-// 		if (prop === 'account') a.ms = r.ms!;
-// 		else {
-// 			if (prop === 'name' || prop === 'email') {
-// 				a[prop] = r.txt!;
-// 				a[`${prop}Ms`] = r.ms!;
-// 			}
-// 			if (prop === 'spaceMss' || prop === 'savedTags') {
-// 				a[`${prop}Ms`] = r.ms!;
-// 				a[prop] = JSON.parse(r.txt!);
-// 			}
-// 		}
-// 		return a;
-// 	}, {} as Account);
-
-let getAccountByMs = async (ms: number, email?: string) => {
-	// let rowsForAccount = await tdbPartsWhere(
-	// 	or(
-	// 		and(
-	// 			isNull(partsTable.to_ms),
-	// 			isNull(partsTable.to_by_ms),
-	// 			isNull(partsTable.to_in_ms),
-	// 			eq(partsTable.ms, ms),
-	// 			isNull(partsTable.by_ms),
-	// 			isNull(partsTable.in_ms),
-	// 			eq(partsTable.code, partCodes.account),
-	// 			isNull(partsTable.txt),
-	// 		),
-	// 		and(
-	// 			isNull(partsTable.to_ms),
-	// 			isNull(partsTable.to_by_ms),
-	// 			isNull(partsTable.to_in_ms),
-	// 			isNotNull(partsTable.ms),
-	// 			isNull(partsTable.by_ms),
-	// 			eq(partsTable.in_ms, ms),
-	// 			// or(
-	// 			// 	eq(partsTable.code, ' spaceMss'),
-	// 			// 	eq(partsTable.code, ' savedTags'),
-	// 			// 	...(email ? [] : [eq(partsTable.code, ' email')]),
-	// 			// 	eq(partsTable.code, ' name'),
-	// 			// ),
-	// 			isNotNull(partsTable.txt),
-	// 		),
-	// 	),
-	// );
-	// @ts-ignore
-	let account: Account = {
-		email, // ...reduceRowsForAccount(rowsForAccount)
-	};
-	if (!AccountSchema.safeParse(account)) throw new Error(`Invalid account`);
-	return { account };
-};
-
-let sendOtp = async (email: string, partCode: number) => {
-	let pin = ('' + Math.random()).slice(-8);
-	if (dev) {
-		pin = '00000000';
-		// console.log('pin:', pin);
-	} else {
-		// await resend.emails.send({
-		// 	from: 'noreply@yourdomain.com',
-		// 	to: email,
-		// 	subject: 'Your Login Code',
-		// 	html: `${otp}`,
-		// });
-	}
-
-	let ms = Date.now();
-	// await tdbInsertParts({
-	// 	ms,
-	// 	partCode,
-	// 	txt: email+':'+pin,
-	// 	num: 0
-	// });
-	return { otpMs: ms };
-};
-
-let checkOtp = async (
-	now: number,
-	deleteIfCorrect: boolean,
-	input: {
-		otpMs: number;
-		email: string;
-		pin: string;
-		partCode: number;
-	},
-): Promise<{ strike?: number }> => {
-	let otpRowsFilter = and(
-		isNull(partsTable.to_ms),
-		isNull(partsTable.to_by_ms),
-		isNull(partsTable.to_in_ms),
-		eq(partsTable.ms, input.otpMs),
-		isNull(partsTable.by_ms),
-		isNull(partsTable.in_ms),
-		eq(partsTable.code, input.partCode),
-		isNotNull(partsTable.txt),
-		// isNotNull(partsTable.num),
-	);
-	let otpRows = await tdbPartsWhere(otpRowsFilter);
-	// let otpRow = assert1Row(otpRows);
-	// let otp: Otp = JSON.parse(otpRow.txt!);
-	// if (!OtpSchema.safeParse(otp).success) throw new Error('Invalid OTP');
-	// // console.log('otp:', otp);
-	// if (input.email !== otp.email) throw new Error('Invalid email');
-	// if (input.partCode && input.partCode !== otp.partCode) throw new Error('Invalid purpose');
-	// if (input.pin !== otp.pin) {
-	// 	otp.strike++;
-	// 	if (otp.strike > 2) {
-	// 		await tdbDeletePartsWhere(
-	// 			or(
-	// 				otpRowsFilter,
-	// 				and(
-	// 					isNull(partsTable.to_ms),
-	// 					isNull(partsTable.to_by_ms),
-	// 					isNull(partsTable.to_in_ms),
-	// 					lt(partsTable.ms, now - 5 * minute), //
-	// 					isNull(partsTable.by_ms),
-	// 					isNull(partsTable.in_ms),
-	// 					eq(partsTable.code, input.partCode),
-	// 					isNotNull(partsTable.txt),
-	// 				),
-	// 			),
-	// 		);
-	// 	} else {
-	// 		await tdbUpdateParts({ txt: JSON.stringify(otp) }).where(otpRowsFilter);
-	// 	}
-	// 	return { strike: otp.strike };
-	// }
-	// deleteIfCorrect && (await tdbDeletePartsWhere(otpRowsFilter));
-	return {};
-};
-
-let assertSessionIsAuthorized = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
-	if (typeof byMs !== 'number' || byMs < 0) throw new Error('Invalid byMs');
-	if (typeof inMs !== 'number' || inMs < 0) throw new Error('Invalid inMs');
-	if (!ctx.session?.accountMss.includes(byMs)) throw new Error('Unauthorized by_ms');
-	// TODO: Verify user by_ms has access to space in_ms
-};
 
 let makeLimiter = (pings: number, minutes: number) => {
 	const limiter = new RateLimiterMemory({
@@ -226,63 +71,135 @@ async function sendEmail(config: { from: string; to: string; subject: string; ht
 	// return result;
 }
 
+export const baseProcedure = t.procedure.input(getBaseInput);
+
+let assertValidSession = async (ctx: Context, input: BaseInput) => {
+	let now = Date.now();
+	let session: undefined | Session;
+	if (ctx.sessionId && input.by_ms !== null) {
+		let sessionRowFilter = and(
+			pt.at_ms.eq(input.by_ms),
+			pt.at_by_ms.eq0,
+			pt.at_in_ms.eq0,
+			pt.ms.gt0,
+			pt.by_ms.eq0,
+			pt.in_ms.eq0,
+			pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+			pt.txt.eq(ctx.sessionId),
+			pt.num.isNull,
+		);
+		let sessionRows = await tdb
+			.select()
+			.from(pTable)
+			.where(sessionRowFilter)
+			.orderBy(pt.ms.desc)
+			.limit(1);
+		let sessionRow = assertLt2Rows(sessionRows);
+		if (sessionRow) {
+			session = { ms: sessionRow.ms! };
+			if (!SessionSchema.safeParse(session).success) throw new Error(`Invalid session`);
+			if (now - session.ms > 8 * day) {
+				session = undefined;
+			} else if (now - session.ms > 88 * minute) {
+				let newSessionKey = makeRandomStr();
+				setSessionKeyCookie(ctx.event, newSessionKey);
+				await tdb
+					.update(pTable)
+					.set({
+						ms: Date.now(),
+						txt: newSessionKey,
+					})
+					.where(
+						and(
+							pt.at_ms.gt0,
+							pt.at_by_ms.eq0,
+							pt.at_in_ms.eq0,
+							pt.ms.eq(session.ms),
+							pt.by_ms.eq0,
+							pt.in_ms.eq0,
+							pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+							pt.txt.eq(ctx.sessionId),
+							pt.num.isNull,
+						),
+					);
+			}
+		}
+		!session && ctx.event.cookies.delete('sessionId', { path: '/' });
+	}
+	return { session };
+};
+
+let assertSessionIsAuthorized = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
+	// if (byMs === null && inMs < 0) throw new Error('Invalid byMs');
+	// if (inMs === null && inMs < 0) throw new Error('Invalid inMs');
+	// if (!ctx.session?.accountMss.includes(byMs)) throw new Error('Unauthorized by_ms');
+	// TODO: Verify user by_ms has access to space in_ms
+};
+
 export const router = t.router({
 	auth: t.router({
-		signOut: t.procedure.input(z.number()).mutation(async ({ input, ctx }) => {
-			if (!ctx.session) throw new Error('Missing session');
-			let sessionRowFilter = makeSessionRowFilter(ctx.session.id);
-			await tdbUpdateParts(
-				makeSessionRowInsert(
-					ctx.session.id,
-					ctx.session.accountMss.filter((ms) => ms !== input),
-				),
-			).where(sessionRowFilter);
+		signOut: baseProcedure.mutation(async ({ ctx, input }) => {
+			assertValidSession(ctx, input);
+			// if (!ctx.session) throw new Error('Missing session');
+			// let sessionRowFilter = filterSessionRows(ctx.session.id);
+			// await tdb
+			// 	.update(partsTable)
+			// 	.set(
+			// 		makeSessionRowInsert(
+			// 			ctx.session.id,
+			// 			ctx.session.accountMss.filter((ms) => ms !== input),
+			// 		),
+			// 	)
+			// 	.where(sessionRowFilter);
 		}),
-		getSignedInMss: t.procedure
+		verifySignedInMss: baseProcedure
 			.input(z.object({ accountMss: z.array(z.number()) }))
-			.mutation(async ({ input, ctx }) => {
-				let signedInMsSet = new Set(ctx.session?.accountMss);
-				return input.accountMss.filter((ms) => signedInMsSet.has(ms));
+			.mutation(async ({ ctx, input }) => {
+				// let signedInMsSet = new Set(ctx.session?.accountMss);
+				// return input.accountMss.filter((ms) => signedInMsSet.has(ms));
 			}),
-		sendOtp: t.procedure
+		sendOtp: baseProcedure
 			.input(
 				z.object({
 					email: z.string(),
 					partCode: z
-						.literal(partCodes.createAccountOtpWithPinColorEmailAndStrikeCount)
-						.or(z.literal(partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount)),
+						.literal(pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount)
+						.or(z.literal(pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount)),
 				}),
 			)
 			.mutation(async ({ input }) => {
-				input.partCode;
 				let email = input.email.trim().toLowerCase();
-				assertEmail(email);
-				let accountRow = await getEmailRow(email);
+				assertValidEmail(email);
+				let accountRow = await _getEmailRow(tdb, email);
 				if (
-					input.partCode === partCodes.createAccountOtpWithPinColorEmailAndStrikeCount &&
+					input.partCode === pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount &&
 					accountRow
 				)
 					throw new Error(m.anAccountWithThatEmailAlreadyExists());
-				// if (
-				// 	input.partCode === partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount &&
-				// 	!accountRow
-				// )
-				// 	throw new Error(m.accountDoesNotExist());
-				// return await sendOtp(email, input.partCode);
+				if (
+					input.partCode === pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount &&
+					!accountRow
+				)
+					throw new Error(m.accountDoesNotExist());
+				return _sendOtp(tdb, email, input.partCode);
 			}),
-		checkOtp: t.procedure
+		checkOtp: baseProcedure
 			.input(
 				z.object({
 					otpMs: z.number(),
 					pin: z.string().length(8),
 					email: z.string(),
+					partCode: z
+						.literal(pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount)
+						.or(z.literal(pc.signInOtpWithTxtAsEmailColonPinAndNumAsStrikeCount))
+						.or(z.literal(pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount)),
 				}),
 			)
 			.mutation(async ({ input }) => {
-				assertEmail(input.email);
-				// return await checkOtp(Date.now(), false, input);
+				assertValidEmail(input.email);
+				return await _checkOtp(tdb, input);
 			}),
-		createAccount: t.procedure
+		attemptCreateAccount: baseProcedure
 			.input(
 				z.object({
 					name: z.string().min(0).max(88),
@@ -292,75 +209,74 @@ export const router = t.router({
 					password: z.string(),
 				}),
 			)
-			.mutation(async ({ input, ctx }) => {
-				assertEmail(input.email);
-				let ms = Date.now();
-				// let res = await checkOtp(ms, true, { ...input, purpose: 'create-account' });
-				// if (res.strike) throw new Error(`Otp check failed`);
-				// let emailRow = await getEmailRow(input.email);
-				// if (emailRow) throw new Error(m.anAccountWithThatEmailAlreadyExists());
-				// let rowsForAccount = await tdbInsertParts([
-				// 	{
-				// 		ms,
-				// 		tag: ' account',
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		tag: ' pwHash',
-				// 		txt: await argon2.hash(input.password),
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		txt: ctx.clientId,
-				// 		tag: ' clientId',
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		tag: ' name',
-				// 		txt: input.name.trim(),
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		tag: ' email',
-				// 		txt: input.email,
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		tag: ' spaceMss',
-				// 		txt: JSON.stringify(['', 0, 1]),
-				// 	},
-				// 	{
-				// 		ms,
-				// 		to_ms: ms,
-				// 		tag: ' savedTags',
-				// 		txt: JSON.stringify([]),
-				// 	},
-				// ]).returning();
-				// console.log('rowsForAccount:', rowsForAccount);
-				// let account = reduceRowsForAccount(rowsForAccount);
-				// if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
-				// console.log('account:', account);
-				// if (ctx.session) {
-				// 	await tdbDeletePartsWhere(makeSessionRowFilter(ctx.session.id));
-				// }
-				// await createSession(
-				// 	ctx,
-				// 	[
-				// 		...new Set([
-				// 			account.ms as number, //
-				// 			...(ctx.session?.accountMss || []),
-				// 		]),
-				// 	].sort(),
-				// );
-				// return { account };
-				return { account: {} };
+			.mutation(async ({ ctx, input }): Promise<{ strike?: number; account?: Account }> => {
+				let session = await assertValidSession(ctx, input);
+				assertValidEmail(input.email);
+				// let ms = Date.now();
+				let ms = 100;
+				let res = await _checkOtp(tdb, {
+					...input,
+					partCode: pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
+				});
+				if (res.strike) return res;
+				let emailRow = await _getEmailRow(tdb, input.email);
+				if (emailRow) throw new Error(m.anAccountWithThatEmailAlreadyExists());
+				let rowsForAccount = await tdb
+					.insert(pTable)
+					.values([
+						{
+							...zeros,
+							ms,
+							code: pc.accountId,
+						},
+						{
+							...zeros,
+							at_ms: ms,
+							ms,
+							code: pc.txtAsAccountPwHashAtAccountId,
+							txt: await argon2.hash(input.password),
+						},
+						{
+							...zeros,
+							at_ms: ms,
+							ms,
+							code: pc.msAndTxtAsClientIdAtAccountId,
+							txt: ctx.clientId,
+						},
+						{
+							...zeros,
+							at_ms: ms,
+							ms,
+							code: pc.msAndTxtAsNameAtAccountId,
+							txt: input.name.trim(),
+						},
+						{
+							...zeros,
+							at_ms: ms,
+							ms,
+							code: pc.txtAsAccountEmailAtAccountId,
+							txt: input.email,
+						},
+					])
+					.returning();
+				let account = sanitizeAccountForUser(reduceAccountRows(rowsForAccount));
+				if (!AccountSchema.safeParse(account).success) throw new Error('Invalid account');
+				if (session) {
+					// await tdb.delete(partsTable).where(filterSessionRows(ctx.session.id));
+				} else {
+					let sessionId = makeRandomStr();
+					setSessionKeyCookie(ctx.event, sessionId);
+					await tdb.insert(pTable).values({
+						...zeros,
+						at_ms: ms,
+						ms,
+						code: pc.msAndTxtAsSessionIdAtAccountId,
+						txt: sessionId,
+					});
+				}
+				return { account };
 			}),
-		signIn: t.procedure
+		attemptSignIn: baseProcedure
 			.input(
 				z.object({
 					otpMs: z.number().optional(),
@@ -369,61 +285,75 @@ export const router = t.router({
 					password: z.string(),
 				}),
 			)
-			.mutation(async ({ input, ctx }) => {
-				// : Promise<{
-				// 	otpMs?: number;
-				// 	strike?: number;
-				// 	account?: any;
-				// }>
-				// let email = input.email.trim().toLowerCase();
-				// assertEmail(email);
-				// let emailRow = await getEmailRow(email);
-				// if (!emailRow) throw new Error(m.accountDoesNotExist());
-				// let accountMs = emailRow.in_ms!;
-				// let pwHashRows = await tdbPartsWhere(
-				// 	and(
-				// 		isNull(partsTable.to_ms),
-				// 		isNull(partsTable.to_by_ms),
-				// 		isNull(partsTable.to_in_ms),
-				// 		isNull(partsTable.ms),
-				// 		isNull(partsTable.by_ms),
-				// 		eq(partsTable.in_ms, accountMs),
-				// 		eq(partsTable.code, partCodes.accountPwHashToAccountId),
-				// 		isNotNull(partsTable.txt),
-				// 	),
-				// );
-				// let pwHashRow = assert1Row(pwHashRows);
-				// if (!(await argon2.verify(pwHashRow.txt!, input.password))) {
-				// 	throw new Error(m.invalidPassword());
-				// }
-				// let clientIdRows = await tdbPartsWhere(
-				// 	and(
-				// 		isNull(partsTable.to_ms),
-				// 		isNull(partsTable.to_by_ms),
-				// 		isNull(partsTable.to_in_ms),
-				// 		isNull(partsTable.ms),
-				// 		isNull(partsTable.by_ms),
-				// 		eq(partsTable.in_ms, accountMs),
-				// 		eq(partsTable.code, partCodes.txtAsClientIdToAccountId),
-				// 		eq(partsTable.txt, ctx.clientId),
-				// 	),
-				// );
-				// let clientIdRow = assertLt2Rows(clientIdRows);
-				// if (!clientIdRow) {
-				// 	if (input.otpMs && input.pin) {
-				// 		let res = await checkOtp(Date.now(), true, {
-				// 			...input,
-				// 			// TODO: Remove the next 2 lines without ts complaining
-				// 			otpMs: input.otpMs,
-				// 			pin: input.pin,
-				// 			partCode: partCodes.signInOtpWithPinColorEmailAndStrikeCount,
-				// 		});
-				// 		return res.strike ? res : await getAccountByMs(accountMs, email);
-				// 	} else return await sendOtp(email, partCodes.signInOtpWithPinColorEmailAndStrikeCount);
-				// }
-				// return await getAccountByMs(accountMs, email);
-			}),
-		resetPassword: t.procedure
+			.mutation(
+				async ({
+					input,
+					ctx,
+				}): Promise<{
+					strike?: number;
+					account?: Account;
+					otpMs?: number;
+				}> => {
+					let email = input.email.trim().toLowerCase();
+					assertValidEmail(email);
+					let { otpMs, pin } = input;
+					let otpVerified = false;
+					if (otpMs && pin) {
+						let res = await _checkOtp(tdb, {
+							email,
+							otpMs,
+							pin,
+							partCode: pc.signInOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
+						});
+						if (res.strike) return res;
+						else otpVerified = true;
+					}
+					let emailRow = await _getEmailRow(tdb, email);
+					if (!emailRow) throw new Error(m.accountDoesNotExist());
+					let accountMs = emailRow.at_ms!;
+					let pwHashRow = assert1Row(
+						await tdb.select().from(pTable).where(filterAccountPwHashRow(accountMs)),
+					);
+					if (!(await argon2.verify(pwHashRow.txt!, input.password))) {
+						throw new Error(m.invalidPassword());
+					}
+					let clientIdRow: undefined | PartSelect;
+					if (otpVerified) {
+						clientIdRow = (
+							await tdb
+								.insert(pTable)
+								.values({
+									...zeros,
+									ms: Date.now(),
+									code: pc.msAndTxtAsClientIdAtAccountId,
+									txt: ctx.clientId,
+								})
+								.returning()
+						)[0];
+					} else {
+						let clientIdRows = await tdb
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pt.at_ms.eq0,
+									pt.at_by_ms.eq0,
+									pt.at_in_ms.eq0,
+									pt.ms.eq0,
+									pt.by_ms.eq0,
+									pt.in_ms.eq(accountMs),
+									pt.code.eq(pc.msAndTxtAsClientIdAtAccountId),
+									pt.txt.eq(ctx.clientId),
+								),
+							);
+						clientIdRow = assertLt2Rows(clientIdRows);
+					}
+					return clientIdRow
+						? await _getMyAccount(tdb, accountMs, email)
+						: await _sendOtp(tdb, email, pc.signInOtpWithTxtAsEmailColonPinAndNumAsStrikeCount);
+				},
+			),
+		resetPassword: baseProcedure
 			.input(
 				z.object({
 					otpMs: z.number(),
@@ -431,63 +361,54 @@ export const router = t.router({
 					email: z.string(),
 					password: z.string(),
 				}),
-			) //
+			)
 			.mutation(async ({ input }) => {
 				let email = input.email.trim().toLowerCase();
-				assertEmail(email);
-				let now = Date.now();
-				let res = await checkOtp(now, true, {
+				assertValidEmail(email);
+				let ms = Date.now();
+				let res = await _checkOtp(tdb, {
 					...input,
-					partCode: partCodes.resetPasswordOtpWithPinColorEmailAndStrikeCount,
+					partCode: pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
 				});
 				if (res.strike) return res;
-				let accountRow = await getEmailRow(email);
-				// if (!accountRow) throw new Error(`accountRow dne`);
-
-				// await tdbUpdateParts({
-				// 	tag: ' pwHash',
-				// 	txt: await argon2.hash(input.password),
-				// }).where(
-				// 	and(
-				// 		isNull(partsTable.to_ms),
-				// 		isNull(partsTable.to_by_ms),
-				// 		isNull(partsTable.to_in_ms),
-				// 		eq(partsTable.ms, accountRow.ms!),
-				// 		isNull(partsTable.by_ms),
-				// 		isNull(partsTable.in_ms),
-				// 		eq(partsTable.code, partCodes.account),
-				// 		isNull(partsTable.txt),
-				// 	),
-				// );
+				let accountRow = await _getEmailRow(tdb, email);
+				if (!accountRow) throw new Error(`accountRow dne`);
+				await tdb
+					.update(pTable)
+					.set({
+						ms,
+						txt: await argon2.hash(input.password),
+					})
+					.where(filterAccountPwHashRow(accountRow.ms!));
 			}),
 	}),
-	getAccountByMs: t.procedure
+	getAccountByMs: baseProcedure
 		.input(
 			z.object({
-				callerMs: z.number(),
 				spaceMssMs: z.number().optional(),
 				savedTagsMs: z.number().optional(),
-				emailMs: z.number().optional(),
+				email: z.string(),
 				nameMs: z.number().optional(),
 			}),
 		)
-		.query(async ({ input, ctx }) => {
-			assertSessionIsAuthorized(ctx, input.callerMs, 0);
-			let { account } = await getAccountByMs(input.callerMs);
+		.query(async ({ ctx, input }) => {
+			assertValidSession(ctx, input);
+			if (!input.by_ms) throw new Error(m.anErrorOccurred());
+			let { account } = await _getMyAccount(tdb, input.by_ms, input.email);
 			if (!account.savedTagsMs || account.savedTagsMs === input.savedTagsMs) return;
 			let savedTagsRows = await tdb
 				.select()
-				.from(partsTable)
+				.from(pTable)
 				.where(
 					and(
-						isNull(partsTable.to_ms),
-						isNull(partsTable.to_by_ms),
-						isNull(partsTable.to_in_ms),
-						isNull(partsTable.ms),
-						eq(partsTable.by_ms, input.callerMs),
-						isNull(partsTable.in_ms),
-						// eq(partsTable.code, ' savedTags'),
-						isNotNull(partsTable.txt),
+						pt.at_ms.eq0,
+						pt.at_by_ms.eq0,
+						pt.at_in_ms.eq0,
+						pt.ms.eq0,
+						eq(pTable.by_ms, input.by_ms),
+						pt.in_ms.eq0,
+						// pf.code.eq(' savedTags'),
+						isNotNull(pTable.txt),
 					),
 				);
 			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
@@ -495,28 +416,28 @@ export const router = t.router({
 			let savedTags: string[] = savedTagsRow ? JSON.parse(savedTagsRow.txt!) : [];
 			return { savedTags, savedTagsMs: savedTagsRow.ms! };
 		}),
-	updateSavedTags: t.procedure
+	updateSavedTags: baseProcedure
 		.input(
 			z.object({
-				callerMs: z.number(),
 				adding: z.array(z.string()),
 				removing: z.array(z.string()),
 			}),
 		)
-		.mutation(async ({ input, ctx }) => {
-			assertSessionIsAuthorized(ctx, input.callerMs, 0);
+		.mutation(async ({ ctx, input }) => {
+			if (!input.by_ms) throw new Error(m.anErrorOccurred());
+			assertValidSession(ctx, input);
 			let now = Date.now();
 			let savedTagsRowFilter = and(
-				isNull(partsTable.to_ms),
-				isNull(partsTable.to_by_ms),
-				isNull(partsTable.to_in_ms),
-				isNull(partsTable.ms),
-				isNull(partsTable.by_ms),
-				eq(partsTable.in_ms, input.callerMs),
-				// eq(partsTable.code, ' savedTags'),
-				isNotNull(partsTable.txt),
+				pt.at_ms.eq0,
+				pt.at_by_ms.eq0,
+				pt.at_in_ms.eq0,
+				pt.ms.eq0,
+				pt.by_ms.eq0,
+				pt.in_ms.eq(input.by_ms),
+				// pf.code.eq(' savedTags'),
+				isNotNull(pTable.txt),
 			);
-			let savedTagsRows = await tdbPartsWhere(savedTagsRowFilter);
+			let savedTagsRows = await tdb.select().from(pTable).where(savedTagsRowFilter);
 			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
 			let savedTagsRow = savedTagsRows[0];
 			if (!savedTagsRow) throw new Error('savedTagsRow dne');
@@ -525,35 +446,38 @@ export const router = t.router({
 			let newSavedTags: string[] = normalizeTags([...savedTags, ...input.adding]).filter(
 				(t) => !removingSet.has(t),
 			);
-			await tdbUpdateParts({
-				ms: now,
-				txt: JSON.stringify(newSavedTags),
-			}).where(savedTagsRowFilter);
+			await tdb
+				.update(pTable)
+				.set({
+					ms: now,
+					txt: JSON.stringify(newSavedTags),
+				})
+				.where(savedTagsRowFilter);
 			return { savedTagsMs: now };
 		}),
-	addPost: t.procedure.input(PostSchema).mutation(
-		async ({
-			input: p,
-			ctx, //
-		}) => {
-			assertSessionIsAuthorized(ctx, p.by_ms, p.in_ms);
-			return _addPost(tdb, p);
-		},
-	),
-	editPost: t.procedure.input(PostSchema).mutation(
-		async ({
-			input: t,
-			ctx, //
-		}) => {
-			assertSessionIsAuthorized(ctx, t.by_ms, t.in_ms);
-			return _editPost(tdb, t);
-		},
-	),
-	deletePost: t.procedure
+	addPost: baseProcedure
+		.input(PostSchema) //
+		.mutation(async ({ input: post, ctx }) => {
+			assertValidSession(ctx, post);
+			if (post.ms) throw new Error('post ms must be 0');
+			if (!post.in_ms) throw new Error('Invalid in_ms');
+			if (!post.by_ms) throw new Error('Invalid by_ms');
+			if (!post.history || Object.keys(post.history).length !== 1 || !post.history['0'])
+				throw new Error('History must have only version 0');
+			if (post.history['0'].ms) throw new Error('history ms must be 0');
+			return _addPost(tdb, post);
+		}),
+	editPost: baseProcedure
+		.input(PostSchema) //
+		.mutation(async ({ input, ctx }) => {
+			assertValidSession(ctx, input);
+			return _editPost(tdb, input);
+		}),
+	deletePost: baseProcedure
 		.input(
 			z.object({
-				postSplitIdToSplitId: SplitIdToSplitIdSchema,
-				version: z.number(),
+				fullPostId: FullIdObjSchema,
+				version: z.number().nullable(),
 			}),
 		)
 		.mutation(
@@ -561,35 +485,34 @@ export const router = t.router({
 				input,
 				ctx, //
 			}) => {
-				assertSessionIsAuthorized(
-					ctx,
-					input.postSplitIdToSplitId.by_ms,
-					input.postSplitIdToSplitId.in_ms,
-				);
-				return _deletePost(tdb, input.postSplitIdToSplitId, input.version);
+				assertValidSession(ctx, input);
+				return _deletePost(tdb, input.fullPostId, input.version);
 			},
 		),
-	getPostFeed: t.procedure.input(GetPostFeedSchema).mutation(async ({ input: q, ctx }) => {
-		if (q.callerMs && !ctx.session?.accountMss.includes(q.callerMs))
-			throw new Error('Unauthorized callerMs');
+	getPostFeed: baseProcedure.input(GetPostFeedSchema).mutation(async ({ input, ctx }) => {
+		if (!input.inMssInclude.length) throw new Error('Must include at least one inMs');
+		// if (input.byMssInclude?.length !== 1) throw new Error(`byMssInclude must be 1`);
 
-		return _getPostFeed(tdb, q);
+		// TODO do most of if not all the security checks here
+
+		assertValidSession(ctx, input);
+		return _getPostFeed(tdb, input);
 	}),
-	getPostHistory: t.procedure
+	getPostHistory: baseProcedure
 		.input(
 			z.object({
-				postSplitIdToSplitId: SplitIdToSplitIdSchema,
+				fullPostId: FullIdObjSchema,
 				version: z.number(),
 			}),
 		)
-		.mutation(async ({ input, ctx }) => {
-			assertSessionIsAuthorized(
-				ctx,
-				input.postSplitIdToSplitId.by_ms,
-				input.postSplitIdToSplitId.in_ms,
-			);
-			return _getPostHistory(tdb, input.postSplitIdToSplitId, input.version);
+		.mutation(async ({ ctx, input }) => {
+			assertValidSession(ctx, input);
+			return _getPostHistory(tdb, input.fullPostId, input.version);
 		}),
+	getSpaceTags: baseProcedure.mutation(async ({ input, ctx }) => {
+		assertValidSession(ctx, input);
+		return _getSpaceTags(tdb, input);
+	}),
 });
 
 // https://trpc.io/docs/server/server-side-calls

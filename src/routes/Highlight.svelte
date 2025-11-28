@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
-	import { getId } from '$lib/types/parts';
+	import { getIdStr } from '$lib/types/parts/partIds';
 
 	let p: {
 		id?: string;
@@ -12,7 +12,8 @@
 	let spotId = $derived(urlId && urlId[0] !== 'l' ? urlId : '');
 	let [lineColor, overlayColor] = $derived.by(() => {
 		if (!p.id) return ['bg-hl2', 'bg-hl2/5'];
-		if ((gs.writingTo || gs.writingEdit) && getId(gs.writingTo || gs.writingEdit || {}) === p.id) {
+		let post = gs.writingTo || gs.writingEdit;
+		if (post && getIdStr(post) === p.id) {
 			return gs.writingTo
 				? ['bg-hl-link', 'bg-hl-link/5']
 				: gs.writingEdit
@@ -25,7 +26,7 @@
 </script>
 
 {#if lineColor && overlayColor}
-	<div class={`z-50 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}>
+	<div class={`z-40 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}>
 		<div class="w-0.5 h-full {lineColor}"></div>
 	</div>
 {/if}

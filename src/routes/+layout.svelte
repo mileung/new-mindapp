@@ -12,14 +12,15 @@
 		updateLocalCache,
 		changeCurrentSpace,
 	} from '$lib/types/local-cache';
-	import { getSplitId } from '$lib/types/parts';
+	import { getBaseInput } from '$lib/types/parts';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
-	import type { LayoutData } from './$types';
+	import type { LayoutData, LayoutServerData } from './$types';
 	import Sidebar from './Sidebar.svelte';
 	import { strIsInt } from '$lib/js';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	onMount(async () => {
@@ -29,12 +30,12 @@
 		)!;
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.spaces = localCache.spaces;
+		gs.idToSpaceMap = localCache.spaces;
 		gs.currentSpaceMs = localCache.currentSpaceMs;
 
 		if (page.url.pathname === '/') {
 			let currentSpaceMsStr = localStorage.getItem('currentSpaceMs');
-			goto(`/l_l_${strIsInt(currentSpaceMsStr || '') ? currentSpaceMsStr : ''}`, {
+			goto(`/l_l_${Number.isInteger(+(currentSpaceMsStr || '')) ? currentSpaceMsStr : '0'}`, {
 				replaceState: true,
 			});
 		}
@@ -58,7 +59,7 @@
 					gs.writerTags = scrapedInfo.tags || [];
 					// TODO: think of a better ux. Like when a user highlights and runs the mindapp shortcut, what should be prepopulated in the writer?
 					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
-					gs.writerBody = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
+					gs.writerCore = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
 				}
 			});
 		}
@@ -77,13 +78,15 @@
 
 			try {
 				if (page.params.id) {
-					let { in_ms } = getSplitId(page.params.id);
-					if ((in_ms === null || Number.isInteger(in_ms)) && in_ms !== gs.currentSpaceMs) {
-						if (page.params.id.startsWith('l_l_')) {
+					let { in_ms } = idStrAsIdObj(page.params.id);
+					if (in_ms > 0 && in_ms !== gs.currentSpaceMs) {
+						if (page.params.id.startsWith('l_l_0')) {
 							changeCurrentSpace(in_ms);
+							goto(`/l_l_${in_ms}`);
 						} else if (!gs.accounts[0].spaceMss.includes(in_ms)) {
 							// If you visit the url for thought in a space you are not in, this should change the current space to local and maybe it'll be there locally saved
-							changeCurrentSpace(null, true);
+							changeCurrentSpace(0);
+							goto(`/l_l_0`);
 							// TODO: Show the option to join the space
 						}
 					}
@@ -91,15 +94,19 @@
 
 				try {
 					// TODO: show accounts that were signed but but need to be signed in again for some reason?
-					let signedInMss = await trpc().auth.getSignedInMss.mutate({
-						accountMss: gs.accounts.map((a) => a.ms).filter((n) => n !== null),
-					});
-					let signedInMsSet = new Set(signedInMss);
-					updateLocalCache((lc) => {
-						lc.accounts = lc.accounts.filter((a) => a.ms === null || signedInMsSet.has(a.ms));
-						return lc;
-					});
-					refreshCurrentAccount();
+					let accountMss = gs.accounts.map((a) => a.ms).filter((n) => n !== null);
+					if (accountMss.length && (page.data as LayoutServerData).sessionIdExists) {
+						let signedInMss = await trpc().auth.verifySignedInMss.mutate({
+							...getBaseInput(),
+							accountMss,
+						});
+						let signedInMsSet = new Set(signedInMss);
+						updateLocalCache((lc) => {
+							lc.accounts = lc.accounts.filter((a) => a.ms === 0 || signedInMsSet.has(a.ms));
+							return lc;
+						});
+						refreshCurrentAccount();
+					}
 				} catch (error) {
 					console.log('error:', error);
 					alert(error);
@@ -129,6 +136,6 @@
 
 <!-- TODO: scroll feed even when on sidebar. Do not use multiple Sidebar instances.  -->
 <Sidebar />
-<div class="xs:pl-[var(--w-sidebar)] min-h-screen pt-9 xs:pt-0">
+<div class="xs:pl-[var(--w-sidebar)] min-h-screen pb-9 xs:pb-0">
 	{@render p.children()}
 </div>

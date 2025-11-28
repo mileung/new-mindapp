@@ -2,27 +2,27 @@
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
 	import { getUndefinedLocalFeedIds, gs } from '$lib/global-state.svelte';
-	import { localDbFilename, gsdb, initLocalDb } from '$lib/local-db';
+	import { identikana, randomInt as ranInt } from '$lib/js';
+	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { getLocalCache } from '$lib/types/local-cache';
-	import {
-		getId,
-		_selectNode,
-		PartInsertSchema,
-		type PartInsert,
-		overwriteLocalPost,
-	} from '$lib/types/parts';
-	import { partsTable } from '$lib/types/parts-table';
+	import { PartInsertSchema, type PartInsert } from '$lib/types/parts';
+	import { pTable } from '$lib/types/parts/partsTable';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
-	import { asc } from 'drizzle-orm';
+	import { and, asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import AccountIcon from '../AccountIcon.svelte';
-	import { identikana } from '$lib/js';
+	import { PostSchema, type Post } from '$lib/types/posts';
+	import { pt } from '$lib/types/parts/partFilters';
+	import { pc } from '$lib/types/parts/partCodes';
+	import { addPost } from '$lib/types/posts/addPost';
+	import { getIdStr } from '$lib/types/parts/partIds';
+	import { day, minute, week } from '$lib/time';
 	let setAccountsAndSpaces = () => {
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.spaces = localCache.spaces;
+		gs.idToSpaceMap = localCache.spaces;
 	};
 </script>
 
@@ -94,19 +94,19 @@
 								await gsdb()
 							)
 								.select()
-								.from(partsTable) // TODO: explicitly make rows with null ms cols come first or last?
+								.from(pTable) // TODO: explicitly make rows with null ms cols come first or last?
 								// TODO: Also had this idea to export rows based on in_ms or ms range
-								.orderBy(asc(partsTable.ms))
+								.orderBy(asc(pTable.ms))
 						).map(
 							(r) =>
 								({
-									to_ms: r.to_ms === null ? undefined : r.to_ms,
-									to_by_ms: r.to_by_ms === null ? undefined : r.to_by_ms,
-									to_in_ms: r.to_in_ms === null ? undefined : r.to_in_ms,
-									ms: r.ms === null ? undefined : r.ms,
-									by_ms: r.by_ms === null ? undefined : r.by_ms,
-									in_ms: r.in_ms === null ? undefined : r.in_ms,
-									code: r.code === null ? undefined : r.code,
+									at_ms: r.at_ms,
+									at_by_ms: r.at_by_ms,
+									at_in_ms: r.at_in_ms,
+									ms: r.ms,
+									by_ms: r.by_ms,
+									in_ms: r.in_ms,
+									code: r.code,
 									txt: r.txt === null ? undefined : r.txt,
 									num: r.num === null ? undefined : r.num,
 								}) satisfies PartInsert,
@@ -127,30 +127,42 @@
 						console.time('import_time');
 						let text = await file.text();
 						try {
-							let importedPosts: PartInsert[] = JSON.parse(text);
+							let importedPosts: Post[] = JSON.parse(text);
 							if (
 								Array.isArray(importedPosts) &&
-								importedPosts.every((item) => PartInsertSchema.safeParse(item).success)
+								importedPosts.every((item) => PostSchema.safeParse(item).success)
 							) {
+								let oldToNewImportedPosts = importedPosts.sort((a, b) => b.ms - a.ms);
 								let db = await gsdb();
 								// TODO: make importing local data faster
 								let results = await Promise.all(
-									importedPosts.map(
-										async (node) => [node, !!(await _selectNode(db, node))] as const,
-									),
+									oldToNewImportedPosts.map(async (post) => [
+										post,
+										!!(
+											await db
+												.select()
+												.from(pTable)
+												.where(
+													and(
+														pt.id(post), //
+														pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+													),
+												)
+										)[0],
+									]),
 								);
 								let inserts: PartInsert[] = [];
 								let overwrites: PartInsert[] = [];
-								results.forEach(([thought, exists]) =>
-									(exists ? overwrites : inserts).push(thought),
-								);
+								// results.forEach(([thought, exists]) =>
+								// 	(exists ? overwrites : inserts).push(thought),
+								// );
 								// await Promise.all([
 								// 	...inserts.map((i) => insertLocalPost(i)),
 								// 	...overwrites.map((o) => overwriteLocalPost(o)),
 								// ]);
 								console.timeEnd('import_time');
 								setAccountsAndSpaces();
-								gs.feeds = {};
+								gs.indentifierToFeedMap = {};
 								alert(m.dataSuccessfullyMerged());
 							} else {
 								alert(m.invalidJsonFile());
@@ -190,14 +202,52 @@
 				console.log('error deleteDatabaseFile:', e);
 			}
 			!dev && alert(m.localDatabaseDeleted());
-			gs.feeds = { ...gs.feeds, ...getUndefinedLocalFeedIds() };
+			gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
 			await initLocalDb();
 			setAccountsAndSpaces();
-
-			console.log('yes');
 
 			// TODO: not great to assume the new local db works after deleting the old one - same for localCache
 			gs.localDbFailed = gs.invalidLocalCache = false;
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
+	{#if dev}
+		<p class="text-xl font-bold">Dev Tools</p>
+		<div class="h-0.5 w-full bg-bg8"></div>
+		<button
+			class="xy px-2 py-1 bg-red-500/20 hover:bg-yellow-500/30 text-yellow-500"
+			onclick={async () => {
+				try {
+					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
+				} catch (e) {
+					console.log('error deleteDatabaseFile:', e);
+				}
+				gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
+				await initLocalDb();
+				setAccountsAndSpaces();
+				let beginning = new Date('8-8-88').getTime();
+				let posts: Post[] = [];
+				for (let i = 0; i < 88; i++) {
+					let ranPost = posts[ranInt(0, i * 8)];
+					let cid = ranPost ? getIdStr(ranPost) : '';
+					let ms = beginning + i * 8 * day;
+					posts.push({
+						at_ms: 0,
+						at_by_ms: 0,
+						at_in_ms: 0,
+						ms,
+						by_ms: 0,
+						in_ms: 0,
+						history: {
+							'0': {
+								ms,
+								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
+								tags: i % 8 === 0 ? [] : ['test', 'dev'],
+							},
+						},
+					});
+				}
+				for (let post of posts) await addPost(post, false);
+			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
+		>
+	{/if}
 </div>

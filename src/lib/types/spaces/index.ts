@@ -3,6 +3,7 @@ import { z } from 'zod';
 export let SpaceSchema = z
 	.object({
 		ms: z.number(),
+		name: z.string().optional(),
 	})
 	.strict();
 

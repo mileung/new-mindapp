@@ -1,47 +1,56 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { getSplitId } from '$lib/types/parts';
-	import {
-		IconCrown,
-		IconSearch,
-		IconStar,
-		IconStarOff,
-		IconUserMinus,
-		IconUsersPlus,
-	} from '@tabler/icons-svelte';
+	import { getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import AccountIcon from '../../AccountIcon.svelte';
-	import { identikana, strIsInt } from '$lib/js';
+	import type { LayoutServerData } from '../../$types';
+	import PromptSignIn from '../../PromptSignIn.svelte';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 
-	let split = $derived(getSplitId(page.params.id || ''));
+	let split = $derived(idStrAsIdObj(page.params.id || ''));
 	let created = $derived(formatMs(split.ms!));
 
 	let searchIpt: HTMLInputElement;
 	let searchVal = $state('');
-	let tags = $state<number[]>([]);
+	let tags = $state<
+		{
+			txt: string;
+			num: number;
+		}[]
+	>([]);
 
 	let loadMoreTags = async (e: InfiniteEvent) => {
-		tags = [
-			//
-			...Array(19),
-		].map(() => +('' + Math.random()).slice(2));
-		let newFromMs = 0; //lastRoot?.ms;
+		// if (!gs.accounts || gs.currentSpaceMs === undefined) return;
+		// let moreTags = (await getSpaceTags()).tags;
+		// tags = [...tags, ...moreTags];
+		// e.detail.loaded();
+
 		let endReached = true; //rootPosts.length < postsPerLoad;
-		e.detail.loaded();
 		endReached ? e.detail.complete() : e.detail.loaded();
 	};
+
+	let idObjParam = $derived(idStrAsIdObj(page.params.id || ''));
+	let promptSignIn = $derived(
+		(!(page.data as LayoutServerData).sessionIdExists || gs.accounts?.[0].ms === 0) &&
+			idObjParam.in_ms !== 0 &&
+			idObjParam.in_ms !== 1,
+	);
 </script>
 
-<div class="xy min-h-screen p-5">
-	<div class="w-full max-w-sm">
-		<div class="text-xl font-bold">
-			<p class="text-3xl font-black">
-				{spaceMsToSpaceName(null)} tags
-			</p>
-			<div class="mt-2 bg-bg2 min-w-0 flex h-9">
+{#if promptSignIn}
+	<PromptSignIn />
+{:else}
+	<div class="xy min-h-screen p-5">
+		<div class="w-full max-w-sm">
+			<div class="text-xl font-bold">
+				<p class="text-3xl font-black">
+					{1 === 1
+						? m.oneSpaceNameTag({ spaceName: spaceMsToSpaceName(0) })
+						: m.nSpaceNameTags({ n: 1, spaceName: spaceMsToSpaceName(0) })}
+				</p>
+				<!-- <div class="mt-2 bg-bg2 min-w-0 flex h-9">
 				<input
 					bind:this={searchIpt}
 					bind:value={searchVal}
@@ -56,14 +65,25 @@
 				>
 					<IconSearch class="h-6 w-6" />
 				</a>
+			</div> -->
+				{#each tags || [] as tag, i}
+					<div class="">
+						<p class="">
+							{tag.num} -
+							<a
+								href={`/l_l_${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag.txt}]`)}`}
+								class="font-bold leading-5 hover:underline"
+							>
+								{tag.txt}
+							</a>
+						</p>
+					</div>
+				{/each}
+				<InfiniteLoading identifier={'identifier'} spinner="spiral" on:infinite={loadMoreTags}>
+					<p slot="noMore" class="mb-2 text-xl text-fg2">{m.endOfList()}</p>
+					<p slot="error" class="mb-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
+				</InfiniteLoading>
 			</div>
-			{#each tags || [] as ms, i}
-				<div class="">{i} {ms}</div>
-			{/each}
-			<InfiniteLoading identifier={'identifier'} spinner="spiral" on:infinite={loadMoreTags}>
-				<p slot="noMore" class="mb-2 text-xl text-fg2">{m.endOfList()}</p>
-				<p slot="error" class="mb-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
-			</InfiniteLoading>
 		</div>
 	</div>
-</div>
+{/if}

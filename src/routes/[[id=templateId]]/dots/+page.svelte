@@ -1,9 +1,8 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { getSplitId } from '$lib/types/parts';
 	import {
 		IconCrown,
 		IconSearch,
@@ -15,11 +14,14 @@
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from '../../AccountIcon.svelte';
 	import { identikana, strIsInt } from '$lib/js';
+	import PromptSignIn from '../../PromptSignIn.svelte';
+	import type { LayoutServerData } from '../../$types';
+	import { idStrAsIdObj } from '$lib/types/parts/partIds';
 
-	let split = $derived(getSplitId(page.params.id || ''));
+	let split = $derived(idStrAsIdObj(page.params.id || ''));
 	let created = $derived(formatMs(split.ms!));
 
-	let searchIpt: HTMLInputElement;
+	let searchIpt = $state<HTMLInputElement>();
 	let searchVal = $state('');
 	let accountMss = $state<number[]>([]);
 
@@ -48,85 +50,95 @@
 		e.detail.loaded();
 		endReached ? e.detail.complete() : e.detail.loaded();
 	};
+	let idObjParam = $derived(idStrAsIdObj(page.params.id || ''));
+	let promptSignIn = $derived(
+		(!(page.data as LayoutServerData).sessionIdExists || gs.accounts?.[0].ms === 0) &&
+			idObjParam.in_ms !== 0 &&
+			idObjParam.in_ms !== 1,
+	);
 </script>
 
-<div class="xy min-h-screen p-5">
-	<div class="w-full max-w-sm">
-		<div class="text-xl font-bold">
-			<p class="text-3xl font-black">
-				{spaceMsToSpaceName(null)}
-			</p>
-			{#if 0 > 1}
-				<p class="mt-2">{m.createdD({ d: created })}</p>
-			{/if}
-			<p class="mt-2">{1 === 1 ? m.onePost() : m.nPosts({ n: 1 })}</p>
-			<div class="mt-2 flex justify-between">
-				<p>{1 === 1 ? m.oneAccount() : m.nAccounts({ n: 1 })}</p>
-				<a
-					href={`/${page.params.id}/invite`}
-					class="xy text-black p-1 px-2 gap-1 bg-hl1 hover:bg-hl2"
-				>
-					<IconUsersPlus />
-					{m.invite()}
-				</a>
-			</div>
-			<div class="mt-2 bg-bg2 min-w-0 flex h-9">
-				<input
-					bind:this={searchIpt}
-					bind:value={searchVal}
-					enterkeyhint="search"
-					class="min-w-0 flex-1 pl-2 pr-10"
-					placeholder={m.search()}
-					onkeydown={(e) => {}}
-				/>
-				<a
-					class="xy -ml-10 w-10 text-fg2 hover:text-fg1"
-					href={`/?q=${encodeURIComponent(searchVal)}`}
-				>
-					<IconSearch class="h-6 w-6" />
-				</a>
-			</div>
-			{#each accountMss || [] as ms}
-				<div class="fx h-8">
-					<AccountIcon {ms} class="h-6 w-6" />
-					<p class="mx-2 font-medium text-lg italic">
-						{identikana(ms)}
-					</p>
-					<span class="truncate text-sm text-fg2 font-normal">{ms}</span>
-					<button
-						class="ml-auto h-full min-w-8 xy hover:bg-bg4"
-						onclick={() => {
-							//
-						}}
+{#if promptSignIn}
+	<PromptSignIn />
+{:else}
+	<div class="xy min-h-screen p-5">
+		<div class="w-full max-w-sm">
+			<div class="text-xl font-bold">
+				<p class="text-3xl font-black">
+					{spaceMsToSpaceName(0)}
+				</p>
+				{#if 0 > 1}
+					<p class="mt-2">{m.createdD({ d: created })}</p>
+				{/if}
+				<p class="mt-2">{1 === 1 ? m.onePost() : m.nPosts({ n: 1 })}</p>
+				<div class="mt-2 flex justify-between">
+					<p>{1 === 1 ? m.oneAccount() : m.nAccounts({ n: 1 })}</p>
+					<a
+						href={`/${page.params.id}/invite`}
+						class="xy text-black p-1 px-2 gap-1 bg-hl1 hover:bg-hl2"
 					>
-						<IconUserMinus class="h-5" />
-					</button>
-					<button
-						class="h-full min-w-8 xy hover:bg-bg4"
-						onclick={() => {
-							//
-						}}
-					>
-						{#if true}
-							<IconStar class="h-5" />
-						{:else}
-							<IconStarOff class="h-5" />
-						{/if}
-					</button>
-					<button
-						class="h-full min-w-8 xy hover:bg-bg4"
-						onclick={() => {
-							//
-						}}
-					>
-						<IconCrown class="h-5" />
-					</button>
+						<IconUsersPlus />
+						{m.invite()}
+					</a>
 				</div>
-			{/each}
-			<InfiniteLoading identifier={'identifier'} spinner="spiral" on:infinite={loadMoreAccounts}>
-				<p slot="noMore" class="mb-2 text-xl text-fg2">{m.endOfList()}</p>
-				<p slot="error" class="mb-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
-			</InfiniteLoading>
+				<div class="mt-2 bg-bg2 min-w-0 flex h-9">
+					<input
+						bind:this={searchIpt}
+						bind:value={searchVal}
+						enterkeyhint="search"
+						class="min-w-0 flex-1 pl-2 pr-10"
+						placeholder={m.search()}
+						onkeydown={(e) => {}}
+					/>
+					<a
+						class="xy -ml-10 w-10 text-fg2 hover:text-fg1"
+						href={`/?q=${encodeURIComponent(searchVal)}`}
+					>
+						<IconSearch class="h-6 w-6" />
+					</a>
+				</div>
+				{#each accountMss || [] as ms}
+					<div class="fx h-8">
+						<AccountIcon {ms} class="h-6 w-6" />
+						<p class="mx-2 font-medium text-lg italic">
+							{identikana(ms)}
+						</p>
+						<span class="truncate text-sm text-fg2 font-normal">{ms}</span>
+						<button
+							class="ml-auto h-full min-w-8 xy hover:bg-bg4"
+							onclick={() => {
+								//
+							}}
+						>
+							<IconUserMinus class="h-5" />
+						</button>
+						<button
+							class="h-full min-w-8 xy hover:bg-bg4"
+							onclick={() => {
+								//
+							}}
+						>
+							{#if true}
+								<IconStar class="h-5" />
+							{:else}
+								<IconStarOff class="h-5" />
+							{/if}
+						</button>
+						<button
+							class="h-full min-w-8 xy hover:bg-bg4"
+							onclick={() => {
+								//
+							}}
+						>
+							<IconCrown class="h-5" />
+						</button>
+					</div>
+				{/each}
+				<InfiniteLoading identifier={'identifier'} spinner="spiral" on:infinite={loadMoreAccounts}>
+					<p slot="noMore" class="mb-2 text-xl text-fg2">{m.endOfList()}</p>
+					<p slot="error" class="mb-2 text-xl text-fg2">{m.anErrorOccurred()}</p>
+				</InfiniteLoading>
+			</div>
 		</div>
 	</div>
-</div>
+{/if}

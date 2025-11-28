@@ -1,6 +1,10 @@
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { gs } from './global-state.svelte';
 import { m } from './paraglide/messages';
+import type { LibSQLDatabase } from 'drizzle-orm/libsql';
+import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
+
+export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
 export let localDbFilename = 'mindapp.db';
 
@@ -10,26 +14,22 @@ export async function initLocalDb() {
 	try {
 		await sql`
 			PRAGMA journal_mode=WAL;
+
 			CREATE TABLE IF NOT EXISTS parts (
-				to_ms INTEGER,
-				to_by_ms INTEGER,
-				to_in_ms INTEGER,
-				ms INTEGER,
-				by_ms INTEGER,
-				in_ms INTEGER,
-				code INTEGER,
+				at_ms INTEGER NOT NULL,
+				at_by_ms INTEGER NOT NULL,
+				at_in_ms INTEGER NOT NULL,
+				ms INTEGER NOT NULL,
+				by_ms INTEGER NOT NULL,
+				in_ms INTEGER NOT NULL,
+				code INTEGER NOT NULL,
 				txt TEXT,
-				num REAL
+				num REAL,
+				PRIMARY KEY (at_ms, at_by_ms, at_in_ms, ms, by_ms, in_ms, code)
 			);
-			CREATE INDEX IF NOT EXISTS to_ms_idx ON parts (to_ms);
-			CREATE INDEX IF NOT EXISTS to_by_ms_idx ON parts (to_by_ms);
-			CREATE INDEX IF NOT EXISTS to_in_ms_idx ON parts (to_in_ms);
-			CREATE INDEX IF NOT EXISTS ms_idx ON parts (ms);
-			CREATE INDEX IF NOT EXISTS by_ms_idx ON parts (by_ms);
-			CREATE INDEX IF NOT EXISTS in_ms_idx ON parts (in_ms);
-			CREATE INDEX IF NOT EXISTS code_idx ON parts (code);
-			CREATE INDEX IF NOT EXISTS txt_idx ON parts (txt);
-			CREATE INDEX IF NOT EXISTS num_idx ON parts (num);
+
+			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
+			CREATE INDEX IF NOT EXISTS num_idx ON parts(num);
 	`;
 	} catch (error) {
 		console.log('error:', error);

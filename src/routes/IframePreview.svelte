@@ -42,7 +42,7 @@
 	{#if !open}
 		<br />
 		<button
-			class=""
+			class="-ml-1 mt-2"
 			onclick={() => {
 				open = true;
 				toggleBtn?.focus();
