@@ -52,7 +52,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 			: dev
 				? mindappNewDevUrl
 				: mindappNewUrl
-		: dev
+		: dev || preview
 			? mindappOldDevUrl
 			: mindappOldUrl;
 	let selector =

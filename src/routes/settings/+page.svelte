@@ -10,7 +10,7 @@
 	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pt } from '$lib/types/parts/partFilters';
-	import { getIdStr } from '$lib/types/parts/partIds';
+	import { getIdStr, idObjAsAtIdObj, zeros } from '$lib/types/parts/partIds';
 	import { pTable } from '$lib/types/parts/partsTable';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
@@ -224,6 +224,7 @@
 				gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
 				await initLocalDb();
 				setAccountsAndSpaces();
+				let testTags = ['test', 'dev', '1980s', '1990s', '2000s'];
 				let beginning = new Date('8-8-88').getTime();
 				let posts: Post[] = [];
 				for (let i = 0; i < 88; i++) {
@@ -231,9 +232,7 @@
 					let cid = ranPost ? getIdStr(ranPost) : '';
 					let ms = beginning + i * 8 * day;
 					posts.push({
-						at_ms: 0,
-						at_by_ms: 0,
-						at_in_ms: 0,
+						...idObjAsAtIdObj(posts[ranInt(0, i * 8)] || zeros),
 						ms,
 						by_ms: 0,
 						in_ms: 0,
@@ -241,7 +240,10 @@
 							'0': {
 								ms,
 								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
-								tags: i % 8 === 0 ? [] : ['test', 'dev'],
+								tags: testTags.slice(
+									ranInt(0, testTags.length - 1),
+									ranInt(0, testTags.length - 1),
+								),
 							},
 						},
 					});

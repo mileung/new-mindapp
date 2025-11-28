@@ -364,8 +364,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	}
 
 	let {
-		[pc.tagIdAndTxtWithNumAsCount]: tagTxtRows = [],
-		[pc.coreIdAndTxtWithNumAsCount]: coreTxtRows = [],
+		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
 		cPTagIdWNumAsVersionAtPIdObjs.length || cPCoreIdWNumAsVersionAtPIdObjs.length
 			? await db
@@ -404,8 +404,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 					: { [mainPartObj.num]: { ms: 0, tags: [] } },
 		};
 	}
-	let tagIdToTxtMap = reduceTxtRowsToMap(tagTxtRows);
-	let coreIdToTxtMap = reduceTxtRowsToMap(coreTxtRows);
+	let tagIdToTxtMap = reduceTxtRowsToMap(tagIdAndTxtWithNumAsCountObjs);
+	let coreIdToTxtMap = reduceTxtRowsToMap(coreIdAndTxtWithNumAsCountObjs);
 	let subParts = [
 		...cPTagIdWNumAsVersionAtPIdObjs,
 		...cPCoreIdWNumAsVersionAtPIdObjs,

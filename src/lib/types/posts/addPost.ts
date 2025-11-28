@@ -103,10 +103,10 @@ export let _addPost = async (db: Database, post: Post) => {
 	tagsFromAllLayers = [...new Set(tagsFromAllLayers)];
 	coresFromAllLayers = [...new Set(coresFromAllLayers)];
 	let {
-		[pc.postIdWithNumAsDepthAtRootId]: parentAsChildRows = [],
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentAsRootRows = [],
-		[pc.tagIdAndTxtWithNumAsCount]: existingTagTxtRows = [],
-		[pc.coreIdAndTxtWithNumAsCount]: existingCoreTxtRows = [],
+		[pc.postIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: pIdWNumAsLastVersionAtPPIdObjs = [],
+		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
 		postIsChild || tagsFromAllLayers.length || coresFromAllLayers.length
 			? await db
@@ -124,7 +124,7 @@ export let _addPost = async (db: Database, post: Post) => {
 										),
 										and(
 											pt.noParent,
-											pt.ms.gt0,
+											pt.atIdAsId(mainPart),
 											pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 											pt.txt.isNull,
 											pt.num.isNotNull,
@@ -155,8 +155,11 @@ export let _addPost = async (db: Database, post: Post) => {
 	);
 
 	if (postIsChild) {
-		let parentRow = assert1Row([...parentAsChildRows, ...parentAsRootRows]);
-		let parentIsRoot = !!parentAsRootRows.length;
+		let parentRow = assert1Row([
+			...postIdWithNumAsDepthAtRootIdObjs,
+			...pIdWNumAsLastVersionAtPPIdObjs,
+		]);
+		let parentIsRoot = !!pIdWNumAsLastVersionAtPPIdObjs.length;
 		let atRootIdObj: AtIdObj = parentIsRoot
 			? {
 					at_ms: mainPart.at_ms,
@@ -202,14 +205,14 @@ export let _addPost = async (db: Database, post: Post) => {
 	let tagTxtToRowMap = addNewTagOrCoreRows(
 		mainPart, //
 		tagsFromAllLayers,
-		existingTagTxtRows,
+		tagIdAndTxtWithNumAsCountObjs,
 		true,
 		partsToInsert,
 	);
 	let coreTxtToRowMap = addNewTagOrCoreRows(
 		mainPart, //
 		coresFromAllLayers,
-		existingCoreTxtRows,
+		coreIdAndTxtWithNumAsCountObjs,
 		false,
 		partsToInsert,
 	);

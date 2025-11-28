@@ -13,6 +13,7 @@
 	let p: {
 		post: Post;
 		nested?: boolean;
+		miniCites?: boolean;
 		depth: number;
 		boldTags?: string[];
 		boldCore?: string[];
@@ -147,7 +148,7 @@
 					{/if}
 					{#if core}
 						{#if parsed}
-							<CoreParser {core} depth={p.depth} />
+							<CoreParser {core} miniCites={p.miniCites} depth={p.depth} />
 						{:else}
 							<p class="whitespace-pre-wrap break-all font-thin font-mono">{core}</p>
 						{/if}

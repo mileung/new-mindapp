@@ -71,7 +71,7 @@
 <div class="h-5 fx">
 	<div class="flex flex-1 overflow-scroll">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			<!-- {#if dev}<div class="fx mr-1">{strPostId}</div>{/if} -->
+			{#if dev}<div class="fx mr-1">{strPostId}</div>{/if}
 			<a
 				href={'/' + strPostId}
 				class="fx group hover:text-fg1"

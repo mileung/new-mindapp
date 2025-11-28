@@ -7,13 +7,13 @@
 		depth: number;
 	} = $props();
 	let id = $derived(getIdStr(p.post));
-	$effect(() => {
-		console.log('p:', p);
-	});
+	// $effect(() => {
+	// 	console.log('p:', p);
+	// });
 </script>
 
 <div
 	class={`m${id} z-0 relative border-l-2 border-hl-cite p-1 pl-2 m-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg3'}`}
 >
-	<PostBlock {...p} />
+	<PostBlock {...p} miniCites />
 </div>
