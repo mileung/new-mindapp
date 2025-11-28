@@ -3,6 +3,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "VITE_ENV=DEV vite build --watch",
+		"preview": "VITE_ENV=PREVIEW vite build",
 		"build": "vite build"
 	},
 	"devDependencies": {

@@ -33,15 +33,14 @@
 		gs.currentSpaceMs = localCache.currentSpaceMs;
 
 		if (page.url.pathname === '/') {
-			let currentSpaceMsStr = localStorage.getItem('currentSpaceMs');
-			goto(`/l_l_${Number.isInteger(+(currentSpaceMsStr || '')) ? currentSpaceMsStr : '0'}`, {
-				replaceState: true,
-			});
+			goto(`/l_l_${localCache.currentSpaceMs}`, { replaceState: true });
 		}
 
 		if (page.url.searchParams.get('extension') !== null) {
+			console.log('heyo');
 			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
 			window.addEventListener('message', (event) => {
+				console.log('event:', event);
 				if (event.source !== window) return;
 				if (event.data.type === '4-popup-receives-external-page-info') {
 					let { url, externalDomString, selectedPlainText, selectedHtmlString } =
@@ -53,6 +52,7 @@
 						}) || {};
 					if (!url || !externalDomString) return;
 					let scrapedInfo = scrape(url, externalDomString);
+					console.log('scrapedInfo:', scrapedInfo);
 
 					gs.writingNew = true;
 					gs.writerTags = scrapedInfo.tags || [];

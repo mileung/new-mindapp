@@ -212,7 +212,7 @@
 			bind:this={tagsIpt}
 			bind:value={gs.writerTagVal}
 			autocomplete="off"
-			class="flex-1 pl-2 pr-9 text-lg"
+			class="flex-1 px-2 text-lg"
 			placeholder={m.tags()}
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
@@ -284,25 +284,10 @@
 				}
 			}}
 		/>
-		<div
-			class="absolute right-0 h-full w-8 xy cursor-grab group active:cursor-grabbing hover:text-fg3"
-			onmousedown={(e) => {
-				e.preventDefault();
-				draggingHeight = true;
-				startY = e.clientY;
-				startHeight = parseFloat(
-					getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'),
-				);
-			}}
-		>
-			<div class="xy h-8 w-7 group-hover:bg-bg5">
-				<IconGripVertical class="w-5" />
-			</div>
-		</div>
 	</div>
-	<div class="flex-1">
+	<div class="flex-1 relative">
 		<div
-			class={`bg-bg3 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
+			class={`z-30 bg-bg3 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
 				suggestingTags ? '' : 'hidden'
 			}`}
 			onmousedown={(e) => e.preventDefault()}
@@ -335,14 +320,27 @@
 			bind:this={coreTa}
 			bind:value={gs.writerCore}
 			placeholder={m.organizeToday()}
-			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-10"
+			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9"
 			onkeydown={(e) => {
 				e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
+		<div
+			class="top-0 right-0 absolute xy h-10 w-10 cursor-grab active:cursor-grabbing hover:text-fg3"
+			onmousedown={(e) => {
+				e.preventDefault();
+				draggingHeight = true;
+				startY = e.clientY;
+				startHeight = parseFloat(
+					getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'),
+				);
+			}}
+		>
+			<IconGripVertical class="w-5" />
+		</div>
 		<button
-			class="absolute xy right-1 bottom-1 h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3"
+			class="bottom-1 right-1 absolute xy h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3"
 			onclick={submit}
 		>
 			<IconArrowUp class="h-9 w-9" />

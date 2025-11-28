@@ -1,5 +1,5 @@
 import { trpc } from '$lib/trpc/client';
-import { and, eq, or, SQL } from 'drizzle-orm';
+import { and, eq, or, type SQL } from 'drizzle-orm';
 import { bumpTagCountsBy1 } from '.';
 import { gsdb, type Database } from '../../local-db';
 import { assert1Row, getBaseInput, type PartSelect } from '../parts';

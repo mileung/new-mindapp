@@ -71,10 +71,10 @@
 		<button
 			class="xy px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-500"
 			onclick={async () => {
-				const { getDatabaseFile } = new SQLocal(localDbFilename);
-				const databaseFile = await getDatabaseFile();
-				const fileUrl = URL.createObjectURL(databaseFile);
-				const a = document.createElement('a');
+				let { getDatabaseFile } = new SQLocal(localDbFilename);
+				let databaseFile = await getDatabaseFile();
+				let fileUrl = URL.createObjectURL(databaseFile);
+				let a = document.createElement('a');
 				a.href = fileUrl;
 				a.download = `mindapp-${Date.now()}.db`;
 				a.click();
@@ -118,7 +118,7 @@
 		<button
 			class="xy px-2 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-500"
 			onclick={async () => {
-				const input = document.createElement('input');
+				let input = document.createElement('input');
 				input.type = 'file';
 				input.accept = 'application/json';
 				input.onchange = async (event) => {

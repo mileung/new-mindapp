@@ -1,19 +1,25 @@
 import { PopupMessage } from './background';
 
 let dev = import.meta.env.VITE_ENV === 'DEV';
+let preview = import.meta.env.VITE_ENV === 'PREVIEW';
 chrome.runtime.onMessage.addListener((msg) => {
 	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type)) openPopup(true);
 });
 
+let mindappPreviewUrl = 'http://localhost:1111';
 let mindappNewDevUrl = 'http://localhost:8888';
 let mindappNewUrl = 'https://new.mindapp.cc';
 let mindappOldDevUrl = 'http://localhost:1234';
 let mindappOldUrl = 'https://mindapp.cc';
 
 if (
-	[mindappNewDevUrl, mindappNewUrl, mindappOldDevUrl, mindappOldUrl].some((url) =>
-		location.href.startsWith(url),
-	)
+	[
+		mindappPreviewUrl,
+		mindappNewDevUrl,
+		mindappNewUrl, //
+		mindappOldDevUrl,
+		mindappOldUrl,
+	].some((url) => location.href.startsWith(url))
 ) {
 	window.addEventListener('message', async (event) => {
 		if (event.source !== window) return;
@@ -41,9 +47,11 @@ window.addEventListener('keydown', (e) => {
 
 let openPopup = (openingNewMindapp?: boolean) => {
 	let baseUrl = openingNewMindapp
-		? dev
-			? mindappNewDevUrl
-			: mindappNewUrl
+		? preview
+			? mindappPreviewUrl
+			: dev
+				? mindappNewDevUrl
+				: mindappNewUrl
 		: dev
 			? mindappOldDevUrl
 			: mindappOldUrl;

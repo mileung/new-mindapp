@@ -112,7 +112,6 @@ export let refreshCurrentAccount = async () => {
 };
 
 export let changeCurrentSpace = (inMs: number) => {
-	localStorage.setItem('currentSpaceMs', '' + inMs);
 	updateLocalCache((lc) => {
 		lc.currentSpaceMs = inMs;
 		return lc;

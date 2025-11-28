@@ -59,8 +59,8 @@
 
 	let invalidUrl = $state(false);
 	let viewPostToastId = $state('');
-	let idObjParam = $derived(idStrAsIdObj(p.idParam || ''));
-	let inLocal = $derived(idObjParam.in_ms === 0);
+	let idObjParam = $derived(p.idParam ? idStrAsIdObj(p.idParam) : null);
+	let inLocal = $derived(idObjParam?.in_ms === 0);
 
 	let view = $derived<'flat' | 'nested'>(
 		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
@@ -85,10 +85,11 @@
 			: '',
 	);
 	let nested = $derived(view === 'nested');
-	let showYourTurn = $derived((idObjParam.in_ms || 0) > 0);
+	let showYourTurn = $derived((idObjParam?.in_ms || 0) > 0);
 	let spotId = $derived(p.idParam && p.idParam[0] !== 'l' ? p.idParam : '');
 	let promptSignIn = $derived(
-		(!(page.data as LayoutServerData).sessionIdExists || gs.accounts?.[0].ms === 0) &&
+		idObjParam &&
+			(!(page.data as LayoutServerData).sessionIdExists || gs.accounts?.[0].ms === 0) &&
 			idObjParam.in_ms !== 0 &&
 			idObjParam.in_ms !== 1,
 	);
@@ -164,9 +165,9 @@
 		let arr = (p.idParam || '').split('_');
 		if (
 			arr.length !== 3 ||
-			(arr[0] !== '' && arr[0] !== 'l' && Number.isNaN(idObjParam.ms)) ||
-			(arr[1] !== '' && arr[1] !== 'l' && Number.isNaN(idObjParam.by_ms)) ||
-			(arr[2] !== '' && arr[2] !== 'l' && Number.isNaN(idObjParam.in_ms))
+			(arr[0] !== '' && arr[0] !== 'l' && Number.isNaN(idObjParam?.ms)) ||
+			(arr[1] !== '' && arr[1] !== 'l' && Number.isNaN(idObjParam?.by_ms)) ||
+			(arr[2] !== '' && arr[2] !== 'l' && Number.isNaN(idObjParam?.in_ms))
 		) {
 			invalidUrl = true;
 			return e.detail.error();
@@ -182,7 +183,7 @@
 			lastPostMs || sortedBy === 'old' //
 				? 0
 				: Number.MAX_SAFE_INTEGER;
-		let inMssInclude = idObjParam.in_ms === null ? [] : [idObjParam.in_ms];
+		let inMssInclude = idObjParam ? [idObjParam.in_ms] : [];
 		let callerMs = gs.accounts[0].ms || null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
 
@@ -413,9 +414,9 @@
 >
 	{#if promptSignIn}
 		<PromptSignIn />
-	{:else if p.idParam === 'l_l_1'}
+	{:else if idObjParam?.in_ms === 1}
 		patience
-	{:else}
+	{:else if idObjParam}
 		<!-- <p class="font-bold text-xl">All Local posts</p> -->
 		{#if showYourTurn}
 			<div class="min-h-9 fx">
@@ -481,7 +482,7 @@
 				{invalidUrl ? m.invalidUrl() : m.anErrorOccurred()}
 			</p>
 		</InfiniteLoading>
-		{#if p.idParam === 'l_l_0' && !p.searchedText && feed && !feed.length}
+		{#if inLocal && !p.searchedText && feed && !feed.length}
 			<div class="xy">
 				<p class="">
 					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}
