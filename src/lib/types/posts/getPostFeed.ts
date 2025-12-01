@@ -1,5 +1,5 @@
 import { trpc } from '$lib/trpc/client';
-import { and, not, or } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { type Post } from '.';
 import { gsdb, type Database } from '../../local-db';
@@ -13,7 +13,14 @@ import {
 } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
-import { atIdObjAsIdObj, getAtIdStr, getIdStr, IdObjSchema, type IdObj } from '../parts/partIds';
+import {
+	getAtIdObjAsIdObj,
+	getAtIdStr,
+	getIdStr,
+	IdObjSchema,
+	zeros,
+	type IdObj,
+} from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let postsPerLoad = 15;
@@ -21,7 +28,7 @@ export let bracketRegex = /\[([^\[\]]+)]/g;
 
 export let GetPostFeedSchema = z.object({
 	useRpc: z.boolean(),
-	callerMs: z.number().nullable(),
+	callerMs: z.number(),
 	view: z.enum(['nested', 'flat']),
 	sortedBy: z.enum(['bumped', 'new', 'old']),
 	fromMs: z.number(),
@@ -44,13 +51,13 @@ export type GetPostFeedQuery = z.infer<typeof GetPostFeedSchema>;
 export let getPostFeed = async (q: GetPostFeedQuery) => {
 	// TODO: Search local and global spaces in one query
 	return q.useRpc
-		? trpc().getPostFeed.mutate({ ...q, ...getBaseInput() })
+		? trpc().getPostFeed.query({ ...q, ...(await getBaseInput()) })
 		: _getPostFeed(await gsdb(), q);
 };
 
 export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
-	let all = await db.select().from(pTable);
-	console.table(all);
+	// console.table(await db.select().from(pTable));
+	// console.log(await db.select().from(pTable));
 
 	// console.log('q:', q);
 
@@ -197,7 +204,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	}
 
 	let excludePostIdsFilter = q.postIdObjsExclude?.length
-		? q.postIdObjsExclude.map((pio) => not(pt.id(pio)!))
+		? q.postIdObjsExclude.map((pio) => pt.notId(pio))
 		: [];
 
 	// for fetching cited posts right after submitting post
@@ -206,7 +213,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		: [];
 
 	if (q.view === 'nested') {
-		let rootPostIdObjs: IdObj[] = [];
+		let rootIdObjs: IdObj[] = [];
 		// let rootPostParts: PartSelect[] = [];
 		if (bumpedFirst) {
 			let atBumpedRootIdObjs = await db
@@ -228,9 +235,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				)
 				.orderBy(pt.ms.desc)
 				.limit(postsPerLoad);
-			rootPostIdObjs = atBumpedRootIdObjs.map((idObj) => atIdObjAsIdObj(idObj));
+			rootIdObjs = atBumpedRootIdObjs.map((idObj) => getAtIdObjAsIdObj(idObj));
 		} else if (newFirst || oldFirst) {
-			rootPostIdObjs = await db
+			rootIdObjs = await db
 				.select()
 				.from(pTable)
 				.where(
@@ -250,37 +257,70 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
 				.limit(postsPerLoad);
 		}
-		let descendentPostIdObjs = rootPostIdObjs.length
+		let descendentPostIdObjs = rootIdObjs.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						and(
-							or(...rootPostIdObjs.map((pio) => pt.idAsAtId(pio))),
+							or(...rootIdObjs.map((pio) => pt.idAsAtId(pio))),
 							// pf.ms.gt0,
 							// byMssFilter,
 							// inMssFilter,
-							pt.code.eq(pc.postIdWithNumAsDepthAtRootId),
+							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
 							pt.txt.isNull,
 							pt.num.isNotNull,
 						),
 					)
 			: [];
 
-		postsToFetchByIdObjs = [...rootPostIdObjs, ...descendentPostIdObjs];
-		postIdObjFeed = rootPostIdObjs;
+		postsToFetchByIdObjs = [...rootIdObjs, ...descendentPostIdObjs];
+		postIdObjFeed = rootIdObjs;
 	} else if (q.view === 'flat') {
-		let rootPostIdObjs = await db
-			.select()
-			.from(pTable)
-			// .where(and(...rootConditions))
-			.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
-			.limit(postsPerLoad);
+		let postIdAtBumpedRootIdObjs = bumpedFirst
+			? await db
+					.select()
+					.from(pTable)
+					.where(
+						and(
+							pt.ms.lte(q.fromMs),
+							...excludePostIdsFilter,
+							pt.code.eq(pc.postIdAtBumpedRootId),
+							pt.txt.isNull,
+							pt.num.isNull,
+						),
+					)
+					.orderBy(pt.ms.desc)
+					.limit(postsPerLoad)
+			: [];
+		let rootIdObjs = bumpedFirst
+			? postIdAtBumpedRootIdObjs.map((aio) => ({ ...zeros, ...getAtIdObjAsIdObj(aio) }))
+			: await db
+					.select()
+					.from(pTable)
+					.where(
+						and(
+							...(bumpedFirst
+								? [
+										pt.noParent, //
+										or(...postIdAtBumpedRootIdObjs.map((aRio) => pt.atIdAsId(aRio))),
+									]
+								: []),
+							(oldFirst ? pt.ms.gte : pt.ms.lte)(q.fromMs),
+							...excludePostIdsFilter,
+							pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+							pt.txt.isNull,
+							pt.num.isNotNull,
+						),
+					)
+					.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
+					.limit(postsPerLoad);
+
 		postsToFetchByIdObjs = [
-			...rootPostIdObjs,
-			...rootPostIdObjs.flatMap((rpio) => (hasParent(rpio) ? [atIdObjAsIdObj(rpio)] : [])),
+			...rootIdObjs,
+			...rootIdObjs.flatMap((rio) => (hasParent(rio) ? [getAtIdObjAsIdObj(rio)] : [])),
 		];
-		postIdObjFeed = rootPostIdObjs;
+		postIdObjFeed = rootIdObjs;
 	}
 
 	postIdStrFeed = postIdObjFeed.map((pio) => getIdStr(pio));
@@ -333,55 +373,63 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 
 	let {
 		[pc.postIdAtCitedPostId]: postIdAtCitedPostIdObjs = [],
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: pIdWNumAsLastVersionAtPPIdObjs = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: cPTagIdWNumAsVersionAtPIdObjs = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: cPCoreIdWNumAsVersionAtPIdObjs = [],
-		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmojiTxtWMsAndNAsCtAtPIdObjs = [],
-		[pc.currentVersionNumAndMsAtPostId]: cVersionNumAndMsAtPIdObjs = [],
-		[pc.currentSoftDeletedVersionNumAndMsAtPostId]: cSoftDeletedVersionNumAndMsAtPIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
+		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdObjs = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdObjs = [],
+		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWMsAndNAsCtAtPostIdObjs = [],
+		[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdObjs = [],
+		[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdObjs = [],
 	} = channelPartsByCode(
 		postsToFetchByIdObjs.length ? await getPostParts(postsToFetchByIdObjs) : [],
 	);
 
 	let atCitedIdObjsThatNeedFetching = postIdAtCitedPostIdObjs
 		.filter((aio) => !postsToFetchByIdObjs.find((fetchedIo) => atIdObjMatchesIdObj(aio, fetchedIo)))
-		.map((aio) => atIdObjAsIdObj(aio));
+		.map((aio) => getAtIdObjAsIdObj(aio));
 	if (atCitedIdObjsThatNeedFetching.length) {
 		let {
-			[pc.postIdWithNumAsLastVersionAtParentPostId]: pIdWNumAsLastVersionAtPPIdObjs_ = [],
-			[pc.currentPostTagIdWithNumAsVersionAtPostId]: cPTagIdWNumAsVersionAtPIdObjs_ = [],
-			[pc.currentPostCoreIdWithNumAsVersionAtPostId]: cPCoreIdWNumAsVersionAtPIdObjs_ = [],
-			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmojiTxtWMsAndNAsCtAtPIdObjs_ = [],
-			[pc.currentVersionNumAndMsAtPostId]: cVersionNumAndMsAtPIdObjs_ = [],
-			[pc.currentSoftDeletedVersionNumAndMsAtPostId]: cSoftDeletedVersionNumAndMsAtPIdObjs_ = [],
+			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs_ = [],
+			[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdObjs_ = [],
+			[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdObjs_ = [],
+			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWMsAndNAsCtAtPostIdObjs_ = [],
+			[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdObjs_ = [],
+			[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSDeletedVersionNumAndMsAtPostIdObjs_ = [],
 		} = channelPartsByCode(await getPostParts(atCitedIdObjsThatNeedFetching, true));
-		pIdWNumAsLastVersionAtPPIdObjs.push(...pIdWNumAsLastVersionAtPPIdObjs_);
-		cPTagIdWNumAsVersionAtPIdObjs.push(...cPTagIdWNumAsVersionAtPIdObjs_);
-		cPCoreIdWNumAsVersionAtPIdObjs.push(...cPCoreIdWNumAsVersionAtPIdObjs_);
-		rEmojiTxtWMsAndNAsCtAtPIdObjs.push(...rEmojiTxtWMsAndNAsCtAtPIdObjs_);
-		cVersionNumAndMsAtPIdObjs.push(...cVersionNumAndMsAtPIdObjs_);
-		cSoftDeletedVersionNumAndMsAtPIdObjs.push(...cSoftDeletedVersionNumAndMsAtPIdObjs_);
+		postIdWNumAsLastVersionAtPPostIdObjs.push(...postIdWNumAsLastVersionAtPPostIdObjs_);
+		curPostTagIdWNumAsVersionAtPostIdObjs.push(...curPostTagIdWNumAsVersionAtPostIdObjs_);
+		curPostCoreIdWNumAsVersionAtPostIdObjs.push(...curPostCoreIdWNumAsVersionAtPostIdObjs_);
+		rEmoTxtWMsAndNAsCtAtPostIdObjs.push(...rEmoTxtWMsAndNAsCtAtPostIdObjs_);
+		curVersionNumAndMsAtPostIdObjs.push(...curVersionNumAndMsAtPostIdObjs_);
+		curSoftDeletedVersionNumAndMsAtPostIdObjs.push(...curSDeletedVersionNumAndMsAtPostIdObjs_);
 	}
 
 	let {
 		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
 		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
-		cPTagIdWNumAsVersionAtPIdObjs.length || cPCoreIdWNumAsVersionAtPIdObjs.length
+		curPostTagIdWNumAsVersionAtPostIdObjs.length || curPostCoreIdWNumAsVersionAtPostIdObjs.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						or(
 							and(
-								or(...makePartsUniqueById(cPTagIdWNumAsVersionAtPIdObjs).map((row) => pt.id(row))),
+								or(
+									...makePartsUniqueById(curPostTagIdWNumAsVersionAtPostIdObjs).map((row) =>
+										pt.id(row),
+									),
+								),
 								pt.noParent,
 								pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
 								pt.txt.isNotNull,
 								pt.num.isNotNull,
 							),
 							and(
-								or(...makePartsUniqueById(cPCoreIdWNumAsVersionAtPIdObjs).map((row) => pt.id(row))),
+								or(
+									...makePartsUniqueById(curPostCoreIdWNumAsVersionAtPostIdObjs).map((row) =>
+										pt.id(row),
+									),
+								),
 								pt.noParent,
 								pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
 								pt.txt.isNotNull,
@@ -393,8 +441,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	);
 
 	let idToPostMap: Record<string, Post> = {};
-	for (let i = 0; i < pIdWNumAsLastVersionAtPPIdObjs.length; i++) {
-		let mainPartObj = pIdWNumAsLastVersionAtPPIdObjs[i];
+	for (let i = 0; i < postIdWNumAsLastVersionAtPPostIdObjs.length; i++) {
+		let mainPartObj = postIdWNumAsLastVersionAtPPostIdObjs[i];
 		let partIdStr = getIdStr(mainPartObj);
 		idToPostMap[partIdStr] = {
 			...mainPartObj,
@@ -407,10 +455,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let tagIdToTxtMap = reduceTxtRowsToMap(tagIdAndTxtWithNumAsCountObjs);
 	let coreIdToTxtMap = reduceTxtRowsToMap(coreIdAndTxtWithNumAsCountObjs);
 	let subParts = [
-		...cPTagIdWNumAsVersionAtPIdObjs,
-		...cPCoreIdWNumAsVersionAtPIdObjs,
-		...cVersionNumAndMsAtPIdObjs,
-		...cSoftDeletedVersionNumAndMsAtPIdObjs,
+		...curPostTagIdWNumAsVersionAtPostIdObjs,
+		...curPostCoreIdWNumAsVersionAtPostIdObjs,
+		...curVersionNumAndMsAtPostIdObjs,
+		...curSoftDeletedVersionNumAndMsAtPostIdObjs,
 	];
 	for (let i = 0; i < subParts.length; i++) {
 		let part = subParts[i];
@@ -428,9 +476,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	}
 
 	pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId;
-	rEmojiTxtWMsAndNAsCtAtPIdObjs;
+	rEmoTxtWMsAndNAsCtAtPostIdObjs;
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
-	console.log('getPostFeed', postIdStrFeed, idToPostMap);
+	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);
 	return { postIdStrFeed, idToPostMap };
 };

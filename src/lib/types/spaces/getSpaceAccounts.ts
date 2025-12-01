@@ -5,23 +5,21 @@ import { gsdb } from '../../local-db';
 import { getBaseInput, type BaseInput } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
-import { getIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let tagsPerLoad = 88;
+export let accountsPerLoad = 88;
 
-export let getSpaceTags = async (fromCount: number, excludeTags: string[]) => {
+export let getSpaceAccounts = async (fromAccountMs: number) => {
 	let baseInput = await getBaseInput();
 	return baseInput.in_ms > 0
-		? trpc().getSpaceTags.query({ ...baseInput, fromCount, excludeTags })
-		: _getSpaceTags(await gsdb(), { ...baseInput, fromCount, excludeTags });
+		? trpc().getSpaceAccounts.query({ ...baseInput, fromAccountMs })
+		: _getSpaceAccounts(await gsdb(), { ...baseInput, fromAccountMs });
 };
 
-export let _getSpaceTags = async (
+export let _getSpaceAccounts = async (
 	db: Database,
 	input: BaseInput & {
-		fromCount: number; //
-		excludeTags: string[];
+		fromAccountMs: number; //
 	},
 ) => {
 	// console.table(await db.select().from(pTable));
@@ -39,18 +37,13 @@ export let _getSpaceTags = async (
 				pt.ms.gt0,
 				pt.in_ms.eq(input.in_ms),
 				pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-				and(...input.excludeTags.map((t) => pt.txt.notEq(t))),
-				pt.num.lte(input.fromCount),
+				pt.num.lte(input.fromAccountMs),
 			),
 		)
 		.orderBy(desc(pTable.num), asc(pTable.txt))
-		.limit(tagsPerLoad);
+		.limit(accountsPerLoad);
 
 	return {
-		tags: tagIdAndTxtWithNumAsCountObjs.map((r) => ({
-			...getIdObj(r),
-			txt: r.txt!, //
-			num: r.num!,
-		})),
+		accounts: [],
 	};
 };

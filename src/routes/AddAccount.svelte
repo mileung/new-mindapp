@@ -133,7 +133,7 @@
 						let strike: undefined | number;
 						if (p.signingIn) {
 							let res = await trpc().auth.attemptSignIn.mutate({
-								...getBaseInput(),
+								...(await getBaseInput()),
 								email,
 								password,
 								otpMs,
@@ -142,7 +142,7 @@
 							strike = res?.strike;
 						} else if (p.creatingAccount) {
 							let res = await trpc().auth.attemptCreateAccount.mutate({
-								...getBaseInput(),
+								...(await getBaseInput()),
 								name,
 								email,
 								password,
@@ -156,11 +156,11 @@
 									lc.accounts = [account, ...lc.accounts.filter((a) => a.ms !== account.ms)];
 									return lc;
 								});
-								goto(`/l_l_${gs.currentSpaceMs}`, {});
+								goto(`/__${gs.currentSpaceMs}`, {});
 							}
 						} else if (p.resettingPassword) {
 							let res = await trpc().auth.checkOtp.mutate({
-								...getBaseInput(),
+								...(await getBaseInput()),
 								otpMs,
 								pin,
 								email,
@@ -222,10 +222,10 @@
 									];
 									return lc;
 								});
-								return goto(`/l_l_${gs.currentSpaceMs}`);
+								return goto(`/__${gs.currentSpaceMs}`);
 							}
 							let res = await trpc().auth.attemptSignIn.mutate({
-								...getBaseInput(),
+								...(await getBaseInput()),
 								email: normalizedEmail,
 								password,
 							});
@@ -237,7 +237,7 @@
 							return;
 						} else {
 							let res = await trpc().auth.sendOtp.mutate({
-								...getBaseInput(),
+								...(await getBaseInput()),
 								email,
 								partCode: p.creatingAccount
 									? pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount

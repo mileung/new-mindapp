@@ -10,7 +10,7 @@
 	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pt } from '$lib/types/parts/partFilters';
-	import { getIdStr, idObjAsAtIdObj, zeros } from '$lib/types/parts/partIds';
+	import { getIdObjAsAtIdObj, getIdStr, zeros } from '$lib/types/parts/partIds';
 	import { pTable } from '$lib/types/parts/partsTable';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
@@ -24,9 +24,10 @@
 		gs.accounts = localCache.accounts;
 		gs.idToSpaceMap = localCache.spaces;
 	};
+	let language = $state('en');
 </script>
 
-<div class="p-2 space-y-2 w-full max-w-lg">
+<div class="flex flex-col items-start gap-2 p-2 w-full max-w-lg">
 	{#if gs.localDbFailed || gs.invalidLocalCache}
 		<p class="text-red-500 border-red-500 border-2 p-2">
 			{gs.localDbFailed
@@ -34,9 +35,7 @@
 				: m.somethingIsWrongWithYourLocalCache___()}
 		</p>
 	{/if}
-
 	<p class="text-xl font-bold">{m.account()}</p>
-	<div class="h-0.5 w-full bg-bg8"></div>
 	{#if gs.accounts}
 		{#if !gs.accounts[0].ms}
 			<p>{m.anon()}</p>
@@ -49,9 +48,8 @@
 			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
 		{/if}
 	{/if}
-
+	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.theme()}</p>
-	<div class="h-0.5 w-full bg-bg8"></div>
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
 	<select
 		name={m.theme()}
@@ -63,9 +61,19 @@
 		<option value="dark">{m.dark()}</option>
 		<!-- TODO: More themes like a text editor -->
 	</select>
+	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+	<p class="text-xl font-bold">{m.language()}</p>
+	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
+	<select
+		name={m.language()}
+		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+		bind:value={language}
+	>
+		<option value="en">English</option>
+	</select>
 	<!-- TODO: Spinners while downloading/importing/deleting local data -->
+	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.manageLocalDatabase()}</p>
-	<div class="h-0.5 w-full bg-bg8"></div>
 
 	{#if gs.localDbFailed}
 		<button
@@ -178,8 +186,8 @@
 			{m.importJsonFile()}
 		</button>
 	{/if}
+	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.dangerZone()}</p>
-	<div class="h-0.5 w-full bg-bg8"></div>
 	<!-- TODO: reset local cache button -->
 	<button
 		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
@@ -210,9 +218,10 @@
 			gs.localDbFailed = gs.invalidLocalCache = false;
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
-	{#if dev}
+	<!-- {#if dev} -->
+	{#if true}
+		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 		<p class="text-xl font-bold">Dev Tools</p>
-		<div class="h-0.5 w-full bg-bg8"></div>
 		<button
 			class="xy px-2 py-1 bg-red-500/20 hover:bg-yellow-500/30 text-yellow-500"
 			onclick={async () => {
@@ -224,15 +233,23 @@
 				gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
 				await initLocalDb();
 				setAccountsAndSpaces();
-				let testTags = ['test', 'dev', '1980s', '1990s', '2000s'];
+
+				let testTags: string[] = [];
+				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
 				let beginning = new Date('8-8-88').getTime();
 				let posts: Post[] = [];
 				for (let i = 0; i < 88; i++) {
 					let ranPost = posts[ranInt(0, i * 8)];
 					let cid = ranPost ? getIdStr(ranPost) : '';
 					let ms = beginning + i * 8 * day;
+					let tagCount = ranInt(0, 8);
+					let tags = [];
+					for (let t = 0; t < tagCount; t++) {
+						let tagIndex = ranInt(0, testTags.length - 1);
+						tags.push(testTags[tagIndex]);
+					}
 					posts.push({
-						...idObjAsAtIdObj(posts[ranInt(0, i * 8)] || zeros),
+						...getIdObjAsAtIdObj(posts[ranInt(0, i * 2)] || zeros),
 						ms,
 						by_ms: 0,
 						in_ms: 0,
@@ -240,15 +257,17 @@
 							'0': {
 								ms,
 								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
-								tags: testTags.slice(
-									ranInt(0, testTags.length - 1),
-									ranInt(0, testTags.length - 1),
-								),
+								tags,
 							},
 						},
 					});
 				}
-				for (let post of posts) await addPost(post, false);
+				console.time('adding posts');
+				for (let post of posts) {
+					await addPost(post, false);
+					console.log('added post');
+				}
+				console.timeEnd('adding posts');
 			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
 		>
 	{/if}

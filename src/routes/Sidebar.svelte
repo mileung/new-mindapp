@@ -8,8 +8,8 @@
 	import {
 		changeCurrentSpace,
 		refreshCurrentAccount,
-		unsaveTagInCurrentAccount,
 		updateLocalCache,
+		updateSavedTags,
 	} from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import {
@@ -66,7 +66,7 @@
 					}
 				}
 				if (e.key === 'h') {
-					gs.accounts && goto(`/l_l_${gs.currentSpaceMs}`);
+					gs.accounts && goto(`/__${gs.currentSpaceMs}`);
 				}
 				if (e.metaKey && e.key === 'Tab' && gs.accounts) {
 					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.currentSpaceMs);
@@ -76,7 +76,7 @@
 						newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
 					let inMs = gs.accounts[0].spaceMss[newSpaceMsIndex];
 					changeCurrentSpace(inMs);
-					goto(`/l_l_${inMs}`);
+					goto(`/__${inMs}`);
 				}
 			}
 		};
@@ -101,7 +101,7 @@
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts) {
 			page.state.modalId = undefined;
-			let urlPath = `/l_l_${gs.currentSpaceMs}?q=${q}`;
+			let urlPath = `/__${gs.currentSpaceMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else goto(urlPath);
 		}
@@ -174,7 +174,7 @@
 					if (e.key === 'Enter') {
 						let tag = suggestedTags[tagIndex];
 						xFocused
-							? unsaveTagInCurrentAccount(tag)
+							? updateSavedTags([tag], true)
 							: tag
 								? addTagToSearchInput(tag)
 								: searchInput(e);
@@ -247,7 +247,7 @@
 							<button
 								bind:this={unsaveTagXRefs[i]}
 								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-								onclick={() => unsaveTagInCurrentAccount(tag)}
+								onclick={() => updateSavedTags([tag], true)}
 							>
 								<IconX class="h-5 w-5" />
 							</button>
@@ -353,10 +353,10 @@
 					</a>
 					{#each gs.accounts[0].spaceMss || [] as ms, i (ms)}
 						<div
-							class={`flex group/space ${`/l_l_${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
+							class={`flex group/space ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
 						>
 							<a
-								href={`/l_l_${ms}`}
+								href={`/__${ms}`}
 								class={`flex-1 fx min-h-10 h-10 px-2 gap-2 font-medium`}
 								onclick={(e) => {
 									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
@@ -370,7 +370,7 @@
 							</a>
 							<!-- TODO: IconCalendar -->
 							<a
-								href={`/l_l_${ms}/tags`}
+								href={`/__${ms}/tags`}
 								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
 								onclick={(e) => {
 									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
@@ -379,7 +379,7 @@
 								<IconTags class="h-5" />
 							</a>
 							<a
-								href={`/l_l_${ms}/dots`}
+								href={`/__${ms}/dots`}
 								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
 								onclick={(e) => {
 									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);

@@ -13,7 +13,7 @@
 	let p: {
 		post: Post;
 		nested?: boolean;
-		miniCites?: boolean;
+		cited?: boolean;
 		depth: number;
 		boldTags?: string[];
 		boldCore?: string[];
@@ -60,7 +60,7 @@
 </script>
 
 <div bind:this={container} id={'m' + id} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
-	{#if p.nested}
+	{#if !p.cited}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 			onclick={() => {
@@ -79,9 +79,9 @@
 			</div>
 		</button>
 	{/if}
-	<div class={`bg-inherit flex-1 ${p.nested ? 'max-w-[calc(100%-1.25rem)]' : 'px-2'}`}>
-		<div class={`relative bg-inherit ${open ? 'pb-2' : ''}`}>
-			<div class="z-10 sticky top-0 bg-inherit">
+	<div class={`bg-inherit flex-1 ${p.cited ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}>
+		<div class={`relative bg-inherit`}>
+			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				<!-- {#if !p.nested && p.post.atId}
 					<div class="relative fx">
 						<a
@@ -128,16 +128,23 @@
 				/>
 				<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is netted? Just for 0 depth PostBlocks?  -->
 			</div>
-			<Highlight {id} class={p.nested ? '-left-5' : `-left-2 ${p.post.at_ms ? 'top-6' : ''}`} />
+			<Highlight
+				{id}
+				class={p.nested || !p.cited
+					? '-left-5'
+					: p.cited
+						? '-left-2.5'
+						: `${p.post.at_ms ? 'top-6' : ''}`}
+			/>
 			{#if open}
-				<div class="pr-1">
+				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
 					{#if tags?.length}
 						<div class="overflow-hidden">
-							<div class="-mx-1 flex flex-wrap mini-scroll max-h-18">
-								{#each tags as tag}
+							<div class="-mx-1 flex flex-wrap">
+								{#each tags as tag (tag)}
 									<!-- TODO: Why does using leading-4 cause parent to scroll? -->
 									<a
-										href={`/l_l_${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+										href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
 										class={`font-bold text-fg2 px-1 leading-5 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 									>
 										{tag}
@@ -148,7 +155,7 @@
 					{/if}
 					{#if core}
 						{#if parsed}
-							<CoreParser {core} miniCites={p.miniCites} depth={p.depth} />
+							<CoreParser {core} miniCites={p.cited} depth={p.depth} />
 						{:else}
 							<p class="whitespace-pre-wrap break-all font-thin font-mono">{core}</p>
 						{/if}

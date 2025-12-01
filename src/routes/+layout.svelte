@@ -13,7 +13,7 @@
 		updateLocalCache,
 	} from '$lib/types/local-cache';
 	import { getBaseInput } from '$lib/types/parts';
-	import { idStrAsIdObj } from '$lib/types/parts/partIds';
+	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
@@ -33,7 +33,7 @@
 		gs.currentSpaceMs = localCache.currentSpaceMs;
 
 		if (page.url.pathname === '/') {
-			goto(`/l_l_${localCache.currentSpaceMs}`, { replaceState: true });
+			goto(`/__${localCache.currentSpaceMs}`, { replaceState: true });
 		}
 
 		if (page.url.searchParams.get('extension') !== null) {
@@ -77,15 +77,15 @@
 
 			try {
 				if (page.params.id) {
-					let { in_ms } = idStrAsIdObj(page.params.id);
+					let { in_ms } = getIdStrAsIdObj(page.params.id);
 					if (in_ms > 0 && in_ms !== gs.currentSpaceMs) {
-						if (page.params.id.startsWith('l_l_0')) {
+						if (page.params.id.startsWith('__0')) {
 							changeCurrentSpace(in_ms);
-							goto(`/l_l_${in_ms}`);
+							goto(`/__${in_ms}`);
 						} else if (!gs.accounts[0].spaceMss.includes(in_ms)) {
 							// If you visit the url for thought in a space you are not in, this should change the current space to local and maybe it'll be there locally saved
 							changeCurrentSpace(0);
-							goto(`/l_l_0`);
+							goto(`/__0`);
 							// TODO: Show the option to join the space
 						}
 					}
@@ -96,7 +96,7 @@
 					let accountMss = gs.accounts.map((a) => a.ms).filter((n) => n !== null);
 					if (accountMss.length && (page.data as LayoutServerData).sessionIdExists) {
 						let signedInMss = await trpc().auth.verifySignedInMss.mutate({
-							...getBaseInput(),
+							...(await getBaseInput()),
 							accountMss,
 						});
 						let signedInMsSet = new Set(signedInMss);

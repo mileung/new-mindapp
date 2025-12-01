@@ -1,7 +1,6 @@
 import { makeRandomStr } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { day } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import {
 	_getEmailRow,
@@ -17,7 +16,7 @@ import { _checkOtp, _sendOtp } from '$lib/types/otp';
 import {
 	assert1Row,
 	assertLt2Rows,
-	getBaseInput,
+	BaseInputSchema,
 	type BaseInput,
 	type PartSelect,
 } from '$lib/types/parts';
@@ -25,13 +24,14 @@ import { pc } from '$lib/types/parts/partCodes';
 import { pt } from '$lib/types/parts/partFilters';
 import { FullIdObjSchema, zeros } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
-import { normalizeTags, PostSchema } from '$lib/types/posts';
+import { PostSchema } from '$lib/types/posts';
 import { _addPost } from '$lib/types/posts/addPost';
 import { _deletePost } from '$lib/types/posts/deletePost';
 import { _editPost } from '$lib/types/posts/editPost';
 import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
 import { _getPostHistory } from '$lib/types/posts/getPostHistory';
-import { SessionSchema, setSessionKeyCookie, type Session } from '$lib/types/sessions';
+import { setSessionKeyCookie } from '$lib/types/sessions';
+import { _getSpaceAccounts } from '$lib/types/spaces/getSpaceAccounts';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 import type { RequestEvent } from '@sveltejs/kit';
 import { initTRPC } from '@trpc/server';
@@ -71,62 +71,63 @@ async function sendEmail(config: { from: string; to: string; subject: string; ht
 	// return result;
 }
 
-export const baseProcedure = t.procedure.input(getBaseInput);
+export const baseProcedure = t.procedure.input(BaseInputSchema);
 
 let assertValidSession = async (ctx: Context, input: BaseInput) => {
-	let now = Date.now();
-	let session: undefined | Session;
-	if (ctx.sessionId && input.by_ms !== null) {
-		let sessionRowFilter = and(
-			pt.at_ms.eq(input.by_ms),
-			pt.at_by_ms.eq0,
-			pt.at_in_ms.eq0,
-			pt.ms.gt0,
-			pt.by_ms.eq0,
-			pt.in_ms.eq0,
-			pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
-			pt.txt.eq(ctx.sessionId),
-			pt.num.isNull,
-		);
-		let sessionRows = await tdb
-			.select()
-			.from(pTable)
-			.where(sessionRowFilter)
-			.orderBy(pt.ms.desc)
-			.limit(1);
-		let sessionRow = assertLt2Rows(sessionRows);
-		if (sessionRow) {
-			session = { ms: sessionRow.ms! };
-			if (!SessionSchema.safeParse(session).success) throw new Error(`Invalid session`);
-			if (now - session.ms > 8 * day) {
-				session = undefined;
-			} else if (now - session.ms > 88 * minute) {
-				let newSessionKey = makeRandomStr();
-				setSessionKeyCookie(ctx.event, newSessionKey);
-				await tdb
-					.update(pTable)
-					.set({
-						ms: Date.now(),
-						txt: newSessionKey,
-					})
-					.where(
-						and(
-							pt.at_ms.gt0,
-							pt.at_by_ms.eq0,
-							pt.at_in_ms.eq0,
-							pt.ms.eq(session.ms),
-							pt.by_ms.eq0,
-							pt.in_ms.eq0,
-							pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
-							pt.txt.eq(ctx.sessionId),
-							pt.num.isNull,
-						),
-					);
-			}
-		}
-		!session && ctx.event.cookies.delete('sessionId', { path: '/' });
-	}
-	return { session };
+	return true;
+	// let now = Date.now();
+	// let session: undefined | Session;
+	// if (ctx.sessionId && input.by_ms !== null) {
+	// 	let sessionRowFilter = and(
+	// 		pt.at_ms.eq(input.by_ms),
+	// 		pt.at_by_ms.eq0,
+	// 		pt.at_in_ms.eq0,
+	// 		pt.ms.gt0,
+	// 		pt.by_ms.eq0,
+	// 		pt.in_ms.eq0,
+	// 		pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+	// 		pt.txt.eq(ctx.sessionId),
+	// 		pt.num.isNull,
+	// 	);
+	// 	let sessionRows = await tdb
+	// 		.select()
+	// 		.from(pTable)
+	// 		.where(sessionRowFilter)
+	// 		.orderBy(pt.ms.desc)
+	// 		.limit(1);
+	// 	let sessionRow = assertLt2Rows(sessionRows);
+	// 	if (sessionRow) {
+	// 		session = { ms: sessionRow.ms! };
+	// 		if (!SessionSchema.safeParse(session).success) throw new Error(`Invalid session`);
+	// 		if (now - session.ms > 8 * day) {
+	// 			session = undefined;
+	// 		} else if (now - session.ms > 88 * minute) {
+	// 			let newSessionKey = makeRandomStr();
+	// 			setSessionKeyCookie(ctx.event, newSessionKey);
+	// 			await tdb
+	// 				.update(pTable)
+	// 				.set({
+	// 					ms: Date.now(),
+	// 					txt: newSessionKey,
+	// 				})
+	// 				.where(
+	// 					and(
+	// 						pt.at_ms.gt0,
+	// 						pt.at_by_ms.eq0,
+	// 						pt.at_in_ms.eq0,
+	// 						pt.ms.eq(session.ms),
+	// 						pt.by_ms.eq0,
+	// 						pt.in_ms.eq0,
+	// 						pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+	// 						pt.txt.eq(ctx.sessionId),
+	// 						pt.num.isNull,
+	// 					),
+	// 				);
+	// 		}
+	// 	}
+	// 	!session && ctx.event.cookies.delete('sessionId', { path: '/' });
+	// }
+	// return { session };
 };
 
 let assertSessionIsAuthorized = (ctx: Context, byMs?: null | number, inMs?: null | number) => {
@@ -393,7 +394,7 @@ export const router = t.router({
 		)
 		.query(async ({ ctx, input }) => {
 			assertValidSession(ctx, input);
-			if (!input.by_ms) throw new Error(m.anErrorOccurred());
+			if (!input.by_ms) throw new Error(m.placeholderError());
 			let { account } = await _getMyAccount(tdb, input.by_ms, input.email);
 			if (!account.savedTagsMs || account.savedTagsMs === input.savedTagsMs) return;
 			let savedTagsRows = await tdb
@@ -419,40 +420,40 @@ export const router = t.router({
 	updateSavedTags: baseProcedure
 		.input(
 			z.object({
-				adding: z.array(z.string()),
-				removing: z.array(z.string()),
+				tags: z.array(z.string()),
+				remove: z.boolean(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			if (!input.by_ms) throw new Error(m.anErrorOccurred());
+			if (!input.by_ms) throw new Error(m.placeholderError());
 			assertValidSession(ctx, input);
 			let now = Date.now();
-			let savedTagsRowFilter = and(
-				pt.at_ms.eq0,
-				pt.at_by_ms.eq0,
-				pt.at_in_ms.eq0,
-				pt.ms.eq0,
-				pt.by_ms.eq0,
-				pt.in_ms.eq(input.by_ms),
-				// pf.code.eq(' savedTags'),
-				isNotNull(pTable.txt),
-			);
-			let savedTagsRows = await tdb.select().from(pTable).where(savedTagsRowFilter);
-			if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
-			let savedTagsRow = savedTagsRows[0];
-			if (!savedTagsRow) throw new Error('savedTagsRow dne');
-			let savedTags: string[] = JSON.parse(savedTagsRow.txt!);
-			let removingSet = new Set(input.removing);
-			let newSavedTags: string[] = normalizeTags([...savedTags, ...input.adding]).filter(
-				(t) => !removingSet.has(t),
-			);
-			await tdb
-				.update(pTable)
-				.set({
-					ms: now,
-					txt: JSON.stringify(newSavedTags),
-				})
-				.where(savedTagsRowFilter);
+			// let savedTagsRowFilter = and(
+			// 	pt.at_ms.eq0,
+			// 	pt.at_by_ms.eq0,
+			// 	pt.at_in_ms.eq0,
+			// 	pt.ms.eq0,
+			// 	pt.by_ms.eq0,
+			// 	pt.in_ms.eq(input.by_ms),
+			// 	// pf.code.eq(' savedTags'),
+			// 	isNotNull(pTable.txt),
+			// );
+			// let savedTagsRows = await tdb.select().from(pTable).where(savedTagsRowFilter);
+			// if (savedTagsRows.length > 1) throw new Error('Multiple savedTagsRows found');
+			// let savedTagsRow = savedTagsRows[0];
+			// if (!savedTagsRow) throw new Error('savedTagsRow dne');
+			// let savedTags: string[] = JSON.parse(savedTagsRow.txt!);
+			// let removingSet = new Set(input.removing);
+			// let newSavedTags: string[] = normalizeTags([...savedTags, ...input.adding]).filter(
+			// 	(t) => !removingSet.has(t),
+			// );
+			// await tdb
+			// 	.update(pTable)
+			// 	.set({
+			// 		ms: now,
+			// 		txt: JSON.stringify(newSavedTags),
+			// 	})
+			// 	.where(savedTagsRowFilter);
 			return { savedTagsMs: now };
 		}),
 	addPost: baseProcedure
@@ -476,7 +477,7 @@ export const router = t.router({
 	deletePost: baseProcedure
 		.input(
 			z.object({
-				fullPostId: FullIdObjSchema,
+				fullPostIdObj: FullIdObjSchema,
 				version: z.number().nullable(),
 			}),
 		)
@@ -486,10 +487,10 @@ export const router = t.router({
 				ctx, //
 			}) => {
 				assertValidSession(ctx, input);
-				return _deletePost(tdb, input.fullPostId, input.version);
+				return _deletePost(tdb, input.fullPostIdObj, input.version);
 			},
 		),
-	getPostFeed: baseProcedure.input(GetPostFeedSchema).mutation(async ({ input, ctx }) => {
+	getPostFeed: baseProcedure.input(GetPostFeedSchema).query(async ({ input, ctx }) => {
 		if (!input.inMssInclude.length) throw new Error('Must include at least one inMs');
 		// if (input.byMssInclude?.length !== 1) throw new Error(`byMssInclude must be 1`);
 
@@ -505,14 +506,31 @@ export const router = t.router({
 				version: z.number(),
 			}),
 		)
-		.mutation(async ({ ctx, input }) => {
+		.query(async ({ ctx, input }) => {
 			assertValidSession(ctx, input);
 			return _getPostHistory(tdb, input.fullPostId, input.version);
 		}),
-	getSpaceTags: baseProcedure.mutation(async ({ input, ctx }) => {
-		assertValidSession(ctx, input);
-		return _getSpaceTags(tdb, input);
-	}),
+	getSpaceTags: baseProcedure
+		.input(
+			z.object({
+				fromCount: z.number(),
+				excludeTags: z.array(z.string()),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			assertValidSession(ctx, input);
+			return _getSpaceTags(tdb, input);
+		}),
+	getSpaceAccounts: baseProcedure
+		.input(
+			z.object({
+				fromAccountMs: z.number(),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			assertValidSession(ctx, input);
+			return _getSpaceAccounts(tdb, input);
+		}),
 });
 
 // https://trpc.io/docs/server/server-side-calls

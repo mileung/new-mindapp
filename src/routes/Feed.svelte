@@ -5,13 +5,15 @@
 	import { textInputFocused } from '$lib/dom';
 	import { getUndefinedLocalFeedIds, gs, makeFeedIdentifier } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { updateLocalCache, updateSavedTags } from '$lib/types/local-cache';
+	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
 	import {
 		getAtIdStr,
 		getIdStr,
+		getIdStrAsIdObj,
 		idsRegex,
-		idStrAsIdObj,
+		isIdStr,
+		isTemplateId,
 		zeros,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
@@ -30,6 +32,7 @@
 		postsPerLoad,
 		type GetPostFeedQuery,
 	} from '$lib/types/posts/getPostFeed';
+	import { getPromptSigningIn } from '$lib/types/spaces';
 	import {
 		IconArchive,
 		IconChevronRight,
@@ -45,7 +48,6 @@
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import type { LayoutServerData } from './$types';
 	import PostBlock from './PostBlock.svelte';
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
@@ -57,10 +59,10 @@
 	let quoteRegex = /"([^"]+)"/g;
 	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
 
-	let invalidUrl = $state(false);
+	let validUrl = $state(true);
 	let viewPostToastId = $state('');
-	let idObjParam = $derived(p.idParam ? idStrAsIdObj(p.idParam) : null);
-	let inLocal = $derived(idObjParam?.in_ms === 0);
+	let idParamObj = $derived(page.params.id ? getIdStrAsIdObj(page.params.id) : null);
+	let inLocal = $derived(idParamObj?.in_ms === 0);
 
 	let view = $derived<'flat' | 'nested'>(
 		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
@@ -80,19 +82,14 @@
 					sortedBy,
 					searchedText: p.searchedText,
 					idParam: p.idParam,
-					byMs: p.idParam !== 'l_l_0' && p.idParam !== 'l_l_8' ? gs.accounts[0].ms : 0,
+					byMs: p.idParam !== '__0' && p.idParam !== '__8' ? gs.accounts[0].ms : 0,
 				})
 			: '',
 	);
 	let nested = $derived(view === 'nested');
-	let showYourTurn = $derived((idObjParam?.in_ms || 0) > 0);
-	let spotId = $derived(p.idParam && p.idParam[0] !== 'l' ? p.idParam : '');
-	let promptSignIn = $derived(
-		idObjParam &&
-			(!(page.data as LayoutServerData).sessionIdExists || gs.accounts?.[0].ms === 0) &&
-			idObjParam.in_ms !== 0 &&
-			idObjParam.in_ms !== 1,
-	);
+	let showYourTurn = $derived((idParamObj?.in_ms || 0) > 0);
+	let spotId = $derived(isIdStr(p.idParam) && p.idParam!);
+	let promptSignIn = $derived(getPromptSigningIn(idParamObj));
 	let allowNewWriting = $derived(!p.modal && !promptSignIn && gs.currentSpaceMs !== 1);
 
 	onMount(() => {
@@ -114,6 +111,7 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
+			if (timeGetPostFeed) gs.indentifierToFeedMap = {};
 			gs.writingNew = gs.writingTo = gs.writingEdit = false;
 			window.removeEventListener('keydown', handler);
 			clearTimeout(countDownTimer);
@@ -134,7 +132,7 @@
 	};
 
 	$effect(() => {
-		if (gs.writingNew || p.idParam !== 'l_l_0') {
+		if (gs.writingNew || p.idParam !== '__0') {
 			clearTimeout(countDownTimer);
 			secondsRemaining = -1;
 		}
@@ -147,10 +145,6 @@
 		}
 	});
 
-	let getTags = (input?: string) => {
-		return (input?.match(bracketRegex) || []).map((match) => match.slice(1, -1));
-	};
-
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
 		// console.log(
@@ -162,41 +156,28 @@
 
 		// TODO: load locally saved postIdStrFeed and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 
-		let arr = (p.idParam || '').split('_');
-		if (
-			arr.length !== 3 ||
-			(arr[0] !== '' && arr[0] !== 'l' && Number.isNaN(idObjParam?.ms)) ||
-			(arr[1] !== '' && arr[1] !== 'l' && Number.isNaN(idObjParam?.by_ms)) ||
-			(arr[2] !== '' && arr[2] !== 'l' && Number.isNaN(idObjParam?.in_ms))
-		) {
-			invalidUrl = true;
-			return e.detail.error();
-		}
-		invalidUrl = false;
+		if (!idParamObj || !gs.accounts || promptSignIn) return;
+		validUrl = isTemplateId(p.idParam || '');
+		if (!validUrl) return e.detail.error();
 
-		if (!gs.accounts || !identifier || !p.idParam || promptSignIn) return;
-		let lastPostId = (gs.indentifierToFeedMap[identifier] || []).slice(-1)[0];
-		if (lastPostId === null) return e.detail.complete();
-		let feedPostIds = (gs.indentifierToFeedMap[identifier] as string[]) || [];
-		let lastPostMs = lastPostId ? idStrAsIdObj(lastPostId).ms! : null;
-		let fromMs =
-			lastPostMs || sortedBy === 'old' //
-				? 0
-				: Number.MAX_SAFE_INTEGER;
-		let inMssInclude = idObjParam ? [idObjParam.in_ms] : [];
-		let callerMs = gs.accounts[0].ms || null;
+		let postIdStrFeed = gs.indentifierToFeedMap[identifier] || [];
+		let lastPostIdStr = (postIdStrFeed as (null | undefined | string)[]).slice(-1)[0];
+		if (lastPostIdStr === null) return e.detail.complete();
+		let lastPostIdObj = lastPostIdStr ? getIdStrAsIdObj(lastPostIdStr) : null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
 
 		let baseQueryParams: GetPostFeedQuery = {
 			useRpc: !inLocal,
-			callerMs,
+			callerMs: gs.accounts[0].ms,
 			view,
 			sortedBy,
-			fromMs,
+			fromMs:
+				lastPostIdObj?.ms || //
+				(sortedBy === 'old' ? 0 : Number.MAX_SAFE_INTEGER),
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
-			inMssInclude,
+			inMssInclude: [idParamObj.in_ms],
 			postIdObjsExclude: [],
 			postIdObjsInclude: [],
 			tagsExclude: [],
@@ -209,15 +190,15 @@
 			console.log('spotId:', spotId);
 			postFeed = await getPostFeed({
 				...baseQueryParams,
-				callerMs,
-				inMssInclude,
-				postIdObjsInclude: [idStrAsIdObj(spotId)],
+				postIdObjsInclude: [getIdStrAsIdObj(spotId)],
 			});
 			console.log('postFeed:', postFeed);
 		} else {
 			// TODO: Instead of set theory, implement tag groups
 			let citedIds = getCitedPostIds(p.searchedText);
-			let tagsInclude = getTags(p.searchedText);
+			let tagsInclude = (p.searchedText?.match(bracketRegex) || []).map((match) =>
+				match.slice(1, -1),
+			);
 			let byMssInclude = p.searchedText.match(byMssRegex)?.map((a) => +a.slice(1)) || [];
 			let searchedTextNoTagsOrAuthors = p.searchedText
 				.replace(bracketRegex, ' ')
@@ -236,26 +217,24 @@
 					.map((s) => s.toLowerCase()),
 			];
 
-			let lastRootLatestIdsWithSameMs: IdObj[] = lastPostId ? [idStrAsIdObj(lastPostId)] : [];
-			for (let i = feedPostIds.length - 2; i >= 0; i--) {
-				let split = idStrAsIdObj(feedPostIds[i]);
-				if (split.ms === lastPostMs) {
-					lastRootLatestIdsWithSameMs.push(split);
+			let lastRootIdObjsWithSameMs: IdObj[] = lastPostIdObj ? [lastPostIdObj] : [];
+			for (let i = postIdStrFeed.length - 3; i >= 0; i--) {
+				let split = getIdStrAsIdObj((postIdStrFeed as string[])[i]);
+				if (split.ms === lastPostIdObj!.ms) {
+					lastRootIdObjsWithSameMs.push(split);
 				} else break;
 			}
-
 			timeGetPostFeed && console.time('getPostFeed');
 			postFeed = await getPostFeed({
 				...baseQueryParams,
-				inMssInclude,
 				byMssInclude,
 				tagsInclude,
 				coreIncludes: coreIncludes,
-				postIdObjsExclude: [...lastRootLatestIdsWithSameMs],
+				postIdObjsExclude: [...lastRootIdObjsWithSameMs],
 			});
 			timeGetPostFeed && console.timeEnd('getPostFeed');
 		}
-		let { postIdStrFeed, idToPostMap } = postFeed;
+		let { postIdStrFeed: newPostIdStrFeed, idToPostMap } = postFeed;
 		// console.log('postFeed:', postFeed);
 
 		let postMapEntries = Object.entries(idToPostMap);
@@ -266,45 +245,41 @@
 			if (lastVersion !== null && idToPostMap[id].history?.[lastVersion]) {
 				idToPostMap[id].history[lastVersion].tags = idToPostMap[id].history[lastVersion].tags || [];
 				idToPostMap[id].history[lastVersion].tags.sort();
-				if (!lastVersion) idToPostMap[id].history[lastVersion].ms = idStrAsIdObj(id).ms!;
+				if (!lastVersion) idToPostMap[id].history[lastVersion].ms = getIdStrAsIdObj(id).ms!;
 			}
 			if (hasParent(post)) {
 				let strAtId = getAtIdStr(post);
-				idToPostMap[strAtId].subIds = idToPostMap[strAtId].subIds || [];
-				idToPostMap[strAtId].subIds.push(id);
+				if (idToPostMap[strAtId]) {
+					idToPostMap[strAtId].subIds = idToPostMap[strAtId].subIds || [];
+					idToPostMap[strAtId].subIds.push(id);
+				}
+				// else a cited post has an atId, but cites don't show parents,
+				// so the parent is not in idToPostMap.
+				// At least this is one cause for idToPostMap[strAtId] === undefined
 			}
 		}
 		for (let i = 0; i < postMapEntries.length; i++) {
 			let [id] = postMapEntries[i];
-			idToPostMap[id].subIds!.sort((a, b) => idStrAsIdObj(b).ms! - idStrAsIdObj(a).ms!);
+			idToPostMap[id].subIds!.sort((a, b) => getIdStrAsIdObj(b).ms! - getIdStrAsIdObj(a).ms!);
 		}
 
-		let endReached = postIdStrFeed.length < postsPerLoad;
+		let endReached = newPostIdStrFeed.length < postsPerLoad;
 		gs.idToPostMap = { ...gs.idToPostMap, ...idToPostMap };
 		gs.indentifierToFeedMap[identifier] = [
 			...(gs.indentifierToFeedMap[identifier] || []),
-			...postIdStrFeed,
+			...newPostIdStrFeed,
 			...(endReached ? [null] : []),
 		];
 		endReached ? e.detail.complete() : e.detail.loaded();
 
-		if (p.idParam === 'l_l_0' && !p.searchedText && endReached && !postIdStrFeed.length) {
+		if (p.idParam === '__0' && !p.searchedText && endReached && !postIdStrFeed.length) {
 			!dev && startCountDown();
 		}
 	};
 
 	let submitPost = async (tags: string[], core: string) => {
 		if (!gs.accounts || !identifier) return;
-		let savedTagsCountBefore = gs.accounts[0].savedTags.length;
-		await updateLocalCache((lc) => {
-			lc.accounts[0].savedTags = normalizeTags([...lc.accounts![0].savedTags, ...tags]);
-			return lc;
-		});
-		let savedTagsCountAfter = gs.accounts[0].savedTags.length;
-		if (savedTagsCountBefore < savedTagsCountAfter) {
-			await updateSavedTags({ adding: tags, removing: [] });
-		}
-
+		await updateSavedTags(tags);
 		let post: Post;
 		if (gs.writingEdit) {
 			let postBeingEdited = gs.idToPostMap[getIdStr(gs.writingEdit)]!;
@@ -395,7 +370,7 @@
 		return queryParams === '?' ? page.url.pathname : queryParams;
 	};
 
-	let feed = $derived(
+	let postObjFeed = $derived(
 		gs.indentifierToFeedMap[identifier]
 			?.map((strPostId) => gs.idToPostMap[strPostId || 0])
 			.filter((t) => !!t),
@@ -403,7 +378,7 @@
 
 	let scrolledToSpotId = $state(false);
 	$effect(() => {
-		if (spotId && !scrolledToSpotId && feed?.length) {
+		if (spotId && !scrolledToSpotId && postObjFeed?.length) {
 			setTimeout(() => scrollToHighlight(spotId), 0);
 		}
 	});
@@ -412,11 +387,13 @@
 <div
 	class={`overflow-y-scroll flex flex-col h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}
 >
-	{#if promptSignIn}
+	{#if !idParamObj}
+		<!--  -->
+	{:else if promptSignIn}
 		<PromptSignIn />
-	{:else if idObjParam?.in_ms === 1}
+	{:else if idParamObj?.in_ms === 1}
 		patience
-	{:else if idObjParam}
+	{:else if idParamObj}
 		<!-- <p class="font-bold text-xl">All Local posts</p> -->
 		{#if showYourTurn}
 			<div class="min-h-9 fx">
@@ -469,20 +446,20 @@
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
 		</div>
-		{#each feed || [] as post (getIdStr(post))}
+		{#each postObjFeed || [] as post (getIdStr(post))}
 			<PostBlock {...p} {nested} {post} depth={0} />
 		{/each}
 		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
-			<p slot="noResults" class="m-2 text-xl text-fg2">
+			<p slot="noResults" class="m-2 text-lg text-fg2">
 				<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
-				{feed?.length ? m.endOfFeed() : m.noPostsFound()}
+				{postObjFeed?.length ? m.endOfFeed() : m.noPostsFound()}
 			</p>
-			<p slot="noMore" class="m-2 text-xl text-fg2">{m.endOfFeed()}</p>
-			<p slot="error" class="m-2 text-xl text-fg2">
-				{invalidUrl ? m.invalidUrl() : m.anErrorOccurred()}
+			<p slot="noMore" class="m-2 text-lg text-fg2">{m.endOfFeed()}</p>
+			<p slot="error" class="m-2 text-lg text-fg2">
+				{validUrl ? m.placeholderError() : m.invalidUrl()}
 			</p>
 		</InfiniteLoading>
-		{#if inLocal && !p.searchedText && feed && !feed.length}
+		{#if inLocal && !p.searchedText && postObjFeed && !postObjFeed.length}
 			<div class="xy">
 				<p class="">
 					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}
@@ -490,9 +467,9 @@
 			</div>
 		{/if}
 	{/if}
-	{#if p.modal}
+	{#if p.modal && idParamObj}
 		<a
-			href={`/l_l_${idStrAsIdObj(spotId).in_ms}`}
+			href={`/__${idParamObj.in_ms}`}
 			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
 		>
 			<IconX class="w-8" />

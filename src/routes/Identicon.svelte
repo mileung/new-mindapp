@@ -22,6 +22,7 @@
 	let data = $derived(p.data || '');
 	// data = '' + Math.random();
 
+	let overlap = 0.8;
 	let halfWidth = $derived(Math.ceil(gridSize / 2));
 	let hash = $derived(
 		data.split('').reduce((acc, char, idx) => {
@@ -65,10 +66,10 @@
 		{#each row as filled, colIndex}
 			{#if filled}
 				<rect
-					x={padding + colIndex * cellSize}
-					y={padding + rowIndex * cellSize}
-					width={cellSize}
-					height={cellSize}
+					x={padding + colIndex * cellSize - overlap}
+					y={padding + rowIndex * cellSize - overlap}
+					width={cellSize + overlap * 2}
+					height={cellSize + overlap * 2}
 				/>
 			{/if}
 		{/each}

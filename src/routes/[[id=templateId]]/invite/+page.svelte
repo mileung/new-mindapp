@@ -4,13 +4,13 @@
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { idStrAsIdObj } from '$lib/types/parts/partIds';
+	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
 	import { IconLinkPlus } from '@tabler/icons-svelte';
 	import { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from '../../AccountIcon.svelte';
 
-	let paramIdObj = $derived(idStrAsIdObj(page.params.id || ''));
-	let created = $derived(formatMs(paramIdObj.in_ms!));
+	let idParamObj = $derived(getIdStrAsIdObj(page.params.id || ''));
+	let created = $derived(formatMs(idParamObj.in_ms!));
 
 	let searchIpt: HTMLInputElement;
 	let searchVal = $state('');

@@ -1,6 +1,6 @@
 import { trpc } from '$lib/trpc/client';
 import { and, eq, or } from 'drizzle-orm';
-import { bumpTagCountsBy1, getLastVersion, normalizeTags, PostSchema, type Post } from '.';
+import { getLastVersion, moveTagOrCoreCountsBy1, normalizeTags, PostSchema, type Post } from '.';
 import { gsdb, type Database } from '../../local-db';
 import { assert1Row, type PartInsert, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -163,7 +163,7 @@ export let _editPost = async (db: Database, post: Post) => {
 
 	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
 
-	await bumpTagCountsBy1(db, tagTxtRowsToIncrementCountBy1);
+	await moveTagOrCoreCountsBy1(db, tagTxtRowsToIncrementCountBy1);
 
 	await db
 		.update(pTable)
@@ -211,7 +211,7 @@ export let _editPost = async (db: Database, post: Post) => {
 				tagTxtRowsToDecrementCountBy1.push(tagTxtRow);
 			}
 		}
-		await bumpTagCountsBy1(db, tagTxtRowsToDecrementCountBy1, false);
+		await moveTagOrCoreCountsBy1(db, tagTxtRowsToDecrementCountBy1, false);
 	}
 
 	return { ms };

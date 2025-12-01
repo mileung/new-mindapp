@@ -61,7 +61,7 @@ export let getUndefinedLocalFeedIds = () =>
 				view,
 				sortedBy,
 				byMs: 0,
-				idParam: 'l_l_0',
+				idParam: '__0',
 				searchedText: '',
 			}),
 			undefined,

@@ -5,7 +5,7 @@ let uniqueMapVals = <const T extends Record<string, number>>(dict: UniqueValues<
 
 export let pc = uniqueMapVals({
 	postIdWithNumAsLastVersionAtParentPostId: 0,
-	postIdWithNumAsDepthAtRootId: 1,
+	childPostIdWithNumAsDepthAtRootId: 1,
 	postIdAtCitedPostId: 2,
 	reactionIdWithEmojiTxtAtPostId: 3,
 
@@ -47,5 +47,5 @@ export let pc = uniqueMapVals({
 	// sessionIdWithTxtAsKeyAndNumAsExpiryAtAccountId: 70,
 
 	postIdAtBumpedRootId: 80,
-	// lonePostIdWithNumAsNestedUpdatesFeedPriority: 81,
+	reactionIdAtBumpedRootId: 81,
 });

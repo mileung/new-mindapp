@@ -1,5 +1,4 @@
 import { gs } from '$lib/global-state.svelte';
-import { m } from '$lib/paraglide/messages';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { gsdb } from '../../local-db';
@@ -13,16 +12,22 @@ export type PartSelect = typeof pTable.$inferSelect;
 export let PartInsertSchema = createInsertSchema(pTable);
 export let PartSelectSchema = createSelectSchema(pTable);
 
-let baseInput = z.object({
+export let BaseInputSchema = z.object({
 	by_ms: z.number(),
 	in_ms: z.number(),
 });
-export type BaseInput = z.infer<typeof baseInput>;
-export let getBaseInput = () => {
-	if (gs.accounts === undefined || gs.currentSpaceMs === undefined)
-		throw new Error(m.anErrorOccurred());
+export type BaseInput = z.infer<typeof BaseInputSchema>;
+
+export let getBaseInput = async () => {
+	let attempts = 0;
+	while (gs.accounts === undefined || gs.currentSpaceMs === undefined) {
+		if (++attempts > 888) {
+			throw new Error(`getBaseInput ${attempts} ${JSON.stringify(gs)} error`);
+		}
+		await new Promise((res) => setTimeout(res, 42));
+	}
 	return {
-		by_ms: gs.accounts?.[0].ms,
+		by_ms: gs.accounts[0].ms,
 		in_ms: gs.currentSpaceMs,
 	} satisfies BaseInput;
 };

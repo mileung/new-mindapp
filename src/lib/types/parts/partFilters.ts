@@ -3,10 +3,18 @@ import type { AtIdObj, FullIdObj, IdObj } from './partIds';
 import { pTable } from './partsTable';
 
 let filterIdObj = (idObj: IdObj) =>
-	and(eq(pTable.ms, idObj.ms), eq(pTable.by_ms, idObj.by_ms), eq(pTable.in_ms, idObj.in_ms));
+	and(
+		eq(pTable.ms, idObj.ms), //
+		eq(pTable.by_ms, idObj.by_ms),
+		eq(pTable.in_ms, idObj.in_ms),
+	);
 
 let filterIdObjAsAtIdObj = (idObj: IdObj) =>
-	and(eq(pTable.at_ms, idObj.ms), eq(pTable.by_ms, idObj.by_ms), eq(pTable.at_in_ms, idObj.in_ms));
+	and(
+		eq(pTable.at_ms, idObj.ms), //
+		eq(pTable.by_ms, idObj.by_ms),
+		eq(pTable.at_in_ms, idObj.in_ms),
+	);
 
 let filterAtIdObjAsIdObj = (idObjAtIdObj: FullIdObj) =>
 	and(
@@ -24,6 +32,7 @@ let filterAtIdObj = (idObjAtIdObj: AtIdObj) =>
 
 export let pt = {
 	id: filterIdObj,
+	notId: (io: IdObj) => not(filterIdObj(io)!),
 	idAsAtId: filterIdObjAsAtIdObj,
 	atIdAsId: filterAtIdObjAsIdObj,
 	atId: filterAtIdObj,
@@ -88,6 +97,7 @@ export let pt = {
 		eq: (v: number) => eq(pTable.num, v),
 		eq0: eq(pTable.num, 0),
 		notEq: (v: number) => not(eq(pTable.num, v)),
+		lte: (v: number) => lte(pTable.num, v),
 		isNull: isNull(pTable.num),
 		isNotNull: isNotNull(pTable.num),
 	},

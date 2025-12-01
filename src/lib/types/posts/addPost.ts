@@ -2,10 +2,9 @@ import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import {
 	addNewTagOrCoreRows,
-	bumpCoreCountBy1,
-	bumpTagCountsBy1,
 	getCitedPostIds,
 	getLastVersion,
+	moveTagOrCoreCountsBy1,
 	PostSchema,
 	type Post,
 } from '.';
@@ -13,7 +12,13 @@ import { gsdb, type Database } from '../../local-db';
 import { assert1Row, channelPartsByCode, hasParent, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
-import { getIdObj, idObjAsAtIdObj, idStrAsAtIdObj, zeros, type AtIdObj } from '../parts/partIds';
+import {
+	getIdObj,
+	getIdObjAsAtIdObj,
+	getIdStrAsAtIdObj,
+	zeros,
+	type AtIdObj,
+} from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let addPost = async (post: Post, useRpc: boolean) => {
@@ -24,7 +29,7 @@ export let addPost = async (post: Post, useRpc: boolean) => {
 
 export let _addPost = async (db: Database, post: Post) => {
 	let lastVersion = getLastVersion(post);
-	let mainPart: PartInsert = {
+	let mainPostIdWithNumAsLastVersionAtParentPostIdObj: PartInsert = {
 		at_ms: post.at_ms,
 		at_by_ms: post.at_by_ms,
 		at_in_ms: post.at_in_ms,
@@ -36,10 +41,10 @@ export let _addPost = async (db: Database, post: Post) => {
 		num: lastVersion,
 	};
 	let postIsChild = hasParent(post);
-	let postIdObj = getIdObj(mainPart);
-	let atPostIdObj = idObjAsAtIdObj(mainPart);
+	let postIdObj = getIdObj(mainPostIdWithNumAsLastVersionAtParentPostIdObj);
+	let atPostIdObj = getIdObjAsAtIdObj(mainPostIdWithNumAsLastVersionAtParentPostIdObj);
 	let partsToInsert: PartInsert[] = [
-		mainPart,
+		mainPostIdWithNumAsLastVersionAtParentPostIdObj,
 		...(postIsChild
 			? []
 			: [
@@ -56,7 +61,7 @@ export let _addPost = async (db: Database, post: Post) => {
 	let currentCore = '';
 
 	if (!post.history) {
-		mainPart.num = null;
+		mainPostIdWithNumAsLastVersionAtParentPostIdObj.num = null;
 	}
 
 	let historyEntries = post.history ? Object.entries(post.history) : [];
@@ -69,7 +74,7 @@ export let _addPost = async (db: Database, post: Post) => {
 		partsToInsert.push({
 			...zeros,
 			...atPostIdObj,
-			ms: layer.ms || mainPart.ms,
+			ms: layer.ms || mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms,
 			code:
 				layer.tags === null
 					? isLastVersion
@@ -91,7 +96,7 @@ export let _addPost = async (db: Database, post: Post) => {
 				currentCore = layer.core;
 				partsToInsert.push(
 					...getCitedPostIds(layer.core).map((id) => ({
-						...idStrAsAtIdObj(id),
+						...getIdStrAsAtIdObj(id),
 						...postIdObj,
 						code: pc.postIdAtCitedPostId,
 					})),
@@ -103,8 +108,8 @@ export let _addPost = async (db: Database, post: Post) => {
 	tagsFromAllLayers = [...new Set(tagsFromAllLayers)];
 	coresFromAllLayers = [...new Set(coresFromAllLayers)];
 	let {
-		[pc.postIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdObjs = [],
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: pIdWNumAsLastVersionAtPPIdObjs = [],
+		[pc.childPostIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
 		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
 		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
@@ -117,14 +122,14 @@ export let _addPost = async (db: Database, post: Post) => {
 							...(postIsChild
 								? [
 										and(
-											pt.atIdAsId(mainPart),
-											pt.code.eq(pc.postIdWithNumAsDepthAtRootId),
+											pt.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
+											pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
 											pt.txt.isNull,
 											pt.num.isNotNull,
 										),
 										and(
 											pt.noParent,
-											pt.atIdAsId(mainPart),
+											pt.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
 											pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 											pt.txt.isNull,
 											pt.num.isNotNull,
@@ -134,7 +139,7 @@ export let _addPost = async (db: Database, post: Post) => {
 							tagsFromAllLayers.length
 								? and(
 										pt.noParent,
-										pt.in_ms.eq(mainPart.in_ms),
+										pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 										pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
 										or(...tagsFromAllLayers.map((t) => pt.txt.eq(t))),
 										pt.num.isNotNull,
@@ -143,7 +148,7 @@ export let _addPost = async (db: Database, post: Post) => {
 							coresFromAllLayers.length
 								? and(
 										pt.noParent,
-										pt.in_ms.eq(mainPart.in_ms),
+										pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 										pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
 										or(...coresFromAllLayers.map((t) => pt.txt.eq(t))),
 										pt.num.isNotNull,
@@ -157,14 +162,14 @@ export let _addPost = async (db: Database, post: Post) => {
 	if (postIsChild) {
 		let parentRow = assert1Row([
 			...postIdWithNumAsDepthAtRootIdObjs,
-			...pIdWNumAsLastVersionAtPPIdObjs,
+			...postIdWNumAsLastVersionAtPPostIdObjs,
 		]);
-		let parentIsRoot = !!pIdWNumAsLastVersionAtPPIdObjs.length;
+		let parentIsRoot = !!postIdWNumAsLastVersionAtPPostIdObjs.length;
 		let atRootIdObj: AtIdObj = parentIsRoot
 			? {
-					at_ms: mainPart.at_ms,
-					at_by_ms: mainPart.at_by_ms,
-					at_in_ms: mainPart.at_in_ms,
+					at_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_ms,
+					at_by_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_by_ms,
+					at_in_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_in_ms,
 				}
 			: {
 					at_ms: parentRow.at_ms,
@@ -175,7 +180,7 @@ export let _addPost = async (db: Database, post: Post) => {
 		partsToInsert.push({
 			...atRootIdObj,
 			...postIdObj,
-			code: pc.postIdWithNumAsDepthAtRootId,
+			code: pc.childPostIdWithNumAsDepthAtRootId,
 			txt: null,
 			num: (parentIsRoot ? 0 : parentRow.num!) + 1,
 		});
@@ -186,7 +191,7 @@ export let _addPost = async (db: Database, post: Post) => {
 				and(
 					pt.atId(atRootIdObj),
 					pt.ms.gt0,
-					pt.in_ms.eq(mainPart.in_ms),
+					pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 					pt.code.eq(pc.postIdAtBumpedRootId),
 					pt.txt.isNull,
 					pt.num.isNull,
@@ -203,14 +208,14 @@ export let _addPost = async (db: Database, post: Post) => {
 	}
 
 	let tagTxtToRowMap = addNewTagOrCoreRows(
-		mainPart, //
+		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
 		tagsFromAllLayers,
 		tagIdAndTxtWithNumAsCountObjs,
 		true,
 		partsToInsert,
 	);
 	let coreTxtToRowMap = addNewTagOrCoreRows(
-		mainPart, //
+		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
 		coresFromAllLayers,
 		coreIdAndTxtWithNumAsCountObjs,
 		false,
@@ -255,13 +260,13 @@ export let _addPost = async (db: Database, post: Post) => {
 		}
 	}
 
-	await bumpTagCountsBy1(
+	await moveTagOrCoreCountsBy1(
 		db,
 		currentTags.map((t) => tagTxtToRowMap[t]),
+		[coreTxtToRowMap[currentCore]],
 	);
-	await bumpCoreCountBy1(db, coreTxtToRowMap[currentCore]);
-
 	await db.insert(pTable).values(partsToInsert);
+
 	// console.log('partsToInsert:', partsToInsert);
-	return { ms: mainPart.ms };
+	return { ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms };
 };

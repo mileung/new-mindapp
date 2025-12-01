@@ -18,7 +18,7 @@
 					e.preventDefault();
 					try {
 						// let res = await trpc().auth.verifyOtp.mutate
-						// goto(`/l_l_${gs.currentSpaceMs}`, {});
+						// goto(`/__${gs.currentSpaceMs}`, {});
 					} catch (error) {
 						console.log('error:', error);
 						alert(error);
@@ -55,7 +55,7 @@
 					e.preventDefault();
 					try {
 						// let res = await trpc().auth.verifyOtp.mutate
-						// goto(`/l_l_${gs.currentSpaceMs}`, {});
+						// goto(`/__${gs.currentSpaceMs}`, {});
 					} catch (error) {
 						console.log('error:', error);
 						alert(error);

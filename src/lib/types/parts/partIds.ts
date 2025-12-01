@@ -19,7 +19,7 @@ export type FullIdObj = z.infer<typeof FullIdObjSchema>;
 
 export let idRegex = /^\d+_\d+_\d+$/;
 export let idsRegex = /(?<!\S)(\d+_\d+_\d+)(?!\S)/g;
-export let templateIdRegex = /^(l|\d+)_(l|\d+)_(l|\d+)$/;
+export let templateIdRegex = /^\d*_\d*_\d*$/;
 
 export let isTemplateId = (str = '') => templateIdRegex.test(str);
 export let isIdStr = (str = '') => idRegex.test(str);
@@ -56,19 +56,19 @@ export let getFullIdObj = (fio: FullIdObj) => ({
 	in_ms: fio.in_ms,
 });
 
-export let atIdObjAsIdObj = (aio: AtIdObj) => ({
+export let getAtIdObjAsIdObj = (aio: AtIdObj) => ({
 	ms: aio.at_ms,
 	by_ms: aio.at_by_ms,
 	in_ms: aio.at_in_ms,
 });
 
-export let idObjAsAtIdObj = (io: IdObj) => ({
+export let getIdObjAsAtIdObj = (io: IdObj) => ({
 	at_ms: io.ms,
 	at_by_ms: io.by_ms,
 	at_in_ms: io.in_ms,
 });
 
-export let idStrAsIdObj = (id: string) => {
+export let getIdStrAsIdObj = (id: string) => {
 	let s = id.split('_', 3);
 	return {
 		ms: +s[0],
@@ -77,7 +77,7 @@ export let idStrAsIdObj = (id: string) => {
 	} as const;
 };
 
-export let idStrAsAtIdObj = (id: string) => {
+export let getIdStrAsAtIdObj = (id: string) => {
 	let s = id.split('_', 3);
 	return {
 		at_ms: +s[0],

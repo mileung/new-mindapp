@@ -1,5 +1,5 @@
 import type { Database } from '$lib/local-db';
-import { and, or, sql } from 'drizzle-orm';
+import { and, or, SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { type PartInsert, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -17,7 +17,8 @@ export let normalizeTags = (tags: string[]) =>
 let HistoryLayerSchema = z.object({
 	ms: z.number(),
 	tags: z
-		.array(z.string()) //
+		.array(z.string().max(888))
+		.max(888) //
 		.transform(normalizeTags)
 		.nullable(), // null tags means soft deleted version
 	core: z
@@ -120,34 +121,106 @@ export let addNewTagOrCoreRows = (
 	return tagOrCoreTxtToRowMap;
 };
 
-export let bumpTagCountsBy1 = async (db: Database, tagRows: PartInsert[], increment = true) =>
-	tagRows.length &&
+export let moveTagOrCoreCountsBy1 = async (
+	db: Database,
+	tagRows: PartInsert[],
+	coreRows: PartInsert[],
+	increment = true,
+) =>
+	(tagRows.length || coreRows.length) &&
 	(await db
 		.update(pTable)
 		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
 		.where(
-			and(
-				pt.at_ms.eq0,
-				pt.at_by_ms.eq0,
-				pt.at_in_ms.eq0,
-				or(...tagRows.map((tagRow) => pt.id(tagRow))),
-				pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-				pt.num.isNotNull,
+			or(
+				tagRows.length
+					? and(
+							pt.at_ms.eq0,
+							pt.at_by_ms.eq0,
+							pt.at_in_ms.eq0,
+							or(...tagRows.map((tagRow) => pt.id(tagRow))),
+							pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+							pt.txt.isNotNull,
+							pt.num.isNotNull,
+						)
+					: undefined,
+				coreRows.length
+					? and(
+							pt.at_ms.eq0,
+							pt.at_by_ms.eq0,
+							pt.at_in_ms.eq0,
+							or(...coreRows.map((coreRow) => pt.id(coreRow))),
+							pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
+							pt.txt.isNotNull,
+							pt.num.isNotNull,
+						)
+					: undefined,
 			),
 		));
 
-export let bumpCoreCountBy1 = async (db: Database, coreRow?: PartInsert, increment = true) =>
-	coreRow?.txt &&
-	(await db
-		.update(pTable)
-		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
-		.where(
-			and(
-				pt.at_ms.eq0,
-				pt.at_by_ms.eq0,
-				pt.at_in_ms.eq0,
-				pt.id(coreRow),
-				pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
-				pt.num.isNotNull,
+export let selectTagOrCoreTxtRowsToDelete = async (
+	db: Database,
+	tagOrCoreIdObjs: PartInsert[],
+	deleteFilters: (undefined | SQL)[],
+	isTag: boolean,
+) => {
+	if (tagOrCoreIdObjs.length) {
+		let postTagOrCoreIdRowsUsing0CountTags = await Promise.all(
+			tagOrCoreIdObjs.map(
+				async (tagOrCoreIdObj) =>
+					(
+						await db
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pt.at_ms.gt0,
+									pt.at_by_ms.eq0,
+									pt.at_in_ms.eq0,
+									pt.id(tagOrCoreIdObj),
+									isTag
+										? or(
+												pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+												pt.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
+											)
+										: or(
+												pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+												pt.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
+											),
+									pt.txt.isNull,
+									pt.num.isNotNull,
+								),
+							)
+							.limit(1)
+					)[0] as undefined | PartSelect,
 			),
-		));
+		);
+		let tagOrCoreTxtRowsToDel = tagOrCoreIdObjs.filter(
+			(rowToPossiblyDelete) =>
+				!postTagOrCoreIdRowsUsing0CountTags.find(
+					(r) =>
+						rowToPossiblyDelete.ms === r?.ms && //
+						rowToPossiblyDelete.by_ms === r?.by_ms &&
+						rowToPossiblyDelete.in_ms === r?.in_ms,
+				),
+		);
+		tagOrCoreTxtRowsToDel.length &&
+			deleteFilters.push(
+				and(
+					pt.at_ms.eq0,
+					pt.at_by_ms.eq0,
+					pt.at_in_ms.eq0,
+					or(
+						...tagOrCoreTxtRowsToDel.map((r) =>
+							and(
+								pt.id(r), //
+								pt.txt.eq(r.txt!),
+							),
+						),
+					),
+					pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+					pt.num.eq0,
+				),
+			);
+	}
+};

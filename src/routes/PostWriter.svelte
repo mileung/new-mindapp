@@ -3,7 +3,7 @@
 	import { gs } from '$lib/global-state.svelte';
 
 	import { m } from '$lib/paraglide/messages';
-	import { unsaveTagInCurrentAccount } from '$lib/types/local-cache';
+	import { updateSavedTags } from '$lib/types/local-cache';
 	import { type PartSelect } from '$lib/types/parts';
 	import { getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
@@ -238,7 +238,7 @@
 					} else setTimeout(() => tagsIpt.blur(), 0);
 				}
 				if (e.key === 'Enter') {
-					if (xFocused) unsaveTagInCurrentAccount(suggestedTags[tagIndex]);
+					if (xFocused) updateSavedTags([suggestedTags[tagIndex]], true);
 					else e.metaKey ? submit() : addTag();
 				}
 				if (suggestingTags) {
@@ -308,7 +308,7 @@
 						<button
 							bind:this={unsaveTagXRefs[i]}
 							class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-							onclick={() => unsaveTagInCurrentAccount(tag)}
+							onclick={() => updateSavedTags([tag], true)}
 						>
 							<IconX class="h-5 w-5" />
 						</button>

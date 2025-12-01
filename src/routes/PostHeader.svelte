@@ -7,7 +7,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
-	import { getAtIdStr, getFullIdObj, getIdStr, idStrAsIdObj } from '$lib/types/parts/partIds';
+	import { getAtIdStr, getFullIdObj, getIdStr, getIdStrAsIdObj } from '$lib/types/parts/partIds';
 	import type { Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import {
@@ -22,6 +22,7 @@
 		IconCube3dSphere,
 		IconDots,
 		IconPencil,
+		IconShare2,
 		IconSquarePlus2,
 		IconTrash,
 		IconX,
@@ -68,8 +69,8 @@
 	let a = { onkeydown: (e: KeyboardEvent) => e.key === 'Escape' && (moreOptionsOpen = false) };
 </script>
 
-<div class="h-5 fx">
-	<div class="flex flex-1 overflow-scroll">
+<div class="h-5 fx w-full">
+	<div class="flex flex-1 overflow-scroll text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
 			{#if dev}<div class="fx mr-1">{strPostId}</div>{/if}
 			<a
@@ -87,12 +88,12 @@
 				</div>
 			</a>
 			<a
-				href={`/l_${p.post.by_ms}_${p.post.in_ms}`}
+				href={`/_${p.post.by_ms}_${p.post.in_ms}`}
 				class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
 				onclick={(e) => {
 					if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 						e.preventDefault();
-						let accountInSpaceId = `/l_${p.post.by_ms}_${p.post.in_ms}`;
+						let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
 						pushState(
 							accountInSpaceId, //
 							{ modalId: accountInSpaceId },
@@ -110,7 +111,7 @@
 				</div>
 			</a>
 			<a
-				href={`/l_l_${p.post.in_ms}`}
+				href={`/__${p.post.in_ms}`}
 				class={`fx group hover:text-fg1 ${p.post.in_ms ? '' : 'italic'}`}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -218,6 +219,29 @@
 						{/if}
 					</div>
 				</button>
+				<button
+					{...a}
+					class="fx group hover:text-fg1"
+					onclick={() => {
+						if (!navigator.share) return alert(m.webShareApiNotSupported());
+						navigator
+							.share({
+								url: '/test',
+								title: 'title',
+								text: 'text',
+							})
+							.catch((err) => {
+								// user cancelled or share failed
+								if (err && err.name !== 'AbortError') {
+									console.error('Share failed:', err);
+								}
+							});
+					}}
+				>
+					<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+						<IconShare2 class="h-4 w-4" />
+					</div>
+				</button>
 				{#if p.post.in_ms !== 0 && p.post.in_ms !== undefined}
 					<button {...a} class="fx group hover:text-fg1" onclick={toggleSavedLocally}>
 						<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -243,7 +267,7 @@
 								m.areYouSureYouWantToDeleteThisPost(),
 							);
 						if (ok) {
-							let useRpc = idStrAsIdObj(page.state.modalId || page.params.id || '').in_ms !== 0;
+							let useRpc = getIdStrAsIdObj(page.state.modalId || page.params.id || '').in_ms !== 0;
 							let { soft } = await deletePost(getFullIdObj(p.post), null, useRpc);
 							if (soft) {
 								gs.idToPostMap[strPostId]!.history = null;
