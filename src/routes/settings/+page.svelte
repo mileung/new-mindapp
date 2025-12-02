@@ -5,6 +5,7 @@
 	import { identikana, randomInt as ranInt } from '$lib/js';
 	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
+	import { setTheme } from '$lib/theme';
 	import { day } from '$lib/time';
 	import { getLocalCache } from '$lib/types/local-cache';
 	import { type PartInsert } from '$lib/types/parts';
@@ -54,7 +55,10 @@
 	<select
 		name={m.theme()}
 		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
-		bind:value={gs.theme}
+		onchange={(e) => {
+			// @ts-ignore
+			setTheme(e.target.value!);
+		}}
 	>
 		<option value="system">{m.system()}</option>
 		<option value="light">{m.light()}</option>

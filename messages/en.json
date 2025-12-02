@@ -110,6 +110,10 @@
 	"oneSpaceNameTag": "1 {spaceName} tag",
 	"nSpaceNameTags": "{n} {spaceName} tags",
 	"sinceD": "Since {d}",
+	"lessThanMinAgo": "<1 min ago",
+	"timeAgoMinutes": "{count}m",
+	"timeAgoHours": "{count}h",
+	"timeAgoDays": "{count}d",
 	"enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase": "Enter the sum of {a} and {b} to irreversibly delete your local database",
 	"somethingIsWrongWithYourLocalDatabase___": "Something is wrong with your local database. You may download it as a db file and try parsing the data. After that you can delete the local database and restore the new one from a JSON file.",
 	"somethingIsWrongWithYourLocalCache___": "Something is wrong with your local cache. You may download your local database as a JSON file and try correcting the data. After that you can import it and that will overwrite the old local cache. If all else fails, you can reset your local cache by deleting your local database."

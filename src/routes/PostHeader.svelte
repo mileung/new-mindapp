@@ -34,6 +34,7 @@
 	let p: {
 		post: Post;
 		parsed: boolean;
+		bumpDownReactionHoverMenu: boolean;
 		open: boolean;
 		evenBg: boolean;
 		onToggleParsed: () => void;
@@ -53,6 +54,7 @@
 		let edited = Object.keys(p.post.history || {}).some((k) => +k > 0);
 		return `${str}${edited ? '*' : ''}`;
 	});
+	let isoMsLabel = $derived.by(() => formatMs(versionMs || p.post.ms!, true));
 
 	let copyClicked = $state(false);
 	let handleCopyClick = () => {
@@ -77,6 +79,7 @@
 			<a
 				href={'/' + strPostId}
 				class="fx group hover:text-fg1"
+				title={isoMsLabel}
 				onclick={(e) => {
 					if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 						e.preventDefault();
@@ -149,7 +152,7 @@
 					</div>
 				</button>
 				<div
-					class={`absolute z-10 right-0 top-5 h-7 hidden group-hover:flex ${p.evenBg ? 'bg-bg1 group-hover:bg-bg4' : 'bg-bg2 group-hover:bg-bg5'}`}
+					class={`absolute z-10 right-0 h-7 hidden group-hover:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover:bg-bg4' : 'bg-bg2 group-hover:bg-bg5'}`}
 				>
 					{#each reactionList.slice(0, 4) as emoji}
 						<button

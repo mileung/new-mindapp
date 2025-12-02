@@ -52,8 +52,9 @@
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
 
+	let refreshFeedMap = true;
 	let timeGetPostFeed = dev;
-	// timeGetPostFeed = false;
+	timeGetPostFeed = false;
 
 	let byMssRegex = /(^|\s)\/_\d+_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
@@ -61,7 +62,7 @@
 
 	let validUrl = $state(true);
 	let viewPostToastId = $state('');
-	let idParamObj = $derived(page.params.id ? getIdStrAsIdObj(page.params.id) : null);
+	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
 	let inLocal = $derived(idParamObj?.in_ms === 0);
 
 	let view = $derived<'flat' | 'nested'>(
@@ -92,8 +93,22 @@
 	let promptSignIn = $derived(getPromptSigningIn(idParamObj));
 	let allowNewWriting = $derived(!p.modal && !promptSignIn && gs.currentSpaceMs !== 1);
 
+	let secondsRemaining = $state(-1);
+	let countDownTimer = $state<NodeJS.Timeout>();
+	let startCountDown = () => {
+		alert('startCountDown');
+		secondsRemaining = 8;
+		let decrement = () => {
+			secondsRemaining--;
+			if (secondsRemaining) {
+				countDownTimer = setTimeout(decrement, 1000);
+			} else goto('/user-guide');
+		};
+		countDownTimer = setTimeout(decrement, 1000);
+	};
+
 	onMount(() => {
-		if (timeGetPostFeed) gs.indentifierToFeedMap = {};
+		// if (refreshFeedMap || timeGetPostFeed) gs.indentifierToFeedMap = {};
 		let handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
 				if (
@@ -111,25 +126,12 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
-			if (timeGetPostFeed) gs.indentifierToFeedMap = {};
+			// if (refreshFeedMap || timeGetPostFeed) gs.indentifierToFeedMap = {};
 			gs.writingNew = gs.writingTo = gs.writingEdit = false;
 			window.removeEventListener('keydown', handler);
 			clearTimeout(countDownTimer);
 		};
 	});
-
-	let secondsRemaining = $state(-1);
-	let countDownTimer = $state<NodeJS.Timeout>();
-	let startCountDown = () => {
-		secondsRemaining = 8;
-		let decrement = () => {
-			secondsRemaining--;
-			if (secondsRemaining) {
-				countDownTimer = setTimeout(decrement, 1000);
-			} else goto('/user-guide');
-		};
-		countDownTimer = setTimeout(decrement, 1000);
-	};
 
 	$effect(() => {
 		if (gs.writingNew || p.idParam !== '__0') {
@@ -147,12 +149,12 @@
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
-		// console.log(
-		// 	'loadMorePosts:',
-		// 	identifier,
-		// 	// $state.snapshot(gs.feeds[identifier]),
-		// 	// $state.snapshot(gs.posts),
-		// );
+		console.log(
+			'loadMorePosts:',
+			identifier,
+			// $state.snapshot(gs.feeds[identifier]),
+			// $state.snapshot(gs.posts),
+		);
 
 		// TODO: load locally saved postIdStrFeed and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 
@@ -187,7 +189,6 @@
 		};
 
 		if (spotId) {
-			console.log('spotId:', spotId);
 			postFeed = await getPostFeed({
 				...baseQueryParams,
 				postIdObjsInclude: [getIdStrAsIdObj(spotId)],
@@ -273,7 +274,8 @@
 		endReached ? e.detail.complete() : e.detail.loaded();
 
 		if (p.idParam === '__0' && !p.qSearchParam && endReached && !postIdStrFeed.length) {
-			!dev && startCountDown();
+			// !dev && startCountDown();
+			startCountDown();
 		}
 	};
 
@@ -375,7 +377,6 @@
 			?.map((strPostId) => gs.idToPostMap[strPostId || 0])
 			.filter((t) => !!t),
 	);
-
 	let scrolledToSpotId = $state(false);
 	$effect(() => {
 		if (spotId && !scrolledToSpotId && postObjFeed?.length) {

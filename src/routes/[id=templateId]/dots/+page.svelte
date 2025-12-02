@@ -20,7 +20,7 @@
 	import AccountIcon from '../../AccountIcon.svelte';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
-	let idParamObj = $derived(page.params.id ? getIdStrAsIdObj(page.params.id) : null);
+	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
 	let numAccounts = $state(0);
 	let created = $derived(idParamObj?.in_ms || 0);
 	let searchIpt = $state<HTMLInputElement>();

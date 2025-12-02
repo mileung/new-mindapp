@@ -10,7 +10,7 @@
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
-	let idParamObj = $derived(page.params.id ? getIdStrAsIdObj(page.params.id) : null);
+	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
 	// let numTags = $state(0);
 	let tags = $state<
 		{

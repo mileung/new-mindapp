@@ -19,7 +19,7 @@ export type FullIdObj = z.infer<typeof FullIdObjSchema>;
 
 export let idRegex = /^\d+_\d+_\d+$/;
 export let idsRegex = /(?<!\S)(\d+_\d+_\d+)(?!\S)/g;
-export let templateIdRegex = /^\d*_\d*_\d*$/;
+export let templateIdRegex = /^\d*_\d*_\d+$/;
 
 export let isTemplateId = (str = '') => templateIdRegex.test(str);
 export let isIdStr = (str = '') => idRegex.test(str);

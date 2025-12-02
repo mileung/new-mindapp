@@ -92,10 +92,10 @@
 		<div class={`relative bg-inherit`}>
 			<div class={`z-20 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				{#if open && !p.nested && !p.cited && atPost}
-					<div class="relative flex h-5 text-xs">
+					<div class="relative flex h-5 text-sm">
 						<a
 							href={`/_${p.post.by_ms}_${p.post.in_ms}`}
-							class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
+							class={`fx group hover:text-fg1`}
 							onclick={(e) => {
 								// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
 								// 	e.preventDefault();
@@ -111,7 +111,7 @@
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
 								<!-- TODO: text color matches UserIcon -->
-								<p class={''}>
+								<p class={`font-bold ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}>
 									<!-- TODO: names for users -->
 									<!-- {p.post.by_ms ? getAccountName(...) || identikana(p.post.by_ms) : m.anon()} -->
 									{identikana(atPost.by_ms)}
@@ -148,9 +148,10 @@
 					{open}
 					{evenBg}
 					{parsed}
-					onToggleParsed={() => (parsed = !parsed)}
-					{lastVersion}
 					{version}
+					{lastVersion}
+					onToggleParsed={() => (parsed = !parsed)}
+					bumpDownReactionHoverMenu={!p.nested && !!atPost && !p.cited}
 					onChangeVersion={(v) => changeVersion(v)}
 				/>
 				<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is netted? Just for 0 depth PostBlocks?  -->
@@ -163,11 +164,11 @@
 			{#if open}
 				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
 					{#if tags?.length}
-						<div class="-mx-1 flex flex-wrap">
+						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags as tag (tag)}
 								<a
 									href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
-									class={`font-bold text-fg2 px-1 leading-5 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}
 								</a>
@@ -175,14 +176,14 @@
 							{#if p.post.reactionCount}
 								{#each reactionCountEntries as [emoji, count], i}
 									<button
-										class={`group fx h-5 text-sm px-1 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+										class={`group fx h-5 px-1 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 									>
 										<p class="grayscale-75 group-hover:grayscale-0">{emoji}</p>
 										<p class="ml-1.5 font-bold">{count}</p>
 									</button>
 									{#if i === reactionCountEntries.length - 1}
 										<div class="h-5 xy">
-											<button class={`group xy h-7 w-7 text-sm text-fg2 hover:text-fg1`}>
+											<button class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}>
 												<div
 													class={`h-5 w-7 xy ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 												>

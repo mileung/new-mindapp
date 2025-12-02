@@ -1,38 +1,38 @@
-export const second = 1000;
-export const minute = 60 * second;
-export const hour = 60 * minute;
-export const day = 24 * hour;
-export const week = 7 * day;
-export const month = 30 * day;
-export const year = 365 * day;
+import { m } from './paraglide/messages';
 
-export function formatMs(ms: number, verbose = false, granular = false): string {
-	const now = Date.now();
-	const timeDiff = now - ms;
-	if (!verbose) {
-		if (timeDiff < minute) {
-			return '<1m';
-		} else if (timeDiff < hour) {
-			const minutesAgo = Math.floor(timeDiff / minute);
-			return `${minutesAgo}m`;
-		} else if (timeDiff < day) {
-			const hoursAgo = Math.floor(timeDiff / hour);
-			return `${hoursAgo}h`;
-		} else if (timeDiff <= week) {
-			const daysAgo = Math.floor(timeDiff / day);
-			return `${daysAgo}d`;
-		}
-	}
-	const date = new Date(ms);
-	const years = date.getFullYear();
-	const months = String(date.getMonth() + 1).padStart(2, '0');
-	const days = String(date.getDate()).padStart(2, '0');
-	const hours = String(date.getHours()).padStart(2, '0');
-	const minutes = String(date.getMinutes()).padStart(2, '0');
-	if (verbose && granular) {
-		const seconds = String(date.getSeconds()).padStart(2, '0');
-		const milliseconds = String(date.getMilliseconds()).padStart(3, '0');
-		return `${years}-${months}-${days} ${hours}:${minutes}:${seconds}.${milliseconds}`;
-	}
-	return `${years}-${months}-${days} ${hours}:${minutes}`;
-}
+export let second = 1000;
+export let minute = 60 * second;
+export let hour = 60 * minute;
+export let day = 24 * hour;
+export let week = 7 * day;
+export let month = 30 * day;
+export let year = 365 * day;
+
+let toLocalISOString = (date: Date) => {
+	let offset = date.getTimezoneOffset();
+	let iso = new Date(date.getTime() - offset * 60 * 1000).toISOString().slice(0, -1);
+	return `${iso}${offset > 0 ? '-' : '+'}${Math.floor(Math.abs(offset) / 60)
+		.toString()
+		.padStart(2, '0')}:${(Math.abs(offset) % 60).toString().padStart(2, '0')}`;
+};
+
+let pad = (n: number) => n.toString().padStart(2, '0');
+
+export let formatMs = (ms: number, iso = false) => {
+	let now = Date.now();
+	let diff = now - ms;
+	if (iso) return toLocalISOString(new Date(ms));
+
+	let abs = Math.abs(diff);
+	if (abs < minute) return m.lessThanMinAgo();
+	if (abs < hour) return m.timeAgoMinutes({ count: Math.floor(abs / minute) });
+	if (abs < day) return m.timeAgoHours({ count: Math.floor(abs / hour) });
+	if (abs < week) return m.timeAgoDays({ count: Math.floor(abs / day) });
+	let date = new Date(ms);
+	let yyyy = date.getFullYear();
+	let mm = pad(date.getMonth() + 1);
+	let dd = pad(date.getDate());
+	let hh = pad(date.getHours());
+	let min = pad(date.getMinutes());
+	return abs < year ? `${mm}/${dd} ${hh}:${min}` : `${yyyy}/${mm}/${dd}`;
+};

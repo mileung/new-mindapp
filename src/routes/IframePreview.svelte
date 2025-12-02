@@ -41,7 +41,7 @@
 		>
 			<!-- TODO: make an iframe widget that renders img urls cuz img tags don't have a credentialless option -->
 			<img
-				class="h-42 bg-bg3 aspect-video object-cover"
+				class="-mb-2 -mt-1 h-42 bg-bg3 aspect-video object-cover"
 				src={`https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`}
 				alt={m.youTubeThumbnail()}
 			/>

@@ -107,10 +107,3 @@ export let refreshCurrentAccount = async () => {
 		// }
 	}
 };
-
-export let changeCurrentSpace = (inMs: number) => {
-	updateLocalCache((lc) => {
-		lc.currentSpaceMs = inMs;
-		return lc;
-	});
-};

@@ -5,12 +5,7 @@
 	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		changeCurrentSpace,
-		refreshCurrentAccount,
-		updateLocalCache,
-		updateSavedTags,
-	} from '$lib/types/local-cache';
+	import { refreshCurrentAccount, updateLocalCache, updateSavedTags } from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import {
 		IconDotsVertical,
@@ -75,7 +70,6 @@
 					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length)
 						newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
 					let inMs = gs.accounts[0].spaceMss[newSpaceMsIndex];
-					changeCurrentSpace(inMs);
 					goto(`/__${inMs}`);
 				}
 			}
@@ -351,17 +345,11 @@
 						<IconSquarePlus2 class="h-6 w-6" />
 						{m.addSpace()}
 					</a>
-					{#each gs.accounts[0].spaceMss || [] as ms, i (ms)}
+					{#each gs.accounts[0].spaceMss || [] as ms (ms)}
 						<div
 							class={`flex group/space ${`/__${ms}` === page.url.pathname ? 'bg-bg5' : ''} hover:bg-bg5`}
 						>
-							<a
-								href={`/__${ms}`}
-								class={`flex-1 fx min-h-10 h-10 px-2 gap-2 font-medium`}
-								onclick={(e) => {
-									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
-								}}
-							>
+							<a href={`/__${ms}`} class={`flex-1 fx min-h-10 h-10 px-2 gap-2 font-medium`}>
 								{#if ms === gs.currentSpaceMs}
 									<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
 								{/if}
@@ -372,18 +360,12 @@
 							<a
 								href={`/__${ms}/tags`}
 								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
-								onclick={(e) => {
-									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
-								}}
 							>
 								<IconTags class="h-5" />
 							</a>
 							<a
 								href={`/__${ms}/dots`}
 								class={`xy w-8 ${ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} group-hover/space:flex hover:bg-bg8`}
-								onclick={(e) => {
-									if (!e.metaKey && !e.shiftKey) changeCurrentSpace(ms);
-								}}
 							>
 								<IconDotsVertical class="h-5" />
 							</a>

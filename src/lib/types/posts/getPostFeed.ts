@@ -14,11 +14,13 @@ import {
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import {
+	getAtIdObj,
 	getAtIdObjAsIdObj,
 	getAtIdStr,
 	getIdStr,
 	IdObjSchema,
 	zeros,
+	type FullIdObj,
 	type IdObj,
 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
@@ -64,7 +66,6 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let bumpedFirst = !q.sortedBy || q.sortedBy === 'bumped';
 	let newFirst = q.sortedBy === 'new';
 	let oldFirst = q.sortedBy === 'old';
-	let postIdObjFeed: IdObj[] = [];
 	let postIdStrFeed: string[] = [];
 	let postsToFetchByIdObjs: IdObj[] = [];
 
@@ -198,6 +199,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	// 		...rootPostDescendantRows,
 	// 		...postIdObjsThatCiteSpotPost,
 	// 	];
+	// }
 
 	if (q.coreExcludes || q.coreIncludes || q.tagsExclude || q.tagsInclude) {
 		//
@@ -208,12 +210,39 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		: [];
 
 	// for fetching cited posts right after submitting post
-	let includePostIdsFilter = q.postIdObjsInclude?.length
+	let includePostIdObjsFilter = q.postIdObjsInclude?.length
 		? q.postIdObjsInclude.map((pio) => pt.id(pio))
 		: [];
-
-	if (q.view === 'nested') {
-		let rootIdObjs: IdObj[] = [];
+	// console.log('q.postIdObjsInclude:', q.postIdObjsInclude);
+	let rootIdObjs: FullIdObj[] = [];
+	if (includePostIdObjsFilter.length) {
+		let includedPostRootOrAtRootIdObjs = await db
+			.select()
+			.from(pTable)
+			.where(
+				and(
+					...includePostIdObjsFilter,
+					or(
+						pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+						and(
+							pt.noParent, //
+							pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						),
+					),
+					pt.txt.isNull,
+					pt.num.isNotNull,
+				),
+			)
+			.limit(includePostIdObjsFilter.length);
+		rootIdObjs = includedPostRootOrAtRootIdObjs.map((idObj) => ({
+			...zeros,
+			...(idObj.code === pc.childPostIdWithNumAsDepthAtRootId
+				? getAtIdObjAsIdObj(idObj)
+				: getAtIdObj(idObj)),
+		}));
+		let descendentPostIdObjs = await getRootDescendentPostIdObjs(db, rootIdObjs);
+		postsToFetchByIdObjs = [...rootIdObjs, ...descendentPostIdObjs];
+	} else if (q.view === 'nested') {
 		// let rootPostParts: PartSelect[] = [];
 		if (bumpedFirst) {
 			let atBumpedRootIdObjs = await db
@@ -235,7 +264,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				)
 				.orderBy(pt.ms.desc)
 				.limit(postsPerLoad);
-			rootIdObjs = atBumpedRootIdObjs.map((idObj) => getAtIdObjAsIdObj(idObj));
+			rootIdObjs = atBumpedRootIdObjs.map((idObj) => ({ ...zeros, ...getAtIdObjAsIdObj(idObj) }));
 		} else if (newFirst || oldFirst) {
 			rootIdObjs = await db
 				.select()
@@ -257,25 +286,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
 				.limit(postsPerLoad);
 		}
-		let descendentPostIdObjs = rootIdObjs.length
-			? await db
-					.select()
-					.from(pTable)
-					.where(
-						and(
-							or(...rootIdObjs.map((pio) => pt.idAsAtId(pio))),
-							// pf.ms.gt0,
-							// byMssFilter,
-							// inMssFilter,
-							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-							pt.txt.isNull,
-							pt.num.isNotNull,
-						),
-					)
-			: [];
-
+		let descendentPostIdObjs = await getRootDescendentPostIdObjs(db, rootIdObjs);
 		postsToFetchByIdObjs = [...rootIdObjs, ...descendentPostIdObjs];
-		postIdObjFeed = rootIdObjs;
 	} else if (q.view === 'flat') {
 		let postIdAtBumpedRootIdObjs = bumpedFirst
 			? await db
@@ -293,7 +305,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 					.orderBy(pt.ms.desc)
 					.limit(postsPerLoad)
 			: [];
-		let rootIdObjs = bumpedFirst
+		rootIdObjs = bumpedFirst
 			? postIdAtBumpedRootIdObjs.map((aio) => ({ ...zeros, ...getAtIdObjAsIdObj(aio) }))
 			: await db
 					.select()
@@ -315,15 +327,13 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 					)
 					.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
 					.limit(postsPerLoad);
-
 		postsToFetchByIdObjs = [
 			...rootIdObjs,
 			...rootIdObjs.flatMap((rio) => (hasParent(rio) ? [getAtIdObjAsIdObj(rio)] : [])),
 		];
-		postIdObjFeed = rootIdObjs;
 	}
 
-	postIdStrFeed = postIdObjFeed.map((pio) => getIdStr(pio));
+	postIdStrFeed = rootIdObjs.map((pio) => getIdStr(pio));
 	// 	postIdStrFeed = [
 	// 		...(spotPostIdRow ? [getIdStr(spotPostIdRow)] : []),
 	// 		...postIdObjsThatCiteSpotPost.map((r) => getIdStr(r)),
@@ -485,6 +495,21 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	rEmoTxtWMsAndNAsCtAtPostIdObjs;
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
-	console.log('getPostFeed:', postIdStrFeed, idToPostMap);
+	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);
 	return { postIdStrFeed, idToPostMap };
 };
+
+let getRootDescendentPostIdObjs = async (db: Database, rootIdObjs: IdObj[]) =>
+	rootIdObjs.length
+		? await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						or(...rootIdObjs.map((pio) => pt.idAsAtId(pio))),
+						pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+						pt.txt.isNull,
+						pt.num.isNotNull,
+					),
+				)
+		: [];

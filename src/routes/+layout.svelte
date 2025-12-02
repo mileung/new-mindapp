@@ -1,17 +1,11 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
-	import {
-		changeCurrentSpace,
-		getLocalCache,
-		refreshCurrentAccount,
-		updateLocalCache,
-	} from '$lib/types/local-cache';
+	import { getLocalCache, refreshCurrentAccount, updateLocalCache } from '$lib/types/local-cache';
 	import { getBaseInput } from '$lib/types/parts';
 	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
@@ -27,41 +21,11 @@
 		gs.theme = (
 			['light', 'dark', 'system'].includes(savedTheme!) ? (savedTheme as typeof gs.theme) : 'system'
 		)!;
+		setTheme(gs.theme);
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
 		gs.idToSpaceMap = localCache.spaces;
 		gs.currentSpaceMs = localCache.currentSpaceMs;
-
-		if (page.url.pathname === '/') {
-			goto(`/__${localCache.currentSpaceMs}`, { replaceState: true });
-		}
-
-		if (page.url.searchParams.get('extension') !== null) {
-			console.log('heyo');
-			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
-			window.addEventListener('message', (event) => {
-				console.log('event:', event);
-				if (event.source !== window) return;
-				if (event.data.type === '4-popup-receives-external-page-info') {
-					let { url, externalDomString, selectedPlainText, selectedHtmlString } =
-						(event.data.payload as {
-							url?: string;
-							externalDomString?: string;
-							selectedPlainText?: string;
-							selectedHtmlString?: string;
-						}) || {};
-					if (!url || !externalDomString) return;
-					let scrapedInfo = scrape(url, externalDomString);
-					console.log('scrapedInfo:', scrapedInfo);
-
-					gs.writingNew = true;
-					gs.writerTags = scrapedInfo.tags || [];
-					// TODO: think of a better ux. Like when a user highlights and runs the mindapp shortcut, what should be prepopulated in the writer?
-					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
-					gs.writerCore = `${scrapedInfo.headline}\n${scrapedInfo.url}\n\n${selectedPlainText}`;
-				}
-			});
-		}
 
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', function () {
@@ -78,13 +42,11 @@
 			try {
 				if (page.params.id) {
 					let { in_ms } = getIdStrAsIdObj(page.params.id);
-					if (in_ms > 0 && in_ms !== gs.currentSpaceMs) {
-						if (page.params.id.startsWith('__0')) {
-							changeCurrentSpace(in_ms);
+					if (in_ms >= 0 && in_ms !== gs.currentSpaceMs) {
+						if (page.params.id.startsWith('__')) {
 							goto(`/__${in_ms}`);
 						} else if (!gs.accounts[0].spaceMss.includes(in_ms)) {
 							// If you visit the url for thought in a space you are not in, this should change the current space to local and maybe it'll be there locally saved
-							changeCurrentSpace(0);
 							goto(`/__0`);
 							// TODO: Show the option to join the space
 						}
@@ -122,13 +84,21 @@
 			goto('/settings');
 		}
 	});
-
-	$effect(() => gs.theme && setTheme(gs.theme));
 	$effect(() => {
 		if (gs.theme === 'system') {
 			window
 				?.matchMedia('(prefers-color-scheme: dark)')
 				?.addEventListener?.('change', () => setTheme('system'));
+		}
+	});
+	$effect(() => {
+		if (page.params.id) {
+			let { in_ms } = getIdStrAsIdObj(page.params.id);
+			gs.currentSpaceMs !== in_ms &&
+				updateLocalCache((lc) => {
+					lc.currentSpaceMs = in_ms;
+					return lc;
+				});
 		}
 	});
 </script>
