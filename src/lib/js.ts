@@ -1,3 +1,4 @@
+import { m } from './paraglide/messages';
 import { minute, second } from './time';
 
 export function copyToClipboard(text: string): void {
@@ -100,7 +101,8 @@ let getSeededRandom = (input: string | number, index: number) => {
 	return hash >>> 0;
 };
 
-export let identikana = (input: string | number, romanized = true) => {
+export let identikana = (input: number, romanized = true) => {
+	if (!input) return m.anon();
 	let seq: string[] = [];
 	for (let i = 0; i < 3; i++) {
 		let seed = getSeededRandom(input, i);

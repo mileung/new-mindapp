@@ -6,21 +6,25 @@
 	let p: {
 		id?: string;
 		class?: string;
+		reply?: boolean;
+		evenBg?: boolean;
 	} = $props();
 
 	let urlId = $derived(page.state.modalId || page.params.id);
 	let spotId = $derived(urlId && urlId[0] !== 'l' ? urlId : '');
 	let [lineColor, overlayColor] = $derived.by(() => {
-		if (!p.id) return ['bg-hl2', 'bg-hl2/5'];
+		if (!p.id) return ['bg-hl2', p.evenBg ? 'bg-hl2/10' : 'bg-hl2/5'];
 		let post = gs.writingTo || gs.writingEdit;
 		if (post && getIdStr(post) === p.id) {
 			return gs.writingTo
-				? ['bg-hl-link', 'bg-hl-link/5']
+				? ['bg-hl-link', p.evenBg ? 'bg-hl-link/10' : 'bg-hl-link/5']
 				: gs.writingEdit
-					? ['bg-hl-edit', 'bg-hl-edit/5']
+					? ['bg-hl-edit', p.evenBg ? 'bg-hl-edit/10' : 'bg-hl-edit/5']
 					: [];
 		}
-		if (spotId === p.id) return ['bg-hl-spot', 'bg-hl-spot/5'];
+		if (spotId === p.id) return ['bg-hl-spot', p.evenBg ? 'bg-hl-spot/10' : 'bg-hl-spot/5'];
+		// TODO: match identicon color
+		if (p.reply) return ['bg-fg1', p.evenBg ? 'bg-fg1/10' : 'bg-fg1/5'];
 		return [];
 	});
 </script>

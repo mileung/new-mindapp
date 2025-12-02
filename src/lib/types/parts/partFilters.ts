@@ -33,6 +33,7 @@ let filterAtIdObj = (idObjAtIdObj: AtIdObj) =>
 export let pt = {
 	id: filterIdObj,
 	notId: (io: IdObj) => not(filterIdObj(io)!),
+	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
 	idAsAtId: filterIdObjAsAtIdObj,
 	atIdAsId: filterAtIdObjAsIdObj,
 	atId: filterAtIdObj,

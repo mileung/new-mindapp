@@ -2,14 +2,15 @@
 	import { page } from '$app/state';
 	import Feed from '../Feed.svelte';
 
-	let searchedText = $derived(page.url.searchParams.get('q') || '');
+	let qSearchParam = $derived(page.url.searchParams.get('q') || '');
 	let idParam = $derived(page.state.modalId || page.params.id || '');
-	let useModal = $derived(!!(page.state.modalId || searchedText || !idParam.startsWith('__')));
+	let useModal = $derived(!!(page.state.modalId || qSearchParam || !idParam.startsWith('__')));
+	console.log('page.url.pathname:', page.url.pathname);
 </script>
 
 {#if page.url.pathname === '/' || idParam}
 	{#if useModal}
-		<Feed modal {searchedText} {idParam} />
+		<Feed modal {qSearchParam} {idParam} />
 	{/if}
-	<Feed hidden={useModal} idParam={page.params.id} searchedText="" />
+	<Feed {qSearchParam} hidden={useModal} idParam={page.params.id} />
 {/if}

@@ -6,12 +6,13 @@
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { type PartSelect } from '$lib/types/parts';
 	import { getIdStr } from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
+	import { getLastVersion, normalizeTags, reactionList, scrollToHighlight } from '$lib/types/posts';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
 		IconCornerUpLeft,
 		IconGripVertical,
+		IconMoodPlus,
 		IconPencil,
 		IconPencilPlus,
 		IconX,
@@ -153,10 +154,10 @@
 			</p>
 		</button>
 		<!-- TODO: reactions stuff -->
-		<!-- {#if gs.writingTo}
+		{#if gs.writingTo}
 			{#each reactionList.slice(0, 4) as emoji}
 				<button
-					class="text-lg w-8 xy grayscale-100 hover:grayscale-0 hover:bg-bg7"
+					class="w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
 					onclick={() => {
 						console.log(emoji);
 					}}
@@ -164,10 +165,10 @@
 					{emoji}
 				</button>
 			{/each}
+			<button class="hidden w-7 xy hover:bg-bg8 hover:text-fg3">
+				<IconMoodPlus class="w-4.5" />
+			</button>
 		{/if}
-		<button class="w-8 xy hover:bg-bg8 hover:text-fg3">
-			<IconMoodPlus class="w-5" />
-		</button> -->
 		<button
 			class="w-8 xy hover:bg-bg7 hover:text-fg3"
 			onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = false)}

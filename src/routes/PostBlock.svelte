@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { gs } from '$lib/global-state.svelte';
+	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { getAtIdStr, getFullIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
-	import { IconMinus, IconPlus } from '@tabler/icons-svelte';
+	import { IconChartBarPopular, IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import CoreParser from './CoreParser.svelte';
 	import Highlight from './Highlight.svelte';
 	import Self from './PostBlock.svelte';
@@ -23,16 +24,24 @@
 	let parsed = $state(true);
 	let id = $derived(getIdStr(p.post));
 	let evenBg = $derived(!(p.depth % 2));
-	let atPost = $derived(gs.idToPostMap[getAtIdStr(p.post) || '']);
+	let atPostIdStr = $derived(getAtIdStr(p.post));
+	let atPost = $derived(gs.idToPostMap[atPostIdStr]);
 	let atPostDeleted = $derived(atPost?.history === null);
 	let deleted = $derived(p.post.history === null);
-
+	let atPostTxt = $derived.by(() => {
+		if (atPost) {
+			if (atPostDeleted) return m.deleted();
+			return atPost.history![getLastVersion(atPost)!]!.core;
+		}
+	});
 	let lastVersion = $derived(getLastVersion(p.post));
 	let version = $state((() => lastVersion)());
 	let layer = $derived(version === null ? null : p.post.history?.[version]);
 	let core = $derived(layer?.core);
 	let tags = $derived(layer?.tags);
-
+	let reactionCountEntries = $derived(
+		Object.entries(p.post.reactionCount || {}).sort(([, a], [, b]) => b - a),
+	);
 	let changeVersion = async (v: null | number) => {
 		if (v !== null && !p.post.history?.[v]) {
 			let { history } = await getPostHistory(getFullIdObj(p.post), v, p.post.in_ms > 0);
@@ -72,50 +81,68 @@
 		>
 			<div class="z-0 sticky top-0 bg-inherit h-5 w-5 xy">
 				{#if open}
-					<IconMinus class="w-4" />
+					<IconMinus stroke={2.5} class="w-4" />
 				{:else}
-					<IconPlus class="w-4" />
+					<IconPlus stroke={2.5} class="w-4" />
 				{/if}
 			</div>
 		</button>
 	{/if}
 	<div class={`bg-inherit flex-1 ${p.cited ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}>
 		<div class={`relative bg-inherit`}>
-			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
-				<!-- {#if !p.nested && p.post.atId}
-					<div class="relative fx">
+			<div class={`z-20 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
+				{#if open && !p.nested && !p.cited && atPost}
+					<div class="relative flex h-5 text-xs">
 						<a
-							href={'/' + p.post.atId}
-							class="group fx gap-0.5 text-sm hover:text-fg3"
+							href={`/_${p.post.by_ms}_${p.post.in_ms}`}
+							class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
 							onclick={(e) => {
-								if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-									e.preventDefault();
-									pushState('/' + p.post.atId, { modalId: p.post.atId! });
-								}
+								// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
+								// 	e.preventDefault();
+								// 	let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
+								// 	pushState(
+								// 		accountInSpaceId, //
+								// 		{ modalId: accountInSpaceId },
+								// 	);
+								// }
 							}}
 						>
 							<div
-								class="self-end h-2.5 w-2.5 mt-1.5 border-t-2 border-l-2 border-fg2 group-hover:border-fg1"
-							></div>
-							<p
-								class={`flex-1 ${atPostDeleted ? 'text-fg2 font-bold italic text-xs' : ''}`}
+								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
-								{atPostDeleted ? m.deleted() : atPost?.txt || p.post.atId}
+								<!-- TODO: text color matches UserIcon -->
+								<p class={''}>
+									<!-- TODO: names for users -->
+									<!-- {p.post.by_ms ? getAccountName(...) || identikana(p.post.by_ms) : m.anon()} -->
+									{identikana(atPost.by_ms)}
+								</p>
+							</div>
+						</a>
+						<a
+							href={'/' + getIdStr(p.post)}
+							class={`fx hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+							onclick={(e) => {
+								// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
+								// 	e.preventDefault();
+								// 	pushState('/' + p.post.atId, { modalId: p.post.atId! });
+								// }
+							}}
+						>
+							<p class={`mr-1 ${atPostDeleted ? 'text-fg2 font-bold italic text-xs' : ''}`}>
+								: {atPostTxt}
 							</p>
 						</a>
 						<button
-							class="flex-1 fx justify-end text-fg2 hover:text-fg1"
+							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 							onclick={() =>
 								(gs.writingTo =
-									gs.writingTo && getId(gs.writingTo) === getId(p.post.atId)
-										? ''
-										: ['to', p.post.atId!])}
+									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? false : atPost)}
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
-						<Highlight id={p.post.atId} class="-left-2" />
+						<Highlight reply {evenBg} id={atPostIdStr} />
 					</div>
-				{/if} -->
+				{/if}
 				<PostHeader
 					{...p}
 					{open}
@@ -130,27 +157,42 @@
 			</div>
 			<Highlight
 				{id}
-				class={p.nested || !p.cited
-					? '-left-5'
-					: p.cited
-						? '-left-2.5'
-						: `${p.post.at_ms ? 'top-6' : ''}`}
+				{evenBg}
+				class={p.nested || !p.cited ? '-left-5' : p.cited ? '-left-2.5' : ''}
 			/>
 			{#if open}
 				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
 					{#if tags?.length}
-						<div class="overflow-hidden">
-							<div class="-mx-1 flex flex-wrap">
-								{#each tags as tag (tag)}
-									<!-- TODO: Why does using leading-4 cause parent to scroll? -->
-									<a
-										href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
-										class={`font-bold text-fg2 px-1 leading-5 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+						<div class="-mx-1 flex flex-wrap">
+							{#each tags as tag (tag)}
+								<a
+									href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+									class={`font-bold text-fg2 px-1 leading-5 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+								>
+									{tag}
+								</a>
+							{/each}
+							{#if p.post.reactionCount}
+								{#each reactionCountEntries as [emoji, count], i}
+									<button
+										class={`group fx h-5 text-sm px-1 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 									>
-										{tag}
-									</a>
+										<p class="grayscale-75 group-hover:grayscale-0">{emoji}</p>
+										<p class="ml-1.5 font-bold">{count}</p>
+									</button>
+									{#if i === reactionCountEntries.length - 1}
+										<div class="h-5 xy">
+											<button class={`group xy h-7 w-7 text-sm text-fg2 hover:text-fg1`}>
+												<div
+													class={`h-5 w-7 xy ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+												>
+													<IconChartBarPopular stroke={2.5} class="w-3.5" />
+												</div>
+											</button>
+										</div>
+									{/if}
 								{/each}
-							</div>
+							{/if}
 						</div>
 					{/if}
 					{#if core}
@@ -163,17 +205,6 @@
 						<p class={`text-fg2 font-bold italic`}>
 							{deleted ? m.deleted() : m.blank()}
 						</p>
-					{/if}
-					<!-- TODO: reactions stuff -->
-					{#if p.post.reactionCount}
-						<div class="fx">
-							{#each Object.entries(p.post.reactionCount) as [emoji, count]}
-								<button class="fx h-7 text-sm">
-									{emoji}
-									<p class="ml-1 text-xs font-bold">{count}</p>
-								</button>
-							{/each}
-						</div>
 					{/if}
 				</div>
 			{/if}

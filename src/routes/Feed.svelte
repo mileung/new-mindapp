@@ -53,11 +53,11 @@
 	import PromptSignIn from './PromptSignIn.svelte';
 
 	let timeGetPostFeed = dev;
-	timeGetPostFeed = false;
+	// timeGetPostFeed = false;
 
 	let byMssRegex = /(^|\s)\/_\d+_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
-	let p: { hidden?: boolean; modal?: boolean; searchedText: string; idParam?: string } = $props();
+	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; idParam?: string } = $props();
 
 	let validUrl = $state(true);
 	let viewPostToastId = $state('');
@@ -80,7 +80,7 @@
 			? makeFeedIdentifier({
 					view,
 					sortedBy,
-					searchedText: p.searchedText,
+					qSearchParam: p.qSearchParam,
 					idParam: p.idParam,
 					byMs: p.idParam !== '__0' && p.idParam !== '__8' ? gs.accounts[0].ms : 0,
 				})
@@ -195,21 +195,21 @@
 			console.log('postFeed:', postFeed);
 		} else {
 			// TODO: Instead of set theory, implement tag groups
-			let citedIds = getCitedPostIds(p.searchedText);
-			let tagsInclude = (p.searchedText?.match(bracketRegex) || []).map((match) =>
+			let citedIds = getCitedPostIds(p.qSearchParam);
+			let tagsInclude = (p.qSearchParam?.match(bracketRegex) || []).map((match) =>
 				match.slice(1, -1),
 			);
-			let byMssInclude = p.searchedText.match(byMssRegex)?.map((a) => +a.slice(1)) || [];
-			let searchedTextNoTagsOrAuthors = p.searchedText
+			let byMssInclude = p.qSearchParam.match(byMssRegex)?.map((a) => +a.slice(1)) || [];
+			let qSearchParamNoTagsOrAuthors = p.qSearchParam
 				.replace(bracketRegex, ' ')
 				.replace(byMssRegex, ' ');
-			let quotes = (searchedTextNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
+			let quotes = (qSearchParamNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
 				match.slice(1, -1),
 			);
 			let coreIncludes = [
 				...quotes,
 				...citedIds,
-				...searchedTextNoTagsOrAuthors
+				...qSearchParamNoTagsOrAuthors
 					.replace(quoteRegex, ' ')
 					.replace(idsRegex, ' ')
 					.split(/\s+/g)
@@ -272,7 +272,7 @@
 		];
 		endReached ? e.detail.complete() : e.detail.loaded();
 
-		if (p.idParam === '__0' && !p.searchedText && endReached && !postIdStrFeed.length) {
+		if (p.idParam === '__0' && !p.qSearchParam && endReached && !postIdStrFeed.length) {
 			!dev && startCountDown();
 		}
 	};
@@ -459,7 +459,7 @@
 				{validUrl ? m.placeholderError() : m.invalidUrl()}
 			</p>
 		</InfiniteLoading>
-		{#if inLocal && !p.searchedText && postObjFeed && !postObjFeed.length}
+		{#if inLocal && !p.qSearchParam && postObjFeed && !postObjFeed.length}
 			<div class="xy">
 				<p class="">
 					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}

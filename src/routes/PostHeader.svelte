@@ -8,7 +8,7 @@
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdStr, getIdStrAsIdObj } from '$lib/types/parts/partIds';
-	import type { Post } from '$lib/types/posts';
+	import { reactionList, type Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import {
 		IconBrowserMinus,
@@ -21,6 +21,7 @@
 		IconCube,
 		IconCube3dSphere,
 		IconDots,
+		IconMoodPlus,
 		IconPencil,
 		IconShare2,
 		IconSquarePlus2,
@@ -72,7 +73,7 @@
 <div class="h-5 fx w-full">
 	<div class="flex flex-1 overflow-scroll text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			{#if dev}<div class="fx mr-1">{strPostId}</div>{/if}
+			<!-- {#if dev}<div class="fx mr-1">{strPostId}</div>{/if} -->
 			<a
 				href={'/' + strPostId}
 				class="fx group hover:text-fg1"
@@ -91,14 +92,14 @@
 				href={`/_${p.post.by_ms}_${p.post.in_ms}`}
 				class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
 				onclick={(e) => {
-					if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-						e.preventDefault();
-						let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
-						pushState(
-							accountInSpaceId, //
-							{ modalId: accountInSpaceId },
-						);
-					}
+					// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
+					// 	e.preventDefault();
+					// 	let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
+					// 	pushState(
+					// 		accountInSpaceId, //
+					// 		{ modalId: accountInSpaceId },
+					// 	);
+					// }
 				}}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -106,21 +107,23 @@
 					<p class="pr-1">
 						<!-- TODO: names for users -->
 						<!-- {p.post.by_ms ? getAccountName(...) || identikana(p.post.by_ms) : m.anon()} -->
-						{p.post.by_ms ? identikana(p.post.by_ms) : m.anon()}
+						{identikana(p.post.by_ms)}
 					</p>
 				</div>
 			</a>
-			<a
-				href={`/__${p.post.in_ms}`}
-				class={`fx group hover:text-fg1 ${p.post.in_ms ? '' : 'italic'}`}
-			>
-				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-					<SpaceIcon ms={p.post.in_ms} class="mx-0.5 w-4 min-w-4" />
-					<p class="pr-0.5">
-						{spaceMsToSpaceName(p.post.in_ms)}
-					</p>
-				</div>
-			</a>
+			{#if p.post.in_ms !== gs.currentSpaceMs}
+				<a
+					href={`/__${p.post.in_ms}`}
+					class={`fx group hover:text-fg1 ${p.post.in_ms ? '' : 'italic'}`}
+				>
+					<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 w-4 min-w-4" />
+						<p class="pr-0.5">
+							{spaceMsToSpaceName(p.post.in_ms)}
+						</p>
+					</div>
+				</a>
+			{/if}
 			<button
 				class="fx group hover:text-fg1"
 				onmousedown={(e) => e.preventDefault()}
@@ -145,13 +148,12 @@
 						<IconCornerUpLeft class="w-5" />
 					</div>
 				</button>
-				<!-- TODO: reactions stuff -->
-				<!-- <div
-					class={`absolute right-0 top-5 h-7 hidden group-hover:flex ${p.evenBg ? 'bg-bg1 group-hover:bg-bg4' : 'bg-bg2 group-hover:bg-bg5'}`}
+				<div
+					class={`absolute z-10 right-0 top-5 h-7 hidden group-hover:flex ${p.evenBg ? 'bg-bg1 group-hover:bg-bg4' : 'bg-bg2 group-hover:bg-bg5'}`}
 				>
 					{#each reactionList.slice(0, 4) as emoji}
 						<button
-							class="text-lg w-8 xy grayscale-100 hover:grayscale-0 hover:bg-bg7"
+							class="text-sm w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
 							onclick={() => {
 								console.log(emoji);
 							}}
@@ -160,14 +162,14 @@
 						</button>
 					{/each}
 					<button
-						class="text-lg w-8 xy hover:bg-bg7 hover:text-fg3"
+						class="hidden text-lg w-7 xy hover:bg-bg7 hover:text-fg3"
 						onclick={() => {
 							// console.log(emoji);
 						}}
 					>
-						<IconMoodPlus class="w-5" />
+						<IconMoodPlus class="w-4" />
 					</button>
-				</div> -->
+				</div>
 			</div>
 			{#if p.lastVersion && p.version !== null && p.lastVersion !== null}
 				<div class="flex">

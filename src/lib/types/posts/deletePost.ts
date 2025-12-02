@@ -7,6 +7,7 @@ import {
 	assertLt2Rows,
 	channelPartsByCode,
 	getBaseInput,
+	hasParent,
 	makePartsUniqueById,
 	type PartInsert,
 } from '../parts';
@@ -48,7 +49,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdObjs = [],
 		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdObjs = [],
 		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPIdObjsToDelete = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPIdObjsToDel = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]:
+			curPostCoreIdWNumAsVersionAtPIdObjsToDelete = [],
 		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdObjs = [],
 		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdObjs = [],
 	} = channelPartsByCode(
@@ -84,7 +86,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 		await moveTagOrCoreCountsBy1(
 			db,
 			curPostTagIdWNumAsVersionAtPIdObjsToDelete,
-			curPostCoreIdWNumAsVersionAtPIdObjsToDel,
+			curPostCoreIdWNumAsVersionAtPIdObjsToDelete,
 			false,
 		);
 	}
@@ -155,64 +157,86 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 					.orderBy(pt.ms.desc)
 					.limit(1)
 			)[0];
-			partsToInsert.push({
-				...(previousChildPostIdAtBumpRootIdObj
-					? getFullIdObj(previousChildPostIdAtBumpRootIdObj)
-					: {
-							...getAtIdObj(postIdAtBumpedRootIdObj),
-							...getAtIdObjAsIdObj(postIdAtBumpedRootIdObj),
-						}),
-				code: pc.postIdAtBumpedRootId,
-			});
+			hasParent(fullPostIdObj) &&
+				partsToInsert.push({
+					...(previousChildPostIdAtBumpRootIdObj
+						? getFullIdObj(previousChildPostIdAtBumpRootIdObj)
+						: {
+								...getAtIdObj(postIdAtBumpedRootIdObj),
+								...getAtIdObjAsIdObj(postIdAtBumpedRootIdObj),
+							}),
+					code: pc.postIdAtBumpedRootId,
+				});
 		}
 	} else {
 		// TODO: delete specific version
 		throw new Error(`cannot delete specific version yet`);
 	}
 
+	let checkForNum0Tags =
+		curPostTagIdWNumAsVersionAtPIdObjsToDelete.length ||
+		exPostTagIdWithNumAsVersionAtPostIdObjs.length;
+	let checkForNum0Cores =
+		curPostCoreIdWNumAsVersionAtPIdObjsToDelete.length ||
+		exPostCoreIdWithNumAsVersionAtPostIdObjs.length;
 	let {
 		[pc.tagIdAndTxtWithNumAsCount]: num0tagIdAndTxtWithNumAsCountObjs = [],
 		[pc.coreIdAndTxtWithNumAsCount]: num0coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
-		curPostTagIdWNumAsVersionAtPIdObjsToDelete.length ||
-			exPostTagIdWithNumAsVersionAtPostIdObjs.length
+		checkForNum0Tags || checkForNum0Cores
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						or(
-							and(
-								pt.noParent,
-								pt.ms.gt0,
-								or(
-									...makePartsUniqueById([
-										...curPostTagIdWNumAsVersionAtPIdObjsToDelete,
-										...exPostTagIdWithNumAsVersionAtPostIdObjs,
-									]).map((r) => pt.id(r)),
-								),
-								pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-								pt.txt.isNotNull,
-								pt.num.eq0,
-							),
-							and(
-								pt.noParent,
-								pt.ms.gt0,
-								or(
-									...makePartsUniqueById([
-										...curPostCoreIdWNumAsVersionAtPIdObjsToDel,
-										...exPostCoreIdWithNumAsVersionAtPostIdObjs,
-									]).map((r) => pt.id(r)),
-								),
-								pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
-								pt.txt.isNotNull,
-								pt.num.eq0,
-							),
+							checkForNum0Tags
+								? and(
+										pt.noParent,
+										pt.ms.gt0,
+										or(
+											...makePartsUniqueById([
+												...curPostTagIdWNumAsVersionAtPIdObjsToDelete,
+												...exPostTagIdWithNumAsVersionAtPostIdObjs,
+											]).map((r) => pt.id(r)),
+										),
+										pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+										pt.txt.isNotNull,
+										pt.num.eq0,
+									)
+								: undefined,
+							checkForNum0Cores
+								? and(
+										pt.noParent,
+										pt.ms.gt0,
+										or(
+											...makePartsUniqueById([
+												...curPostCoreIdWNumAsVersionAtPIdObjsToDelete,
+												...exPostCoreIdWithNumAsVersionAtPostIdObjs,
+											]).map((r) => pt.id(r)),
+										),
+										pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
+										pt.txt.isNotNull,
+										pt.num.eq0,
+									)
+								: undefined,
 						),
 					)
 			: [],
 	);
-	await selectTagOrCoreTxtRowsToDelete(db, num0tagIdAndTxtWithNumAsCountObjs, deleteFilters, true);
-	await selectTagOrCoreTxtRowsToDelete(db, num0coreIdAndTxtWithNumAsCountObjs, deleteFilters, true);
+	await selectTagOrCoreTxtRowsToDelete(
+		db,
+		fullPostIdObj,
+		num0tagIdAndTxtWithNumAsCountObjs,
+		deleteFilters,
+		true,
+	);
+	await selectTagOrCoreTxtRowsToDelete(
+		db,
+		fullPostIdObj,
+		num0coreIdAndTxtWithNumAsCountObjs,
+		deleteFilters,
+		false,
+	);
 	deleteFilters.length && (await db.delete(pTable).where(or(...deleteFilters)));
 	partsToInsert.length && (await db.insert(pTable).values(partsToInsert));
 	return { soft: postIsParent };

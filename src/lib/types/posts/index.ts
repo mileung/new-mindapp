@@ -160,6 +160,7 @@ export let moveTagOrCoreCountsBy1 = async (
 
 export let selectTagOrCoreTxtRowsToDelete = async (
 	db: Database,
+	postIdObj: IdObj,
 	tagOrCoreIdObjs: PartInsert[],
 	deleteFilters: (undefined | SQL)[],
 	isTag: boolean,
@@ -174,9 +175,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 							.from(pTable)
 							.where(
 								and(
-									pt.at_ms.gt0,
-									pt.at_by_ms.eq0,
-									pt.at_in_ms.eq0,
+									pt.notIdAsAtId(postIdObj),
 									pt.id(tagOrCoreIdObj),
 									isTag
 										? or(
@@ -218,7 +217,11 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 							),
 						),
 					),
-					pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+					pt.code.eq(
+						isTag
+							? pc.tagIdAndTxtWithNumAsCount //
+							: pc.coreIdAndTxtWithNumAsCount,
+					),
 					pt.num.eq0,
 				),
 			);

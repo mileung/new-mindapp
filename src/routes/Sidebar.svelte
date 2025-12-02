@@ -30,8 +30,8 @@
 	import SpaceIcon from './SpaceIcon.svelte';
 
 	let searchIpt: HTMLInputElement;
-	let searchedText = $state(page.url.searchParams.get('q') || '');
-	let searchVal = $state((() => searchedText)());
+	let qSearchParam = $state(page.url.searchParams.get('q') || '');
+	let searchVal = $state((() => qSearchParam)());
 	let searchIptFocused = $state(false);
 	let xFocused = $state(false);
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
@@ -63,10 +63,10 @@
 						gs.writingNew = gs.writingTo = gs.writingEdit = false;
 					} else if (accountMenuOpen || spaceMenuOpen) {
 						accountMenuOpen = spaceMenuOpen = false;
-					}
+					} else goto(`/__${gs.currentSpaceMs}`);
 				}
 				if (e.key === 'h') {
-					gs.accounts && goto(`/__${gs.currentSpaceMs}`);
+					goto(`/__${gs.currentSpaceMs}`);
 				}
 				if (e.metaKey && e.key === 'Tab' && gs.accounts) {
 					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.currentSpaceMs);

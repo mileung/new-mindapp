@@ -473,12 +473,18 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		} else if (part.code === pc.currentSoftDeletedVersionNumAndMsAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
 		}
+		idToPostMap[partAtIdStr].reactionCount = {
+			'😂': 88,
+			'👍': 8,
+			'👀': 8,
+			'❤️': 88,
+		};
 	}
 
 	pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId;
 	rEmoTxtWMsAndNAsCtAtPostIdObjs;
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
-	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);
+	console.log('getPostFeed:', postIdStrFeed, idToPostMap);
 	return { postIdStrFeed, idToPostMap };
 };

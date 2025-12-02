@@ -40,7 +40,7 @@ export let makeFeedIdentifier = (p: {
 	sortedBy: 'bumped' | 'new' | 'old';
 	byMs: number;
 	idParam: string;
-	searchedText: string;
+	qSearchParam: string;
 }) => {
 	return JSON.stringify(sortObjectProps(p));
 };
@@ -62,7 +62,7 @@ export let getUndefinedLocalFeedIds = () =>
 				sortedBy,
 				byMs: 0,
 				idParam: '__0',
-				searchedText: '',
+				qSearchParam: '',
 			}),
 			undefined,
 		]),
