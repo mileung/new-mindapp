@@ -55,6 +55,7 @@
 	<select
 		name={m.theme()}
 		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+		value={gs.theme}
 		onchange={(e) => {
 			// @ts-ignore
 			setTheme(e.target.value!);

@@ -273,7 +273,13 @@
 		];
 		endReached ? e.detail.complete() : e.detail.loaded();
 
-		if (p.idParam === '__0' && !p.qSearchParam && endReached && !postIdStrFeed.length) {
+		if (
+			p.idParam === '__0' &&
+			!p.qSearchParam &&
+			endReached &&
+			!postIdStrFeed.length &&
+			!newPostIdStrFeed.length
+		) {
 			// !dev && startCountDown();
 			startCountDown();
 		}

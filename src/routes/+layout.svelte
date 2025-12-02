@@ -86,9 +86,10 @@
 	});
 	$effect(() => {
 		if (gs.theme === 'system') {
-			window
-				?.matchMedia('(prefers-color-scheme: dark)')
-				?.addEventListener?.('change', () => setTheme('system'));
+			window?.matchMedia('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => {
+				gs.theme = 'dark'; // retriggers moreOpaque in Highlight.svelte
+				setTheme('system');
+			});
 		}
 	});
 	$effect(() => {
