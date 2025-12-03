@@ -231,18 +231,15 @@
 			onclick={async () => {
 				try {
 					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
-					alert('db deleted');
 				} catch (e) {
 					console.log('error deleteDatabaseFile:', e);
 				}
 				gs.indentifierToFeedMap = {};
 				await initLocalDb();
-				alert('db init');
 				setAccountsAndSpaces();
-
 				let testTags: string[] = [];
 				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
-				let beginning = new Date('8-8-88').getTime();
+				let beginning = new Date('1888-08-08').getTime();
 				let posts: Post[] = [];
 				for (let i = 0; i < 88; i++) {
 					let ranPost = posts[ranInt(0, i * 8)];
@@ -269,8 +266,7 @@
 					});
 				}
 				console.time('adding posts');
-				alert('start adding');
-				for (let post of [posts[0]]) {
+				for (let post of posts) {
 					try {
 						await addPost(post, false);
 					} catch (error) {
@@ -279,7 +275,6 @@
 					console.log('added post');
 				}
 				console.timeEnd('adding posts');
-				alert('done adding');
 			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
 		>
 	{/if}

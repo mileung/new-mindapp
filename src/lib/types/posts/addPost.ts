@@ -22,9 +22,10 @@ import {
 import { pTable } from '../parts/partsTable';
 
 export let addPost = async (post: Post, useRpc: boolean) => {
+	console.log('post', JSON.stringify(post, null, 2));
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
-		alert(String(JSON.stringify(parsedPost.error.issues, null, 2)));
+		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
 		throw new Error(`Invalid post`);
 	}
 	return useRpc ? trpc().addPost.mutate(parsedPost.data) : _addPost(await gsdb(), parsedPost.data);
