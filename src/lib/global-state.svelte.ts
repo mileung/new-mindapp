@@ -44,26 +44,3 @@ export let makeFeedIdentifier = (p: {
 }) => {
 	return JSON.stringify(sortObjectProps(p));
 };
-
-export let getUndefinedLocalFeedIds = () =>
-	Object.fromEntries(
-		(
-			[
-				['nested', 'bumped'],
-				['nested', 'new'],
-				['nested', 'old'],
-				['flat', 'bumped'],
-				['flat', 'new'],
-				['flat', 'old'],
-			] as const
-		).map(([view, sortedBy]) => [
-			makeFeedIdentifier({
-				view,
-				sortedBy,
-				byMs: 0,
-				idParam: '__0',
-				qSearchParam: '',
-			}),
-			undefined,
-		]),
-	);

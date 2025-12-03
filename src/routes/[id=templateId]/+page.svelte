@@ -7,9 +7,6 @@
 	let idParam = $derived(page.state.modalId || page.params.id!);
 	let useModal = $derived(!!qSearchParam || !idParam.startsWith('__'));
 	let idParamObj = $derived(getIdStrAsIdObj(idParam));
-	$effect(() => {
-		console.log('useModal:', useModal);
-	});
 </script>
 
 {#if idParam}

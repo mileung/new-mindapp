@@ -68,7 +68,11 @@
 	});
 </script>
 
-<div bind:this={container} id={'m' + id} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
+<div
+	bind:this={container}
+	{...p.cited ? {} : { id: 'm' + id }}
+	class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}
+>
 	{#if !p.cited}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}

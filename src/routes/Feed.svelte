@@ -3,7 +3,7 @@
 	import { goto, pushState } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
-	import { getUndefinedLocalFeedIds, gs, makeFeedIdentifier } from '$lib/global-state.svelte';
+	import { gs, makeFeedIdentifier } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
@@ -52,14 +52,14 @@
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
 
-	let refreshFeedMap = true;
 	let timeGetPostFeed = dev;
 	timeGetPostFeed = false;
 
 	let byMssRegex = /(^|\s)\/_\d+_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
 	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; idParam?: string } = $props();
-
+	let postIdStrFeed = $state<string[]>([]);
+	let endReached = $state(false);
 	let validUrl = $state(true);
 	let viewPostToastId = $state('');
 	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
@@ -76,8 +76,12 @@
 				? 'old'
 				: 'bumped';
 	});
+	let shown = $state(!p.hidden);
+	$effect(() => {
+		!shown && !p.hidden && (shown = true);
+	});
 	let identifier = $derived(
-		gs.accounts && p.idParam
+		shown && gs.accounts && p.idParam
 			? makeFeedIdentifier({
 					view,
 					sortedBy,
@@ -95,9 +99,11 @@
 
 	let secondsRemaining = $state(-1);
 	let countDownTimer = $state<NodeJS.Timeout>();
+	let showNewHere = $state(false);
+
 	let startCountDown = () => {
-		alert('startCountDown');
 		secondsRemaining = 8;
+		showNewHere = true;
 		let decrement = () => {
 			secondsRemaining--;
 			if (secondsRemaining) {
@@ -108,7 +114,7 @@
 	};
 
 	onMount(() => {
-		// if (refreshFeedMap || timeGetPostFeed) gs.indentifierToFeedMap = {};
+		endReached = false;
 		let handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
 				if (
@@ -126,7 +132,6 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
-			// if (refreshFeedMap || timeGetPostFeed) gs.indentifierToFeedMap = {};
 			gs.writingNew = gs.writingTo = gs.writingEdit = false;
 			window.removeEventListener('keydown', handler);
 			clearTimeout(countDownTimer);
@@ -147,14 +152,19 @@
 		}
 	});
 
+	$effect(() => {
+		identifier;
+		postIdStrFeed = [];
+		endReached = false;
+	});
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// await new Promise((res) => setTimeout(res, 1000));
-		console.log(
-			'loadMorePosts:',
-			identifier,
-			// $state.snapshot(gs.feeds[identifier]),
-			// $state.snapshot(gs.posts),
-		);
+		// console.log(
+		// 	'loadMorePosts:',
+		// 	identifier,
+		// 	// $state.snapshot(gs.feeds[identifier]),
+		// 	// $state.snapshot(gs.posts),
+		// );
 
 		// TODO: load locally saved postIdStrFeed and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 
@@ -162,9 +172,8 @@
 		validUrl = isTemplateId(p.idParam || '');
 		if (!validUrl) return e.detail.error();
 
-		let postIdStrFeed = gs.indentifierToFeedMap[identifier] || [];
-		let lastPostIdStr = (postIdStrFeed as (null | undefined | string)[]).slice(-1)[0];
-		if (lastPostIdStr === null) return e.detail.complete();
+		if (endReached) return e.detail.complete();
+		let lastPostIdStr = (postIdStrFeed as (undefined | string)[]).slice(-1)[0];
 		let lastPostIdObj = lastPostIdStr ? getIdStrAsIdObj(lastPostIdStr) : null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
 
@@ -235,44 +244,36 @@
 			});
 			timeGetPostFeed && console.timeEnd('getPostFeed');
 		}
-		let { postIdStrFeed: newPostIdStrFeed, idToPostMap } = postFeed;
-		// console.log('postFeed:', postFeed);
-
-		let postMapEntries = Object.entries(idToPostMap);
-		for (let i = 0; i < postMapEntries.length; i++) {
-			let [id, post] = postMapEntries[i];
-			idToPostMap[id].subIds = idToPostMap[id].subIds || [];
-			let lastVersion = getLastVersion(idToPostMap[id]);
-			if (lastVersion !== null && idToPostMap[id].history?.[lastVersion]) {
-				idToPostMap[id].history[lastVersion].tags = idToPostMap[id].history[lastVersion].tags || [];
-				idToPostMap[id].history[lastVersion].tags.sort();
-				if (!lastVersion) idToPostMap[id].history[lastVersion].ms = getIdStrAsIdObj(id).ms!;
+		let { postIdStrFeed: newPostIdStrFeed, idToPostMap: newIdToPostMap } = postFeed;
+		let newPostMapEntries = Object.entries(newIdToPostMap);
+		for (let i = 0; i < newPostMapEntries.length; i++) {
+			let [id, post] = newPostMapEntries[i];
+			let lastVersion = getLastVersion(newIdToPostMap[id]);
+			if (lastVersion !== null && newIdToPostMap[id].history?.[lastVersion]) {
+				newIdToPostMap[id].history[lastVersion].tags =
+					newIdToPostMap[id].history[lastVersion].tags || [];
+				newIdToPostMap[id].history[lastVersion].tags.sort();
+				if (!lastVersion) newIdToPostMap[id].history[lastVersion].ms = getIdStrAsIdObj(id).ms!;
 			}
 			if (hasParent(post)) {
 				let strAtId = getAtIdStr(post);
-				if (idToPostMap[strAtId]) {
-					idToPostMap[strAtId].subIds = idToPostMap[strAtId].subIds || [];
-					idToPostMap[strAtId].subIds.push(id);
-				}
-				// else a cited post has an atId, but cites don't show parents,
-				// so the parent is not in idToPostMap.
-				// At least this is one cause for idToPostMap[strAtId] === undefined
+				if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...zeros, history: {} };
+				gs.idToPostMap[strAtId].subIds = [
+					...new Set([...(gs.idToPostMap[strAtId]?.subIds || []), id]),
+				];
+				gs.idToPostMap[strAtId].subIds.sort(
+					(a, b) => getIdStrAsIdObj(b).ms! - getIdStrAsIdObj(a).ms!,
+				);
 			}
-		}
-		for (let i = 0; i < postMapEntries.length; i++) {
-			let [id] = postMapEntries[i];
-			idToPostMap[id].subIds!.sort((a, b) => getIdStrAsIdObj(b).ms! - getIdStrAsIdObj(a).ms!);
+			gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...newIdToPostMap[id] };
 		}
 
-		let endReached = newPostIdStrFeed.length < postsPerLoad;
-		gs.idToPostMap = { ...gs.idToPostMap, ...idToPostMap };
-		gs.indentifierToFeedMap[identifier] = [
-			...(gs.indentifierToFeedMap[identifier] || []),
-			...newPostIdStrFeed,
-			...(endReached ? [null] : []),
-		];
-		endReached ? e.detail.complete() : e.detail.loaded();
+		endReached = newPostIdStrFeed.length < postsPerLoad;
+		postIdStrFeed = [...postIdStrFeed, ...newPostIdStrFeed];
+		newPostIdStrFeed.length && e.detail.loaded();
+		endReached && e.detail.complete();
 
+		// console.log('cool', JSON.stringify(gs.idToPostMap['587026800000_0_0'], null, 2));
 		if (
 			p.idParam === '__0' &&
 			!p.qSearchParam &&
@@ -280,7 +281,6 @@
 			!postIdStrFeed.length &&
 			!newPostIdStrFeed.length
 		) {
-			// !dev && startCountDown();
 			startCountDown();
 		}
 	};
@@ -349,25 +349,14 @@
 			let atPostId = getAtIdStr(post);
 			nested && gs.idToPostMap[atPostId!]!.subIds!.unshift(strPostId);
 		}
-		gs.indentifierToFeedMap = {
-			...gs.indentifierToFeedMap,
-			...getUndefinedLocalFeedIds(),
-			[identifier]: [
-				...((
-					nested
-						? gs.writingNew && (sortedBy === 'bumped' || sortedBy === 'new')
-						: sortedBy === 'new'
-				)
-					? [strPostId]
-					: []),
-				...gs.indentifierToFeedMap[identifier]!,
-			],
-		};
-
+		if (gs.writingNew && (sortedBy === 'bumped' || sortedBy === 'new')) {
+			postIdStrFeed = [strPostId, ...postIdStrFeed];
+		}
 		if (gs.writingNew || gs.writingTo) {
 			viewPostToastId = strPostId;
 			setTimeout(() => (viewPostToastId = ''), 3000);
 		}
+		// TODO add new posts to all feeds applicable (cited, bumped, new, etc.)
 		gs.writingNew = gs.writingTo = gs.writingEdit = false;
 	};
 
@@ -379,9 +368,7 @@
 	};
 
 	let postObjFeed = $derived(
-		gs.indentifierToFeedMap[identifier]
-			?.map((strPostId) => gs.idToPostMap[strPostId || 0])
-			.filter((t) => !!t),
+		postIdStrFeed?.map((strPostId) => gs.idToPostMap[strPostId || 0]).filter((t) => !!t),
 	);
 	let scrolledToSpotId = $state(false);
 	$effect(() => {
@@ -453,7 +440,10 @@
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
 		</div>
-		{#each postObjFeed || [] as post (getIdStr(post))}
+		{#each postObjFeed || [] as post, i (getIdStr(post))}
+			{#if spotId && i === 1}
+				<p class="m-2 text-center text-fg2 text-lg">{m.citedIn()}</p>
+			{/if}
 			<PostBlock {...p} {nested} {post} depth={0} />
 		{/each}
 		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
@@ -461,12 +451,14 @@
 				<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
 				{postObjFeed?.length ? m.endOfFeed() : m.noPostsFound()}
 			</p>
-			<p slot="noMore" class="m-2 text-lg text-fg2">{m.endOfFeed()}</p>
+			<div slot="noMore" class="h-screen">
+				<p class="m-2 text-lg text-fg2">{m.endOfFeed()}</p>
+			</div>
 			<p slot="error" class="m-2 text-lg text-fg2">
 				{validUrl ? m.placeholderError() : m.invalidUrl()}
 			</p>
 		</InfiniteLoading>
-		{#if inLocal && !p.qSearchParam && postObjFeed && !postObjFeed.length}
+		{#if showNewHere}
 			<div class="xy">
 				<p class="">
 					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}

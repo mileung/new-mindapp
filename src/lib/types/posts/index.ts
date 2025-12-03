@@ -81,10 +81,10 @@ export let getLastVersion = (p: Post) =>
 export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
 
 export let scrollToHighlight = (id: string) => {
-	let e =
+	(
 		document.querySelector('#m' + id) || //
-		document.querySelector('.m' + id);
-	e?.scrollIntoView({ block: 'start' });
+		document.querySelector('.m' + id)
+	)?.scrollIntoView({ block: 'start' });
 };
 
 export let addNewTagOrCoreRows = (

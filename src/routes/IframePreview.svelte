@@ -55,6 +55,7 @@
 				allowfullscreen
 				class="max-h-[80vh] max-w-[calc(80vh*16/9)] aspect-video"
 				src={`https://www.youtube.com/embed/${videoId}?start=${startTime}`}
+				sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
 				onkeydown={(e) => e.key === 'Escape' && (open = false)}
 			/>
 		</div>

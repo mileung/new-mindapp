@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
-	import { getUndefinedLocalFeedIds, gs } from '$lib/global-state.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { identikana, randomInt as ranInt } from '$lib/js';
 	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
@@ -175,7 +175,6 @@
 								// ]);
 								console.timeEnd('import_time');
 								setAccountsAndSpaces();
-								gs.indentifierToFeedMap = {};
 								alert(m.dataSuccessfullyMerged());
 							} else {
 								alert(m.invalidJsonFile());
@@ -215,7 +214,7 @@
 				console.log('error deleteDatabaseFile:', e);
 			}
 			!dev && alert(m.localDatabaseDeleted());
-			gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
+			gs.indentifierToFeedMap = {};
 			await initLocalDb();
 			setAccountsAndSpaces();
 
@@ -235,7 +234,7 @@
 				} catch (e) {
 					console.log('error deleteDatabaseFile:', e);
 				}
-				gs.indentifierToFeedMap = { ...gs.indentifierToFeedMap, ...getUndefinedLocalFeedIds() };
+				gs.indentifierToFeedMap = {};
 				await initLocalDb();
 				setAccountsAndSpaces();
 
