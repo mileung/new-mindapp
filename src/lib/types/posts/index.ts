@@ -15,7 +15,7 @@ export let normalizeTags = (tags: string[]) =>
 	].sort((a, b) => a.localeCompare(b));
 
 let HistoryLayerSchema = z.object({
-	ms: z.number().gt(0),
+	ms: z.number().gte(0),
 	tags: z
 		.array(z.string().max(888))
 		.max(888) //
@@ -35,7 +35,7 @@ export let PostSchema = z
 		at_by_ms: z.number().gte(0),
 		at_in_ms: z.number().gte(0),
 
-		ms: z.number().gt(0),
+		ms: z.number().gte(0),
 		by_ms: z.number().gte(0),
 		in_ms: z.number().gte(0),
 

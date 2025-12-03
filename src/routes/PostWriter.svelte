@@ -83,6 +83,7 @@
 		};
 
 		let onMouseMove = (moveEvent: MouseEvent) => {
+			// TODO: touchstart, touchmove, and touchend for mobile web
 			if (draggingHeight) {
 				let deltaY = startY - moveEvent.clientY;
 				let newHeight = Math.min(window.innerHeight - 100, Math.max(133, startHeight + deltaY));

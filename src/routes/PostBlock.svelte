@@ -94,7 +94,7 @@
 	{/if}
 	<div class={`bg-inherit flex-1 ${p.cited ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}>
 		<div class={`relative bg-inherit`}>
-			<div class={`z-20 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
+			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
 						<a

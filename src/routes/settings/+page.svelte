@@ -207,13 +207,14 @@
 			}
 
 			try {
-				// deleteDatabaseFile is slow and unreliable
-				// await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
 				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
 			} catch (e) {
+				alert('Error deleting db' + String(e));
 				console.log('error deleteDatabaseFile:', e);
+				// deleteDatabaseFile is slow and unreliable
+				await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
 			}
-			!dev && alert(m.localDatabaseDeleted());
+			alert(m.localDatabaseDeleted());
 			gs.indentifierToFeedMap = {};
 			await initLocalDb();
 			setAccountsAndSpaces();
