@@ -270,8 +270,12 @@
 				}
 				console.time('adding posts');
 				alert('start adding');
-				for (let post of posts) {
-					await addPost(post, false);
+				for (let post of [posts[0]]) {
+					try {
+						await addPost(post, false);
+					} catch (error) {
+						alert(String(error));
+					}
 					console.log('added post');
 				}
 				console.timeEnd('adding posts');
