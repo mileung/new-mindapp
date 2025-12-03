@@ -378,9 +378,7 @@
 	});
 </script>
 
-<div
-	class={`overflow-y-scroll flex flex-col h-[calc(100vh-36px)] xs:h-screen ${p.hidden ? 'hidden' : ''}`}
->
+<div class={`z-50 overflow-y-scroll flex flex-col h-screen ${p.hidden ? 'hidden' : ''}`}>
 	{#if !idParamObj}
 		<!--  -->
 	{:else if promptSignIn}
@@ -451,7 +449,10 @@
 				<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
 				{postObjFeed?.length ? m.endOfFeed() : m.noPostsFound()}
 			</p>
-			<div slot="noMore" class="h-screen">
+			<div
+				slot="noMore"
+				class={`${gs.writingNew || gs.writingTo || gs.writingEdit ? 'h-[calc(100vh-var(--h-post-writer))]' : 'h-screen'}`}
+			>
 				<p class="m-2 text-lg text-fg2">{m.endOfFeed()}</p>
 			</div>
 			<p slot="error" class="m-2 text-lg text-fg2">

@@ -20,7 +20,7 @@
 {#if videoId}
 	<button
 		bind:this={toggleBtn}
-		class="absolute h-6 w-6 bg-bg5 hover:bg-bg8 xy inline-flex ml-1"
+		class="h-6 w-6 bg-bg5 hover:bg-bg8 xy inline-flex -mb-1"
 		onclick={() => (open = !open)}
 		onkeydown={(e) => e.key === 'Escape' && (open = false)}
 	>
@@ -50,12 +50,14 @@
 	{#if open}
 		<!-- TODO: add allow="autoplay" attribute and add ?autoplay=1 to url once you are able to focus the embedded player when it renders. That way keyboard shortcuts work without having to click pause and play first -->
 		<!-- TODO: play next youtube video when the current one ends -->
-		<div bind:this={iframeDiv} class="w-full">
+		<div
+			bind:this={iframeDiv}
+			class="h-full max-h-[80vh] max-w-[calc(80vh*16/9)] aspect-video w-full"
+		>
 			<CredentiallessIframe
 				allowfullscreen
-				class="max-h-[80vh] max-w-[calc(80vh*16/9)] aspect-video"
+				class="h-full w-full"
 				src={`https://www.youtube.com/embed/${videoId}?start=${startTime}`}
-				sandbox="allow-forms allow-scripts allow-pointer-lock allow-same-origin allow-top-navigation allow-presentation"
 				onkeydown={(e) => e.key === 'Escape' && (open = false)}
 			/>
 		</div>

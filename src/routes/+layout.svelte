@@ -106,6 +106,6 @@
 
 <!-- TODO: scroll feed even when on sidebar. Do not use multiple Sidebar instances.  -->
 <Sidebar />
-<div class="xs:pl-[var(--w-sidebar)] min-h-screen pb-9 xs:pb-0">
+<div class="xs:pl-[var(--w-sidebar)] min-h-screen">
 	{@render p.children()}
 </div>
