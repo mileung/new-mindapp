@@ -231,11 +231,13 @@
 			onclick={async () => {
 				try {
 					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
+					alert('db deleted');
 				} catch (e) {
 					console.log('error deleteDatabaseFile:', e);
 				}
 				gs.indentifierToFeedMap = {};
 				await initLocalDb();
+				alert('db init');
 				setAccountsAndSpaces();
 
 				let testTags: string[] = [];
@@ -267,11 +269,13 @@
 					});
 				}
 				console.time('adding posts');
+				alert('start adding');
 				for (let post of posts) {
 					await addPost(post, false);
 					console.log('added post');
 				}
 				console.timeEnd('adding posts');
+				alert('done adding');
 			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
 		>
 	{/if}
