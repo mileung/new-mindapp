@@ -239,7 +239,7 @@
 				setAccountsAndSpaces();
 				let testTags: string[] = [];
 				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
-				let beginning = new Date('1888-08-08').getTime();
+				let beginning = new Date('1988-08-08').getTime();
 				let posts: Post[] = [];
 				for (let i = 0; i < 88; i++) {
 					let ranPost = posts[ranInt(0, i * 8)];

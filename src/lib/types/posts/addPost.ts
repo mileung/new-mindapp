@@ -22,7 +22,6 @@ import {
 import { pTable } from '../parts/partsTable';
 
 export let addPost = async (post: Post, useRpc: boolean) => {
-	console.log('post', JSON.stringify(post, null, 2));
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));

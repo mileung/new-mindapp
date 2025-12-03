@@ -15,7 +15,7 @@ export let normalizeTags = (tags: string[]) =>
 	].sort((a, b) => a.localeCompare(b));
 
 let HistoryLayerSchema = z.object({
-	ms: z.number(),
+	ms: z.number().gt(0),
 	tags: z
 		.array(z.string().max(888))
 		.max(888) //
@@ -31,20 +31,20 @@ export type HistoryLayer = z.infer<typeof HistoryLayerSchema>;
 
 export let PostSchema = z
 	.object({
-		at_ms: z.number(),
-		at_by_ms: z.number(),
-		at_in_ms: z.number(),
+		at_ms: z.number().gte(0),
+		at_by_ms: z.number().gte(0),
+		at_in_ms: z.number().gte(0),
 
-		ms: z.number(),
-		by_ms: z.number(),
-		in_ms: z.number(),
+		ms: z.number().gt(0),
+		by_ms: z.number().gte(0),
+		in_ms: z.number().gte(0),
 
 		reactionCount: z.record(z.number()).optional(),
 		subIds: z.array(z.string()).optional(),
 
 		history: z
 			.record(
-				z.number().or(z.string().regex(/^\d+$/)),
+				z.number().gte(0).or(z.string().regex(/^\d+$/)),
 				HistoryLayerSchema.optional(), // undefined history layer means hasn't been loaded
 			)
 			.nullable() // null history means soft deleted post
