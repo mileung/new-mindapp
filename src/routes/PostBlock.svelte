@@ -2,9 +2,11 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { getAtIdStr, getFullIdObj, getIdStr } from '$lib/types/parts/partIds';
+	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
+	import type { RxnEmoji } from '$lib/types/reactions';
+	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
 	import { IconChartBarPopular, IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import CoreParser from './CoreParser.svelte';
 	import Highlight from './Highlight.svelte';
@@ -39,8 +41,8 @@
 	let layer = $derived(version === null ? null : p.post.history?.[version]);
 	let core = $derived(layer?.core);
 	let tags = $derived(layer?.tags);
-	let reactionCountEntries = $derived(
-		Object.entries(p.post.reactionCount || {}).sort(([, a], [, b]) => b - a),
+	let rxnCountEntries = $derived(
+		Object.entries(p.post.rxnCount || {}).sort(([, a], [, b]) => b - a) as [RxnEmoji, number][],
 	);
 	let changeVersion = async (v: null | number) => {
 		if (v !== null && !p.post.history?.[v]) {
@@ -140,7 +142,7 @@
 							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 							onclick={() =>
 								(gs.writingTo =
-									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? false : atPost)}
+									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost)}
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
@@ -167,9 +169,9 @@
 			/>
 			{#if open}
 				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
-					{#if tags?.length}
+					{#if tags?.length || rxnCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
-							{#each tags as tag (tag)}
+							{#each tags || [] as tag (tag)}
 								<a
 									href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
 									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -177,27 +179,48 @@
 									{tag}
 								</a>
 							{/each}
-							{#if p.post.reactionCount}
-								{#each reactionCountEntries as [emoji, count], i}
-									<button
-										class={`group fx h-5 px-1 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+							{#each rxnCountEntries as [emoji, count], i}
+								<button
+									class={`group fx h-5 px-1 ${
+										evenBg //
+											? p.post.myRxns?.includes(emoji)
+												? 'bg-bg4 hover:bg-bg5 border-b border-b-hl1'
+												: 'hover:bg-bg4'
+											: p.post.myRxns?.includes(emoji)
+												? 'bg-bg5 hover:bg-bg6 border-b border-hl1'
+												: 'hover:bg-bg5'
+									}`}
+									onclick={async () => {
+										await toggleReaction({
+											...getIdObjAsAtIdObj(p.post),
+											ms: 0,
+											by_ms: gs.accounts![0].ms,
+											in_ms: gs.currentSpaceMs!,
+											emoji,
+										});
+									}}
+								>
+									<p
+										class={`${p.post.myRxns?.includes(emoji) ? '' : 'grayscale-75'} group-hover:grayscale-0`}
 									>
-										<p class="grayscale-75 group-hover:grayscale-0">{emoji}</p>
-										<p class="ml-1.5 font-bold">{count}</p>
-									</button>
-									{#if i === reactionCountEntries.length - 1}
-										<div class="h-5 xy">
-											<button class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}>
-												<div
-													class={`h-5 w-7 xy ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
-												>
-													<IconChartBarPopular stroke={2.5} class="w-3.5" />
-												</div>
-											</button>
-										</div>
-									{/if}
-								{/each}
-							{/if}
+										{emoji}
+									</p>
+									<p class={`ml-1.5 font-bold ${p.post.myRxns?.includes(emoji) ? 'text-fg3' : ''}`}>
+										{count}
+									</p>
+								</button>
+								{#if i === rxnCountEntries.length - 1}
+									<div class="h-5 xy">
+										<button class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}>
+											<div
+												class={`h-5 w-7 xy ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+											>
+												<IconChartBarPopular stroke={2.5} class="w-3.5" />
+											</div>
+										</button>
+									</div>
+								{/if}
+							{/each}
 						</div>
 					{/if}
 					{#if core}

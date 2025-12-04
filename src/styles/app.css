@@ -9,7 +9,7 @@
 @theme {
 	/* --w-sidebar: 100vw; */
 	--w-sidebar: max(10rem, min(17rem, 20vw));
-	--h-post-writer: 200px;
+	--h-post-writer: 180px;
 
 	--breakpoint-xs: 501px;
 

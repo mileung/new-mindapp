@@ -4,7 +4,7 @@ import {
 	addNewTagOrCoreRows,
 	getCitedPostIds,
 	getLastVersion,
-	moveTagOrCoreCountsBy1,
+	moveTagCoreOrRxnCountsBy1,
 	PostSchema,
 	type Post,
 } from '.';
@@ -13,6 +13,7 @@ import { assert1Row, channelPartsByCode, hasParent, type PartInsert } from '../p
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import {
+	getAtIdObj,
 	getIdObj,
 	getIdObjAsAtIdObj,
 	getIdStrAsAtIdObj,
@@ -168,17 +169,9 @@ export let _addPost = async (db: Database, post: Post) => {
 			...postIdWNumAsLastVersionAtPPostIdObjs,
 		]);
 		let parentIsRoot = !!postIdWNumAsLastVersionAtPPostIdObjs.length;
-		let atRootIdObj: AtIdObj = parentIsRoot
-			? {
-					at_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_ms,
-					at_by_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_by_ms,
-					at_in_ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.at_in_ms,
-				}
-			: {
-					at_ms: parentRow.at_ms,
-					at_by_ms: parentRow.at_by_ms,
-					at_in_ms: parentRow.at_in_ms,
-				};
+		let atRootIdObj: AtIdObj = getAtIdObj(
+			parentIsRoot ? mainPostIdWithNumAsLastVersionAtParentPostIdObj : parentRow,
+		);
 
 		partsToInsert.push({
 			...atRootIdObj,
@@ -263,10 +256,12 @@ export let _addPost = async (db: Database, post: Post) => {
 		}
 	}
 
-	await moveTagOrCoreCountsBy1(
+	await moveTagCoreOrRxnCountsBy1(
 		db,
 		currentTags.map((t) => tagTxtToRowMap[t]),
 		[coreTxtToRowMap[currentCore]],
+		[],
+		true,
 	);
 	await db.insert(pTable).values(partsToInsert);
 

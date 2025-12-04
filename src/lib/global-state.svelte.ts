@@ -15,9 +15,9 @@ class GlobalState {
 	accounts = $state<undefined | Account[]>();
 	indentifierToFeedMap = $state<Record<string, undefined | (null | string)[]>>({});
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
-	writingNew = $state(false);
-	writingEdit = $state<false | Post>(false);
-	writingTo = $state<false | Post>(false);
+	writingNew = $state<null | true>(null);
+	writingEdit = $state<null | Post>(null);
+	writingTo = $state<null | Post>(null);
 	writerTags = $state<string[]>([]);
 	writerTagVal = $state('');
 	writerCore = $state('');

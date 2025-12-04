@@ -30,6 +30,9 @@ import { _deletePost } from '$lib/types/posts/deletePost';
 import { _editPost } from '$lib/types/posts/editPost';
 import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
 import { _getPostHistory } from '$lib/types/posts/getPostHistory';
+import { ReactionSchema } from '$lib/types/reactions';
+import { _addReaction } from '$lib/types/reactions/addReaction';
+import { _removeReaction } from '$lib/types/reactions/removeReaction';
 import { setSessionKeyCookie } from '$lib/types/sessions';
 import { _getSpaceAccounts } from '$lib/types/spaces/getSpaceAccounts';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
@@ -468,6 +471,20 @@ export const router = t.router({
 			if (post.history['0'].ms) throw new Error('history ms must be 0');
 			return _addPost(tdb, post);
 		}),
+	addReaction: baseProcedure.input(ReactionSchema).mutation(async ({ input: rxn, ctx }) => {
+		assertValidSession(ctx, rxn);
+		if (rxn.ms) throw new Error('rxn ms must be 0');
+		if (!rxn.in_ms) throw new Error('Invalid in_ms');
+		if (!rxn.by_ms) throw new Error('Invalid by_ms');
+		return _addReaction(tdb, rxn);
+	}),
+	removeReaction: baseProcedure.input(ReactionSchema).mutation(async ({ input: rxn, ctx }) => {
+		assertValidSession(ctx, rxn);
+		if (rxn.ms) throw new Error('rxn ms must be 0');
+		if (!rxn.in_ms) throw new Error('Invalid in_ms');
+		if (!rxn.by_ms) throw new Error('Invalid by_ms');
+		return _removeReaction(tdb, rxn);
+	}),
 	editPost: baseProcedure
 		.input(PostSchema) //
 		.mutation(async ({ input, ctx }) => {

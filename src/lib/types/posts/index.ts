@@ -6,8 +6,7 @@ import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import { idsRegex, zeros, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
-import { reactionList } from './reactionList';
-export { reactionList };
+import { reactionList } from '../reactions/reactionList';
 
 export let normalizeTags = (tags: string[]) =>
 	[
@@ -39,7 +38,8 @@ export let PostSchema = z
 		by_ms: z.number().gte(0),
 		in_ms: z.number().gte(0),
 
-		reactionCount: z.record(z.number()).optional(),
+		myRxns: z.array(z.enum(reactionList)).optional(),
+		rxnCount: z.record(z.number()).optional(),
 		subIds: z.array(z.string()).optional(),
 
 		history: z
@@ -84,7 +84,7 @@ export let scrollToHighlight = (id: string) => {
 	(
 		document.querySelector('#m' + id) || //
 		document.querySelector('.m' + id)
-	)?.scrollIntoView({ block: 'start' });
+	)?.scrollIntoView({ block: 'center' });
 };
 
 export let addNewTagOrCoreRows = (
@@ -121,37 +121,54 @@ export let addNewTagOrCoreRows = (
 	return tagOrCoreTxtToRowMap;
 };
 
-export let moveTagOrCoreCountsBy1 = async (
+export let moveTagCoreOrRxnCountsBy1 = async (
 	db: Database,
-	tagRows: PartInsert[],
-	coreRows: PartInsert[],
-	increment = true,
+	tagIdObjs: IdObj[],
+	coreIdObjs: IdObj[],
+	rxns: Reaction[],
+	increment: boolean,
 ) =>
-	(tagRows.length || coreRows.length) &&
+	(tagIdObjs.length || coreIdObjs.length) &&
 	(await db
 		.update(pTable)
 		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
 		.where(
 			or(
-				tagRows.length
+				tagIdObjs.length
 					? and(
 							pt.at_ms.eq0,
 							pt.at_by_ms.eq0,
 							pt.at_in_ms.eq0,
-							or(...tagRows.map((tagRow) => pt.id(tagRow))),
+							or(...tagIdObjs.map((tagIdObj) => pt.id(tagIdObj))),
 							pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
 							pt.txt.isNotNull,
 							pt.num.isNotNull,
 						)
 					: undefined,
-				coreRows.length
+				coreIdObjs.length
 					? and(
 							pt.at_ms.eq0,
 							pt.at_by_ms.eq0,
 							pt.at_in_ms.eq0,
-							or(...coreRows.map((coreRow) => pt.id(coreRow))),
+							or(...coreIdObjs.map((coreIdObj) => pt.id(coreIdObj))),
 							pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
 							pt.txt.isNotNull,
+							pt.num.isNotNull,
+						)
+					: undefined,
+				rxns.length
+					? and(
+							or(
+								...rxns.map((rxn) =>
+									and(
+										pt.atId(rxn), //
+										pt.txt.eq(rxn.emoji),
+										pt.in_ms.eq(rxn.in_ms),
+									),
+								),
+							),
+							pt.ms.gt0,
+							pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
 							pt.num.isNotNull,
 						)
 					: undefined,

@@ -99,14 +99,12 @@
 
 	let secondsRemaining = $state(-1);
 	let countDownTimer = $state<NodeJS.Timeout>();
-	let showNewHere = $state(false);
 
 	let startCountDown = () => {
 		secondsRemaining = 8;
-		showNewHere = true;
 		let decrement = () => {
 			secondsRemaining--;
-			if (secondsRemaining) {
+			if (secondsRemaining > 0) {
 				countDownTimer = setTimeout(decrement, 1000);
 			} else goto('/user-guide');
 		};
@@ -132,7 +130,7 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
-			gs.writingNew = gs.writingTo = gs.writingEdit = false;
+			gs.writingNew = gs.writingTo = gs.writingEdit = null;
 			window.removeEventListener('keydown', handler);
 			clearTimeout(countDownTimer);
 		};
@@ -148,7 +146,7 @@
 	$effect(() => {
 		if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
 			alert(m.signInToPostInThisSpace());
-			gs.writingNew = gs.writingTo = gs.writingEdit = false;
+			gs.writingNew = gs.writingTo = gs.writingEdit = null;
 		}
 	});
 
@@ -202,7 +200,7 @@
 				...baseQueryParams,
 				postIdObjsInclude: [getIdStrAsIdObj(spotId)],
 			});
-			console.log('postFeed:', postFeed);
+			// console.log('postFeed:', postFeed);
 		} else {
 			// TODO: Instead of set theory, implement tag groups
 			let citedIds = getCitedPostIds(p.qSearchParam);
@@ -347,6 +345,7 @@
 		gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
 		if (gs.writingTo) {
 			let atPostId = getAtIdStr(post);
+			gs.idToPostMap[atPostId!]!.subIds = gs.idToPostMap[atPostId!]!.subIds || [];
 			nested && gs.idToPostMap[atPostId!]!.subIds!.unshift(strPostId);
 		}
 		if (gs.writingNew && (sortedBy === 'bumped' || sortedBy === 'new')) {
@@ -357,7 +356,7 @@
 			setTimeout(() => (viewPostToastId = ''), 3000);
 		}
 		// TODO add new posts to all feeds applicable (cited, bumped, new, etc.)
-		gs.writingNew = gs.writingTo = gs.writingEdit = false;
+		gs.writingNew = gs.writingTo = gs.writingEdit = null;
 	};
 
 	let makeParams = (newView: 'nested' | 'flat', newSortedBy: 'bumped' | 'new' | 'old') => {
@@ -459,7 +458,7 @@
 				{validUrl ? m.placeholderError() : m.invalidUrl()}
 			</p>
 		</InfiniteLoading>
-		{#if showNewHere}
+		{#if secondsRemaining >= 0}
 			<div class="xy">
 				<p class="">
 					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}

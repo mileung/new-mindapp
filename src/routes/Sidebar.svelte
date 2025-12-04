@@ -55,7 +55,7 @@
 				e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
 				if (e.key === 'Escape') {
 					if (gs.writingNew || gs.writingTo || gs.writingEdit) {
-						gs.writingNew = gs.writingTo = gs.writingEdit = false;
+						gs.writingNew = gs.writingTo = gs.writingEdit = null;
 					} else if (accountMenuOpen || spaceMenuOpen) {
 						accountMenuOpen = spaceMenuOpen = false;
 					} else goto(`/__${gs.currentSpaceMs}`);

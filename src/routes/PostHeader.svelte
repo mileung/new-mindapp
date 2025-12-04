@@ -7,9 +7,17 @@
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
-	import { getAtIdStr, getFullIdObj, getIdStr, getIdStrAsIdObj } from '$lib/types/parts/partIds';
-	import { reactionList, type Post } from '$lib/types/posts';
+	import {
+		getAtIdStr,
+		getFullIdObj,
+		getIdObjAsAtIdObj,
+		getIdStr,
+		getIdStrAsIdObj,
+	} from '$lib/types/parts/partIds';
+	import type { Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
+	import { reactionList } from '$lib/types/reactions/reactionList';
+	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
 	import {
 		IconBrowserMinus,
 		IconBrowserShare,
@@ -75,7 +83,7 @@
 <div class="h-5 fx w-full">
 	<div class="flex flex-1 overflow-scroll text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			<!-- {#if dev}<div class="fx mr-1">{strPostId}</div>{/if} -->
+			{#if dev}<div class="fx mr-1">{strPostId}</div>{/if}
 			<a
 				href={'/' + strPostId}
 				class="fx group hover:text-fg1"
@@ -143,8 +151,8 @@
 				<button
 					class="fx h-full flex-1"
 					onclick={() => {
-						gs.writingNew = gs.writingEdit = false;
-						gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === strPostId ? false : p.post;
+						gs.writingNew = gs.writingEdit = null;
+						gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === strPostId ? null : p.post;
 					}}
 				>
 					<div class={`h-5 fx w-full ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -157,8 +165,14 @@
 					{#each reactionList.slice(0, 4) as emoji}
 						<button
 							class="text-sm w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
-							onclick={() => {
-								console.log(emoji);
+							onclick={async () => {
+								await toggleReaction({
+									...getIdObjAsAtIdObj(p.post),
+									ms: 0,
+									by_ms: gs.accounts![0].ms,
+									in_ms: gs.currentSpaceMs!,
+									emoji,
+								});
 							}}
 						>
 							{emoji}
@@ -310,9 +324,9 @@
 						{...a}
 						class="fx group hover:text-fg1"
 						onclick={() => {
-							gs.writingNew = gs.writingTo = false;
+							gs.writingNew = gs.writingTo = null;
 							gs.writingEdit =
-								gs.writingEdit && getIdStr(gs.writingEdit) === strPostId ? false : p.post;
+								gs.writingEdit && getIdStr(gs.writingEdit) === strPostId ? null : p.post;
 						}}
 					>
 						<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>

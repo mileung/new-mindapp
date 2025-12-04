@@ -24,6 +24,7 @@ import {
 	type IdObj,
 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
+import type { RxnEmoji } from '../reactions';
 
 export let postsPerLoad = 15;
 export let bracketRegex = /\[([^\[\]]+)]/g;
@@ -58,7 +59,7 @@ export let getPostFeed = async (q: GetPostFeedQuery) => {
 };
 
 export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
-	// console.table(await db.select().from(pTable));
+	console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
 	// console.log('q:', q);
@@ -213,12 +214,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let includePostIdObjsFilter = q.postIdObjsInclude?.length
 		? q.postIdObjsInclude.map((pio) => pt.id(pio))
 		: [];
-	console.log('q.postIdObjsInclude:', q.postIdObjsInclude);
 	let d0IdObjs: FullIdObj[] = [];
-	// let rootIdObjs: FullIdObj[] = [];
 	if (includePostIdObjsFilter.length) {
-		// let includedPostRootOrAtRootIdObjs =
-
 		let {
 			[pc.childPostIdWithNumAsDepthAtRootId]: childPostIdWithNumAsDepthAtRootIdObjs = [],
 			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtParentPostIdObjs = [],
@@ -396,7 +393,6 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 							...[
 								pc.currentPostTagIdWithNumAsVersionAtPostId,
 								pc.currentPostCoreIdWithNumAsVersionAtPostId,
-								pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId,
 								pc.currentVersionNumAndMsAtPostId,
 								pc.currentSoftDeletedVersionNumAndMsAtPostId,
 							].map((code) =>
@@ -405,6 +401,20 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 									pt.num.isNotNull,
 									pt.txt.isNull, //
 								),
+							),
+							and(
+								pt.ms.gt0,
+								// pt.in_ms.eq(),
+								pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+								pt.num.isNotNull,
+								pt.txt.isNotNull,
+							),
+							and(
+								pt.ms.gt0,
+								// pt.in_ms.eq(),
+								pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+								pt.num.isNull,
+								pt.txt.isNotNull,
 							),
 						),
 					),
@@ -416,9 +426,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
 		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdObjs = [],
 		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdObjs = [],
-		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWMsAndNAsCtAtPostIdObjs = [],
 		[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdObjs = [],
 		[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdObjs = [],
+		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdObjs = [],
+		[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIds = [],
 	} = channelPartsByCode(
 		postsToFetchByIdObjs.length ? await getPostParts(postsToFetchByIdObjs) : [],
 	);
@@ -431,17 +442,24 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs_ = [],
 			[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdObjs_ = [],
 			[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdObjs_ = [],
-			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWMsAndNAsCtAtPostIdObjs_ = [],
 			[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdObjs_ = [],
 			[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSDeletedVersionNumAndMsAtPostIdObjs_ = [],
+			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdObjs_ = [],
+			[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIds_ = [],
 		} = channelPartsByCode(await getPostParts(atCitedIdObjsThatNeedFetching, true));
 		postIdWNumAsLastVersionAtPPostIdObjs.push(...postIdWNumAsLastVersionAtPPostIdObjs_);
 		curPostTagIdWNumAsVersionAtPostIdObjs.push(...curPostTagIdWNumAsVersionAtPostIdObjs_);
 		curPostCoreIdWNumAsVersionAtPostIdObjs.push(...curPostCoreIdWNumAsVersionAtPostIdObjs_);
-		rEmoTxtWMsAndNAsCtAtPostIdObjs.push(...rEmoTxtWMsAndNAsCtAtPostIdObjs_);
 		curVersionNumAndMsAtPostIdObjs.push(...curVersionNumAndMsAtPostIdObjs_);
 		curSoftDeletedVersionNumAndMsAtPostIdObjs.push(...curSDeletedVersionNumAndMsAtPostIdObjs_);
+		rEmoTxtWUMsAndNAsCtAtPostIdObjs.push(...rEmoTxtWUMsAndNAsCtAtPostIdObjs_);
+		rxnIdWEmoTxtAtPostIds.push(...rxnIdWEmoTxtAtPostIds_);
 	}
+
+	// rEmoTxtWUMsAndNAsCtAtPostIdObjs
+	console.log('rEmoTxtWUMsAndNAsCtAtPostIdObjs:', rEmoTxtWUMsAndNAsCtAtPostIdObjs);
+	// rxnIdWEmoTxtAtPostIds
+	console.log('rxnIdWEmoTxtAtPostIds:', rxnIdWEmoTxtAtPostIds);
 
 	let {
 		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
@@ -499,6 +517,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		...curPostCoreIdWNumAsVersionAtPostIdObjs,
 		...curVersionNumAndMsAtPostIdObjs,
 		...curSoftDeletedVersionNumAndMsAtPostIdObjs,
+		...rEmoTxtWUMsAndNAsCtAtPostIdObjs,
+		...rxnIdWEmoTxtAtPostIds,
 	];
 	for (let i = 0; i < subParts.length; i++) {
 		let part = subParts[i];
@@ -512,17 +532,21 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 			idToPostMap[partAtIdStr].history![part.num!]!.ms = part.ms!;
 		} else if (part.code === pc.currentSoftDeletedVersionNumAndMsAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
+		} else if (part.code === pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId) {
+			idToPostMap[partAtIdStr].rxnCount = {
+				...idToPostMap[partAtIdStr].rxnCount,
+				[part.txt!]: part.num!,
+			};
+		} else if (part.code === pc.reactionIdWithEmojiTxtAtPostId) {
+			idToPostMap[partAtIdStr].myRxns = [
+				part.txt as RxnEmoji,
+				...(idToPostMap[partAtIdStr].myRxns || []),
+			];
 		}
-		idToPostMap[partAtIdStr].reactionCount = {
-			'😂': 88,
-			'👍': 8,
-			'👀': 8,
-			'❤️': 88,
-		};
 	}
 
-	pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId;
-	rEmoTxtWMsAndNAsCtAtPostIdObjs;
+	rEmoTxtWUMsAndNAsCtAtPostIdObjs;
+	rxnIdWEmoTxtAtPostIds;
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
 	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);

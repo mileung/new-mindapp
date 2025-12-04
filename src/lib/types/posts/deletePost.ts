@@ -1,6 +1,6 @@
 import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
-import { moveTagOrCoreCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
+import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
 import { gsdb, type Database } from '../../local-db';
 import {
 	assert1Row,
@@ -83,10 +83,11 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	if (!lastVersion && versionIsLastVersion && !deleteAllVersions) deleteAllVersions = true;
 
 	if (deleteAllVersions || versionIsLastVersion) {
-		await moveTagOrCoreCountsBy1(
+		await moveTagCoreOrRxnCountsBy1(
 			db,
 			curPostTagIdWNumAsVersionAtPIdObjsToDelete,
 			curPostCoreIdWNumAsVersionAtPIdObjsToDelete,
+			[],
 			false,
 		);
 	}
@@ -106,8 +107,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			.limit(1)
 	).length;
 
-	let deleteFilters: (undefined | SQL)[] = [];
 	let postIdAtBumpedRootIdObj = assertLt2Rows(postIdAtBumpedRootIdObjs);
+	let deleteFilters: (undefined | SQL)[] = [];
 
 	if (deleteAllVersions) {
 		postIsParent &&

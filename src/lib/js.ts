@@ -138,3 +138,7 @@ export let randomInt = (a: number, b: number) => {
 	const max = Math.max(a, b);
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 };
+
+export let supportsCredentiallessIframe =
+	typeof HTMLIFrameElement !== 'undefined' && //
+	'credentialless' in HTMLIFrameElement.prototype;

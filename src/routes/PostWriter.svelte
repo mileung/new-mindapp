@@ -5,8 +5,10 @@
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { type PartSelect } from '$lib/types/parts';
-	import { getIdStr } from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTags, reactionList, scrollToHighlight } from '$lib/types/posts';
+	import { getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
+	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
+	import { addReaction } from '$lib/types/reactions/addReaction';
+	import { reactionList } from '$lib/types/reactions/reactionList';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
@@ -159,8 +161,17 @@
 			{#each reactionList.slice(0, 4) as emoji}
 				<button
 					class="w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
-					onclick={() => {
-						console.log(emoji);
+					onclick={async () => {
+						await addReaction(
+							{
+								...getIdObjAsAtIdObj(gs.writingTo!),
+								ms: 0,
+								by_ms: gs.accounts![0].ms,
+								in_ms: gs.currentSpaceMs!,
+								emoji,
+							},
+							gs.currentSpaceMs! > 0,
+						);
 					}}
 				>
 					{emoji}
@@ -172,7 +183,7 @@
 		{/if}
 		<button
 			class="w-8 xy hover:bg-bg7 hover:text-fg3"
-			onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = false)}
+			onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = null)}
 		>
 			<IconX class="w-5" />
 		</button>
