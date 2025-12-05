@@ -2,8 +2,8 @@
 	import { dev } from '$app/environment';
 	import { goto, pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { textInputFocused } from '$lib/dom';
-	import { gs, makeFeedIdentifier } from '$lib/global-state.svelte';
+	import { scrollToHighlight, textInputFocused } from '$lib/dom';
+	import { gs, makeFeedIdentifier, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
@@ -15,15 +15,10 @@
 		isIdStr,
 		isTemplateId,
 		zeros,
+		type FullIdObj,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
-	import {
-		getCitedPostIds,
-		getLastVersion,
-		normalizeTags,
-		scrollToHighlight,
-		type Post,
-	} from '$lib/types/posts';
+	import { getCitedPostIds, getLastVersion, normalizeTags, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
 	import { editPost } from '$lib/types/posts/editPost';
 	import {
@@ -51,6 +46,7 @@
 	import PostBlock from './PostBlock.svelte';
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
+	import ReactionHistory from './ReactionHistory.svelte';
 
 	let timeGetPostFeed = dev;
 	timeGetPostFeed = false;
@@ -59,6 +55,7 @@
 	let quoteRegex = /"([^"]+)"/g;
 	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; idParam?: string } = $props();
 	let postIdStrFeed = $state<string[]>([]);
+	let postAtBumpedPostsIdObjsExclude = $state<FullIdObj[]>();
 	let endReached = $state(false);
 	let validUrl = $state(true);
 	let viewPostToastId = $state('');
@@ -112,7 +109,6 @@
 	};
 
 	onMount(() => {
-		endReached = false;
 		let handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
 				if (
@@ -130,7 +126,7 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
-			gs.writingNew = gs.writingTo = gs.writingEdit = null;
+			resetBottomOverlay();
 			window.removeEventListener('keydown', handler);
 			clearTimeout(countDownTimer);
 		};
@@ -146,13 +142,15 @@
 	$effect(() => {
 		if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
 			alert(m.signInToPostInThisSpace());
-			gs.writingNew = gs.writingTo = gs.writingEdit = null;
+			resetBottomOverlay();
 		}
 	});
 
 	$effect(() => {
 		identifier;
+		console.log('yup');
 		postIdStrFeed = [];
+		postAtBumpedPostsIdObjsExclude = [];
 		endReached = false;
 	});
 	let loadMorePosts = async (e: InfiniteEvent) => {
@@ -180,9 +178,12 @@
 			callerMs: gs.accounts[0].ms,
 			view,
 			sortedBy,
+			postAtBumpedPostsIdObjsExclude,
 			fromMs:
-				lastPostIdObj?.ms || //
-				(sortedBy === 'old' ? 0 : Number.MAX_SAFE_INTEGER),
+				sortedBy === 'bumped'
+					? postAtBumpedPostsIdObjsExclude?.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER
+					: lastPostIdObj?.ms || //
+						(sortedBy === 'old' ? 0 : Number.MAX_SAFE_INTEGER),
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
@@ -226,21 +227,24 @@
 			];
 
 			let lastRootIdObjsWithSameMs: IdObj[] = lastPostIdObj ? [lastPostIdObj] : [];
-			for (let i = postIdStrFeed.length - 3; i >= 0; i--) {
+			for (let i = postIdStrFeed.length - 1; i >= 0; i--) {
 				let split = getIdStrAsIdObj((postIdStrFeed as string[])[i]);
 				if (split.ms === lastPostIdObj!.ms) {
 					lastRootIdObjsWithSameMs.push(split);
 				} else break;
 			}
+
 			timeGetPostFeed && console.time('getPostFeed');
 			postFeed = await getPostFeed({
 				...baseQueryParams,
 				byMssInclude,
 				tagsInclude,
 				coreIncludes: coreIncludes,
+				postAtBumpedPostsIdObjsExclude,
 				postIdObjsExclude: [...lastRootIdObjsWithSameMs],
 			});
 			timeGetPostFeed && console.timeEnd('getPostFeed');
+			postAtBumpedPostsIdObjsExclude = postFeed.postAtBumpedPostsIdObjsExclude;
 		}
 		let { postIdStrFeed: newPostIdStrFeed, idToPostMap: newIdToPostMap } = postFeed;
 		let newPostMapEntries = Object.entries(newIdToPostMap);
@@ -356,7 +360,7 @@
 			setTimeout(() => (viewPostToastId = ''), 3000);
 		}
 		// TODO add new posts to all feeds applicable (cited, bumped, new, etc.)
-		gs.writingNew = gs.writingTo = gs.writingEdit = null;
+		resetBottomOverlay();
 	};
 
 	let makeParams = (newView: 'nested' | 'flat', newSortedBy: 'bumped' | 'new' | 'old') => {
@@ -377,7 +381,10 @@
 	});
 </script>
 
-<div class={`z-50 overflow-y-scroll flex flex-col h-screen ${p.hidden ? 'hidden' : ''}`}>
+<div
+	id={p.hidden ? '' : 'feed'}
+	class={`z-50 overflow-y-scroll flex flex-col h-screen ${p.hidden ? 'hidden' : ''}`}
+>
 	{#if !idParamObj}
 		<!--  -->
 	{:else if promptSignIn}
@@ -483,9 +490,13 @@
 	{/if}
 	<div class="flex-1"></div>
 	<div
-		class={`sticky bottom-0 z-50 h-[var(--h-post-writer)] ${gs.writingNew || gs.writingTo || gs.writingEdit ? '' : 'hidden'}`}
+		class={`sticky bottom-0 z-50 h-[var(--h-post-writer)] ${gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit ? '' : 'hidden'}`}
 	>
-		<PostWriter onSubmit={submitPost} />
+		{#if gs.showReactionHistory}
+			<ReactionHistory />
+		{:else}
+			<PostWriter onSubmit={submitPost} />
+		{/if}
 	</div>
 	{#if viewPostToastId}
 		<a

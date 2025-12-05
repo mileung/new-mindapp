@@ -18,6 +18,7 @@ class GlobalState {
 	writingNew = $state<null | true>(null);
 	writingEdit = $state<null | Post>(null);
 	writingTo = $state<null | Post>(null);
+	showReactionHistory = $state<null | Post>(null);
 	writerTags = $state<string[]>([]);
 	writerTagVal = $state('');
 	writerCore = $state('');
@@ -43,4 +44,11 @@ export let makeFeedIdentifier = (p: {
 	qSearchParam: string;
 }) => {
 	return JSON.stringify(sortObjectProps(p));
+};
+
+export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
+	except !== 'rh' && (gs.showReactionHistory = null);
+	except !== 'wn' && (gs.writingNew = null);
+	except !== 'we' && (gs.writingEdit = null);
+	except !== 'wt' && (gs.writingTo = null);
 };

@@ -2,7 +2,7 @@
 	import { dev } from '$app/environment';
 	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs, resetBottomOverlay, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { copyToClipboard, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
@@ -80,10 +80,9 @@
 	let a = { onkeydown: (e: KeyboardEvent) => e.key === 'Escape' && (moreOptionsOpen = false) };
 </script>
 
-<div class="h-5 fx w-full">
-	<div class="flex flex-1 overflow-scroll text-nowrap">
+<div class="group/div h-5 fx w-full">
+	<div class="fx flex-1 overflow-scroll text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			{#if dev}<div class="fx mr-1">{strPostId}</div>{/if}
 			<a
 				href={'/' + strPostId}
 				class="fx group hover:text-fg1"
@@ -151,7 +150,7 @@
 				<button
 					class="fx h-full flex-1"
 					onclick={() => {
-						gs.writingNew = gs.writingEdit = null;
+						resetBottomOverlay('wt');
 						gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === strPostId ? null : p.post;
 					}}
 				>
@@ -160,7 +159,7 @@
 					</div>
 				</button>
 				<div
-					class={`absolute z-10 right-0 h-7 hidden group-hover:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover:bg-bg4' : 'bg-bg2 group-hover:bg-bg5'}`}
+					class={`absolute z-10 right-0 h-7 hidden group-hover/div:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover/div:bg-bg4' : 'bg-bg2 group-hover/div:bg-bg5'}`}
 				>
 					{#each reactionList.slice(0, 4) as emoji}
 						<button
@@ -324,7 +323,7 @@
 						{...a}
 						class="fx group hover:text-fg1"
 						onclick={() => {
-							gs.writingNew = gs.writingTo = null;
+							gs.showReactionHistory = gs.writingNew = gs.writingTo = null;
 							gs.writingEdit =
 								gs.writingEdit && getIdStr(gs.writingEdit) === strPostId ? null : p.post;
 						}}
@@ -348,5 +347,6 @@
 				</button>
 			{/if}
 		</div>
+		{#if dev}{strPostId}{/if}
 	</div>
 </div>

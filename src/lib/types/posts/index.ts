@@ -6,6 +6,7 @@ import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import { idsRegex, zeros, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
+import type { Reaction } from '../reactions';
 import { reactionList } from '../reactions/reactionList';
 
 export let normalizeTags = (tags: string[]) =>
@@ -80,12 +81,7 @@ export let getLastVersion = (p: Post) =>
 
 export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
 
-export let scrollToHighlight = (id: string) => {
-	(
-		document.querySelector('#m' + id) || //
-		document.querySelector('.m' + id)
-	)?.scrollIntoView({ block: 'center' });
-};
+
 
 export let addNewTagOrCoreRows = (
 	mainPart: IdObj,

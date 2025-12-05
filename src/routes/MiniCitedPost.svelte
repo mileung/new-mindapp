@@ -1,24 +1,16 @@
 <script lang="ts">
-	import { pushState } from '$app/navigation';
 	import { formatMs } from '$lib/time';
 	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
 	import Highlight from './Highlight.svelte';
-	let p: { id: string; depth: number } = $props();
+	let p: { postId: string; depth: number } = $props();
 	let evenBg = $derived(!(p.depth % 2));
 </script>
 
 <a
-	target="_blank"
-	href={'/' + p.id}
+	href={'/' + p.postId}
 	class={`relative border-l-2 border-hl-cite p-1 m-1 w-fit block text-sm font-bold text-fg2 hover:text-fg1 ${evenBg ? 'bg-bg1 hover:bg-bg4' : 'bg-bg2 hover:bg-bg5'}`}
-	title={formatMs(getIdStrAsIdObj(p.id).ms, true)}
-	onclick={(e) => {
-		if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-			e.preventDefault();
-			pushState('/' + p.id, { modalId: p.id });
-		}
-	}}
+	title={formatMs(getIdStrAsIdObj(p.postId).ms, true)}
 >
 	<Highlight {...p} {evenBg} class="-left-0.5" />
-	{formatMs(getIdStrAsIdObj(p.id).ms)}
+	{formatMs(getIdStrAsIdObj(p.postId).ms)}
 </a>

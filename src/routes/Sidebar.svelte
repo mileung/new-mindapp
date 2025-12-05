@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
-	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs, resetBottomOverlay, spaceMsToSpaceName } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { refreshCurrentAccount, updateLocalCache, updateSavedTags } from '$lib/types/local-cache';
@@ -55,7 +55,7 @@
 				e.key === '/' && setTimeout(() => searchIpt.focus(), 0); // setTimeout prevents inputting '/' on focus
 				if (e.key === 'Escape') {
 					if (gs.writingNew || gs.writingTo || gs.writingEdit) {
-						gs.writingNew = gs.writingTo = gs.writingEdit = null;
+						resetBottomOverlay();
 					} else if (accountMenuOpen || spaceMenuOpen) {
 						accountMenuOpen = spaceMenuOpen = false;
 					} else goto(`/__${gs.currentSpaceMs}`);

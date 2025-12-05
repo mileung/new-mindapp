@@ -12,7 +12,7 @@ let filterIdObj = (idObj: IdObj) =>
 let filterIdObjAsAtIdObj = (idObj: IdObj) =>
 	and(
 		eq(pTable.at_ms, idObj.ms), //
-		eq(pTable.by_ms, idObj.by_ms),
+		eq(pTable.at_by_ms, idObj.by_ms),
 		eq(pTable.at_in_ms, idObj.in_ms),
 	);
 
@@ -20,14 +20,24 @@ let filterAtIdObjAsIdObj = (idObjAtIdObj: FullIdObj) =>
 	and(
 		eq(pTable.ms, idObjAtIdObj.at_ms),
 		eq(pTable.by_ms, idObjAtIdObj.at_by_ms),
-		eq(pTable.at_in_ms, idObjAtIdObj.at_in_ms),
+		eq(pTable.in_ms, idObjAtIdObj.at_in_ms),
 	);
 
 let filterAtIdObj = (idObjAtIdObj: AtIdObj) =>
 	and(
 		eq(pTable.at_ms, idObjAtIdObj.at_ms),
-		eq(pTable.by_ms, idObjAtIdObj.at_by_ms),
+		eq(pTable.at_by_ms, idObjAtIdObj.at_by_ms),
 		eq(pTable.at_in_ms, idObjAtIdObj.at_in_ms),
+	);
+
+let filterFullIdObj = (fullIdObj: FullIdObj) =>
+	and(
+		eq(pTable.at_ms, fullIdObj.at_ms),
+		eq(pTable.at_by_ms, fullIdObj.at_by_ms),
+		eq(pTable.at_in_ms, fullIdObj.at_in_ms),
+		eq(pTable.ms, fullIdObj.ms),
+		eq(pTable.by_ms, fullIdObj.by_ms),
+		eq(pTable.in_ms, fullIdObj.in_ms),
 	);
 
 export let pt = {
@@ -37,6 +47,7 @@ export let pt = {
 	idAsAtId: filterIdObjAsAtIdObj,
 	atIdAsId: filterAtIdObjAsIdObj,
 	atId: filterAtIdObj,
+	notFullId: (fio: FullIdObj) => not(filterFullIdObj(fio)!),
 
 	noParent: and(
 		eq(pTable.at_ms, 0), //

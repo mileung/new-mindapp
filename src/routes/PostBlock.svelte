@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { gs } from '$lib/global-state.svelte';
+	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
+	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
@@ -24,7 +25,7 @@
 	let container: HTMLDivElement;
 	let open = $state(true);
 	let parsed = $state(true);
-	let id = $derived(getIdStr(p.post));
+	let postId = $derived(getIdStr(p.post));
 	let evenBg = $derived(!(p.depth % 2));
 	let atPostIdStr = $derived(getAtIdStr(p.post));
 	let atPost = $derived(gs.idToPostMap[atPostIdStr]);
@@ -49,10 +50,10 @@
 			let { history } = await getPostHistory(getFullIdObj(p.post), v, p.post.in_ms > 0);
 			if (!history) return;
 			Object.keys(history).forEach((key) => history[key]?.tags?.sort());
-			gs.idToPostMap[id] = {
-				...gs.idToPostMap[id]!,
+			gs.idToPostMap[postId] = {
+				...gs.idToPostMap[postId]!,
 				history: {
-					...gs.idToPostMap[id]!.history,
+					...gs.idToPostMap[postId]!.history,
 					...history,
 				},
 			};
@@ -70,11 +71,7 @@
 	});
 </script>
 
-<div
-	bind:this={container}
-	{...p.cited ? {} : { id: 'm' + id }}
-	class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}
->
+<div bind:this={container} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if !p.cited}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -140,13 +137,15 @@
 						</a>
 						<button
 							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-							onclick={() =>
-								(gs.writingTo =
-									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost)}
+							onclick={() => {
+								resetBottomOverlay('wt');
+								gs.writingTo =
+									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost;
+							}}
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
-						<Highlight reply {evenBg} id={atPostIdStr} />
+						<Highlight reply {evenBg} postId={atPostIdStr} />
 					</div>
 				{/if}
 				<PostHeader
@@ -160,12 +159,16 @@
 					bumpDownReactionHoverMenu={!p.nested && !!atPost && !p.cited}
 					onChangeVersion={(v) => changeVersion(v)}
 				/>
-				<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is netted? Just for 0 depth PostBlocks?  -->
+				<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->
 			</div>
+			{#if !open && hasParent(p.post)}
+				<Highlight {evenBg} postId={atPostIdStr} class="-left-0.5" />
+			{/if}
 			<Highlight
-				{id}
+				main
+				{postId}
 				{evenBg}
-				class={p.nested || !p.cited ? '-left-5' : p.cited ? '-left-2.5' : ''}
+				class={p.nested || !p.cited ? '-left-5' : p.cited ? '-left-2.5 -bot tom-1' : ''}
 			/>
 			{#if open}
 				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
@@ -211,7 +214,16 @@
 								</button>
 								{#if i === rxnCountEntries.length - 1}
 									<div class="h-5 xy">
-										<button class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}>
+										<button
+											class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}
+											onclick={() => {
+												resetBottomOverlay('rh');
+												gs.showReactionHistory =
+													gs.showReactionHistory && postId === getIdStr(gs.showReactionHistory)
+														? null
+														: p.post;
+											}}
+										>
 											<div
 												class={`h-5 w-7 xy ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 											>
@@ -225,7 +237,10 @@
 					{/if}
 					{#if core}
 						{#if parsed}
-							<CoreParser {core} miniCites={p.cited} depth={p.depth} />
+							<!-- overflow-hidden makes the Highlight of cited posts with cited posts the correct height. idk y -->
+							<div class="overflow-hidden">
+								<CoreParser {core} miniCites={p.cited} depth={p.depth} />
+							</div>
 						{:else}
 							<p class="whitespace-pre-wrap break-all font-thin font-mono">{core}</p>
 						{/if}

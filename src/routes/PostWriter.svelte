@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/global-state.svelte';
+	import { getPostWriterHeight, scrollToHighlight, textInputFocused } from '$lib/dom';
+	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { type PartSelect } from '$lib/types/parts';
 	import { getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTags, scrollToHighlight } from '$lib/types/posts';
-	import { addReaction } from '$lib/types/reactions/addReaction';
+	import { getLastVersion, normalizeTags } from '$lib/types/posts';
 	import { reactionList } from '$lib/types/reactions/reactionList';
+	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
@@ -162,16 +162,13 @@
 				<button
 					class="w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
 					onclick={async () => {
-						await addReaction(
-							{
-								...getIdObjAsAtIdObj(gs.writingTo!),
-								ms: 0,
-								by_ms: gs.accounts![0].ms,
-								in_ms: gs.currentSpaceMs!,
-								emoji,
-							},
-							gs.currentSpaceMs! > 0,
-						);
+						await toggleReaction({
+							...getIdObjAsAtIdObj(gs.writingTo!),
+							ms: 0,
+							by_ms: gs.accounts![0].ms,
+							in_ms: gs.currentSpaceMs!,
+							emoji,
+						});
 					}}
 				>
 					{emoji}
@@ -181,14 +178,16 @@
 				<IconMoodPlus class="w-4.5" />
 			</button>
 		{/if}
-		<button
-			class="w-8 xy hover:bg-bg7 hover:text-fg3"
-			onclick={() => (gs.writingNew = gs.writingTo = gs.writingEdit = null)}
-		>
+		<button class="w-8 xy hover:bg-bg7 hover:text-fg3" onclick={() => resetBottomOverlay()}>
 			<IconX class="w-5" />
 		</button>
 		<Highlight
-			id={gs.writingTo ? getIdStr(gs.writingTo) : gs.writingEdit ? getIdStr(gs.writingEdit) : ''}
+			noScrollTo
+			postId={gs.writingTo
+				? getIdStr(gs.writingTo)
+				: gs.writingEdit
+					? getIdStr(gs.writingEdit)
+					: ''}
 		/>
 	</div>
 	<div
@@ -345,9 +344,7 @@
 				e.preventDefault();
 				draggingHeight = true;
 				startY = e.clientY;
-				startHeight = parseFloat(
-					getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'),
-				);
+				startHeight = getPostWriterHeight();
 			}}
 		>
 			<IconGripVertical class="w-5" />

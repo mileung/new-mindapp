@@ -63,7 +63,7 @@ export let _removeReaction = async (db: Database, rxn: Reaction) => {
 	];
 	let rEmTxtWUnqMsAndNumAsCtAtPostIdObj = assert1Row(rEmTxtWUnqMsAndNumAsCtAtPostIdObjs);
 	if (rEmTxtWUnqMsAndNumAsCtAtPostIdObj.num! > 1) {
-		await moveTagCoreOrRxnCountsBy1(db, [], [], [rEmTxtWUnqMsAndNumAsCtAtPostIdObj], false);
+		await moveTagCoreOrRxnCountsBy1(db, [], [], [rxn], false);
 	} else {
 		deleteFilters.push(
 			and(

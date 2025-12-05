@@ -259,7 +259,7 @@ export let _addPost = async (db: Database, post: Post) => {
 	await moveTagCoreOrRxnCountsBy1(
 		db,
 		currentTags.map((t) => tagTxtToRowMap[t]),
-		[coreTxtToRowMap[currentCore]],
+		[coreTxtToRowMap[currentCore]].filter((r) => !!r),
 		[],
 		true,
 	);

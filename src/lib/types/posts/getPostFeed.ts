@@ -14,8 +14,10 @@ import {
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import {
+	FullIdObjSchema,
 	getAtIdObjAsIdObj,
 	getAtIdStr,
+	getFullIdObj,
 	getIdObj,
 	getIdStr,
 	IdObjSchema,
@@ -35,6 +37,7 @@ export let GetPostFeedSchema = z.object({
 	view: z.enum(['nested', 'flat']),
 	sortedBy: z.enum(['bumped', 'new', 'old']),
 	fromMs: z.number(),
+	postAtBumpedPostsIdObjsExclude: z.array(FullIdObjSchema).optional(),
 
 	byMssExclude: z.array(z.number()),
 	byMssInclude: z.array(z.number()),
@@ -59,7 +62,7 @@ export let getPostFeed = async (q: GetPostFeedQuery) => {
 };
 
 export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
-	console.table(await db.select().from(pTable));
+	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
 	// console.log('q:', q);
@@ -69,7 +72,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let oldFirst = q.sortedBy === 'old';
 	let postIdStrFeed: string[] = [];
 	let postsToFetchByIdObjs: IdObj[] = [];
-
+	let postAtBumpedPostsIdObjsExclude = q.postAtBumpedPostsIdObjsExclude || [];
 	// let searchConditions = q.useRpc ? [pf.by_ms.gt0, pf.in_ms.gt0] : undefined;
 	// or(
 	// 	...(q.tagsExclude || []).map((tag) => notLike(pTable.tag, `%"${tag}"%`)),
@@ -289,7 +292,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 						// pf.ms.gt0,
 						// byMssFilter,
 						// inMssFilter,
-						...excludePostIdsFilter,
+						...postAtBumpedPostsIdObjsExclude.flatMap((fullIdObj) => [
+							pt.notFullId(fullIdObj),
+							pt.notFullId(fullIdObj),
+						]),
 						pt.code.eq(pc.postIdAtBumpedRootId),
 						pt.txt.isNull,
 						pt.num.isNull,
@@ -298,6 +304,14 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				.orderBy(pt.ms.desc)
 				.limit(postsPerLoad);
 			d0IdObjs = atBumpedRootIdObjs.map((idObj) => ({ ...zeros, ...getAtIdObjAsIdObj(idObj) }));
+			let lastAtBumpedRootIdObj = atBumpedRootIdObjs.slice(-1)[0];
+			postAtBumpedPostsIdObjsExclude = [];
+			for (let i = atBumpedRootIdObjs.length - 1; i >= 0; i--) {
+				let postIdObj = atBumpedRootIdObjs[i];
+				if (postIdObj.ms === lastAtBumpedRootIdObj!.ms) {
+					postAtBumpedPostsIdObjsExclude.push(getFullIdObj(postIdObj));
+				} else break;
+			}
 		} else if (newFirst || oldFirst) {
 			d0IdObjs = await db
 				.select()
@@ -456,11 +470,6 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		rxnIdWEmoTxtAtPostIds.push(...rxnIdWEmoTxtAtPostIds_);
 	}
 
-	// rEmoTxtWUMsAndNAsCtAtPostIdObjs
-	console.log('rEmoTxtWUMsAndNAsCtAtPostIdObjs:', rEmoTxtWUMsAndNAsCtAtPostIdObjs);
-	// rxnIdWEmoTxtAtPostIds
-	console.log('rxnIdWEmoTxtAtPostIds:', rxnIdWEmoTxtAtPostIds);
-
 	let {
 		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
 		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
@@ -550,7 +559,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
 	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);
-	return { postIdStrFeed, idToPostMap };
+	return { postIdStrFeed, idToPostMap, postAtBumpedPostsIdObjsExclude };
 };
 
 let getRootDescendentPostIdObjs = async (db: Database, rootIdObjs: IdObj[]) =>

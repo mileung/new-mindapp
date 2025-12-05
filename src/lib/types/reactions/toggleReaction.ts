@@ -16,6 +16,7 @@ export let toggleReaction = async (rxn: Reaction) => {
 	} else {
 		myRxns = myRxns.filter((e) => e !== rxn.emoji);
 		rxnCount[rxn.emoji]--;
+		if (!rxnCount[rxn.emoji]) delete rxnCount[rxn.emoji];
 	}
 	gs.idToPostMap[postIdStr]!.myRxns = myRxns;
 	gs.idToPostMap[postIdStr]!.rxnCount = rxnCount;

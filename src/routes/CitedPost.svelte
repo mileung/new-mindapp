@@ -6,14 +6,14 @@
 		post: Post;
 		depth: number;
 	} = $props();
-	let id = $derived(getIdStr(p.post));
+	let postId = $derived(getIdStr(p.post));
 	// $effect(() => {
 	// 	console.log('p:', p);
 	// });
 </script>
 
 <div
-	class={`m${id} z-0 border-l-2 border-hl-cite pl-2 my-1 -mr-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg2'}`}
+	class={`relative z-0 border-l-2 border-hl-cite pl-2 my-1 -mr-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg2'}`}
 >
 	<PostBlock {...p} cited />
 </div>

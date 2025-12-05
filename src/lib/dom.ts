@@ -1,5 +1,24 @@
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
+export let getPostWriterHeight = () =>
+	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
+
+export let scrollToHighlight = (id: string) => {
+	let feedContainer = document.getElementById('feed');
+	let hl =
+		document.querySelector('#post-' + id) || //
+		document.querySelector('.post-' + id);
+	hl &&
+		feedContainer?.scrollTo({
+			top:
+				hl.getBoundingClientRect().bottom +
+				feedContainer.scrollTop - //
+				feedContainer.getBoundingClientRect().height +
+				getPostWriterHeight(),
+			behavior: 'smooth',
+		});
+};
+
 export function scrape(externalUrl: string, externalDomString: string) {
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
 
