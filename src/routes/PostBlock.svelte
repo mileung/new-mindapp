@@ -45,9 +45,9 @@
 	let rxnCountEntries = $derived(
 		Object.entries(p.post.rxnCount || {}).sort(([, a], [, b]) => b - a) as [RxnEmoji, number][],
 	);
-	let changeVersion = async (v: null | number) => {
-		if (v !== null && !p.post.history?.[v]) {
-			let { history } = await getPostHistory(getFullIdObj(p.post), v, p.post.in_ms > 0);
+	let changeVersion = async (v: number) => {
+		if (!p.post.history?.[v]) {
+			let { history } = await getPostHistory(getFullIdObj(p.post), v);
 			if (!history) return;
 			Object.keys(history).forEach((key) => history[key]?.tags?.sort());
 			gs.idToPostMap[postId] = {

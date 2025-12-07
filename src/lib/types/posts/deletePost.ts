@@ -19,17 +19,16 @@ import { pTable } from '../parts/partsTable';
 export let deletePost = async (
 	fullPostIdObj: FullIdObj,
 	version: null | number,
-	useRpc: boolean,
+	forceUsingLocalDb?: boolean,
 ) => {
-	return useRpc
-		? trpc().deletePost.mutate({ ...(await getBaseInput()), fullPostIdObj, version })
-		: _deletePost(await gsdb(), fullPostIdObj, version);
+	let baseInput = await getBaseInput();
+	return forceUsingLocalDb || !baseInput.spaceMs
+		? _deletePost(await gsdb(), fullPostIdObj, version)
+		: trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version });
 };
 
 export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version: null | number) => {
-	if (fullPostIdObj.in_ms > 0 && !fullPostIdObj.by_ms) throw new Error('Invalid by_ms');
 	let deleteAllVersions = version === null;
-	if (!deleteAllVersions && version! < 0) throw new Error(`Invalid version`);
 	let partsToInsert: PartInsert[] = [];
 
 	let mainPIdWNumAsLastVersionAtPPIdObjsFilter = and(
@@ -41,17 +40,16 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	let postIdAtBumpedRootIdObjsFilter = and(
 		pt.id(fullPostIdObj),
 		pt.code.eq(pc.postIdAtBumpedRootId),
+		pt.num.eq0,
 		pt.txt.isNull,
-		pt.num.isNull,
 	);
 
 	let {
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdObjs = [],
 		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdObjs = [],
 		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPIdObjsToDelete = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]:
-			curPostCoreIdWNumAsVersionAtPIdObjsToDelete = [],
 		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdObjs = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdObjsToDelete = [],
 		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdObjs = [],
 	} = channelPartsByCode(
 		await db
@@ -66,12 +64,12 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						pt.ms.gt0,
 						or(
 							pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-							pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
 							pt.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
+							pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
 							pt.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
 						),
-						pt.txt.isNull,
 						version === null ? undefined : pt.num.eq(version),
+						pt.txt.isNull,
 					),
 				),
 			),
@@ -86,10 +84,13 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 		await moveTagCoreOrRxnCountsBy1(
 			db,
 			curPostTagIdWNumAsVersionAtPIdObjsToDelete,
-			curPostCoreIdWNumAsVersionAtPIdObjsToDelete,
+			curPostCoreIdWNumAsVrsnAtPIdObjsToDelete,
 			[],
 			false,
 		);
+	} else {
+		// Bump up tags from previous version? What if last version is deleted but already has interactions? Then the last version would be soft deleted. May end up scrapping the idea of deleting individual versions.
+		throw new Error(`cannot delete specific version yet?`);
 	}
 
 	let postIsParent = !!(
@@ -100,8 +101,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 				and(
 					pt.idAsAtId(fullPostIdObj),
 					pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+					pt.num.gte0,
 					pt.txt.isNull,
-					pt.num.isNotNull,
 				),
 			)
 			.limit(1)
@@ -112,7 +113,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 
 	if (deleteAllVersions) {
 		postIsParent &&
-			(await db.update(pTable).set({ num: null }).where(mainPIdWNumAsLastVersionAtPPIdObjsFilter));
+			(await db.update(pTable).set({ num: 0 }).where(mainPIdWNumAsLastVersionAtPPIdObjsFilter));
 		deleteFilters.push(
 			...(postIsParent
 				? []
@@ -121,7 +122,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						and(
 							pt.id(fullPostIdObj), //
 							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-							pt.num.isNotNull,
+							pt.num.gte0,
 						),
 					]),
 			and(
@@ -129,16 +130,16 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 				or(
 					...[
 						pc.currentVersionNumAndMsAtPostId,
-						pc.currentSoftDeletedVersionNumAndMsAtPostId,
 						pc.exVersionNumAndMsAtPostId,
+						pc.currentSoftDeletedVersionNumAndMsAtPostId,
 						pc.exSoftDeletedVersionNumAndMsAtPostId,
 						pc.currentPostTagIdWithNumAsVersionAtPostId,
-						pc.currentPostCoreIdWithNumAsVersionAtPostId,
 						pc.exPostTagIdWithNumAsVersionAtPostId,
+						pc.currentPostCoreIdWithNumAsVersionAtPostId,
 						pc.exPostCoreIdWithNumAsVersionAtPostId,
 					].map((c) => pt.code.eq(c)),
 				),
-				pt.num.isNotNull,
+				pt.num.gte0,
 			),
 		);
 		if (postIdAtBumpedRootIdObj) {
@@ -152,7 +153,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 							pt.atId(postIdAtBumpedRootIdObj),
 							pt.notId(fullPostIdObj),
 							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-							pt.num.isNotNull,
+							pt.num.gte0,
 						),
 					)
 					.orderBy(pt.ms.desc)
@@ -167,22 +168,23 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 								...getAtIdObjAsIdObj(postIdAtBumpedRootIdObj),
 							}),
 					code: pc.postIdAtBumpedRootId,
+					num: 0,
 				});
 		}
 	} else {
 		// TODO: delete specific version
-		throw new Error(`cannot delete specific version yet`);
+		throw new Error(`cannot delete specific version yet?`);
 	}
 
 	let checkForNum0Tags =
 		curPostTagIdWNumAsVersionAtPIdObjsToDelete.length ||
 		exPostTagIdWithNumAsVersionAtPostIdObjs.length;
 	let checkForNum0Cores =
-		curPostCoreIdWNumAsVersionAtPIdObjsToDelete.length ||
+		curPostCoreIdWNumAsVrsnAtPIdObjsToDelete.length ||
 		exPostCoreIdWithNumAsVersionAtPostIdObjs.length;
 	let {
-		[pc.tagIdAndTxtWithNumAsCount]: num0tagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreIdAndTxtWithNumAsCount]: num0coreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: num0tagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreId8AndTxtWithNumAsCount]: num0coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
 		checkForNum0Tags || checkForNum0Cores
 			? await db
@@ -200,9 +202,9 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 												...exPostTagIdWithNumAsVersionAtPostIdObjs,
 											]).map((r) => pt.id(r)),
 										),
-										pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-										pt.txt.isNotNull,
+										pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
 										pt.num.eq0,
+										pt.txt.isNotNull,
 									)
 								: undefined,
 							checkForNum0Cores
@@ -211,13 +213,13 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 										pt.ms.gt0,
 										or(
 											...makePartsUniqueById([
-												...curPostCoreIdWNumAsVersionAtPIdObjsToDelete,
+												...curPostCoreIdWNumAsVrsnAtPIdObjsToDelete,
 												...exPostCoreIdWithNumAsVersionAtPostIdObjs,
 											]).map((r) => pt.id(r)),
 										),
-										pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
-										pt.txt.isNotNull,
+										pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
 										pt.num.eq0,
+										pt.txt.isNotNull,
 									)
 								: undefined,
 						),

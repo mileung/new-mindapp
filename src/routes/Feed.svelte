@@ -11,10 +11,10 @@
 		getAtIdStr,
 		getIdStr,
 		getIdStrAsIdObj,
+		id0,
 		idsRegex,
 		isIdStr,
 		isTemplateId,
-		zeros,
 		type FullIdObj,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
@@ -120,6 +120,7 @@
 				) {
 					e.preventDefault();
 					clearTimeout(countDownTimer);
+					resetBottomOverlay();
 					gs.writingNew = true;
 				}
 			}
@@ -148,9 +149,8 @@
 
 	$effect(() => {
 		identifier;
-		console.log('yup');
 		postIdStrFeed = [];
-		postAtBumpedPostsIdObjsExclude = [];
+		postAtBumpedPostsIdObjsExclude = undefined;
 		endReached = false;
 	});
 	let loadMorePosts = async (e: InfiniteEvent) => {
@@ -174,8 +174,6 @@
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
 
 		let baseQueryParams: GetPostFeedQuery = {
-			useRpc: !inLocal,
-			callerMs: gs.accounts[0].ms,
 			view,
 			sortedBy,
 			postAtBumpedPostsIdObjsExclude,
@@ -259,7 +257,7 @@
 			}
 			if (hasParent(post)) {
 				let strAtId = getAtIdStr(post);
-				if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...zeros, history: {} };
+				if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...id0, history: {} };
 				gs.idToPostMap[strAtId].subIds = [
 					...new Set([...(gs.idToPostMap[strAtId]?.subIds || []), id]),
 				];
@@ -312,10 +310,10 @@
 			// if (inLocal) {
 			// 	Number.isInteger(post.in_ms) ? updateInCloud() : (post.tags = await editPost(post, false));
 			// } else updateInCloud();
-			post.history![newLastVersion]!.ms = (await editPost(post, !inLocal)).ms;
+			post.history![newLastVersion]!.ms = (await editPost(post)).ms;
 		} else {
 			post = {
-				...zeros,
+				...id0,
 				...(gs.writingTo
 					? {
 							at_ms: gs.writingTo.ms,
@@ -326,7 +324,7 @@
 				by_ms: gs.accounts[0].ms,
 				in_ms: gs.currentSpaceMs!,
 				history: {
-					0: {
+					1: {
 						ms: 0,
 						tags: normalizeTags(tags),
 						core,
@@ -335,10 +333,10 @@
 			};
 			try {
 				// TODO: fetch cited posts if not already in feed
-				post.ms = (await addPost(post, !inLocal)).ms;
-				post.history![0]!.ms = post.ms;
+				post.ms = (await addPost(post)).ms;
+				post.history![1]!.ms = post.ms;
 				post.subIds = [];
-				if (!inLocal) await addPost(post, false);
+				if (!inLocal) await addPost(post, true);
 			} catch (error) {
 				console.log(error);
 				return alert(error);

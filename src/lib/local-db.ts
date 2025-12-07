@@ -23,13 +23,12 @@ export async function initLocalDb() {
 				by_ms INTEGER NOT NULL,
 				in_ms INTEGER NOT NULL,
 				code INTEGER NOT NULL,
-				txt TEXT,
 				num REAL,
-				PRIMARY KEY (at_ms, at_by_ms, at_in_ms, ms, by_ms, in_ms, code)
+				txt TEXT,
+				PRIMARY KEY (at_ms, at_by_ms, at_in_ms, ms, by_ms, in_ms, code, num)
 			);
 
 			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
-			CREATE INDEX IF NOT EXISTS num_idx ON parts(num);
 	`;
 	} catch (error) {
 		console.log('error:', error);

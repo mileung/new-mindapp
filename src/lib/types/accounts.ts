@@ -102,8 +102,8 @@ export let _getEmailRow = async (db: Database, email: string) => {
 		pt.by_ms.eq0,
 		pt.in_ms.eq0,
 		pt.code.eq(pc.txtAsAccountEmailAtAccountId),
+		pt.num.eq0,
 		pt.txt.eq(email),
-		pt.num.isNull,
 	);
 	let emailRows = await db.select().from(pTable).where(emailRowsFilter);
 	return assertLt2Rows(emailRows);
@@ -133,8 +133,8 @@ export let _getMyAccount = async (db: Database, ms: number, email: string) => {
 					pt.by_ms.eq0,
 					pt.in_ms.eq0,
 					pt.code.eq(pc.txtAsAccountEmailAtAccountId),
+					pt.num.eq0,
 					pt.txt.eq(email),
-					pt.num.isNull,
 				),
 				and(
 					pt.at_ms.eq(ms),
@@ -171,6 +171,6 @@ export let filterAccountPwHashRow = (accountMs: number) =>
 		pt.by_ms.eq0,
 		pt.in_ms.eq0,
 		pt.code.eq(pc.txtAsAccountPwHashAtAccountId),
+		pt.num.eq0,
 		pt.txt.isNotNull,
-		pt.num.isNull,
 	);

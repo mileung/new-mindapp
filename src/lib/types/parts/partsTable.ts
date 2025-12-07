@@ -10,8 +10,8 @@ export let pTable = sqliteTable(
 		by_ms: integer('by_ms').notNull(),
 		in_ms: integer('in_ms').notNull(),
 		code: integer('code').notNull(),
+		num: real('num').notNull(),
 		txt: text('txt'),
-		num: real('num'),
 	},
 	(table) => [
 		primaryKey({
@@ -23,9 +23,9 @@ export let pTable = sqliteTable(
 				table.by_ms,
 				table.in_ms,
 				table.code,
+				table.num,
 			],
 		}),
 		index('txt_idx').on(table.txt),
-		index('num_idx').on(table.num),
 	],
 );

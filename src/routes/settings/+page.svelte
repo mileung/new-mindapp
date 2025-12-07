@@ -2,7 +2,7 @@
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/global-state.svelte';
-	import { identikana, randomInt as ranInt } from '$lib/js';
+	import { identikana, ranInt } from '$lib/js';
 	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
@@ -11,7 +11,7 @@
 	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pt } from '$lib/types/parts/partFilters';
-	import { getIdObjAsAtIdObj, getIdStr, zeros } from '$lib/types/parts/partIds';
+	import { getIdObjAsAtIdObj, getIdStr, id0 } from '$lib/types/parts/partIds';
 	import { pTable } from '$lib/types/parts/partsTable';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
@@ -120,8 +120,8 @@
 									by_ms: r.by_ms,
 									in_ms: r.in_ms,
 									code: r.code,
+									num: r.num,
 									txt: r.txt === null ? undefined : r.txt,
-									num: r.num === null ? undefined : r.num,
 								}) satisfies PartInsert,
 						),
 					}),
@@ -253,12 +253,12 @@
 						tags.push(testTags[tagIndex]);
 					}
 					posts.push({
-						...getIdObjAsAtIdObj(posts[ranInt(0, i * 2)] || zeros),
+						...getIdObjAsAtIdObj(posts[ranInt(0, i * 2)] || id0),
 						ms,
 						by_ms: 0,
 						in_ms: 0,
 						history: {
-							'0': {
+							'1': {
 								ms,
 								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
 								tags,

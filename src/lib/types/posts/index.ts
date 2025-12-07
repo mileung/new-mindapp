@@ -1,10 +1,10 @@
 import type { Database } from '$lib/local-db';
 import { and, or, SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { type PartInsert, type PartSelect } from '../parts';
+import { idObjMatchesIdObj, type PartInsert, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
-import { idsRegex, zeros, type IdObj } from '../parts/partIds';
+import { idsRegex, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import type { Reaction } from '../reactions';
 import { reactionList } from '../reactions/reactionList';
@@ -45,7 +45,10 @@ export let PostSchema = z
 
 		history: z
 			.record(
-				z.number().gte(0).or(z.string().regex(/^\d+$/)),
+				z
+					.number()
+					.gt(0)
+					.or(z.string().regex(/^[1-9]\d*$/)),
 				HistoryLayerSchema.optional(), // undefined history layer means hasn't been loaded
 			)
 			.nullable() // null history means soft deleted post
@@ -77,45 +80,9 @@ export let PostSchema = z
 export type Post = z.infer<typeof PostSchema>;
 
 export let getLastVersion = (p: Post) =>
-	p.history && Math.max(...Object.keys(p.history).map((k) => +k));
+	p.history ? Math.max(...Object.keys(p.history).map((k) => +k)) : 0;
 
 export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
-
-
-
-export let addNewTagOrCoreRows = (
-	mainPart: IdObj,
-	tagOrCoresFromAllLayers: string[],
-	existingTagOrCoreTxtRows: PartSelect[],
-	isTag: boolean,
-	partsToInsert: PartInsert[],
-) => {
-	let tagOrCoreTxtToRowMap: Record<string, PartInsert> = {};
-	for (let i = 0; i < existingTagOrCoreTxtRows.length; i++) {
-		let tagOrCoreRow = existingTagOrCoreTxtRows[i];
-		tagOrCoreTxtToRowMap[tagOrCoreRow.txt!] = tagOrCoreRow;
-	}
-	let newRowsCount = 0;
-	let code = isTag ? pc.tagIdAndTxtWithNumAsCount : pc.coreIdAndTxtWithNumAsCount;
-	for (let i = 0; i < tagOrCoresFromAllLayers.length; i++) {
-		let tagOrCore = tagOrCoresFromAllLayers[i];
-		let tagOrCoreRow = tagOrCoreTxtToRowMap[tagOrCore];
-		if (!tagOrCoreRow) {
-			tagOrCoreRow = {
-				...zeros,
-				ms: mainPart.ms + newRowsCount++,
-				by_ms: mainPart.by_ms,
-				in_ms: mainPart.in_ms,
-				code,
-				txt: tagOrCore,
-				num: 1,
-			};
-			tagOrCoreTxtToRowMap[tagOrCore] = tagOrCoreRow;
-			partsToInsert.push(tagOrCoreRow);
-		}
-	}
-	return tagOrCoreTxtToRowMap;
-};
 
 export let moveTagCoreOrRxnCountsBy1 = async (
 	db: Database,
@@ -124,7 +91,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 	rxns: Reaction[],
 	increment: boolean,
 ) =>
-	(tagIdObjs.length || coreIdObjs.length) &&
+	(tagIdObjs.length || coreIdObjs.length || rxns.length) &&
 	(await db
 		.update(pTable)
 		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
@@ -136,9 +103,9 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 							pt.at_by_ms.eq0,
 							pt.at_in_ms.eq0,
 							or(...tagIdObjs.map((tagIdObj) => pt.id(tagIdObj))),
-							pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+							pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
+							pt.num.gte0,
 							pt.txt.isNotNull,
-							pt.num.isNotNull,
 						)
 					: undefined,
 				coreIdObjs.length
@@ -147,9 +114,9 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 							pt.at_by_ms.eq0,
 							pt.at_in_ms.eq0,
 							or(...coreIdObjs.map((coreIdObj) => pt.id(coreIdObj))),
-							pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
+							pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
+							pt.num.gte0,
 							pt.txt.isNotNull,
-							pt.num.isNotNull,
 						)
 					: undefined,
 				rxns.length
@@ -165,7 +132,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 							),
 							pt.ms.gt0,
 							pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-							pt.num.isNotNull,
+							pt.num.gte0,
 						)
 					: undefined,
 			),
@@ -199,8 +166,8 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 												pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
 												pt.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
 											),
+									pt.num.gte0,
 									pt.txt.isNull,
-									pt.num.isNotNull,
 								),
 							)
 							.limit(1)
@@ -210,10 +177,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 		let tagOrCoreTxtRowsToDel = tagOrCoreIdObjs.filter(
 			(rowToPossiblyDelete) =>
 				!postTagOrCoreIdRowsUsing0CountTags.find(
-					(r) =>
-						rowToPossiblyDelete.ms === r?.ms && //
-						rowToPossiblyDelete.by_ms === r?.by_ms &&
-						rowToPossiblyDelete.in_ms === r?.in_ms,
+					(r) => r && idObjMatchesIdObj(rowToPossiblyDelete, r),
 				),
 		);
 		tagOrCoreTxtRowsToDel.length &&
@@ -232,8 +196,8 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 					),
 					pt.code.eq(
 						isTag
-							? pc.tagIdAndTxtWithNumAsCount //
-							: pc.coreIdAndTxtWithNumAsCount,
+							? pc.tagId8AndTxtWithNumAsCount //
+							: pc.coreId8AndTxtWithNumAsCount,
 					),
 					pt.num.eq0,
 				),

@@ -2,17 +2,24 @@ import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import { ReactionSchema, type Reaction } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, assertLt2Rows, channelPartsByCode, type PartInsert } from '../parts';
+import {
+	assert1Row,
+	assertLt2Rows,
+	channelPartsByCode,
+	getBaseInput,
+	type PartInsert,
+} from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import { getFullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let addReaction = async (rxn: Reaction, useRpc: boolean) => {
+export let addReaction = async (rxn: Reaction) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	return useRpc
-		? trpc().addReaction.mutate(rxn) //
+	let baseInput = await getBaseInput();
+	return baseInput.spaceMs
+		? trpc().addReaction.mutate({ ...baseInput, rxn }) //
 		: _addReaction(await gsdb(), rxn);
 };
 
@@ -22,6 +29,7 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 		...getFullIdObj(rxn),
 		ms,
 		code: pc.reactionIdWithEmojiTxtAtPostId,
+		num: 0,
 		txt: rxn.emoji,
 	};
 	let partsToInsert: PartInsert[] = [
@@ -46,14 +54,14 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 					and(
 						pt.atIdAsId(reactionIdWithEmojiTxtAtPostIdObj),
 						pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pt.num.gte0,
 						pt.txt.isNull,
-						pt.num.isNotNull,
 					),
 					and(
 						pt.atId(reactionIdWithEmojiTxtAtPostIdObj),
 						pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+						pt.num.gte0,
 						pt.txt.eq(rxn.emoji),
-						pt.num.isNotNull,
 					),
 				),
 			),
@@ -68,8 +76,8 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 				and(
 					pt.atId(reactionIdWithEmojiTxtAtPostIdObj),
 					pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+					pt.num.gte0,
 					pt.txt.eq(rxn.emoji),
-					pt.num.isNotNull,
 				),
 			),
 	);
@@ -79,8 +87,8 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 		partsToInsert.push({
 			...reactionIdWithEmojiTxtAtPostIdObj,
 			code: pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId,
-			txt: rxn.emoji,
 			num: 1,
+			txt: rxn.emoji,
 		});
 	}
 	await db.insert(pTable).values(partsToInsert);

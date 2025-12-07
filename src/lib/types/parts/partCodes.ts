@@ -10,17 +10,17 @@ export let pc = uniqueMapVals({
 	reactionIdWithEmojiTxtAtPostId: 3,
 
 	currentVersionNumAndMsAtPostId: 10,
-	currentSoftDeletedVersionNumAndMsAtPostId: 11,
-	exVersionNumAndMsAtPostId: 12,
+	exVersionNumAndMsAtPostId: 11,
+	currentSoftDeletedVersionNumAndMsAtPostId: 12,
 	exSoftDeletedVersionNumAndMsAtPostId: 13,
 
 	currentPostTagIdWithNumAsVersionAtPostId: 20,
-	currentPostCoreIdWithNumAsVersionAtPostId: 21,
-	exPostTagIdWithNumAsVersionAtPostId: 22,
+	exPostTagIdWithNumAsVersionAtPostId: 21,
+	currentPostCoreIdWithNumAsVersionAtPostId: 22,
 	exPostCoreIdWithNumAsVersionAtPostId: 23,
 
-	tagIdAndTxtWithNumAsCount: 30,
-	coreIdAndTxtWithNumAsCount: 31,
+	tagId8AndTxtWithNumAsCount: 30,
+	coreId8AndTxtWithNumAsCount: 31,
 	reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId: 32,
 
 	spaceId: 40,

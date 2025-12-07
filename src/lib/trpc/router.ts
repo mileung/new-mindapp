@@ -22,7 +22,7 @@ import {
 } from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
 import { pt } from '$lib/types/parts/partFilters';
-import { FullIdObjSchema, zeros } from '$lib/types/parts/partIds';
+import { FullIdObjSchema, id0, IdObjSchema } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
 import { PostSchema } from '$lib/types/posts';
 import { _addPost } from '$lib/types/posts/addPost';
@@ -32,6 +32,7 @@ import { _getPostFeed, GetPostFeedSchema } from '$lib/types/posts/getPostFeed';
 import { _getPostHistory } from '$lib/types/posts/getPostHistory';
 import { ReactionSchema } from '$lib/types/reactions';
 import { _addReaction } from '$lib/types/reactions/addReaction';
+import { _getReactionHistory } from '$lib/types/reactions/getReactionHistory';
 import { _removeReaction } from '$lib/types/reactions/removeReaction';
 import { setSessionKeyCookie } from '$lib/types/sessions';
 import { _getSpaceAccounts } from '$lib/types/spaces/getSpaceAccounts';
@@ -80,17 +81,17 @@ let assertValidSession = async (ctx: Context, input: BaseInput) => {
 	return true;
 	// let now = Date.now();
 	// let session: undefined | Session;
-	// if (ctx.sessionId && input.by_ms !== null) {
+	// if (ctx.sessionId && input.callerMs !== null) {
 	// 	let sessionRowFilter = and(
-	// 		pt.at_ms.eq(input.by_ms),
+	// 		pt.at_ms.eq(input.callerMs),
 	// 		pt.at_by_ms.eq0,
 	// 		pt.at_in_ms.eq0,
 	// 		pt.ms.gt0,
 	// 		pt.by_ms.eq0,
 	// 		pt.in_ms.eq0,
 	// 		pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+	// 		pt.num.eq0,
 	// 		pt.txt.eq(ctx.sessionId),
-	// 		pt.num.isNull,
 	// 	);
 	// 	let sessionRows = await tdb
 	// 		.select()
@@ -122,8 +123,8 @@ let assertValidSession = async (ctx: Context, input: BaseInput) => {
 	// 						pt.by_ms.eq0,
 	// 						pt.in_ms.eq0,
 	// 						pt.code.eq(pc.msAndTxtAsSessionIdAtAccountId),
+	// 						pt.num.eq0,
 	// 						pt.txt.eq(ctx.sessionId),
-	// 						pt.num.isNull,
 	// 					),
 	// 				);
 	// 		}
@@ -185,6 +186,8 @@ export const router = t.router({
 					!accountRow
 				)
 					throw new Error(m.accountDoesNotExist());
+				if (!input.callerMs) throw new Error('Missing callerMs');
+				if (!input.spaceMs) throw new Error('Missing spaceMs');
 				return _sendOtp(tdb, email, input.partCode);
 			}),
 		checkOtp: baseProcedure
@@ -229,36 +232,41 @@ export const router = t.router({
 					.insert(pTable)
 					.values([
 						{
-							...zeros,
+							...id0,
 							ms,
 							code: pc.accountId,
+							num: 0,
 						},
 						{
-							...zeros,
+							...id0,
 							at_ms: ms,
 							ms,
 							code: pc.txtAsAccountPwHashAtAccountId,
+							num: 0,
 							txt: await argon2.hash(input.password),
 						},
 						{
-							...zeros,
+							...id0,
 							at_ms: ms,
 							ms,
 							code: pc.msAndTxtAsClientIdAtAccountId,
+							num: 0,
 							txt: ctx.clientId,
 						},
 						{
-							...zeros,
+							...id0,
 							at_ms: ms,
 							ms,
 							code: pc.msAndTxtAsNameAtAccountId,
+							num: 0,
 							txt: input.name.trim(),
 						},
 						{
-							...zeros,
+							...id0,
 							at_ms: ms,
 							ms,
 							code: pc.txtAsAccountEmailAtAccountId,
+							num: 0,
 							txt: input.email,
 						},
 					])
@@ -271,10 +279,11 @@ export const router = t.router({
 					let sessionId = makeRandomStr();
 					setSessionKeyCookie(ctx.event, sessionId);
 					await tdb.insert(pTable).values({
-						...zeros,
+						...id0,
 						at_ms: ms,
 						ms,
 						code: pc.msAndTxtAsSessionIdAtAccountId,
+						num: 0,
 						txt: sessionId,
 					});
 				}
@@ -327,9 +336,10 @@ export const router = t.router({
 							await tdb
 								.insert(pTable)
 								.values({
-									...zeros,
+									...id0,
 									ms: Date.now(),
 									code: pc.msAndTxtAsClientIdAtAccountId,
+									num: 0,
 									txt: ctx.clientId,
 								})
 								.returning()
@@ -397,8 +407,8 @@ export const router = t.router({
 		)
 		.query(async ({ ctx, input }) => {
 			assertValidSession(ctx, input);
-			if (!input.by_ms) throw new Error(m.placeholderError());
-			let { account } = await _getMyAccount(tdb, input.by_ms, input.email);
+			if (!input.callerMs) throw new Error(m.placeholderError());
+			let { account } = await _getMyAccount(tdb, input.callerMs, input.email);
 			if (!account.savedTagsMs || account.savedTagsMs === input.savedTagsMs) return;
 			let savedTagsRows = await tdb
 				.select()
@@ -409,7 +419,7 @@ export const router = t.router({
 						pt.at_by_ms.eq0,
 						pt.at_in_ms.eq0,
 						pt.ms.eq0,
-						eq(pTable.by_ms, input.by_ms),
+						eq(pTable.by_ms, input.callerMs),
 						pt.in_ms.eq0,
 						// pf.code.eq(' savedTags'),
 						isNotNull(pTable.txt),
@@ -428,8 +438,7 @@ export const router = t.router({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			if (!input.by_ms) throw new Error(m.placeholderError());
-			assertValidSession(ctx, input);
+			if (!input.callerMs) throw new Error(m.placeholderError());
 			let now = Date.now();
 			// let savedTagsRowFilter = and(
 			// 	pt.at_ms.eq0,
@@ -437,7 +446,7 @@ export const router = t.router({
 			// 	pt.at_in_ms.eq0,
 			// 	pt.ms.eq0,
 			// 	pt.by_ms.eq0,
-			// 	pt.in_ms.eq(input.by_ms),
+			// 	pt.in_ms.eq(input.callerMs),
 			// 	// pf.code.eq(' savedTags'),
 			// 	isNotNull(pTable.txt),
 			// );
@@ -457,45 +466,57 @@ export const router = t.router({
 			// 		txt: JSON.stringify(newSavedTags),
 			// 	})
 			// 	.where(savedTagsRowFilter);
+			if (!input.callerMs) throw new Error('Missing callerMs');
+			// if (!input.spaceMs) throw new Error('Missing spaceMs');
+			assertValidSession(ctx, input);
 			return { savedTagsMs: now };
 		}),
 	addPost: baseProcedure
-		.input(PostSchema) //
-		.mutation(async ({ input: post, ctx }) => {
-			assertValidSession(ctx, post);
+		.input(z.object({ post: PostSchema })) //
+		.mutation(async ({ input, ctx }) => {
+			let { post } = input;
 			if (post.ms) throw new Error('post ms must be 0');
-			if (!post.in_ms) throw new Error('Invalid in_ms');
-			if (!post.by_ms) throw new Error('Invalid by_ms');
-			if (!post.history || Object.keys(post.history).length !== 1 || !post.history['0'])
-				throw new Error('History must have only version 0');
-			if (post.history['0'].ms) throw new Error('history ms must be 0');
+			if (!post.in_ms || post.in_ms !== input.callerMs) throw new Error('Invalid in_ms');
+			if (!post.by_ms || post.by_ms !== input.spaceMs) throw new Error('Invalid by_ms');
+			if (!post.history || Object.keys(post.history).length !== 1 || !post.history['1'])
+				throw new Error('History must have only version 1');
+			if (post.history['1'].ms) throw new Error('history ms must be 1');
+			assertValidSession(ctx, input);
 			return _addPost(tdb, post);
 		}),
-	addReaction: baseProcedure.input(ReactionSchema).mutation(async ({ input: rxn, ctx }) => {
-		assertValidSession(ctx, rxn);
-		if (rxn.ms) throw new Error('rxn ms must be 0');
-		if (!rxn.in_ms) throw new Error('Invalid in_ms');
-		if (!rxn.by_ms) throw new Error('Invalid by_ms');
-		return _addReaction(tdb, rxn);
-	}),
-	removeReaction: baseProcedure.input(ReactionSchema).mutation(async ({ input: rxn, ctx }) => {
-		assertValidSession(ctx, rxn);
-		if (rxn.ms) throw new Error('rxn ms must be 0');
-		if (!rxn.in_ms) throw new Error('Invalid in_ms');
-		if (!rxn.by_ms) throw new Error('Invalid by_ms');
-		return _removeReaction(tdb, rxn);
-	}),
-	editPost: baseProcedure
-		.input(PostSchema) //
+	addReaction: baseProcedure
+		.input(z.object({ rxn: ReactionSchema })) //
 		.mutation(async ({ input, ctx }) => {
+			let { rxn } = input;
+			if (!rxn.in_ms || rxn.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
+			if (!rxn.by_ms || rxn.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			if (rxn.ms) throw new Error('rxn ms must be 0');
 			assertValidSession(ctx, input);
-			return _editPost(tdb, input);
+			return _addReaction(tdb, rxn);
+		}),
+	removeReaction: baseProcedure
+		.input(z.object({ rxn: ReactionSchema })) //
+		.mutation(async ({ input, ctx }) => {
+			let { rxn } = input;
+			if (!rxn.in_ms || rxn.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
+			if (!rxn.by_ms || rxn.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			assertValidSession(ctx, input);
+			return _removeReaction(tdb, rxn);
+		}),
+	editPost: baseProcedure
+		.input(z.object({ post: PostSchema })) //
+		.mutation(async ({ input, ctx }) => {
+			let { post } = input;
+			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
+			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			assertValidSession(ctx, input);
+			return _editPost(tdb, post);
 		}),
 	deletePost: baseProcedure
 		.input(
 			z.object({
 				fullPostIdObj: FullIdObjSchema,
-				version: z.number().nullable(),
+				version: z.number().gte(0).nullable(),
 			}),
 		)
 		.mutation(
@@ -503,8 +524,11 @@ export const router = t.router({
 				input,
 				ctx, //
 			}) => {
+				let { fullPostIdObj, callerMs, spaceMs } = input;
+				if (!callerMs || fullPostIdObj.by_ms !== callerMs) throw new Error('Invalid callerMs');
+				if (!spaceMs || fullPostIdObj.in_ms !== spaceMs) throw new Error('Invalid callerMs');
 				assertValidSession(ctx, input);
-				return _deletePost(tdb, input.fullPostIdObj, input.version);
+				return _deletePost(tdb, fullPostIdObj, input.version);
 			},
 		),
 	getPostFeed: baseProcedure.input(GetPostFeedSchema).query(async ({ input, ctx }) => {
@@ -513,6 +537,8 @@ export const router = t.router({
 
 		// TODO do most of if not all the security checks here
 
+		// if (!input.callerMs) throw new Error('Missing callerMs');
+		if (!input.spaceMs) throw new Error('Missing spaceMs');
 		assertValidSession(ctx, input);
 		return _getPostFeed(tdb, input);
 	}),
@@ -524,8 +550,27 @@ export const router = t.router({
 			}),
 		)
 		.query(async ({ ctx, input }) => {
+			if (!input.spaceMs) throw new Error('Invalid by_ms');
 			assertValidSession(ctx, input);
+			// TODO: post in_ms is in calllerMs' spaces
 			return _getPostHistory(tdb, input.fullPostId, input.version);
+		}),
+	getReactionHistory: baseProcedure
+		.input(
+			z.object({
+				postIdObj: IdObjSchema,
+				fromMs: z.number(),
+				rxnIdObjsExclude: z.array(IdObjSchema),
+			}),
+		)
+		.query(async ({ input, ctx }) => {
+			let { postIdObj } = input;
+			if (postIdObj.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
+			if (!input.spaceMs || postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			// if (!input.callerMs) throw new Error('Missing callerMs');
+			assertValidSession(ctx, input);
+			// TODO: post in_ms is in calllerMs' spaces
+			return _getReactionHistory(tdb, input);
 		}),
 	getSpaceTags: baseProcedure
 		.input(
@@ -535,6 +580,8 @@ export const router = t.router({
 			}),
 		)
 		.query(async ({ input, ctx }) => {
+			// if (!input.callerMs) throw new Error('Missing callerMs');
+			if (!input.spaceMs) throw new Error('Missing spaceMs');
 			assertValidSession(ctx, input);
 			return _getSpaceTags(tdb, input);
 		}),
@@ -545,6 +592,8 @@ export const router = t.router({
 			}),
 		)
 		.query(async ({ input, ctx }) => {
+			if (!input.callerMs) throw new Error('Missing callerMs');
+			if (!input.spaceMs) throw new Error('Missing spaceMs');
 			assertValidSession(ctx, input);
 			return _getSpaceAccounts(tdb, input);
 		}),

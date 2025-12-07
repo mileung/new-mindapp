@@ -1,218 +1,331 @@
+import { ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, eq, or } from 'drizzle-orm';
-import { getLastVersion, moveTagCoreOrRxnCountsBy1, normalizeTags, PostSchema, type Post } from '.';
+import { getLastVersion, moveTagCoreOrRxnCountsBy1, PostSchema, type Post } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, type PartInsert, type PartSelect } from '../parts';
+import {
+	assert1Row,
+	assertLt2Rows,
+	channelPartsByCode,
+	getBaseInput,
+	idObjMatchesIdObj,
+	type PartInsert,
+	type PartSelect,
+} from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
-import { getIdStr, zeros } from '../parts/partIds';
+import { getIdObjAsAtIdObj, getIdStr, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let editPost = async (post: Post, useRpc: boolean) => {
+export let editPost = async (post: Post, forceUsingLocalDb?: boolean) => {
 	let parsedPost = PostSchema.safeParse(post);
-	if (!parsedPost.success) throw new Error(`Invalid post`);
-	return useRpc
-		? trpc().editPost.mutate(parsedPost.data)
-		: _editPost(await gsdb(), parsedPost.data);
+	if (!parsedPost.success) {
+		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
+		throw new Error(`Invalid post`);
+	}
+	let baseInput = await getBaseInput();
+	return forceUsingLocalDb || !baseInput.spaceMs
+		? _editPost(await gsdb(), parsedPost.data)
+		: trpc().editPost.mutate({ ...baseInput, post: parsedPost.data });
 };
 
 export let _editPost = async (db: Database, post: Post) => {
 	let newLastVersion = getLastVersion(post);
-	if (newLastVersion === null) throw new Error(`Cannot edit deleted posts`);
+	if (!newLastVersion) throw new Error(`Cannot edit deleted posts`);
 	if (newLastVersion <= 0) throw new Error('newLastVersion must be gt0');
-	if (post.in_ms > 0 && !post.by_ms) throw new Error('Invalid by_ms');
-	if (!post.ms) throw new Error('Missing ms');
-	let currentLastVersion = newLastVersion - 1;
+	let curLastVersion = newLastVersion - 1;
 
-	let postPartFilter = and(
+	let mainPIdWNumAsLastVersionAtPPIdObjsFilter = and(
 		pt.atId(post),
 		pt.id(post),
 		pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+		pt.num.gte0,
 		pt.txt.isNull,
-		pt.num.isNotNull,
 	);
 
-	let currentPostPartAndSubParts = await db
-		.select()
-		.from(pTable)
-		.where(
-			or(
-				postPartFilter,
-				and(
-					pt.idAsAtId(post),
-					or(
-						...[
-							pc.currentPostTagIdWithNumAsVersionAtPostId,
-							pc.currentPostCoreIdWithNumAsVersionAtPostId,
-						].map((code) => pt.code.eq(code)),
+	let {
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
+		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVrsnAtPIdObjs = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdObjs = [],
+	} = channelPartsByCode(
+		await db
+			.select()
+			.from(pTable)
+			.where(
+				or(
+					mainPIdWNumAsLastVersionAtPPIdObjsFilter,
+					and(
+						pt.idAsAtId(post),
+						or(
+							...[
+								pc.currentPostTagIdWithNumAsVersionAtPostId,
+								pc.currentPostCoreIdWithNumAsVersionAtPostId,
+							].map((code) => pt.code.eq(code)),
+						),
+						eq(pTable.num, curLastVersion),
 					),
-					eq(pTable.num, currentLastVersion),
 				),
 			),
-		);
-	let postPartRows: PartSelect[] = [];
-	let currentTagIdRows: PartSelect[] = [];
-	let currentPostCoreRows: PartSelect[] = [];
-	for (let i = 0; i < currentPostPartAndSubParts.length; i++) {
-		let part = currentPostPartAndSubParts[i];
-		if (part.code === pc.currentPostTagIdWithNumAsVersionAtPostId) {
-			if (part.ms) {
-				currentTagIdRows.push(part);
-			}
-		} else if (part.code === pc.currentPostCoreIdWithNumAsVersionAtPostId) {
-			currentPostCoreRows.push(part);
-		} else if (part.code === pc.postIdWithNumAsLastVersionAtParentPostId) {
-			postPartRows.push(part);
-		}
-	}
+	);
 
-	let postPart = assert1Row(postPartRows);
-	if (postPart.num === null) throw new Error('Cannot edit deleted posts');
+	let mainPIdWNumAsLastVersionAtPPIdObj = assert1Row(postIdWNumAsLastVersionAtPPostIdObjs);
+	if (!mainPIdWNumAsLastVersionAtPPIdObj.num) throw new Error('Cannot edit deleted posts');
 	// TODO: what do if trying to edit post in cloud space from local space
 	// and the last versions don't match?
-	if (postPart.num !== currentLastVersion) throw new Error(`Invalid newLastVersion`);
+	if (mainPIdWNumAsLastVersionAtPPIdObj.num > curLastVersion)
+		throw new Error(`Post edit history out of sync`);
+	if (mainPIdWNumAsLastVersionAtPPIdObj.num !== curLastVersion)
+		throw new Error(`Invalid newLastVersion`);
+
 	let ms = Date.now();
-	let partsToInsert: PartInsert[] = [];
+	let partsToInsert: PartInsert[] = [
+		{
+			...id0,
+			...getIdObjAsAtIdObj(post),
+			ms,
+			code: pc.currentVersionNumAndMsAtPostId,
+			num: newLastVersion,
+		},
+	];
+	let newPostTagStrs = post.history![newLastVersion]!.tags || [];
+	let newPostCoreStr = (post.history![newLastVersion]!.core || '').trim();
+	assertLt2Rows(curPostCoreIdWNumAsVrsnAtPIdObjs);
 
-	let newPostTags = normalizeTags(post.history![newLastVersion]!.tags || []);
-
-	let tagTxtRows =
-		currentTagIdRows.length || newPostTags.length
+	let {
+		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountObjs = [],
+	} = channelPartsByCode(
+		curPostTagIdWNumAsVrsnAtPIdObjs.length ||
+			newPostTagStrs.length ||
+			curPostCoreIdWNumAsVrsnAtPIdObjs.length ||
+			newPostCoreStr
 			? await db
 					.select()
 					.from(pTable)
 					.where(
-						and(
-							pt.at_ms.eq0,
-							pt.at_by_ms.eq0,
-							pt.at_in_ms.eq0,
-							pt.ms.gt0,
-							pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-							or(...currentTagIdRows.map((r) => pt.id(r)), ...newPostTags.map((t) => pt.txt.eq(t))),
-							pt.num.isNotNull,
+						or(
+							and(
+								pt.noParent,
+								or(
+									...curPostTagIdWNumAsVrsnAtPIdObjs.map((r) => pt.id(r)),
+									...newPostTagStrs.map((t) => pt.txt.eq(t)),
+								),
+								pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pt.num.gte0,
+							),
+							and(
+								pt.noParent,
+								or(
+									...curPostCoreIdWNumAsVrsnAtPIdObjs.map((cio) => pt.id(cio)),
+									pt.txt.eq(newPostCoreStr),
+								),
+								pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pt.num.gte0,
+							),
 						),
 					)
-			: [];
+			: [],
+	);
 
-	let tagTxtToRowMap: Record<string, undefined | PartInsert> = {};
-	let tagIdToTxtMap: Record<string, string> = {};
-	for (let i = 0; i < tagTxtRows.length; i++) {
-		let tagTxtRow = tagTxtRows[i];
-		tagTxtToRowMap[tagTxtRow.txt!] = tagTxtRow;
-		tagIdToTxtMap[getIdStr(tagTxtRow)] = tagTxtRow.txt!;
+	let {
+		txtToTagOrCoreIdAndTxtWNumAsCtObjMap: txtToTagIdAndTxtWNumAsCtObjMap,
+		tagOrCoresChanged: tagsChanged,
+		tagOrCoreTxtRowsToIncrementCountBy1: tagTxtRowsToIncrementCountBy1,
+		removedTagOrCoreStrs: removedTags,
+	} = processStuff(
+		ms,
+		newLastVersion,
+		mainPIdWNumAsLastVersionAtPPIdObj,
+		newPostTagStrs,
+		existingTagIdAndTxtWithNumAsCountObjs,
+		curPostTagIdWNumAsVrsnAtPIdObjs,
+		true,
+		partsToInsert,
+	);
+
+	let {
+		txtToTagOrCoreIdAndTxtWNumAsCtObjMap: txtToCoreIdAndTxtWNumAsCtObjMap,
+		tagOrCoresChanged: coreChanged,
+		tagOrCoreTxtRowsToIncrementCountBy1: coreTxtRowsToIncrementCountBy1,
+		removedTagOrCoreStrs: removedCores,
+	} = processStuff(
+		ms,
+		newLastVersion,
+		mainPIdWNumAsLastVersionAtPPIdObj,
+		newPostCoreStr ? [newPostCoreStr] : [],
+		existingCoreIdAndTxtWithNumAsCountObjs,
+		curPostCoreIdWNumAsVrsnAtPIdObjs,
+		false,
+		partsToInsert,
+	);
+
+	// console.log('txtToCoreIdAndTxtWNumAsCtObjMap:', txtToCoreIdAndTxtWNumAsCtObjMap);
+	// console.log('coreChanged:', coreChanged);
+	// console.log('coreTxtRowsToIncrementCountBy1:', coreTxtRowsToIncrementCountBy1);
+	// console.log('removedCores:', removedCores);
+
+	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
+
+	await moveTagCoreOrRxnCountsBy1(
+		db,
+		tagTxtRowsToIncrementCountBy1,
+		coreTxtRowsToIncrementCountBy1,
+		[],
+		true,
+	);
+
+	let tagTxtRowsToDecrementCountBy1: PartInsert[] = [];
+	for (let i = 0; i < removedTags.length; i++) {
+		let tagTxtRow = txtToTagIdAndTxtWNumAsCtObjMap[removedTags[i]];
+		if (tagTxtRow) tagTxtRowsToDecrementCountBy1.push(tagTxtRow);
+	}
+	let coreTxtRowsToDecrementCountBy1: PartInsert[] = [];
+	for (let i = 0; i < removedCores.length; i++) {
+		let coreTxtRow = txtToCoreIdAndTxtWNumAsCtObjMap[removedCores[i]];
+		if (coreTxtRow) coreTxtRowsToDecrementCountBy1.push(coreTxtRow);
 	}
 
-	let tagTxtRowsToIncrementCountBy1: PartInsert[] = [];
-	let newTagsCount = 0;
-	for (let i = 0; i < newPostTags.length; i++) {
-		let tag = newPostTags[i];
-		let tagTxtRow = tagTxtToRowMap[tag];
+	await moveTagCoreOrRxnCountsBy1(
+		db,
+		tagTxtRowsToDecrementCountBy1,
+		coreTxtRowsToDecrementCountBy1,
+		[],
+		false,
+	);
+	await db
+		.update(pTable)
+		.set({ code: pc.exPostTagIdWithNumAsVersionAtPostId })
+		.where(
+			and(
+				pt.idAsAtId(mainPIdWNumAsLastVersionAtPPIdObj),
+				pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+				pt.txt.isNull,
+				eq(pTable.num, curLastVersion),
+			),
+		);
+	await db
+		.update(pTable)
+		.set({ code: pc.exPostCoreIdWithNumAsVersionAtPostId })
+		.where(
+			and(
+				pt.idAsAtId(mainPIdWNumAsLastVersionAtPPIdObj),
+				pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+				eq(pTable.num, curLastVersion),
+			),
+		);
+	await db
+		.update(pTable)
+		.set({ num: newLastVersion })
+		.where(mainPIdWNumAsLastVersionAtPPIdObjsFilter);
+	await db
+		.update(pTable)
+		.set({ code: pc.exVersionNumAndMsAtPostId })
+		.where(
+			and(
+				pt.idAsAtId(post),
+				pt.ms.gt0,
+				pt.by_ms.eq0,
+				pt.in_ms.eq0,
+				pt.code.eq(pc.currentVersionNumAndMsAtPostId),
+				pt.num.eq(curLastVersion),
+				pt.txt.isNull,
+			),
+		);
+
+	// partsToInsert.push({
+	// 	at_ms: mainPIdWNumAsLastVersionAtPPIdObj.ms,
+	// 	at_by_ms: mainPIdWNumAsLastVersionAtPPIdObj.by_ms,
+	// 	at_in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
+	// 	...(coreChanged
+	// 		? {
+	// 				ms,
+	// 				by_ms: ranInt(8, 88888888),
+	// 				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
+	// 			}
+	// 		: {
+	// 				ms: curPostCoreIdWNumAsVrsnAtPIdObj.ms,
+	// 				by_ms: curPostCoreIdWNumAsVrsnAtPIdObj.by_ms,
+	// 				in_ms: curPostCoreIdWNumAsVrsnAtPIdObj.in_ms,
+	// 			}),
+	// 	code: pc.currentPostCoreIdWithNumAsVersionAtPostId,
+	// 	txt: newPostCore,
+	// 	num: newLastVersion,
+	// });
+
+	await db.insert(pTable).values(partsToInsert);
+
+	return { ms };
+};
+
+let processStuff = (
+	ms: number,
+	newLastVersion: number,
+	mainPIdWNumAsLastVersionAtPPIdObj: IdObj,
+	newPostTagOrCoreStrs: string[],
+	existingTagOrCoreTxtObjs: PartSelect[],
+	curPostTagOrCoreIdWNumAsVersionAtPIdObjs: PartSelect[],
+	isTag: boolean,
+	partsToInsert: PartInsert[],
+) => {
+	let txtToTagOrCoreIdAndTxtWNumAsCtObjMap: Record<string, undefined | PartInsert> = {};
+	let tagIdToTxtMap: Record<string, string> = {};
+	for (let i = 0; i < existingTagOrCoreTxtObjs.length; i++) {
+		let tagIdAndTxtWNumAsCtObj = existingTagOrCoreTxtObjs[i];
+		txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tagIdAndTxtWNumAsCtObj.txt!] = tagIdAndTxtWNumAsCtObj;
+		tagIdToTxtMap[getIdStr(tagIdAndTxtWNumAsCtObj)] = tagIdAndTxtWNumAsCtObj.txt!;
+	}
+	let tagOrCoreTxtRowsToIncrementCountBy1: PartInsert[] = [];
+	let newTagOrCoresCount = 0;
+	for (let i = 0; i < newPostTagOrCoreStrs.length; i++) {
+		let tag = newPostTagOrCoreStrs[i];
+		let tagTxtRow = txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tag];
 		if (tagTxtRow) {
 			if (
-				!currentTagIdRows.find(
-					(r) =>
-						r.ms === tagTxtRow!.ms && //
-						r.by_ms === tagTxtRow!.by_ms &&
-						r.in_ms === tagTxtRow!.in_ms,
+				!curPostTagOrCoreIdWNumAsVersionAtPIdObjs.find((curPostTagIdWNumAsVersionAtPIdObj) =>
+					idObjMatchesIdObj(curPostTagIdWNumAsVersionAtPIdObj, tagTxtRow!),
 				)
-			) {
-				tagTxtRowsToIncrementCountBy1.push(tagTxtRow);
-			}
+			)
+				tagOrCoreTxtRowsToIncrementCountBy1.push(tagTxtRow);
 		} else {
 			tagTxtRow = {
-				...zeros,
-				ms: ms + newTagsCount++,
-				by_ms: post.by_ms, // TODO: Multiple tagTxtRows can share the same id if the same user in the same space adds a lot (hundreds+) of the same tags at the same time. How to deal with this? Ok to ignore as this is unusual behavior and shouldn't break anything - just posts will have duplicate tags. Could bump tagTxtRow ms bxy randomInt but idk
-				in_ms: post.in_ms,
-				code: pc.tagIdAndTxtWithNumAsCount,
+				...id0,
+				ms: ms + newTagOrCoresCount++,
+				by_ms: ranInt(8, 88888888),
+				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
+				code: isTag ? pc.tagId8AndTxtWithNumAsCount : pc.coreId8AndTxtWithNumAsCount,
 				txt: tag,
 				num: 1,
 			};
 			partsToInsert.push(tagTxtRow);
 		}
 		partsToInsert.push({
-			at_ms: postPart.ms,
-			at_by_ms: postPart.by_ms,
-			at_in_ms: postPart.in_ms,
+			at_ms: mainPIdWNumAsLastVersionAtPPIdObj.ms,
+			at_by_ms: mainPIdWNumAsLastVersionAtPPIdObj.by_ms,
+			at_in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
 			ms: tagTxtRow.ms,
 			by_ms: tagTxtRow.by_ms,
 			in_ms: tagTxtRow.in_ms,
-			code: pc.currentPostTagIdWithNumAsVersionAtPostId,
+			code: isTag
+				? pc.currentPostTagIdWithNumAsVersionAtPostId
+				: pc.currentPostCoreIdWithNumAsVersionAtPostId,
 			num: newLastVersion,
 		});
 	}
 
-	!newPostTags.length &&
-		partsToInsert.push({
-			...zeros,
-			at_ms: postPart.ms,
-			at_by_ms: postPart.by_ms,
-			at_in_ms: postPart.in_ms,
-			code: pc.currentPostTagIdWithNumAsVersionAtPostId,
-			num: newLastVersion,
-		});
+	let curPostTagStrs = curPostTagOrCoreIdWNumAsVersionAtPIdObjs.map(
+		(curPostTagOrCoreIdWNumAsVersionAtPIdObj) =>
+			tagIdToTxtMap[getIdStr(curPostTagOrCoreIdWNumAsVersionAtPIdObj)],
+	);
+	let removedTagOrCoreStrs = curPostTagStrs.filter((t) => !newPostTagOrCoreStrs.includes(t));
+	let tagOrCoresChanged =
+		!!newTagOrCoresCount ||
+		!!tagOrCoreTxtRowsToIncrementCountBy1.length ||
+		!!removedTagOrCoreStrs.length;
 
-	let currentPostTags = currentTagIdRows.map((r) => tagIdToTxtMap[getIdStr(r)]);
-	let removedTags = currentPostTags.filter((t) => !newPostTags.includes(t));
-
-	let tagsChanged =
-		!!newTagsCount || !!tagTxtRowsToIncrementCountBy1.length || !!removedTags.length;
-	let currentPostCoreRow = assert1Row(currentPostCoreRows);
-	let newPostCore = (post.history![newLastVersion]!.core || '').trim();
-	let coreChanged = currentPostCoreRow?.txt !== newPostCore;
-
-	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
-
-	await moveTagCoreOrRxnCountsBy1(db, tagTxtRowsToIncrementCountBy1);
-
-	await db
-		.update(pTable)
-		.set({ code: pc.exPostTagIdWithNumAsVersionAtPostId })
-		.where(
-			and(
-				pt.idAsAtId(postPart),
-				pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-				pt.txt.isNull,
-				eq(pTable.num, currentLastVersion),
-			),
-		);
-
-	await db
-		.update(pTable)
-		.set({ code: pc.exPostCoreIdWithNumAsVersionAtPostId })
-		.where(
-			and(
-				pt.idAsAtId(postPart),
-				pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
-				eq(pTable.num, currentLastVersion),
-			),
-		);
-
-	partsToInsert.push({
-		...zeros,
-		at_ms: postPart.ms,
-		at_by_ms: postPart.by_ms,
-		at_in_ms: postPart.in_ms,
-		ms,
-		code: pc.currentPostCoreIdWithNumAsVersionAtPostId,
-		txt: newPostCore,
-		num: newLastVersion,
-	});
-
-	await db.update(pTable).set({ num: newLastVersion }).where(postPartFilter);
-	await db.insert(pTable).values(partsToInsert);
-
-	if (removedTags.length) {
-		let tagTxtRowsToDecrementCountBy1: PartInsert[] = [];
-		for (let i = 0; i < removedTags.length; i++) {
-			let tag = removedTags[i];
-			let tagTxtRow = tagTxtToRowMap[tag];
-			if (tagTxtRow) {
-				tagTxtRowsToDecrementCountBy1.push(tagTxtRow);
-			}
-		}
-		await moveTagCoreOrRxnCountsBy1(db, tagTxtRowsToDecrementCountBy1, false);
-	}
-
-	return { ms };
+	return {
+		txtToTagOrCoreIdAndTxtWNumAsCtObjMap,
+		tagOrCoresChanged,
+		tagOrCoreTxtRowsToIncrementCountBy1,
+		removedTagOrCoreStrs,
+	};
 };

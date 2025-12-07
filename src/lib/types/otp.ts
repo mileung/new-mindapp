@@ -6,7 +6,7 @@ import { and, like } from 'drizzle-orm';
 import { z } from 'zod';
 import type { pc } from './parts/partCodes';
 import { pt } from './parts/partFilters';
-import { zeros } from './parts/partIds';
+import { id0 } from './parts/partIds';
 
 export let OtpSchema = z
 	.object({
@@ -40,11 +40,11 @@ export let _sendOtp = async (db: Database, email: string, partCode: OtpPartCode)
 
 	let ms = Date.now();
 	await db.insert(pTable).values({
-		...zeros,
+		...id0,
 		ms,
 		code: partCode,
-		txt: `${email}:${pin}`,
 		num: 0,
+		txt: `${email}:${pin}`,
 	});
 	return { otpMs: ms };
 };
@@ -66,8 +66,8 @@ export let _checkOtp = async (
 		pt.ms.eq0,
 		pt.in_ms.eq0,
 		pt.code.eq(input.partCode),
+		pt.num.gte0,
 		like(pTable.txt, `${input.email}:%`),
-		pt.num.isNotNull,
 	);
 	let otpRows = await db.select().from(pTable).where(otpRowsFilter);
 	let otpRow = assert1Row(otpRows);

@@ -133,7 +133,7 @@ export let sortObjectProps = (obj: Record<string, any>) => {
 	return obj;
 };
 
-export let randomInt = (a: number, b: number) => {
+export let ranInt = (a: number, b: number) => {
 	const min = Math.min(a, b);
 	const max = Math.max(a, b);
 	return Math.floor(Math.random() * (max - min + 1)) + min;

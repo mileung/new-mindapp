@@ -8,6 +8,7 @@ import {
 	channelPartsByCode,
 	getBaseInput,
 	hasParent,
+	idObjMatchesIdObj,
 	makePartsUniqueById,
 	reduceTxtRowsToMap,
 } from '../parts';
@@ -20,8 +21,8 @@ import {
 	getFullIdObj,
 	getIdObj,
 	getIdStr,
+	id0,
 	IdObjSchema,
-	zeros,
 	type FullIdObj,
 	type IdObj,
 } from '../parts/partIds';
@@ -32,8 +33,6 @@ export let postsPerLoad = 15;
 export let bracketRegex = /\[([^\[\]]+)]/g;
 
 export let GetPostFeedSchema = z.object({
-	useRpc: z.boolean(),
-	callerMs: z.number(),
 	view: z.enum(['nested', 'flat']),
 	sortedBy: z.enum(['bumped', 'new', 'old']),
 	fromMs: z.number(),
@@ -54,15 +53,16 @@ export let GetPostFeedSchema = z.object({
 
 export type GetPostFeedQuery = z.infer<typeof GetPostFeedSchema>;
 
-export let getPostFeed = async (q: GetPostFeedQuery) => {
-	// TODO: Search local and global spaces in one query
-	return q.useRpc
-		? trpc().getPostFeed.query({ ...q, ...(await getBaseInput()) })
+export let getPostFeed = async (q: GetPostFeedQuery, forceUsingLocalDb?: boolean) => {
+	let baseInput = await getBaseInput();
+	// TODO: use local db as a fallback when cloud db can't find a post
+	return baseInput.spaceMs && !forceUsingLocalDb
+		? trpc().getPostFeed.query({ ...q, ...baseInput })
 		: _getPostFeed(await gsdb(), q);
 };
 
 export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
-	// console.table(await db.select().from(pTable));
+	console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
 	// console.log('q:', q);
@@ -73,7 +73,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let postIdStrFeed: string[] = [];
 	let postsToFetchByIdObjs: IdObj[] = [];
 	let postAtBumpedPostsIdObjsExclude = q.postAtBumpedPostsIdObjsExclude || [];
-	// let searchConditions = q.useRpc ? [pf.by_ms.gt0, pf.in_ms.gt0] : undefined;
+	// let searchConditions = q.baseInput.spaceMs? [pf.by_ms.gt0, pf.in_ms.gt0] : undefined;
 	// or(
 	// 	...(q.tagsExclude || []).map((tag) => notLike(pTable.tag, `%"${tag}"%`)),
 	// 	...(q.tagsInclude || []).map((tag) => like(pTable.tag, `%"${tag}"%`)),
@@ -238,15 +238,15 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 									pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 								),
 							),
+							pt.num.gte0,
 							pt.txt.isNull,
-							pt.num.isNotNull,
 						),
 						and(
 							or(...q.postIdObjsInclude.map((pio) => pt.idAsAtId(pio))),
 							pt.ms.gt0,
 							pt.code.eq(pc.postIdAtCitedPostId),
+							pt.num.eq0,
 							pt.txt.isNull,
-							pt.num.isNull,
 						),
 					),
 				)
@@ -254,12 +254,11 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				.limit(includePostIdObjsFilter.length + postsPerLoad),
 		);
 
-		let includedPostRootOrAtRootIdObjs = [
+		let rootIdObjs = [
 			...childPostIdWithNumAsDepthAtRootIdObjs,
 			...postIdWNumAsLastVersionAtParentPostIdObjs,
-		];
-		let rootIdObjs = includedPostRootOrAtRootIdObjs.map((idObj) => ({
-			...zeros,
+		].map((idObj) => ({
+			...id0,
 			...(idObj.code === pc.childPostIdWithNumAsDepthAtRootId
 				? getAtIdObjAsIdObj(idObj)
 				: getIdObj(idObj)),
@@ -270,13 +269,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		d0IdObjs = [
 			...rootIdObjs,
 			...postIdAtCitedPostIdObjs.filter(
-				(pio) =>
-					!descendentPostIdObjs.find(
-						(io) =>
-							io.ms === pio.ms && //
-							io.by_ms === pio.by_ms &&
-							io.in_ms === pio.in_ms,
-					),
+				(pio) => !descendentPostIdObjs.find((io) => idObjMatchesIdObj(io, pio)),
 			),
 		];
 	} else if (q.view === 'nested') {
@@ -288,7 +281,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 					and(
 						pt.ms.lte(q.fromMs),
 						// pt.at_ms.gt0,
-						// ...(q.useRpc ? [pt.at_by_ms.gt0, pt.at_in_ms.gt0] : []),
+						// ...(q.baseInput.spaceMs? [pt.at_by_ms.gt0, pt.at_in_ms.gt0] : []),
 						// pf.ms.gt0,
 						// byMssFilter,
 						// inMssFilter,
@@ -297,13 +290,13 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 							pt.notFullId(fullIdObj),
 						]),
 						pt.code.eq(pc.postIdAtBumpedRootId),
+						pt.num.eq0,
 						pt.txt.isNull,
-						pt.num.isNull,
 					),
 				)
 				.orderBy(pt.ms.desc)
 				.limit(postsPerLoad);
-			d0IdObjs = atBumpedRootIdObjs.map((idObj) => ({ ...zeros, ...getAtIdObjAsIdObj(idObj) }));
+			d0IdObjs = atBumpedRootIdObjs.map((idObj) => ({ ...id0, ...getAtIdObjAsIdObj(idObj) }));
 			let lastAtBumpedRootIdObj = atBumpedRootIdObjs.slice(-1)[0];
 			postAtBumpedPostsIdObjsExclude = [];
 			for (let i = atBumpedRootIdObjs.length - 1; i >= 0; i--) {
@@ -319,15 +312,15 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 				.where(
 					and(
 						pt.noParent,
-						// ...(q.useRpc ? [pt.by_ms.gt0, pt.in_ms.gt0] : []),
+						// ...(q.baseInput.spaceMs? [pt.by_ms.gt0, pt.in_ms.gt0] : []),
 						// pf.ms.gt0,
 						(oldFirst ? pt.ms.gte : pt.ms.lte)(q.fromMs),
 						// byMssFilter,
 						// inMssFilter,
 						...excludePostIdsFilter,
 						pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pt.num.gte0,
 						pt.txt.isNull,
-						pt.num.isNotNull,
 					),
 				)
 				.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
@@ -345,15 +338,15 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 							pt.ms.lte(q.fromMs),
 							...excludePostIdsFilter,
 							pt.code.eq(pc.postIdAtBumpedRootId),
+							pt.num.eq0,
 							pt.txt.isNull,
-							pt.num.isNull,
 						),
 					)
 					.orderBy(pt.ms.desc)
 					.limit(postsPerLoad)
 			: [];
 		d0IdObjs = bumpedFirst
-			? postIdAtBumpedRootIdObjs.map((aio) => ({ ...zeros, ...getAtIdObjAsIdObj(aio) }))
+			? postIdAtBumpedRootIdObjs.map((aio) => ({ ...id0, ...getAtIdObjAsIdObj(aio) }))
 			: await db
 					.select()
 					.from(pTable)
@@ -368,8 +361,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 							(oldFirst ? pt.ms.gte : pt.ms.lte)(q.fromMs),
 							...excludePostIdsFilter,
 							pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+							pt.num.gte0,
 							pt.txt.isNull,
-							pt.num.isNotNull,
 						),
 					)
 					.orderBy(oldFirst ? pt.ms.asc : pt.ms.desc)
@@ -412,7 +405,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 							].map((code) =>
 								and(
 									pt.code.eq(code),
-									pt.num.isNotNull,
+									pt.num.gte0,
 									pt.txt.isNull, //
 								),
 							),
@@ -420,14 +413,14 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 								pt.ms.gt0,
 								// pt.in_ms.eq(),
 								pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-								pt.num.isNotNull,
+								pt.num.gte0,
 								pt.txt.isNotNull,
 							),
 							and(
 								pt.ms.gt0,
 								// pt.in_ms.eq(),
 								pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-								pt.num.isNull,
+								pt.num.eq0,
 								pt.txt.isNotNull,
 							),
 						),
@@ -471,8 +464,8 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	}
 
 	let {
-		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreId8AndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
 		curPostTagIdWNumAsVersionAtPostIdObjs.length || curPostCoreIdWNumAsVersionAtPostIdObjs.length
 			? await db
@@ -487,9 +480,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 									),
 								),
 								pt.noParent,
-								pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+								pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pt.num.gte0,
 								pt.txt.isNotNull,
-								pt.num.isNotNull,
 							),
 							and(
 								or(
@@ -498,9 +491,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 									),
 								),
 								pt.noParent,
-								pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
+								pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pt.num.gte0,
 								pt.txt.isNotNull,
-								pt.num.isNotNull,
 							),
 						),
 					)
@@ -512,11 +505,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		let mainPartObj = postIdWNumAsLastVersionAtPPostIdObjs[i];
 		let partIdStr = getIdStr(mainPartObj);
 		idToPostMap[partIdStr] = {
-			...mainPartObj,
-			history:
-				mainPartObj.num === null
-					? null //
-					: { [mainPartObj.num]: { ms: 0, tags: [] } },
+			...getFullIdObj(mainPartObj),
+			history: mainPartObj.num //
+				? { [mainPartObj.num]: { ms: 0, tags: [] } }
+				: null,
 		};
 	}
 	let tagIdToTxtMap = reduceTxtRowsToMap(tagIdAndTxtWithNumAsCountObjs);
@@ -571,8 +563,8 @@ let getRootDescendentPostIdObjs = async (db: Database, rootIdObjs: IdObj[]) =>
 					and(
 						or(...rootIdObjs.map((pio) => pt.idAsAtId(pio))),
 						pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+						pt.num.gte0,
 						pt.txt.isNull,
-						pt.num.isNotNull,
 					),
 				)
 		: [];

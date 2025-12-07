@@ -12,7 +12,7 @@ export let tagsPerLoad = 88;
 
 export let getSpaceTags = async (fromCount: number, excludeTags: string[]) => {
 	let baseInput = await getBaseInput();
-	return baseInput.in_ms > 0
+	return baseInput.spaceMs
 		? trpc().getSpaceTags.query({ ...baseInput, fromCount, excludeTags })
 		: _getSpaceTags(await gsdb(), { ...baseInput, fromCount, excludeTags });
 };
@@ -27,7 +27,6 @@ export let _getSpaceTags = async (
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
-	if (input.in_ms !== 0 && input.in_ms !== 1 && !input.by_ms) throw new Error('Missing byMs');
 	let tagIdAndTxtWithNumAsCountObjs = await db
 		.select()
 		.from(pTable)
@@ -37,10 +36,10 @@ export let _getSpaceTags = async (
 				pt.at_by_ms.eq0,
 				pt.at_in_ms.eq0,
 				pt.ms.gt0,
-				pt.in_ms.eq(input.in_ms),
-				pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-				and(...input.excludeTags.map((t) => pt.txt.notEq(t))),
+				pt.in_ms.eq(input.spaceMs),
+				pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
 				pt.num.lte(input.fromCount),
+				and(...input.excludeTags.map((t) => pt.txt.notEq(t))),
 			),
 		)
 		.orderBy(desc(pTable.num), asc(pTable.txt))

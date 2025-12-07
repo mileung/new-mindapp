@@ -2,16 +2,17 @@ import { trpc } from '$lib/trpc/client';
 import { and, or, SQL } from 'drizzle-orm';
 import { ReactionSchema, type Reaction } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode } from '../parts';
+import { assert1Row, channelPartsByCode, getBaseInput } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let removeReaction = async (rxn: Reaction, useRpc: boolean) => {
+export let removeReaction = async (rxn: Reaction) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	return useRpc
-		? trpc().removeReaction.mutate(rxn) //
+	let baseInput = await getBaseInput();
+	return baseInput.spaceMs
+		? trpc().removeReaction.mutate({ ...baseInput, rxn }) //
 		: _removeReaction(await gsdb(), rxn);
 };
 
@@ -29,22 +30,22 @@ export let _removeReaction = async (db: Database, rxn: Reaction) => {
 					and(
 						pt.atIdAsId(rxn),
 						pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pt.num.gte0,
 						pt.txt.isNull,
-						pt.num.isNotNull,
 					),
 					and(
 						pt.atId(rxn),
 						pt.by_ms.eq(rxn.by_ms),
 						pt.in_ms.eq(rxn.in_ms),
 						pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+						pt.num.eq0,
 						pt.txt.eq(rxn.emoji),
-						pt.num.isNull,
 					),
 					and(
 						pt.atId(rxn),
 						pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+						pt.num.gte0,
 						pt.txt.eq(rxn.emoji),
-						pt.num.isNotNull,
 					),
 				),
 			),
@@ -57,8 +58,8 @@ export let _removeReaction = async (db: Database, rxn: Reaction) => {
 			pt.by_ms.eq(rxn.by_ms),
 			pt.in_ms.eq(rxn.in_ms),
 			pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+			pt.num.eq0,
 			pt.txt.eq(rxn.emoji),
-			pt.num.isNull,
 		),
 	];
 	let rEmTxtWUnqMsAndNumAsCtAtPostIdObj = assert1Row(rEmTxtWUnqMsAndNumAsCtAtPostIdObjs);
@@ -69,8 +70,8 @@ export let _removeReaction = async (db: Database, rxn: Reaction) => {
 			and(
 				pt.atId(rEmTxtWUnqMsAndNumAsCtAtPostIdObj),
 				pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-				pt.txt.eq(rxn.emoji),
 				pt.num.eq(1),
+				pt.txt.eq(rxn.emoji),
 			),
 		);
 	}

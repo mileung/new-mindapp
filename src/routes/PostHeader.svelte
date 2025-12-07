@@ -46,8 +46,8 @@
 		open: boolean;
 		evenBg: boolean;
 		onToggleParsed: () => void;
-		lastVersion: null | number;
-		version: null | number;
+		lastVersion: number;
+		version: number;
 		onChangeVersion: (v: number) => void;
 	} = $props();
 	let moreOptionsOpen = $state(false);
@@ -59,7 +59,7 @@
 	let msLabel = $derived.by(() => {
 		if (p.version === null) return formatMs(p.post.ms!);
 		let str = formatMs(versionMs || 0, p.version < p.lastVersion!);
-		let edited = Object.keys(p.post.history || {}).some((k) => +k > 0);
+		let edited = Object.keys(p.post.history || {}).some((k) => +k > 1);
 		return `${str}${edited ? '*' : ''}`;
 	});
 	let isoMsLabel = $derived.by(() => formatMs(versionMs || p.post.ms!, true));
@@ -101,16 +101,6 @@
 			<a
 				href={`/_${p.post.by_ms}_${p.post.in_ms}`}
 				class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
-				onclick={(e) => {
-					// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-					// 	e.preventDefault();
-					// 	let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
-					// 	pushState(
-					// 		accountInSpaceId, //
-					// 		{ modalId: accountInSpaceId },
-					// 	);
-					// }
-				}}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					<AccountIcon ms={p.post.by_ms} class="mr-0.5 w-4 min-w-4" />
@@ -187,12 +177,12 @@
 					</button>
 				</div>
 			</div>
-			{#if p.lastVersion && p.version !== null && p.lastVersion !== null}
+			{#if p.lastVersion > 1 && p.version}
 				<div class="flex">
 					<p class="self-center mx-0.5">({p.version}/{p.lastVersion})</p>
 					<button
 						class="fx relative overflow-clip group hover:text-fg1"
-						onclick={() => p.onChangeVersion(Math.max(0, p.version! - 1))}
+						onclick={() => p.onChangeVersion(Math.max(1, p.version! - 1))}
 					>
 						<div class={`xy h-5 w-6 ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 							<IconCaretLeft class="w-5.5 translate-x-0.5" />
@@ -287,9 +277,8 @@
 						if (ok) {
 							let useRpc = getIdStrAsIdObj(page.state.modalId || page.params.id || '').in_ms !== 0;
 							let { soft } = await deletePost(getFullIdObj(p.post), null, useRpc);
-							if (soft) {
-								gs.idToPostMap[strPostId]!.history = null;
-							} else {
+							if (soft) gs.idToPostMap[strPostId]!.history = null;
+							else {
 								let parentPostIdStr = getAtIdStr(p.post);
 								if (hasParent(p.post) && gs.idToPostMap[parentPostIdStr]?.subIds) {
 									gs.idToPostMap[parentPostIdStr].subIds = [

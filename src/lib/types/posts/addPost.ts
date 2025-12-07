@@ -1,7 +1,7 @@
+import { ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import {
-	addNewTagOrCoreRows,
 	getCitedPostIds,
 	getLastVersion,
 	moveTagCoreOrRxnCountsBy1,
@@ -9,7 +9,14 @@ import {
 	type Post,
 } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode, hasParent, type PartInsert } from '../parts';
+import {
+	assert1Row,
+	channelPartsByCode,
+	getBaseInput,
+	hasParent,
+	type PartInsert,
+	type PartSelect,
+} from '../parts';
 import { pc } from '../parts/partCodes';
 import { pt } from '../parts/partFilters';
 import {
@@ -17,18 +24,22 @@ import {
 	getIdObj,
 	getIdObjAsAtIdObj,
 	getIdStrAsAtIdObj,
-	zeros,
+	id0,
 	type AtIdObj,
+	type IdObj,
 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let addPost = async (post: Post, useRpc: boolean) => {
+export let addPost = async (post: Post, forceUsingLocalDb?: boolean) => {
+	let baseInput = await getBaseInput();
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
 		throw new Error(`Invalid post`);
 	}
-	return useRpc ? trpc().addPost.mutate(parsedPost.data) : _addPost(await gsdb(), parsedPost.data);
+	return forceUsingLocalDb || !baseInput.spaceMs
+		? _addPost(await gsdb(), parsedPost.data)
+		: trpc().editPost.mutate({ ...baseInput, post: parsedPost.data });
 };
 
 export let _addPost = async (db: Database, post: Post) => {
@@ -41,7 +52,6 @@ export let _addPost = async (db: Database, post: Post) => {
 		by_ms: post.by_ms,
 		in_ms: post.in_ms,
 		code: pc.postIdWithNumAsLastVersionAtParentPostId,
-		txt: null,
 		num: lastVersion,
 	};
 	let postIsChild = hasParent(post);
@@ -56,17 +66,14 @@ export let _addPost = async (db: Database, post: Post) => {
 						...atPostIdObj,
 						...postIdObj,
 						code: pc.postIdAtBumpedRootId,
+						num: 0,
 					},
 				]),
 	];
-	let tagsFromAllLayers: string[] = [];
-	let coresFromAllLayers: string[] = [];
-	let currentTags: string[] = [];
-	let currentCore = '';
-
-	if (!post.history) {
-		mainPostIdWithNumAsLastVersionAtParentPostIdObj.num = null;
-	}
+	let tagStrsFromAllLayers: string[] = [];
+	let coreStrsFromAllLayers: string[] = [];
+	let currentTagStrs: string[] = [];
+	let currentCoreStr = '';
 
 	let historyEntries = post.history ? Object.entries(post.history) : [];
 	for (let i = 0; i < historyEntries.length; i++) {
@@ -76,7 +83,7 @@ export let _addPost = async (db: Database, post: Post) => {
 		let isLastVersion = version === lastVersion;
 
 		partsToInsert.push({
-			...zeros,
+			...id0,
 			...atPostIdObj,
 			ms: layer.ms || mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms,
 			code:
@@ -91,33 +98,34 @@ export let _addPost = async (db: Database, post: Post) => {
 		});
 
 		if (layer.tags?.length) {
-			tagsFromAllLayers.push(...layer.tags);
-			if (isLastVersion) currentTags = layer.tags;
+			tagStrsFromAllLayers.push(...layer.tags);
+			if (isLastVersion) currentTagStrs = layer.tags;
 		}
 		if (layer.core) {
-			coresFromAllLayers.push(layer.core);
+			coreStrsFromAllLayers.push(layer.core);
 			if (isLastVersion) {
-				currentCore = layer.core;
+				currentCoreStr = layer.core;
 				partsToInsert.push(
 					...getCitedPostIds(layer.core).map((id) => ({
 						...getIdStrAsAtIdObj(id),
 						...postIdObj,
 						code: pc.postIdAtCitedPostId,
+						num: 0,
 					})),
 				);
 			}
 		}
 	}
 
-	tagsFromAllLayers = [...new Set(tagsFromAllLayers)];
-	coresFromAllLayers = [...new Set(coresFromAllLayers)];
+	tagStrsFromAllLayers = [...new Set(tagStrsFromAllLayers)];
+	coreStrsFromAllLayers = [...new Set(coreStrsFromAllLayers)];
 	let {
 		[pc.childPostIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdObjs = [],
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
-		[pc.tagIdAndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreIdAndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountObjs = [],
+		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountObjs = [],
 	} = channelPartsByCode(
-		postIsChild || tagsFromAllLayers.length || coresFromAllLayers.length
+		postIsChild || tagStrsFromAllLayers.length || coreStrsFromAllLayers.length
 			? await db
 					.select()
 					.from(pTable)
@@ -128,34 +136,34 @@ export let _addPost = async (db: Database, post: Post) => {
 										and(
 											pt.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
 											pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+											pt.num.gte0,
 											pt.txt.isNull,
-											pt.num.isNotNull,
 										),
 										and(
 											pt.noParent,
 											pt.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
 											pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+											pt.num.gte0,
 											pt.txt.isNull,
-											pt.num.isNotNull,
 										),
 									]
 								: []),
-							tagsFromAllLayers.length
+							tagStrsFromAllLayers.length
 								? and(
 										pt.noParent,
 										pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-										pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
-										or(...tagsFromAllLayers.map((t) => pt.txt.eq(t))),
-										pt.num.isNotNull,
+										pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
+										pt.num.gte0,
+										or(...tagStrsFromAllLayers.map((t) => pt.txt.eq(t))),
 									)
 								: undefined,
-							coresFromAllLayers.length
+							coreStrsFromAllLayers.length
 								? and(
 										pt.noParent,
 										pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-										pt.code.eq(pc.coreIdAndTxtWithNumAsCount),
-										or(...coresFromAllLayers.map((t) => pt.txt.eq(t))),
-										pt.num.isNotNull,
+										pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
+										pt.num.gte0,
+										or(...coreStrsFromAllLayers.map((t) => pt.txt.eq(t))),
 									)
 								: undefined,
 						),
@@ -189,8 +197,8 @@ export let _addPost = async (db: Database, post: Post) => {
 					pt.ms.gt0,
 					pt.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 					pt.code.eq(pc.postIdAtBumpedRootId),
+					pt.num.eq0,
 					pt.txt.isNull,
-					pt.num.isNull,
 				),
 			)
 			.returning();
@@ -199,23 +207,32 @@ export let _addPost = async (db: Database, post: Post) => {
 				...atRootIdObj,
 				...postIdObj,
 				code: pc.postIdAtBumpedRootId,
+				num: 0,
 			});
 		}
 	}
 
 	let tagTxtToRowMap = addNewTagOrCoreRows(
 		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
-		tagsFromAllLayers,
-		tagIdAndTxtWithNumAsCountObjs,
+		tagStrsFromAllLayers,
+		existingTagIdAndTxtWithNumAsCountObjs,
 		true,
 		partsToInsert,
 	);
 	let coreTxtToRowMap = addNewTagOrCoreRows(
 		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
-		coresFromAllLayers,
-		coreIdAndTxtWithNumAsCountObjs,
+		coreStrsFromAllLayers,
+		existingCoreIdAndTxtWithNumAsCountObjs,
 		false,
 		partsToInsert,
+	);
+
+	await moveTagCoreOrRxnCountsBy1(
+		db,
+		currentTagStrs.map((t) => tagTxtToRowMap[t]),
+		[coreTxtToRowMap[currentCoreStr]].filter((r) => !!r),
+		[],
+		true,
 	);
 
 	for (let i = 0; i < historyEntries.length; i++) {
@@ -256,15 +273,43 @@ export let _addPost = async (db: Database, post: Post) => {
 		}
 	}
 
-	await moveTagCoreOrRxnCountsBy1(
-		db,
-		currentTags.map((t) => tagTxtToRowMap[t]),
-		[coreTxtToRowMap[currentCore]].filter((r) => !!r),
-		[],
-		true,
-	);
 	await db.insert(pTable).values(partsToInsert);
 
 	// console.log('partsToInsert:', partsToInsert);
 	return { ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms };
+};
+
+let addNewTagOrCoreRows = (
+	mainPIdWNumAsLastVersionAtPPIdObj: IdObj,
+	allTagOrCoreStrs: string[],
+	existingTagOrCoreTxtObjs: PartSelect[],
+	isTag: boolean,
+	partsToInsert: PartInsert[],
+) => {
+	let txtToIdAndTxtWithNumAsCountObjMap: Record<string, PartInsert> = {};
+	for (let i = 0; i < existingTagOrCoreTxtObjs.length; i++) {
+		let existingTagOrCoreTxtObj = existingTagOrCoreTxtObjs[i];
+		txtToIdAndTxtWithNumAsCountObjMap[existingTagOrCoreTxtObj.txt!] = existingTagOrCoreTxtObj;
+	}
+	let newRowsCount = 0;
+	let code = isTag ? pc.tagId8AndTxtWithNumAsCount : pc.coreId8AndTxtWithNumAsCount;
+	for (let i = 0; i < allTagOrCoreStrs.length; i++) {
+		let tagOrCoreStr = allTagOrCoreStrs[i];
+		let tagOrCoreRow = txtToIdAndTxtWithNumAsCountObjMap[tagOrCoreStr];
+		if (!tagOrCoreRow) {
+			tagOrCoreRow = {
+				...id0,
+				ms: mainPIdWNumAsLastVersionAtPPIdObj.ms + newRowsCount++,
+				by_ms: ranInt(8, 88888888),
+				// If not for the random by_ms, a single user in the same space could add a lot (hundreds+) of the same tag or cores at the same time causing multiple tag or core rows to have the same id.
+				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
+				code,
+				txt: tagOrCoreStr,
+				num: 1,
+			};
+			txtToIdAndTxtWithNumAsCountObjMap[tagOrCoreStr] = tagOrCoreRow;
+			partsToInsert.push(tagOrCoreRow);
+		}
+	}
+	return txtToIdAndTxtWithNumAsCountObjMap;
 };

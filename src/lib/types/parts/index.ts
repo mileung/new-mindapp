@@ -13,8 +13,8 @@ export let PartInsertSchema = createInsertSchema(pTable);
 export let PartSelectSchema = createSelectSchema(pTable);
 
 export let BaseInputSchema = z.object({
-	by_ms: z.number(),
-	in_ms: z.number(),
+	callerMs: z.number(),
+	spaceMs: z.number(),
 });
 export type BaseInput = z.infer<typeof BaseInputSchema>;
 
@@ -27,8 +27,8 @@ export let getBaseInput = async () => {
 		await new Promise((res) => setTimeout(res, 42));
 	}
 	return {
-		by_ms: gs.accounts[0].ms,
-		in_ms: gs.currentSpaceMs,
+		callerMs: gs.accounts[0].ms,
+		spaceMs: gs.currentSpaceMs,
 	} satisfies BaseInput;
 };
 

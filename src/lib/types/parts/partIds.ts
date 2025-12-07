@@ -26,7 +26,7 @@ export let isIdStr = (str = '') => idRegex.test(str);
 export let getIdStr = (io: IdObj) => `${io.ms}_${io.by_ms}_${io.in_ms}`;
 export let getAtIdStr = (aio: AtIdObj) => `${aio.at_ms}_${aio.at_by_ms}_${aio.at_in_ms}`;
 
-export let zeros = {
+export let id0 = {
 	at_ms: 0,
 	at_by_ms: 0,
 	at_in_ms: 0,

@@ -97,6 +97,13 @@ export let pt = {
 	code: {
 		eq: (v: number) => eq(pTable.code, v),
 	},
+	num: {
+		eq: (v: number) => eq(pTable.num, v),
+		eq0: eq(pTable.num, 0),
+		gte0: gte(pTable.num, 0),
+		notEq: (v: number) => not(eq(pTable.num, v)),
+		lte: (v: number) => lte(pTable.num, v),
+	},
 	txt: {
 		eq: (v: string) => eq(pTable.txt, v),
 		notEq: (v: string) => not(eq(pTable.txt, v)),
@@ -104,13 +111,5 @@ export let pt = {
 		notLike: (v: string) => not(like(pTable.txt, v)),
 		isNull: isNull(pTable.txt),
 		isNotNull: isNotNull(pTable.txt),
-	},
-	num: {
-		eq: (v: number) => eq(pTable.num, v),
-		eq0: eq(pTable.num, 0),
-		notEq: (v: number) => not(eq(pTable.num, v)),
-		lte: (v: number) => lte(pTable.num, v),
-		isNull: isNull(pTable.num),
-		isNotNull: isNotNull(pTable.num),
 	},
 } as const;

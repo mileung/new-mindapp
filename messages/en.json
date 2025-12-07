@@ -16,6 +16,7 @@
 	"personal": "Personal",
 	"global": "Global",
 	"settings": "Settings",
+	"reactions": "Reactions",
 	"scrollToLoad": "Scroll to load",
 	"invalidJsonFile": "Invalid JSON file",
 	"invalidUrl": "Invalid URL",

@@ -11,7 +11,7 @@ export let accountsPerLoad = 88;
 
 export let getSpaceAccounts = async (fromAccountMs: number) => {
 	let baseInput = await getBaseInput();
-	return baseInput.in_ms > 0
+	return baseInput.spaceMs
 		? trpc().getSpaceAccounts.query({ ...baseInput, fromAccountMs })
 		: _getSpaceAccounts(await gsdb(), { ...baseInput, fromAccountMs });
 };
@@ -25,7 +25,6 @@ export let _getSpaceAccounts = async (
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
-	if (input.in_ms !== 0 && input.in_ms !== 1 && !input.by_ms) throw new Error('Missing byMs');
 	let tagIdAndTxtWithNumAsCountObjs = await db
 		.select()
 		.from(pTable)
@@ -35,8 +34,8 @@ export let _getSpaceAccounts = async (
 				pt.at_by_ms.eq0,
 				pt.at_in_ms.eq0,
 				pt.ms.gt0,
-				pt.in_ms.eq(input.in_ms),
-				pt.code.eq(pc.tagIdAndTxtWithNumAsCount),
+				pt.in_ms.eq(input.spaceMs),
+				pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
 				pt.num.lte(input.fromAccountMs),
 			),
 		)
