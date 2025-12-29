@@ -7,13 +7,13 @@ import {
 	assert1Row,
 	assertLt2Rows,
 	channelPartsByCode,
-	getBaseInput,
+	getWhoWhereObj,
 	idObjMatchesIdObj,
 	type PartInsert,
 	type PartSelect,
 } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { getIdObjAsAtIdObj, getIdStr, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
@@ -23,7 +23,7 @@ export let editPost = async (post: Post, forceUsingLocalDb?: boolean) => {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
 		throw new Error(`Invalid post`);
 	}
-	let baseInput = await getBaseInput();
+	let baseInput = await getWhoWhereObj();
 	return forceUsingLocalDb || !baseInput.spaceMs
 		? _editPost(await gsdb(), parsedPost.data)
 		: trpc().editPost.mutate({ ...baseInput, post: parsedPost.data });
@@ -35,32 +35,32 @@ export let _editPost = async (db: Database, post: Post) => {
 	if (newLastVersion <= 0) throw new Error('newLastVersion must be gt0');
 	let curLastVersion = newLastVersion - 1;
 
-	let mainPIdWNumAsLastVersionAtPPIdObjsFilter = and(
-		pt.atId(post),
-		pt.id(post),
-		pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-		pt.num.gte0,
-		pt.txt.isNull,
+	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
+		pf.atId(post),
+		pf.id(post),
+		pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+		pf.num.gte0,
+		pf.txt.isNull,
 	);
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdObjs = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVrsnAtPIdObjs = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVrsnAtPIdRows = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					mainPIdWNumAsLastVersionAtPPIdObjsFilter,
+					mainPIdWNumAsLastVersionAtPPIdRowsFilter,
 					and(
-						pt.idAsAtId(post),
+						pf.idAsAtId(post),
 						or(
 							...[
 								pc.currentPostTagIdWithNumAsVersionAtPostId,
 								pc.currentPostCoreIdWithNumAsVersionAtPostId,
-							].map((code) => pt.code.eq(code)),
+							].map((code) => pf.code.eq(code)),
 						),
 						eq(pTable.num, curLastVersion),
 					),
@@ -68,13 +68,13 @@ export let _editPost = async (db: Database, post: Post) => {
 			),
 	);
 
-	let mainPIdWNumAsLastVersionAtPPIdObj = assert1Row(postIdWNumAsLastVersionAtPPostIdObjs);
-	if (!mainPIdWNumAsLastVersionAtPPIdObj.num) throw new Error('Cannot edit deleted posts');
+	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(postIdWNumAsLastVersionAtPPostIdRows);
+	if (!mainPIdWNumAsLastVersionAtPPIdRow.num) throw new Error('Cannot edit deleted posts');
 	// TODO: what do if trying to edit post in cloud space from local space
 	// and the last versions don't match?
-	if (mainPIdWNumAsLastVersionAtPPIdObj.num > curLastVersion)
+	if (mainPIdWNumAsLastVersionAtPPIdRow.num > curLastVersion)
 		throw new Error(`Post edit history out of sync`);
-	if (mainPIdWNumAsLastVersionAtPPIdObj.num !== curLastVersion)
+	if (mainPIdWNumAsLastVersionAtPPIdRow.num !== curLastVersion)
 		throw new Error(`Invalid newLastVersion`);
 
 	let ms = Date.now();
@@ -89,15 +89,15 @@ export let _editPost = async (db: Database, post: Post) => {
 	];
 	let newPostTagStrs = post.history![newLastVersion]!.tags || [];
 	let newPostCoreStr = (post.history![newLastVersion]!.core || '').trim();
-	assertLt2Rows(curPostCoreIdWNumAsVrsnAtPIdObjs);
+	assertLt2Rows(curPostCoreIdWNumAsVrsnAtPIdRows);
 
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountRows = [],
+		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
-		curPostTagIdWNumAsVrsnAtPIdObjs.length ||
+		curPostTagIdWNumAsVrsnAtPIdRows.length ||
 			newPostTagStrs.length ||
-			curPostCoreIdWNumAsVrsnAtPIdObjs.length ||
+			curPostCoreIdWNumAsVrsnAtPIdRows.length ||
 			newPostCoreStr
 			? await db
 					.select()
@@ -105,22 +105,22 @@ export let _editPost = async (db: Database, post: Post) => {
 					.where(
 						or(
 							and(
-								pt.noParent,
+								pf.noParent,
 								or(
-									...curPostTagIdWNumAsVrsnAtPIdObjs.map((r) => pt.id(r)),
-									...newPostTagStrs.map((t) => pt.txt.eq(t)),
+									...curPostTagIdWNumAsVrsnAtPIdRows.map((r) => pf.id(r)),
+									...newPostTagStrs.map((t) => pf.txt.eq(t)),
 								),
-								pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
-								pt.num.gte0,
+								pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pf.num.gte0,
 							),
 							and(
-								pt.noParent,
+								pf.noParent,
 								or(
-									...curPostCoreIdWNumAsVrsnAtPIdObjs.map((cio) => pt.id(cio)),
-									pt.txt.eq(newPostCoreStr),
+									...curPostCoreIdWNumAsVrsnAtPIdRows.map((cio) => pf.id(cio)),
+									pf.txt.eq(newPostCoreStr),
 								),
-								pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
-								pt.num.gte0,
+								pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pf.num.gte0,
 							),
 						),
 					)
@@ -135,10 +135,10 @@ export let _editPost = async (db: Database, post: Post) => {
 	} = processStuff(
 		ms,
 		newLastVersion,
-		mainPIdWNumAsLastVersionAtPPIdObj,
+		mainPIdWNumAsLastVersionAtPPIdRow,
 		newPostTagStrs,
-		existingTagIdAndTxtWithNumAsCountObjs,
-		curPostTagIdWNumAsVrsnAtPIdObjs,
+		existingTagIdAndTxtWithNumAsCountRows,
+		curPostTagIdWNumAsVrsnAtPIdRows,
 		true,
 		partsToInsert,
 	);
@@ -151,18 +151,13 @@ export let _editPost = async (db: Database, post: Post) => {
 	} = processStuff(
 		ms,
 		newLastVersion,
-		mainPIdWNumAsLastVersionAtPPIdObj,
+		mainPIdWNumAsLastVersionAtPPIdRow,
 		newPostCoreStr ? [newPostCoreStr] : [],
-		existingCoreIdAndTxtWithNumAsCountObjs,
-		curPostCoreIdWNumAsVrsnAtPIdObjs,
+		existingCoreIdAndTxtWithNumAsCountRows,
+		curPostCoreIdWNumAsVrsnAtPIdRows,
 		false,
 		partsToInsert,
 	);
-
-	// console.log('txtToCoreIdAndTxtWNumAsCtObjMap:', txtToCoreIdAndTxtWNumAsCtObjMap);
-	// console.log('coreChanged:', coreChanged);
-	// console.log('coreTxtRowsToIncrementCountBy1:', coreTxtRowsToIncrementCountBy1);
-	// console.log('removedCores:', removedCores);
 
 	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
 
@@ -197,9 +192,9 @@ export let _editPost = async (db: Database, post: Post) => {
 		.set({ code: pc.exPostTagIdWithNumAsVersionAtPostId })
 		.where(
 			and(
-				pt.idAsAtId(mainPIdWNumAsLastVersionAtPPIdObj),
-				pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-				pt.txt.isNull,
+				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
+				pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+				pf.txt.isNull,
 				eq(pTable.num, curLastVersion),
 			),
 		);
@@ -208,27 +203,27 @@ export let _editPost = async (db: Database, post: Post) => {
 		.set({ code: pc.exPostCoreIdWithNumAsVersionAtPostId })
 		.where(
 			and(
-				pt.idAsAtId(mainPIdWNumAsLastVersionAtPPIdObj),
-				pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
+				pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
 				eq(pTable.num, curLastVersion),
 			),
 		);
 	await db
 		.update(pTable)
 		.set({ num: newLastVersion })
-		.where(mainPIdWNumAsLastVersionAtPPIdObjsFilter);
+		.where(mainPIdWNumAsLastVersionAtPPIdRowsFilter);
 	await db
 		.update(pTable)
 		.set({ code: pc.exVersionNumAndMsAtPostId })
 		.where(
 			and(
-				pt.idAsAtId(post),
-				pt.ms.gt0,
-				pt.by_ms.eq0,
-				pt.in_ms.eq0,
-				pt.code.eq(pc.currentVersionNumAndMsAtPostId),
-				pt.num.eq(curLastVersion),
-				pt.txt.isNull,
+				pf.idAsAtId(post),
+				pf.ms.gt0,
+				pf.by_ms.eq0,
+				pf.in_ms.eq0,
+				pf.code.eq(pc.currentVersionNumAndMsAtPostId),
+				pf.num.eq(curLastVersion),
+				pf.txt.isNull,
 			),
 		);
 
@@ -262,15 +257,15 @@ let processStuff = (
 	newLastVersion: number,
 	mainPIdWNumAsLastVersionAtPPIdObj: IdObj,
 	newPostTagOrCoreStrs: string[],
-	existingTagOrCoreTxtObjs: PartSelect[],
-	curPostTagOrCoreIdWNumAsVersionAtPIdObjs: PartSelect[],
+	existingTagOrCoreTxtRows: PartSelect[],
+	curPostTagOrCoreIdWNumAsVersionAtPIdRows: PartSelect[],
 	isTag: boolean,
 	partsToInsert: PartInsert[],
 ) => {
 	let txtToTagOrCoreIdAndTxtWNumAsCtObjMap: Record<string, undefined | PartInsert> = {};
 	let tagIdToTxtMap: Record<string, string> = {};
-	for (let i = 0; i < existingTagOrCoreTxtObjs.length; i++) {
-		let tagIdAndTxtWNumAsCtObj = existingTagOrCoreTxtObjs[i];
+	for (let i = 0; i < existingTagOrCoreTxtRows.length; i++) {
+		let tagIdAndTxtWNumAsCtObj = existingTagOrCoreTxtRows[i];
 		txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tagIdAndTxtWNumAsCtObj.txt!] = tagIdAndTxtWNumAsCtObj;
 		tagIdToTxtMap[getIdStr(tagIdAndTxtWNumAsCtObj)] = tagIdAndTxtWNumAsCtObj.txt!;
 	}
@@ -281,7 +276,7 @@ let processStuff = (
 		let tagTxtRow = txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tag];
 		if (tagTxtRow) {
 			if (
-				!curPostTagOrCoreIdWNumAsVersionAtPIdObjs.find((curPostTagIdWNumAsVersionAtPIdObj) =>
+				!curPostTagOrCoreIdWNumAsVersionAtPIdRows.find((curPostTagIdWNumAsVersionAtPIdObj) =>
 					idObjMatchesIdObj(curPostTagIdWNumAsVersionAtPIdObj, tagTxtRow!),
 				)
 			)
@@ -312,7 +307,7 @@ let processStuff = (
 		});
 	}
 
-	let curPostTagStrs = curPostTagOrCoreIdWNumAsVersionAtPIdObjs.map(
+	let curPostTagStrs = curPostTagOrCoreIdWNumAsVersionAtPIdRows.map(
 		(curPostTagOrCoreIdWNumAsVersionAtPIdObj) =>
 			tagIdToTxtMap[getIdStr(curPostTagOrCoreIdWNumAsVersionAtPIdObj)],
 	);

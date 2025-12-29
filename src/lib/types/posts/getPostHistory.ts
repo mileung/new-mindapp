@@ -2,71 +2,71 @@ import { trpc } from '$lib/trpc/client';
 import { and, eq, or } from 'drizzle-orm';
 import { type Post } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, assertLt2Rows, channelPartsByCode, getBaseInput } from '../parts';
+import { assert1Row, assertLt2Rows, channelPartsByCode, getWhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
-import { getIdStr, type FullIdObj } from '../parts/partIds';
+import { pf } from '../parts/partFilters';
+import { getIdStr, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let getPostHistory = async (fullPostId: FullIdObj, version: number) => {
-	let baseInput = await getBaseInput();
+export let getPostHistory = async (postIdObj: IdObj, version: number) => {
+	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
-		? trpc().getPostHistory.query({ ...baseInput, fullPostId, version })
-		: _getPostHistory(await gsdb(), fullPostId, version);
+		? trpc().getPostHistory.query({ ...baseInput, postIdObj, version })
+		: _getPostHistory(await gsdb(), postIdObj, version);
 };
 
 // TODO: paginate history versions?
-export let _getPostHistory = async (db: Database, fullPostId: FullIdObj, version: number) => {
+export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
-		[pc.exVersionNumAndMsAtPostId]: exVersionNumAndMsAtPostIdObjs = [],
-		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdObjs = [],
-		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdObjs = [],
+		[pc.exVersionNumAndMsAtPostId]: exVersionNumAndMsAtPostIdRows = [],
+		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				and(
-					pt.idAsAtId(fullPostId),
+					pf.idAsAtId(postIdObj),
 					or(
 						...[
 							pc.exVersionNumAndMsAtPostId,
 							pc.exPostTagIdWithNumAsVersionAtPostId,
 							pc.exPostCoreIdWithNumAsVersionAtPostId,
-						].map((code) => pt.code.eq(code)),
+						].map((code) => pf.code.eq(code)),
 					),
 					eq(pTable.num, version),
 				),
 			),
 	);
 
-	let exVersionNumAndMsAtPostIdObj = assert1Row(exVersionNumAndMsAtPostIdObjs);
-	assertLt2Rows(exPostCoreIdWithNumAsVersionAtPostIdObjs);
+	let exVersionNumAndMsAtPostIdRow = assert1Row(exVersionNumAndMsAtPostIdRows);
+	assertLt2Rows(exPostCoreIdWithNumAsVersionAtPostIdRows);
 
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreId8AndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountRows = [],
+		[pc.coreId8AndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
-		exPostTagIdWithNumAsVersionAtPostIdObjs.length ||
-			exPostCoreIdWithNumAsVersionAtPostIdObjs.length
+		exPostTagIdWithNumAsVersionAtPostIdRows.length ||
+			exPostCoreIdWithNumAsVersionAtPostIdRows.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						or(
 							and(
-								pt.noParent,
-								or(...exPostTagIdWithNumAsVersionAtPostIdObjs.map((row) => pt.id(row))),
-								pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
-								pt.num.gte0,
-								pt.txt.isNotNull,
+								pf.noParent,
+								or(...exPostTagIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
+								pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pf.num.gte0,
+								pf.txt.isNotNull,
 							),
 							and(
-								pt.noParent,
-								or(...exPostCoreIdWithNumAsVersionAtPostIdObjs.map((row) => pt.id(row))),
-								pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
-								pt.num.gte0,
-								pt.txt.isNotNull,
+								pf.noParent,
+								or(...exPostCoreIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
+								pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pf.num.gte0,
+								pf.txt.isNotNull,
 							),
 						),
 					)
@@ -74,15 +74,15 @@ export let _getPostHistory = async (db: Database, fullPostId: FullIdObj, version
 	);
 
 	let parts = [
-		...exPostTagIdWithNumAsVersionAtPostIdObjs,
-		...exPostCoreIdWithNumAsVersionAtPostIdObjs,
-		...tagIdAndTxtWithNumAsCountObjs,
-		...coreIdAndTxtWithNumAsCountObjs,
+		...exPostTagIdWithNumAsVersionAtPostIdRows,
+		...exPostCoreIdWithNumAsVersionAtPostIdRows,
+		...tagIdAndTxtWithNumAsCountRows,
+		...coreIdAndTxtWithNumAsCountRows,
 	];
 	let tagIdToTxtMap: Record<string, string> = {};
 	let coreIdToTxtMap: Record<string, string> = {};
 	let history: Post['history'] = {
-		[version]: { ms: exVersionNumAndMsAtPostIdObj.ms!, tags: [], core: '' },
+		[version]: { ms: exVersionNumAndMsAtPostIdRow.ms!, tags: [], core: '' },
 	};
 
 	for (let i = 0; i < parts.length; i++) {

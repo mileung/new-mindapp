@@ -12,6 +12,12 @@ export let pTable = sqliteTable(
 		code: integer('code').notNull(),
 		num: real('num').notNull(),
 		txt: text('txt'),
+		// TODO: lang: enum('en', 'jp', 'fr') ?
+		// prob just have a separate db for each lang subdomain.
+		// That would fragment users tho...
+		// ensure uniqueness across all dbs when making an account
+		// query all dbs when signing in.
+		// Or just create new spaces for languages/countries
 	},
 	(table) => [
 		primaryKey({

@@ -31,7 +31,7 @@
 	{#if supportsCredentiallessIframe}
 		<button
 			bind:this={toggleBtn}
-			class="h-6 w-6 bg-bg5 hover:bg-bg8 xy inline-flex translate-y-1"
+			class="h-6 w-6 bg-bg5 hover:bg-bg7 hover:text-fg3 xy inline-flex translate-y-1"
 			onclick={() => (open = !open)}
 			onkeydown={(e) => e.key === 'Escape' && (open = false)}
 		>

@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
-	import { goto, pushState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { scrollToHighlight, textInputFocused } from '$lib/dom';
-	import { gs, makeFeedIdentifier, resetBottomOverlay } from '$lib/global-state.svelte';
+	import { scrollToHighlight, scrollToLastY, textInputFocused } from '$lib/dom';
+	import {
+		getBottomOverlayShown,
+		gs,
+		makeFeedIdentifier,
+		resetBottomOverlay,
+	} from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
@@ -14,7 +19,6 @@
 		id0,
 		idsRegex,
 		isIdStr,
-		isTemplateId,
 		type FullIdObj,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
@@ -32,6 +36,7 @@
 		IconArchive,
 		IconChevronRight,
 		IconClockUp,
+		IconEye,
 		IconInbox,
 		IconList,
 		IconListTree,
@@ -43,6 +48,7 @@
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
+	import Apush from './Apush.svelte';
 	import PostBlock from './PostBlock.svelte';
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
@@ -55,12 +61,12 @@
 	let quoteRegex = /"([^"]+)"/g;
 	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; idParam?: string } = $props();
 	let postIdStrFeed = $state<string[]>([]);
-	let postAtBumpedPostsIdObjsExclude = $state<FullIdObj[]>();
+	let postAtBumpedPostIdObjsExclude = $state<FullIdObj[]>();
 	let endReached = $state(false);
-	let validUrl = $state(true);
+	let feedError = $state('');
 	let viewPostToastId = $state('');
 	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
-	let inLocal = $derived(idParamObj?.in_ms === 0);
+	let inLocal = $derived(!idParamObj?.in_ms);
 
 	let view = $derived<'flat' | 'nested'>(
 		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
@@ -73,6 +79,7 @@
 				? 'old'
 				: 'bumped';
 	});
+
 	let shown = $state(!p.hidden);
 	$effect(() => {
 		!shown && !p.hidden && (shown = true);
@@ -89,9 +96,11 @@
 			: '',
 	);
 	let nested = $derived(view === 'nested');
-	let showYourTurn = $derived((idParamObj?.in_ms || 0) > 0);
+	let isViewOnly = $derived((gs.accounts?.[0].ms || 0) > 0);
+	//
+	let showYourTurn = $derived(!isViewOnly && (idParamObj?.in_ms || 0) > 0);
 	let spotId = $derived(isIdStr(p.idParam) && p.idParam!);
-	let promptSignIn = $derived(getPromptSigningIn(idParamObj));
+	let promptSignIn = $derived(getPromptSigningIn());
 	let allowNewWriting = $derived(!p.modal && !promptSignIn && gs.currentSpaceMs !== 1);
 
 	let secondsRemaining = $state(-1);
@@ -111,6 +120,17 @@
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
 			if (!p.hidden && !textInputFocused()) {
+				// TODO: press b to sort feed by bumped
+				// TODO: press n to sort feed by new
+				// TODO: press o to sort feed by old
+				// TODO: press f to sort feed by first
+
+				// TODO: press r to reply to current highlighted or hovered post
+				// TODO: press e to edit to current highlighted or hovered post
+				// TODO: press c to cite current highlighted or hovered post
+
+				// TODO: press left/right to highlight next adjacent post
+				// TODO: press shift left/right to highlight next depth 0 post
 				if (
 					allowNewWriting &&
 					e.key === 'n' &&
@@ -140,17 +160,18 @@
 		}
 	});
 
-	$effect(() => {
-		if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
-			alert(m.signInToPostInThisSpace());
-			resetBottomOverlay();
-		}
-	});
+	// $effect(() => {
+	// 	if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
+	// 		alert(m.signInToPostInThisSpace());
+	// 		resetBottomOverlay();
+	// 	}
+	// });
 
 	$effect(() => {
 		identifier;
+		// TODO: use gs.indentifierToFeedMap with time/write based cache invalidations
 		postIdStrFeed = [];
-		postAtBumpedPostsIdObjsExclude = undefined;
+		postAtBumpedPostIdObjsExclude = undefined;
 		endReached = false;
 	});
 	let loadMorePosts = async (e: InfiniteEvent) => {
@@ -165,21 +186,17 @@
 		// TODO: load locally saved postIdStrFeed and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 
 		if (!idParamObj || !gs.accounts || promptSignIn) return;
-		validUrl = isTemplateId(p.idParam || '');
-		if (!validUrl) return e.detail.error();
-
 		if (endReached) return e.detail.complete();
 		let lastPostIdStr = (postIdStrFeed as (undefined | string)[]).slice(-1)[0];
 		let lastPostIdObj = lastPostIdStr ? getIdStrAsIdObj(lastPostIdStr) : null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
-
 		let baseQueryParams: GetPostFeedQuery = {
 			view,
 			sortedBy,
-			postAtBumpedPostsIdObjsExclude,
+			postAtBumpedPostIdObjsExclude,
 			fromMs:
 				sortedBy === 'bumped'
-					? postAtBumpedPostsIdObjsExclude?.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER
+					? postAtBumpedPostIdObjsExclude?.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER
 					: lastPostIdObj?.ms || //
 						(sortedBy === 'old' ? 0 : Number.MAX_SAFE_INTEGER),
 			byMssExclude: [],
@@ -194,94 +211,99 @@
 			coreIncludes: [],
 		};
 
-		if (spotId) {
-			postFeed = await getPostFeed({
-				...baseQueryParams,
-				postIdObjsInclude: [getIdStrAsIdObj(spotId)],
-			});
-			// console.log('postFeed:', postFeed);
-		} else {
-			// TODO: Instead of set theory, implement tag groups
-			let citedIds = getCitedPostIds(p.qSearchParam);
-			let tagsInclude = (p.qSearchParam?.match(bracketRegex) || []).map((match) =>
-				match.slice(1, -1),
-			);
-			let byMssInclude = p.qSearchParam.match(byMssRegex)?.map((a) => +a.slice(1)) || [];
-			let qSearchParamNoTagsOrAuthors = p.qSearchParam
-				.replace(bracketRegex, ' ')
-				.replace(byMssRegex, ' ');
-			let quotes = (qSearchParamNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
-				match.slice(1, -1),
-			);
-			let coreIncludes = [
-				...quotes,
-				...citedIds,
-				...qSearchParamNoTagsOrAuthors
-					.replace(quoteRegex, ' ')
-					.replace(idsRegex, ' ')
-					.split(/\s+/g)
-					.filter((a) => !!a)
-					.map((s) => s.toLowerCase()),
-			];
-
-			let lastRootIdObjsWithSameMs: IdObj[] = lastPostIdObj ? [lastPostIdObj] : [];
-			for (let i = postIdStrFeed.length - 1; i >= 0; i--) {
-				let split = getIdStrAsIdObj((postIdStrFeed as string[])[i]);
-				if (split.ms === lastPostIdObj!.ms) {
-					lastRootIdObjsWithSameMs.push(split);
-				} else break;
-			}
-
-			timeGetPostFeed && console.time('getPostFeed');
-			postFeed = await getPostFeed({
-				...baseQueryParams,
-				byMssInclude,
-				tagsInclude,
-				coreIncludes: coreIncludes,
-				postAtBumpedPostsIdObjsExclude,
-				postIdObjsExclude: [...lastRootIdObjsWithSameMs],
-			});
-			timeGetPostFeed && console.timeEnd('getPostFeed');
-			postAtBumpedPostsIdObjsExclude = postFeed.postAtBumpedPostsIdObjsExclude;
-		}
-		let { postIdStrFeed: newPostIdStrFeed, idToPostMap: newIdToPostMap } = postFeed;
-		let newPostMapEntries = Object.entries(newIdToPostMap);
-		for (let i = 0; i < newPostMapEntries.length; i++) {
-			let [id, post] = newPostMapEntries[i];
-			let lastVersion = getLastVersion(newIdToPostMap[id]);
-			if (lastVersion !== null && newIdToPostMap[id].history?.[lastVersion]) {
-				newIdToPostMap[id].history[lastVersion].tags =
-					newIdToPostMap[id].history[lastVersion].tags || [];
-				newIdToPostMap[id].history[lastVersion].tags.sort();
-				if (!lastVersion) newIdToPostMap[id].history[lastVersion].ms = getIdStrAsIdObj(id).ms!;
-			}
-			if (hasParent(post)) {
-				let strAtId = getAtIdStr(post);
-				if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...id0, history: {} };
-				gs.idToPostMap[strAtId].subIds = [
-					...new Set([...(gs.idToPostMap[strAtId]?.subIds || []), id]),
-				];
-				gs.idToPostMap[strAtId].subIds.sort(
-					(a, b) => getIdStrAsIdObj(b).ms! - getIdStrAsIdObj(a).ms!,
+		try {
+			if (spotId) {
+				postFeed = await getPostFeed({
+					...baseQueryParams,
+					postIdObjsInclude: [getIdStrAsIdObj(spotId)],
+				});
+			} else {
+				// TODO: Instead of set theory, implement tag groups
+				let citedIds = getCitedPostIds(p.qSearchParam);
+				let tagsInclude = (p.qSearchParam?.match(bracketRegex) || []).map((match) =>
+					match.slice(1, -1),
 				);
+				let byMssInclude = p.qSearchParam.match(byMssRegex)?.map((a) => +a.slice(1)) || [];
+				let qSearchParamNoTagsOrAuthors = p.qSearchParam
+					.replace(bracketRegex, ' ')
+					.replace(byMssRegex, ' ');
+				let quotes = (qSearchParamNoTagsOrAuthors.match(quoteRegex) || []).map((match) =>
+					match.slice(1, -1),
+				);
+				let coreIncludes = [
+					...quotes,
+					...citedIds,
+					...qSearchParamNoTagsOrAuthors
+						.replace(quoteRegex, ' ')
+						.replace(idsRegex, ' ')
+						.split(/\s+/g)
+						.filter((a) => !!a)
+						.map((s) => s.toLowerCase()),
+				];
+
+				let lastRootIdObjsWithSameMs: IdObj[] = lastPostIdObj ? [lastPostIdObj] : [];
+				for (let i = postIdStrFeed.length - 1; i >= 0; i--) {
+					let split = getIdStrAsIdObj((postIdStrFeed as string[])[i]);
+					if (split.ms === lastPostIdObj!.ms) {
+						lastRootIdObjsWithSameMs.push(split);
+					} else break;
+				}
+
+				timeGetPostFeed && console.time('getPostFeed');
+				postFeed = await getPostFeed({
+					...baseQueryParams,
+					byMssInclude,
+					tagsInclude,
+					coreIncludes: coreIncludes,
+					postAtBumpedPostIdObjsExclude,
+					postIdObjsExclude: [...lastRootIdObjsWithSameMs],
+				});
+				timeGetPostFeed && console.timeEnd('getPostFeed');
+				postAtBumpedPostIdObjsExclude = postFeed.postAtBumpedPostIdObjsExclude;
 			}
-			gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...newIdToPostMap[id] };
-		}
+			let { postIdStrFeed: newPostIdStrFeed, idToPostMap: newIdToPostMap } = postFeed;
+			let newPostMapEntries = Object.entries(newIdToPostMap);
+			for (let i = 0; i < newPostMapEntries.length; i++) {
+				let [id, post] = newPostMapEntries[i];
+				let lastVersion = getLastVersion(newIdToPostMap[id]);
+				if (lastVersion !== null && newIdToPostMap[id].history?.[lastVersion]) {
+					newIdToPostMap[id].history[lastVersion].tags =
+						newIdToPostMap[id].history[lastVersion].tags || [];
+					newIdToPostMap[id].history[lastVersion].tags.sort();
+					if (!lastVersion) newIdToPostMap[id].history[lastVersion].ms = getIdStrAsIdObj(id).ms!;
+				}
+				if (hasParent(post)) {
+					let strAtId = getAtIdStr(post);
+					if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...id0, history: {} };
+					gs.idToPostMap[strAtId].subIds = [
+						...new Set([...(gs.idToPostMap[strAtId]?.subIds || []), id]),
+					];
+					gs.idToPostMap[strAtId].subIds.sort(
+						(a, b) => getIdStrAsIdObj(b).ms! - getIdStrAsIdObj(a).ms!,
+					);
+				}
+				gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...newIdToPostMap[id] };
+			}
 
-		endReached = newPostIdStrFeed.length < postsPerLoad;
-		postIdStrFeed = [...postIdStrFeed, ...newPostIdStrFeed];
-		newPostIdStrFeed.length && e.detail.loaded();
-		endReached && e.detail.complete();
+			endReached = newPostIdStrFeed.length < postsPerLoad;
+			postIdStrFeed = [...new Set([...postIdStrFeed, ...newPostIdStrFeed])];
+			newPostIdStrFeed.length && e.detail.loaded();
+			endReached && e.detail.complete();
 
-		// console.log('cool', JSON.stringify(gs.idToPostMap['587026800000_0_0'], null, 2));
-		if (
-			p.idParam === '__0' &&
-			!p.qSearchParam &&
-			endReached &&
-			!postIdStrFeed.length &&
-			!newPostIdStrFeed.length
-		) {
-			startCountDown();
+			// console.log('cool', JSON.stringify(gs.idToPostMap['587026800000_0_0'], null, 2));
+			if (
+				p.idParam === '__0' &&
+				!p.qSearchParam &&
+				endReached &&
+				!postIdStrFeed.length &&
+				!newPostIdStrFeed.length
+			) {
+				startCountDown();
+			}
+		} catch (error) {
+			// @ts-ignore
+			feedError = String(error?.message || m.placeholderError());
+			e.detail.error();
 		}
 	};
 
@@ -338,7 +360,7 @@
 				post.subIds = [];
 				if (!inLocal) await addPost(post, true);
 			} catch (error) {
-				console.log(error);
+				console.error(error);
 				return alert(error);
 			}
 		}
@@ -377,35 +399,48 @@
 			setTimeout(() => scrollToHighlight(spotId), 0);
 		}
 	});
+
+	let endingPanelClass = $derived.by(() =>
+		!!gs.pendingInvite //
+			? `h-[calc(100vh-36px-36px)] xs:h-[calc(100vh-36px)]`
+			: 'h-[calc(100vh-36px)]  xs:h-screen',
+	);
 </script>
 
 <div
 	id={p.hidden ? '' : 'feed'}
-	class={`z-50 overflow-y-scroll flex flex-col h-screen ${p.hidden ? 'hidden' : ''}`}
+	class={`z-50 flex flex-col ${gs.pendingInvite ? 'h- screen-[calc(100vh-36px)]' : 'h- screen'} ${p.hidden ? 'hidden' : ''}`}
 >
 	{#if !idParamObj}
 		<!--  -->
 	{:else if promptSignIn}
 		<PromptSignIn />
-	{:else if idParamObj?.in_ms === 1}
-		patience
+		<!-- {:else if idParamObj?.in_ms === 1}
+		patience -->
 	{:else if idParamObj}
-		<!-- <p class="font-bold text-xl">All Local posts</p> -->
-		{#if showYourTurn}
-			<div class="min-h-9 fx">
+		{#if isViewOnly}
+			<div class="shrink-0 h-9 fx">
+				<IconEye class="w-6 ml-0.5 mr-2" />
+				<p class="font-bold text-xl">{m.viewOnlyMode()}</p>
+			</div>
+			<p class="ml-1.5">
+				{"You may contribute to this space once you're invited"}
+			</p>
+		{:else if showYourTurn}
+			<div class="shrink-0 h-9 fx">
 				<IconInbox class="w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl">Your turn</p>
+				<p class="font-bold text-xl">{m.yourTurn()}</p>
 			</div>
 			<p class="ml-1.5">
 				{@html m.signInToSeePostsAwaitingYourResponse()}
 			</p>
 			<div class="mt-2 fx">
 				<IconStack2 class="w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl leading-4">All posts</p>
+				<p class="font-bold text-xl leading-4">{m.nextUp()}</p>
 			</div>
 		{/if}
 		<div
-			class={`${spotId ? 'hidden' : ''} ${showYourTurn ? 'min-h-8' : 'min-h-9'} flex w-full text-fg2 overflow-scroll`}
+			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${spotId ? 'hidden' : ''}`}
 		>
 			<a
 				href={makeParams('nested', sortedBy)}
@@ -446,21 +481,20 @@
 			{#if spotId && i === 1}
 				<p class="m-2 text-center text-fg2 text-lg">{m.citedIn()}</p>
 			{/if}
-			<PostBlock {...p} {nested} {post} depth={0} />
+			<PostBlock {...p} {post} depth={0} nested={spotId ? !i : nested} />
 		{/each}
 		<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
-			<p slot="noResults" class="m-2 text-lg text-fg2">
-				<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
-				{postObjFeed?.length ? m.endOfFeed() : m.noPostsFound()}
-			</p>
-			<div
-				slot="noMore"
-				class={`${gs.writingNew || gs.writingTo || gs.writingEdit ? 'h-[calc(100vh-var(--h-post-writer))]' : 'h-screen'}`}
-			>
+			<div slot="noResults" class={endingPanelClass}>
+				<p class="m-2 text-lg text-fg2">
+					<!-- TODO: noResults shows after deleting the one and only post then making another new post in Local  -->
+					{postObjFeed?.length ? m.endOfFeed() : m.noPostsFound()}
+				</p>
+			</div>
+			<div slot="noMore" class={endingPanelClass}>
 				<p class="m-2 text-lg text-fg2">{m.endOfFeed()}</p>
 			</div>
 			<p slot="error" class="m-2 text-lg text-fg2">
-				{validUrl ? m.placeholderError() : m.invalidUrl()}
+				{feedError}
 			</p>
 		</InfiniteLoading>
 		{#if secondsRemaining >= 0}
@@ -471,16 +505,17 @@
 			</div>
 		{/if}
 	{/if}
-	{#if p.modal && idParamObj}
+	{#if p.modal}
 		<a
 			href={`/__${idParamObj.in_ms}`}
-			class="z-50 fixed xy right-1 bottom-1 h-9 w-9 bg-bg5 border-b-4 border-hl1 hover:bg-bg7 hover:border-hl2"
+			onclick={scrollToLastY}
+			class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
 		>
 			<IconX class="w-8" />
 		</a>
 	{:else if allowNewWriting}
 		<button
-			class="z-40 fixed xy right-1 bottom-10 xs:bottom-1 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3"
+			class="z-40 fixed xy right-0 bottom-9 xs:bottom-0 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
 			onclick={() => (gs.writingNew = true)}
 		>
 			<IconPencilPlus class="h-8 xs:h-9" />
@@ -488,7 +523,7 @@
 	{/if}
 	<div class="flex-1"></div>
 	<div
-		class={`sticky bottom-0 z-50 h-[var(--h-post-writer)] ${gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit ? '' : 'hidden'}`}
+		class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}
 	>
 		{#if gs.showReactionHistory}
 			<ReactionHistory />
@@ -497,18 +532,12 @@
 		{/if}
 	</div>
 	{#if viewPostToastId}
-		<a
+		<Apush
 			href={'/' + viewPostToastId}
-			class="fx z-50 fixed h-10 pl-2 font-semibold bottom-2 self-center bg-bg5 hover:bg-bg7 border-b-4 border-hl1 hover:border-hl2"
-			onclick={(e) => {
-				if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-					e.preventDefault();
-					pushState('/' + viewPostToastId, { modalId: viewPostToastId });
-				}
-			}}
+			class="z-50 fixed bottom-2 self-center fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 		>
 			{m.viewPost()}
 			<IconChevronRight class="h-5" stroke={3} />
-		</a>
+		</Apush>
 	{/if}
 </div>

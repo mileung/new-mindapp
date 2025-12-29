@@ -9,6 +9,7 @@
 	import type { RxnEmoji } from '$lib/types/reactions';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
 	import { IconChartBarPopular, IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
+	import Apush from './Apush.svelte';
 	import CoreParser from './CoreParser.svelte';
 	import Highlight from './Highlight.svelte';
 	import Self from './PostBlock.svelte';
@@ -25,7 +26,7 @@
 	let container: HTMLDivElement;
 	let open = $state(true);
 	let parsed = $state(true);
-	let postId = $derived(getIdStr(p.post));
+	let postIdStr = $derived(getIdStr(p.post));
 	let evenBg = $derived(!(p.depth % 2));
 	let atPostIdStr = $derived(getAtIdStr(p.post));
 	let atPost = $derived(gs.idToPostMap[atPostIdStr]);
@@ -50,10 +51,10 @@
 			let { history } = await getPostHistory(getFullIdObj(p.post), v);
 			if (!history) return;
 			Object.keys(history).forEach((key) => history[key]?.tags?.sort());
-			gs.idToPostMap[postId] = {
-				...gs.idToPostMap[postId]!,
+			gs.idToPostMap[postIdStr] = {
+				...gs.idToPostMap[postIdStr]!,
 				history: {
-					...gs.idToPostMap[postId]!.history,
+					...gs.idToPostMap[postIdStr]!.history,
 					...history,
 				},
 			};
@@ -71,7 +72,14 @@
 	});
 </script>
 
-<div bind:this={container} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
+<div
+	bind:this={container}
+	class={`flex ${
+		p.cited //
+			? `cited-hlc-${postIdStr}`
+			: `hlc-${postIdStr} ${p.nested || !atPostIdStr ? '' : `flat-at-hlc-${atPostIdStr}`}`
+	} ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}
+>
 	{#if !p.cited}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -82,7 +90,7 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class="z-0 sticky top-0 bg-inherit h-5 w-5 xy">
+			<div class={`z-0 sticky bg-inherit h-5 w-5 xy ${!!gs.pendingInvite ? 'top-9' : 'top-0'}`}>
 				{#if open}
 					<IconMinus stroke={2.5} class="w-4" />
 				{:else}
@@ -93,48 +101,31 @@
 	{/if}
 	<div class={`bg-inherit flex-1 ${p.cited ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}>
 		<div class={`relative bg-inherit`}>
-			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
+			<div
+				class={`z-10 bg-inherit ${p.cited ? '' : `sticky ${!!gs.pendingInvite ? 'top-9' : 'top-0'}`}`}
+			>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
-						<a
-							href={`/_${p.post.by_ms}_${p.post.in_ms}`}
-							class={`fx group hover:text-fg1`}
-							onclick={(e) => {
-								// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-								// 	e.preventDefault();
-								// 	let accountInSpaceId = `/_${p.post.by_ms}_${p.post.in_ms}`;
-								// 	pushState(
-								// 		accountInSpaceId, //
-								// 		{ modalId: accountInSpaceId },
-								// 	);
-								// }
-							}}
-						>
+						<Apush href={`/_${atPost.by_ms}_${atPost.in_ms}`} class={`fx group hover:text-fg1`}>
 							<div
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
 								<!-- TODO: text color matches UserIcon -->
-								<p class={`font-bold ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}>
+								<p class={`font-bold ${gs.idToPostMap[atPost.by_ms] ? '' : 'italic'}`}>
 									<!-- TODO: names for users -->
-									<!-- {p.post.by_ms ? getAccountName(...) || identikana(p.post.by_ms) : m.anon()} -->
+									<!-- {atPost.by_ms ? accountMsToName(...) || identikana(atPost.by_ms) : m.anon()} -->
 									{identikana(atPost.by_ms)}
 								</p>
 							</div>
-						</a>
-						<a
-							href={'/' + getIdStr(p.post)}
+						</Apush>
+						<Apush
+							href={'/' + getIdStr(atPost)}
 							class={`fx hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-							onclick={(e) => {
-								// if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-								// 	e.preventDefault();
-								// 	pushState('/' + p.post.atId, { modalId: p.post.atId! });
-								// }
-							}}
 						>
 							<p class={`mr-1 ${atPostDeleted ? 'text-fg2 font-bold italic text-xs' : ''}`}>
 								: {atPostTxt}
 							</p>
-						</a>
+						</Apush>
 						<button
 							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 							onclick={() => {
@@ -145,7 +136,7 @@
 						>
 							<IconCornerUpLeft class="w-5" />
 						</button>
-						<Highlight reply {evenBg} postId={atPostIdStr} />
+						<Highlight reply {evenBg} postIdStr={atPostIdStr} />
 					</div>
 				{/if}
 				<PostHeader
@@ -161,12 +152,12 @@
 				/>
 				<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->
 			</div>
-			{#if !open && hasParent(p.post)}
-				<Highlight {evenBg} postId={atPostIdStr} class="-left-0.5" />
+			{#if !open && !p.nested && hasParent(p.post)}
+				<Highlight {evenBg} postIdStr={atPostIdStr} class="-left-0.5" />
 			{/if}
 			<Highlight
-				main
-				{postId}
+				main={!p.cited}
+				{postIdStr}
 				{evenBg}
 				class={p.nested || !p.cited ? '-left-5' : p.cited ? '-left-2.5 -bot tom-1' : ''}
 			/>
@@ -175,12 +166,12 @@
 					{#if tags?.length || rxnCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags || [] as tag (tag)}
-								<a
+								<Apush
 									href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
 									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}
-								</a>
+								</Apush>
 							{/each}
 							{#each rxnCountEntries as [emoji, count], i}
 								<button
@@ -219,7 +210,7 @@
 											onclick={() => {
 												resetBottomOverlay('rh');
 												gs.showReactionHistory =
-													gs.showReactionHistory && postId === getIdStr(gs.showReactionHistory)
+													gs.showReactionHistory && postIdStr === getIdStr(gs.showReactionHistory)
 														? null
 														: p.post;
 											}}

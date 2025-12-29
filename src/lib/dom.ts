@@ -1,25 +1,38 @@
+import { page } from '$app/state';
+
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
 export let getPostWriterHeight = () =>
 	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
 
+export let scrollToLastY = () => {
+	let { lastScrollY = 0 } = page.state;
+	setTimeout(() => window.scrollTo({ top: lastScrollY }), 1);
+};
+
 export let scrollToHighlight = (id: string) => {
-	let feedContainer = document.getElementById('feed');
+	let hlc =
+		document.querySelector('.hlc-' + id) || //
+		document.querySelector('.flat-at-hlc-' + id) ||
+		document.querySelector('.cited-hlc-' + id);
 	let hl =
-		document.querySelector('#post-' + id) || //
-		document.querySelector('.post-' + id);
-	hl &&
-		feedContainer?.scrollTo({
+		document.querySelector('#hl-' + id) || //
+		document.querySelector('.hl-' + id);
+	if (hlc && hl) {
+		let { top: hlcTop } = hlc.getBoundingClientRect();
+		let { height: hlHeight } = hl.getBoundingClientRect();
+		window.scrollTo({
 			top:
-				hl.getBoundingClientRect().bottom +
-				feedContainer.scrollTop - //
-				feedContainer.getBoundingClientRect().height +
+				window.scrollY -
+				(window.innerHeight - hlcTop) +
+				hlHeight + //
 				getPostWriterHeight(),
 			behavior: 'smooth',
 		});
+	}
 };
 
-export function scrape(externalUrl: string, externalDomString: string) {
+export let scrape = (externalUrl: string, externalDomString: string) => {
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
 
 	let urlScrapers: Record<
@@ -142,4 +155,9 @@ export function scrape(externalUrl: string, externalDomString: string) {
 		).trim(),
 		url: scraped?.url || externalUrl,
 	};
-}
+};
+
+export let getHoverColors = () => {
+	// TODO: for borders, bgs, etc
+	// Difference in hover and default state should be 2 or 3 levels idk yet
+};

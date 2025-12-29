@@ -2,28 +2,28 @@
 	import { dev } from '$app/environment';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/global-state.svelte';
-	import { identikana, ranInt } from '$lib/js';
+	import { ranInt } from '$lib/js';
 	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { day } from '$lib/time';
-	import { getLocalCache } from '$lib/types/local-cache';
+	import { getLocalCache, signOut } from '$lib/types/local-cache';
 	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
-	import { pt } from '$lib/types/parts/partFilters';
+	import { pf } from '$lib/types/parts/partFilters';
 	import { getIdObjAsAtIdObj, getIdStr, id0 } from '$lib/types/parts/partIds';
 	import { pTable } from '$lib/types/parts/partsTable';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
-	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
+	import { IconArrowMerge, IconDownload, IconLogout2, IconTrash } from '@tabler/icons-svelte';
 	import { and, asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
-	import AccountIcon from '../AccountIcon.svelte';
+	import SpaceOrAccountHeader from '../SpaceOrAccountHeader.svelte';
 	let setAccountsAndSpaces = () => {
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.idToSpaceMap = localCache.spaces;
+		gs.msToSpaceMap = localCache.msToSpaceMap;
 	};
 	let language = $state('en');
 </script>
@@ -38,15 +38,25 @@
 	{/if}
 	<p class="text-xl font-bold">{m.account()}</p>
 	{#if gs.accounts}
-		{#if !gs.accounts[0].ms}
-			<p>{m.anon()}</p>
-		{:else}
-			<div class="fx h-10">
-				<AccountIcon class="h-10 w-10" ms={gs.accounts[0].ms} />
-				<p class="ml-2 font-medium text-lg">{identikana(gs.accounts[0].ms)}</p>
-			</div>
-			<p>{m.ms()}: <span class="font-medium">{gs.accounts[0].ms}</span></p>
-			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
+		<SpaceOrAccountHeader
+			isAccount
+			ms={gs.accounts[0].ms}
+			name="teste"
+			bio="this is a test"
+			onChange={(changes) => {
+				console.log('changes:', changes);
+			}}
+		/>
+		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+		<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
+		{#if gs.accounts[0].ms}
+			<button
+				class="xy px-2 py-1 bg-bg5 hover:bg-bg7 text-fg1"
+				onclick={() => signOut(gs.accounts![0].ms, true)}
+			>
+				<IconLogout2 class="w-5 mr-1" />
+				{m.signOutEverywhere()}
+			</button>
 		{/if}
 	{/if}
 	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
@@ -54,7 +64,7 @@
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
 	<select
 		name={m.theme()}
-		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 hover:text-fg3 text-fg1"
 		value={gs.theme}
 		onchange={(e) => {
 			// @ts-ignore
@@ -71,7 +81,7 @@
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
 	<select
 		name={m.language()}
-		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+		class="font-normal text-lg w-full p-2 bg-bg5 hover:bg-bg7 hover:text-fg3 text-fg1"
 		bind:value={language}
 	>
 		<option value="en">English</option>
@@ -157,8 +167,8 @@
 												.from(pTable)
 												.where(
 													and(
-														pt.id(post), //
-														pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+														pf.id(post), //
+														pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 													),
 												)
 										)[0],
@@ -210,7 +220,7 @@
 				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
 			} catch (e) {
 				alert('Error deleting db' + String(e));
-				console.log('error deleteDatabaseFile:', e);
+				console.error('error deleteDatabaseFile:', e);
 				// deleteDatabaseFile is slow and unreliable
 				await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
 			}
@@ -228,12 +238,12 @@
 		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 		<p class="text-xl font-bold">Dev Tools</p>
 		<button
-			class="xy px-2 py-1 bg-red-500/20 hover:bg-yellow-500/30 text-yellow-500"
+			class="xy px-2 py-1 bg-yellow-400/20 hover:bg-yellow-500/30 text-yellow-500"
 			onclick={async () => {
 				try {
 					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
 				} catch (e) {
-					console.log('error deleteDatabaseFile:', e);
+					console.error('error deleteDatabaseFile:', e);
 				}
 				gs.indentifierToFeedMap = {};
 				await initLocalDb();

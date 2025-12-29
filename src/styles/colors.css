@@ -17,7 +17,6 @@
 		--hl-link: var(--color-teal-400);
 		--hl-edit: var(--color-red-400);
 		--hl-spot: var(--color-yellow-400);
-		--hl-cite: var(--color-zinc-400);
 		--fg1: #2c353a;
 		--fg2: #6d6d69;
 		--fg3: #000;
@@ -40,7 +39,6 @@
 		--hl-link: var(--color-teal-300);
 		--hl-edit: var(--color-red-300);
 		--hl-spot: var(--color-yellow-300);
-		--hl-cite: var(--color-zinc-500);
 		--fg1: #e8e8e7;
 		--fg2: #a5a5a4;
 		--fg3: #fff;

@@ -1,12 +1,15 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
+	import { passwordRegexStr, type MyAccount } from '$lib/types/accounts';
 	import { updateLocalCache } from '$lib/types/local-cache';
-	import { getBaseInput } from '$lib/types/parts';
+	import { getWhoObj } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
+	import { usePendingInvite } from '$lib/types/spaces';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 
 	let p: {
@@ -28,8 +31,27 @@
 		type: showingPw ? '' : 'password',
 		minlength: 8,
 		maxlength: 64,
-		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1',
+		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8',
 	});
+
+	$effect(() => {
+		email = page.state.email || '';
+	});
+
+	let onAccountClaimed = (account?: MyAccount) => {
+		if (account) {
+			updateLocalCache((lc) => ({
+				...lc,
+				accounts: [
+					{ ...account, signedIn: true },
+					...lc.accounts.filter((a) => a.ms !== account.ms),
+				],
+			}));
+			gs.pendingInvite //
+				? usePendingInvite()
+				: goto(`/__${gs.currentSpaceMs}`);
+		}
+	};
 </script>
 
 {#snippet pwInputs()}
@@ -57,7 +79,7 @@
 		bind:value={password}
 		autocomplete={p.signingIn ? 'current-password' : 'new-password'}
 		{...pwIptProps}
-		pattern={`(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,64}`}
+		pattern={passwordRegexStr}
 		title={m.charactersIncludingOnesFromAZAZ_0_9()}
 	/>
 	{#if !p.signingIn}
@@ -76,7 +98,7 @@
 	<div class="mt-2 flex items-end w-full justify-between">
 		<button
 			type="submit"
-			class="fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 border-b-4 border-hl1 hover:border-hl2"
+			class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 		>
 			{m.continue()}
 			<IconChevronRight class="h-5" stroke={3} /></button
@@ -95,7 +117,7 @@
 	</div>
 {/snippet}
 
-<div class="xy min-h-screen p-5">
+<div class={`xy p-2 ${!gs.pendingInvite ? 'min-h-screen' : 'min-h-[calc(100vh-36px)]'}`}>
 	<div class="w-full max-w-sm">
 		{#if resettingPassword}
 			<p class="text-3xl font-black">{m.resetPassword()}</p>
@@ -105,15 +127,16 @@
 				onsubmit={async (e) => {
 					e.preventDefault();
 					try {
-						// let res = await trpc().auth.resetPassword.mutate({
-						// 	email,
-						// 	pin,
-						// 	otpMs,
-						// 	password,
-						// });
+						let res = await trpc().resetPassword.mutate({
+							...(await getWhoObj()),
+							otpMs,
+							pin,
+							email,
+							password,
+						});
 						// TODO: sign in
 					} catch (error) {
-						console.log('error:', error);
+						console.error(error);
 						alert(error);
 					}
 				}}
@@ -131,46 +154,42 @@
 					e.preventDefault();
 					try {
 						let strike: undefined | number;
-						let baseInput = await getBaseInput();
-						if (p.signingIn) {
-							let res = await trpc().auth.attemptSignIn.mutate({
-								...baseInput,
-								email,
-								password,
-								otpMs,
-								pin,
-							});
-							strike = res?.strike;
-						} else if (p.creatingAccount) {
-							let res = await trpc().auth.attemptCreateAccount.mutate({
-								...baseInput,
-								name,
-								email,
-								password,
-								otpMs,
-								pin,
-							});
-							strike = res?.strike;
-							let { account } = res;
-							if (account) {
-								updateLocalCache((lc) => {
-									lc.accounts = [account, ...lc.accounts.filter((a) => a.ms !== account.ms)];
-									return lc;
-								});
-								goto(`/__${gs.currentSpaceMs}`, {});
-							}
+						let expiredOtp: undefined | true;
+						if (p.signingIn || p.creatingAccount) {
+							let res = p.signingIn
+								? await trpc().signIn.mutate({
+										email,
+										password,
+										otpMs,
+										pin,
+									})
+								: await trpc().createAccount.mutate({
+										name,
+										email,
+										password,
+										otpMs,
+										pin,
+									});
+							console.log('res:', res);
+							if (res.fail) return alert(m.anErrorOccurred());
+							strike = res.strike;
+							expiredOtp = res.expiredOtp;
+							onAccountClaimed(res.account);
 						} else if (p.resettingPassword) {
-							let res = await trpc().auth.checkOtp.mutate({
-								...baseInput,
+							let res = await trpc().checkOtp.mutate({
 								otpMs,
 								pin,
 								email,
-								partCode: pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
+								partCode: pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
 							});
 							strike = res?.strike;
-							if (!strike) resettingPassword = true;
+							expiredOtp = res?.expiredOtp;
+							if (!strike && !expiredOtp) resettingPassword = true;
 						}
-						console.log('strike:', strike);
+						if (expiredOtp) {
+							alert(m.expiredOneTimePin());
+							email = pin = '';
+						}
 						if (strike) {
 							if (strike > 2) {
 								alert(m.tooManyFailedAttempts());
@@ -178,7 +197,7 @@
 							} else alert(m.incorrectOneTimePin());
 						}
 					} catch (error) {
-						console.log('error:', error);
+						console.error(error);
 						alert(error);
 					}
 				}}
@@ -186,7 +205,7 @@
 				<p class="mt-2 font-bold">{m.oneTimePin()}</p>
 				<input
 					bind:value={pin}
-					class="bg-bg4 w-full px-2 h-9 text-lg"
+					class="bg-bg4 w-full px-2 h-9 text-lg border-l-2 border-bg8"
 					required
 					maxlength={8}
 					minlength={8}
@@ -209,41 +228,44 @@
 			<form
 				class="mt-2"
 				onsubmit={async (e) => {
-					console.log('e:', e);
 					e.preventDefault();
+					if ((p.creatingAccount || p.signingIn) && gs.accounts!.length >= 88) {
+						return alert(m.placeholderError()); // gs.accounts.length must be lte88
+					}
 					try {
-						let baseInput = await getBaseInput();
 						let normalizedEmail = email.trim().toLowerCase();
 						if (p.signingIn) {
-							let signedInAccount = gs.accounts?.find((a) => a.email === normalizedEmail);
+							let signedInAccount = gs.accounts?.find(
+								(a) => a.signedIn && a.email === normalizedEmail,
+							);
 							if (signedInAccount) {
-								updateLocalCache((lc) => {
-									lc.accounts = [
+								console.log('signedInAccount:', signedInAccount);
+								updateLocalCache((lc) => ({
+									...lc,
+									accounts: [
 										signedInAccount,
 										...lc.accounts.filter((a) => a.ms !== signedInAccount.ms),
-									];
-									return lc;
-								});
+									],
+								}));
 								return goto(`/__${gs.currentSpaceMs}`);
 							}
-							let res = await trpc().auth.attemptSignIn.mutate({
-								...baseInput,
+							let res = await trpc().signIn.mutate({
 								email: normalizedEmail,
 								password,
 							});
+							if (res.fail) return alert(m.anErrorOccurred());
 							if (res.otpMs) {
 								otpMs = res.otpMs;
 								email = normalizedEmail;
 								pin = dev ? '00000000' : '';
 							}
-							return;
+							onAccountClaimed(res.account);
 						} else {
-							let res = await trpc().auth.sendOtp.mutate({
-								...baseInput,
+							let res = await trpc().sendOtp.mutate({
 								email,
 								partCode: p.creatingAccount
-									? pc.createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount
-									: pc.resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount,
+									? pc.createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount
+									: pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
 							});
 							name = name.trim();
 							otpMs = res.otpMs;
@@ -251,7 +273,7 @@
 							pin = dev ? '00000000' : '';
 						}
 					} catch (error) {
-						console.log('error:', error);
+						console.error(error);
 						alert(error);
 					}
 				}}
@@ -264,7 +286,7 @@
 						type="name"
 						maxlength={88}
 						autocomplete="given-name"
-						class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+						class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8"
 					/>
 				{/if}
 				<p class="mt-2 font-bold">{m.email()}</p>
@@ -272,9 +294,10 @@
 					required
 					bind:value={email}
 					type="email"
+					minlength={6}
 					maxlength={254}
 					autocomplete="username"
-					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
+					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8"
 				/>
 				{#if p.creatingAccount || p.signingIn}
 					{@render pwInputs()}

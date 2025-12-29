@@ -2,7 +2,7 @@ import { gs } from '$lib/global-state.svelte';
 import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { gsdb } from '../../local-db';
-import { pt } from './partFilters';
+import { pf } from './partFilters';
 import { getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
 import { pTable } from './partsTable';
 
@@ -12,24 +12,39 @@ export type PartSelect = typeof pTable.$inferSelect;
 export let PartInsertSchema = createInsertSchema(pTable);
 export let PartSelectSchema = createSelectSchema(pTable);
 
-export let BaseInputSchema = z.object({
+export let WhoObjSchema = z.object({
 	callerMs: z.number(),
-	spaceMs: z.number(),
 });
-export type BaseInput = z.infer<typeof BaseInputSchema>;
+export type WhoObj = z.infer<typeof WhoObjSchema>;
 
-export let getBaseInput = async () => {
+export let WhoWhereObjSchema = WhoObjSchema.merge(
+	z.object({
+		spaceMs: z.number(),
+	}),
+);
+export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
+
+export let getWhoObj = async () => {
+	let attempts = 0;
+	while (gs.accounts === undefined) {
+		if (++attempts > 888) throw new Error(`getWhoObj timed out`);
+		await new Promise((res) => setTimeout(res, 42));
+	}
+	return {
+		callerMs: gs.accounts[0].ms,
+	} satisfies WhoObj;
+};
+
+export let getWhoWhereObj = async () => {
 	let attempts = 0;
 	while (gs.accounts === undefined || gs.currentSpaceMs === undefined) {
-		if (++attempts > 888) {
-			throw new Error(`getBaseInput ${attempts} ${JSON.stringify(gs)} error`);
-		}
+		if (++attempts > 888) throw new Error(`getWhoWhereObj timed out`);
 		await new Promise((res) => setTimeout(res, 42));
 	}
 	return {
 		callerMs: gs.accounts[0].ms,
 		spaceMs: gs.currentSpaceMs,
-	} satisfies BaseInput;
+	} satisfies WhoWhereObj;
 };
 
 export let hasParent = (part: FullIdObj) =>
@@ -38,7 +53,7 @@ export let hasParent = (part: FullIdObj) =>
 	part.at_in_ms !== 0;
 
 export let overwriteLocalPost = async (t: PartInsert) => {
-	await (await gsdb()).update(pTable).set(t).where(pt.id(t));
+	await (await gsdb()).update(pTable).set(t).where(pf.id(t));
 };
 
 export let assertLt2Rows = (parts: PartSelect[]) => {

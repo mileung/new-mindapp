@@ -1,8 +1,7 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
-	import { pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { gs, resetBottomOverlay, spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { copyToClipboard, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
@@ -18,6 +17,7 @@
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import { reactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
+	import { spaceMsToName } from '$lib/types/spaces';
 	import {
 		IconBrowserMinus,
 		IconBrowserShare,
@@ -37,6 +37,7 @@
 		IconX,
 	} from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
+	import Apush from './Apush.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
 	let p: {
@@ -51,18 +52,18 @@
 		onChangeVersion: (v: number) => void;
 	} = $props();
 	let moreOptionsOpen = $state(false);
-	let strPostId = $derived(getIdStr(p.post));
+	let postIdStr = $derived(getIdStr(p.post));
 	let versionMs = $derived(
 		p.version === null || p.post.history === null ? null : p.post.history[p.version]?.ms,
 	);
 
 	let msLabel = $derived.by(() => {
 		if (p.version === null) return formatMs(p.post.ms!);
-		let str = formatMs(versionMs || 0, p.version < p.lastVersion!);
+		let str = formatMs(versionMs || 0, p.version < p.lastVersion! ? 'ms' : '');
 		let edited = Object.keys(p.post.history || {}).some((k) => +k > 1);
 		return `${str}${edited ? '*' : ''}`;
 	});
-	let isoMsLabel = $derived.by(() => formatMs(versionMs || p.post.ms!, true));
+	let isoMsLabel = $derived.by(() => formatMs(versionMs || p.post.ms!, 'ms'));
 
 	let copyClicked = $state(false);
 	let handleCopyClick = () => {
@@ -83,65 +84,56 @@
 <div class="group/div h-5 fx w-full">
 	<div class="fx flex-1 overflow-scroll text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			<a
-				href={'/' + strPostId}
-				class="fx group hover:text-fg1"
-				title={isoMsLabel}
-				onclick={(e) => {
-					if (!e.metaKey && !e.shiftKey && !e.ctrlKey) {
-						e.preventDefault();
-						pushState('/' + strPostId, { modalId: strPostId });
-					}
-				}}
-			>
+			<Apush href={'/' + postIdStr} class="fx group hover:text-fg1" title={isoMsLabel}>
 				<div class={`pr-1 ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					{msLabel}
 				</div>
-			</a>
-			<a
+			</Apush>
+			<Apush
 				href={`/_${p.post.by_ms}_${p.post.in_ms}`}
 				class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-					<AccountIcon ms={p.post.by_ms} class="mr-0.5 w-4 min-w-4" />
+					<AccountIcon ms={p.post.by_ms} class="mr-0.5 shrink-0 w-4" />
 					<p class="pr-1">
 						<!-- TODO: names for users -->
-						<!-- {p.post.by_ms ? getAccountName(...) || identikana(p.post.by_ms) : m.anon()} -->
+						<!-- {p.post.by_ms ? accountMsToName(...) || identikana(p.post.by_ms) : m.anon()} -->
+						<!-- TODO: getNameByAccountMs -->
 						{identikana(p.post.by_ms)}
 					</p>
 				</div>
-			</a>
+			</Apush>
 			{#if p.post.in_ms !== gs.currentSpaceMs}
-				<a
+				<Apush
 					href={`/__${p.post.in_ms}`}
 					class={`fx group hover:text-fg1 ${p.post.in_ms ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 w-4 min-w-4" />
+						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
 						<p class="pr-0.5">
-							{spaceMsToSpaceName(p.post.in_ms)}
+							{spaceMsToName(p.post.in_ms)}
 						</p>
 					</div>
-				</a>
+				</Apush>
 			{/if}
 			<button
 				class="fx group hover:text-fg1"
 				onmousedown={(e) => e.preventDefault()}
 				onclick={() => {
 					gs.writingNew = true;
-					gs.writerCore = `${gs.writerCore}\n${strPostId}`;
+					gs.writerCore = `${gs.writerCore}\n${postIdStr}`;
 				}}
 			>
 				<div class={`h-5 px-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					<IconSquarePlus2 stroke={2.5} class="w-4" />
 				</div>
 			</button>
-			<div class="flex-1 min-w-4 fx group hover:text-fg1">
+			<div class="flex-1 shrink-0 w-4 fx group hover:text-fg1">
 				<button
 					class="fx h-full flex-1"
 					onclick={() => {
 						resetBottomOverlay('wt');
-						gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === strPostId ? null : p.post;
+						gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === postIdStr ? null : p.post;
 					}}
 				>
 					<div class={`h-5 fx w-full ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -153,7 +145,7 @@
 				>
 					{#each reactionList.slice(0, 4) as emoji}
 						<button
-							class="text-sm w-7 xy hover:bg-bg7 grayscale-75 hover:grayscale-0"
+							class="text-sm w-7 xy hover:bg-bg7 hover:text-fg3 grayscale-75 hover:grayscale-0"
 							onclick={async () => {
 								await toggleReaction({
 									...getIdObjAsAtIdObj(p.post),
@@ -277,15 +269,15 @@
 						if (ok) {
 							let useRpc = getIdStrAsIdObj(page.state.modalId || page.params.id || '').in_ms !== 0;
 							let { soft } = await deletePost(getFullIdObj(p.post), null, useRpc);
-							if (soft) gs.idToPostMap[strPostId]!.history = null;
+							if (soft) gs.idToPostMap[postIdStr]!.history = null;
 							else {
 								let parentPostIdStr = getAtIdStr(p.post);
 								if (hasParent(p.post) && gs.idToPostMap[parentPostIdStr]?.subIds) {
 									gs.idToPostMap[parentPostIdStr].subIds = [
-										...gs.idToPostMap[parentPostIdStr].subIds.filter((id) => id !== strPostId),
+										...gs.idToPostMap[parentPostIdStr].subIds.filter((id) => id !== postIdStr),
 									];
 								}
-								gs.idToPostMap[strPostId] = null;
+								gs.idToPostMap[postIdStr] = null;
 							}
 						}
 					}}
@@ -314,7 +306,7 @@
 						onclick={() => {
 							gs.showReactionHistory = gs.writingNew = gs.writingTo = null;
 							gs.writingEdit =
-								gs.writingEdit && getIdStr(gs.writingEdit) === strPostId ? null : p.post;
+								gs.writingEdit && getIdStr(gs.writingEdit) === postIdStr ? null : p.post;
 						}}
 					>
 						<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -336,6 +328,6 @@
 				</button>
 			{/if}
 		</div>
-		{#if dev}{strPostId}{/if}
+		{#if dev}{postIdStr}{/if}
 	</div>
 </div>

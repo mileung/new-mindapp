@@ -5,7 +5,9 @@ let uniqueMapVals = <const T extends Record<string, number>>(dict: UniqueValues<
 
 export let pc = uniqueMapVals({
 	postIdWithNumAsLastVersionAtParentPostId: 0,
-	childPostIdWithNumAsDepthAtRootId: 1,
+	childPostIdWithNumAsDepthAtRootId: 1, // TODO: grandchildren and later
+	// remoteDescendantPostIdWithNumAsDepthAtRootId
+	// NumAsDepth isn't actually necessary
 	postIdAtCitedPostId: 2,
 	reactionIdWithEmojiTxtAtPostId: 3,
 
@@ -24,28 +26,73 @@ export let pc = uniqueMapVals({
 	reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId: 32,
 
 	spaceId: 40,
-	txtAsSpaceNameToSpaceId: 41,
-	spaceInviteWithAcceptanceMsAsNumAtAccountId: 42,
-	lastSpaceViewMsAtAccountId: 43,
-	spaceRoleNumAsIdAtAccountId: 44,
+	spaceVisibilityIdNum: 41,
+	newUsersCanPostIdNum: 42,
+	spaceNameIdTxt: 43,
+	spaceDescriptionIdTxt: 44,
+	joinMsByMsAtInviteId: 45,
+	canWriteIdNumAtAccountId: 46,
+	promotionToModIdAtAccountId: 47,
+	promotionToOwnerIdAtAccountId: 48,
 
 	accountId: 50,
-	msAndTxtAsNameAtAccountId: 51,
-	txtAsAccountEmailAtAccountId: 52,
-	txtAsAccountPwHashAtAccountId: 53,
+	emailMsTxtAtAccountId: 51,
+	pwHashMsTxtAtAccountId: 52,
+	nameMsTxtAtAccountId: 53,
+	bioMsTxtAtAccountId: 54,
+	savedTagsMsTxtAtAccountId: 55,
 
-	// accountIdInContactsSinceMsAtAccountId: 54,
-	// accountHandleAtAccountId: 51,
-	// contactNote: 56,
+	clientKeyTxtMsAtAccountId: 60,
+	sessionKeyTxtMsAtAccountId: 61,
+	createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 62,
+	signInOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 63,
+	resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 64,
 
-	msAndTxtAsClientIdAtAccountId: 60,
-	createAccountOtpWithTxtAsEmailColonPinAndNumAsStrikeCount: 61,
-	signInOtpWithTxtAsEmailColonPinAndNumAsStrikeCount: 62,
-	resetPasswordOtpWithTxtAsEmailColonPinAndNumAsStrikeCount: 63,
-
-	msAndTxtAsSessionIdAtAccountId: 70,
-	// sessionIdWithTxtAsKeyAndNumAsExpiryAtAccountId: 70,
+	inviteMsByMsWithNumAsUseCountAndTxtAsSlugAtSpaceId: 70,
+	validForNumAtInviteId: 71,
+	maxUsesNumAtInviteId: 72,
+	revokeMsByMsAtInviteId: 74,
 
 	postIdAtBumpedRootId: 80,
-	// reactionIdAtBumpedRootId: 81,
+	LastSpaceViewId: 81,
+	lastSpacePostId: 82,
+	// lastSpacePostMsAtLastSpaceViewId: 81,
 });
+
+// spaceRoleId8AndTxtWithNumAsCount: 33,
+// modIdAtPromoterId:22551225,
+// ownerIdAtPromoterId:225512255,
+// currentSpaceRoleIdAtAccountId: 44,
+// exSpaceRoleIdAtAccountId: 45,
+// joinMsByMsAtInviteId: 46,
+// exitIdAtAccountId: 47,
+
+// memberIdAtDemoterId:2255270,
+// currentMemberIdAtInviteId:2255122552,
+// currentModIdAtInviteId:22551225,
+// currentOwnerIdAtInviteId:225512255,
+// exMemberIdAtInviteId:22551,
+
+// promoteToModIdAtAccountId:1222,
+// promoteToCoOwnerIdAtAccountId:122,
+// demoteToModIdAtAccountId:1252,
+// demoteToMemberIdAtAccountId:12252,
+
+// accountIdWithNumAsLastSeenMsAtSpaceId: 43,
+// exSpaceRoleIdAtAccountId: 45,
+// spaceInviteWithAcceptanceMsAsNumAtAccountId: 42,
+
+// badgeIdAtAccountId
+// spaceIdAtAccountId
+
+// useMsByMsAtInviteId:76,
+// exitMsByMsAtInviteId:77,
+
+// acceptMsByMsAtInviteId: 73,
+// revokeMsByMsAtInviteId: 74,
+
+// kickIdAtAccountId:59,
+// muteIdAtAccountId:58,
+// banMsByMsAtInviteId:,
+// canReadAndWrite
+// canOnlyRead

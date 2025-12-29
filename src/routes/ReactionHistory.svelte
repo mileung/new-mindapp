@@ -12,6 +12,7 @@
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from './AccountIcon.svelte';
+	import Apush from './Apush.svelte';
 	import Highlight from './Highlight.svelte';
 
 	let post = $derived(gs.showReactionHistory);
@@ -47,9 +48,9 @@
 		<div class="flex group bg-bg4 relative w-full">
 			<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
 			<button
-				class="truncate flex-1 h-8 pl-2 text-left fx gap-1"
+				class="flex-1 h-8 pl-2 fx gap-1 truncate text-left"
 				onclick={() => {
-					let post = gs.writingEdit || gs.writingTo;
+					let post = gs.showReactionHistory;
 					post && scrollToHighlight(getIdStr(post));
 				}}
 			>
@@ -61,24 +62,24 @@
 			<button class="w-8 xy hover:bg-bg7 hover:text-fg3" onclick={() => resetBottomOverlay()}>
 				<IconX class="w-5" />
 			</button>
-			<Highlight noScrollTo postId={getIdStr(post)} />
+			<Highlight noScrollTo postIdStr={getIdStr(post)} />
 		</div>
 		{#each reactions || [] as rxn, i (getIdStr(rxn))}
 			<div class="px-1 flex">
 				{rxn.emoji}
-				<a
+				<Apush
 					href={`/_${post.by_ms}_${post.in_ms}`}
 					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.idToPostMap[post.by_ms] ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx`}>
-						<AccountIcon ms={post.by_ms} class="mr-0.5 w-4 min-w-4" />
+						<AccountIcon isUser ms={post.by_ms} class="mr-0.5 shrink-0 w-4" />
 						<p class="pr-1">
 							<!-- TODO: names for users -->
-							<!-- {post.by_ms ? getAccountName(...) || identikana(post.by_ms) : m.anon()} -->
+							<!-- {post.by_ms ? accountMsToName(...) || identikana(post.by_ms) : m.anon()} -->
 							{identikana(post.by_ms)}
 						</p>
 					</div>
-				</a>
+				</Apush>
 				<p class="text-fg2">{formatMs(rxn.ms)}</p>
 			</div>
 		{/each}

@@ -9,7 +9,7 @@ export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 export let localDbFilename = 'mindapp.db';
 
 // https://sqlocal.dev/guide/introduction
-export async function initLocalDb() {
+export let initLocalDb = async () => {
 	let { sql } = new SQLocalDrizzle(localDbFilename);
 	try {
 		await sql`
@@ -31,11 +31,11 @@ export async function initLocalDb() {
 			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
 	`;
 	} catch (error) {
-		console.log('error:', error);
+		console.error(error);
 	}
-}
+};
 
-export async function gsdb() {
+export let gsdb = async () => {
 	let attempts = 0;
 	while (!gs.db) {
 		if (++attempts > 888) {
@@ -45,4 +45,4 @@ export async function gsdb() {
 		await new Promise((res) => setTimeout(res, 42));
 	}
 	return gs.db;
-}
+};

@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gs, spaceMsToSpaceName } from '$lib/global-state.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
-	import { getPromptSigningIn } from '$lib/types/spaces';
+	import { getPromptSigningIn, spaceMsToName } from '$lib/types/spaces';
 	import { getSpaceTags, tagsPerLoad } from '$lib/types/spaces/getSpaceTags';
 	import { IconSquare, IconSquareCheckFilled } from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
+	import Apush from '../../Apush.svelte';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
 	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
@@ -51,26 +52,26 @@
 
 {#if !idParamObj}
 	<!--  -->
-{:else if getPromptSigningIn(idParamObj)}
+{:else if getPromptSigningIn()}
 	<PromptSignIn />
 {:else}
 	<div class="p-2 w-full max-w-lg">
 		<p class="text-xl font-bold">
 			<!-- {numTags === 1
-				? m.oneSpaceNameTag({ spaceName: spaceMsToSpaceName(idParamObj.in_ms) })
-				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToSpaceName(idParamObj.in_ms) })} -->
-			{m.spaceNameTags({ spaceName: spaceMsToSpaceName(idParamObj.in_ms) })}
+				? m.oneSpaceNameTag({ spaceName: spaceMsToName(idParamObj.in_ms) })
+				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(idParamObj.in_ms) })} -->
+			{m.spaceNameTags({ spaceName: spaceMsToName(idParamObj.in_ms) })}
 		</p>
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
-				{i + 1}.
 				{tag.num} -
-				<a
+				<!-- use Apush here? -->
+				<Apush
 					href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag.txt}]`)}`}
 					class="px-1 font-bold hover:underline hover:bg-bg3"
 				>
 					{tag.txt}
-				</a>
+				</Apush>
 				<button
 					class="group flex-1 hover:bg-bg3 pr-1"
 					onclick={() => updateSavedTags([tag.txt], savedTags.has(tag.txt))}

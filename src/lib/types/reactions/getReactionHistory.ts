@@ -3,9 +3,9 @@ import { trpc } from '$lib/trpc/client';
 import { and, asc, desc } from 'drizzle-orm';
 import type { Reaction, RxnEmoji } from '.';
 import { gsdb } from '../../local-db';
-import { getBaseInput } from '../parts';
+import { getWhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { getIdObj, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
@@ -16,9 +16,14 @@ export let getReactionHistory = async (
 	fromMs: number,
 	rxnIdObjsExclude: IdObj[],
 ) => {
-	let baseInput = await getBaseInput();
+	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
-		? trpc().getReactionHistory.query({ ...baseInput, postIdObj, fromMs, rxnIdObjsExclude })
+		? trpc().getReactionHistory.query({
+				...baseInput,
+				postIdObj,
+				fromMs,
+				rxnIdObjsExclude,
+			})
 		: _getReactionHistory(await gsdb(), {
 				...baseInput,
 				postIdObj,
@@ -38,22 +43,22 @@ export let _getReactionHistory = async (
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
-	let reactionIdWithEmojiTxtAtPostIdObjs = await db
+	let reactionIdWithEmojiTxtAtPostIdRows = await db
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pt.idAsAtId(input.postIdObj),
-				and(...input.rxnIdObjsExclude.map((t) => pt.notId(t))),
-				pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-				pt.ms.lte(input.fromMs),
+				pf.idAsAtId(input.postIdObj),
+				and(...input.rxnIdObjsExclude.map((t) => pf.notId(t))),
+				pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+				pf.ms.lte(input.fromMs),
 			),
 		)
 		.orderBy(desc(pTable.num), asc(pTable.txt))
 		.limit(reactionsPerLoad);
 
 	return {
-		reactions: reactionIdWithEmojiTxtAtPostIdObjs.map(
+		reactions: reactionIdWithEmojiTxtAtPostIdRows.map(
 			(r) =>
 				({
 					...id0,

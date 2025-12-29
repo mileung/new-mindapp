@@ -7,6 +7,8 @@ declare global {
 		// interface PageData {}
 		interface PageState {
 			modalId?: string;
+			lastScrollY?: number;
+			email?: string;
 		}
 		// interface Platform {}
 	}

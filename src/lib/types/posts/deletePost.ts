@@ -6,13 +6,13 @@ import {
 	assert1Row,
 	assertLt2Rows,
 	channelPartsByCode,
-	getBaseInput,
+	getWhoWhereObj,
 	hasParent,
 	makePartsUniqueById,
 	type PartInsert,
 } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
@@ -21,7 +21,7 @@ export let deletePost = async (
 	version: null | number,
 	forceUsingLocalDb?: boolean,
 ) => {
-	let baseInput = await getBaseInput();
+	let baseInput = await getWhoWhereObj();
 	return forceUsingLocalDb || !baseInput.spaceMs
 		? _deletePost(await gsdb(), fullPostIdObj, version)
 		: trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version });
@@ -31,60 +31,60 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	let deleteAllVersions = version === null;
 	let partsToInsert: PartInsert[] = [];
 
-	let mainPIdWNumAsLastVersionAtPPIdObjsFilter = and(
-		pt.atId(fullPostIdObj),
-		pt.id(fullPostIdObj),
-		pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-		pt.txt.isNull,
+	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
+		pf.atId(fullPostIdObj),
+		pf.id(fullPostIdObj),
+		pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+		pf.txt.isNull,
 	);
-	let postIdAtBumpedRootIdObjsFilter = and(
-		pt.id(fullPostIdObj),
-		pt.code.eq(pc.postIdAtBumpedRootId),
-		pt.num.eq0,
-		pt.txt.isNull,
+	let postIdAtBumpedRootIdRowsFilter = and(
+		pf.id(fullPostIdObj),
+		pf.code.eq(pc.postIdAtBumpedRootId),
+		pf.num.eq0,
+		pf.txt.isNull,
 	);
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdObjs = [],
-		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdObjs = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPIdObjsToDelete = [],
-		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdObjs = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdObjsToDelete = [],
-		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdRows = [],
+		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdRows = [],
+		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
+		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRowsToDelete = [],
+		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					mainPIdWNumAsLastVersionAtPPIdObjsFilter,
-					postIdAtBumpedRootIdObjsFilter,
+					mainPIdWNumAsLastVersionAtPPIdRowsFilter,
+					postIdAtBumpedRootIdRowsFilter,
 					and(
-						pt.idAsAtId(fullPostIdObj),
-						pt.ms.gt0,
+						pf.idAsAtId(fullPostIdObj),
+						pf.ms.gt0,
 						or(
-							pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-							pt.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
-							pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
-							pt.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
+							pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+							pf.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
+							pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+							pf.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
 						),
-						version === null ? undefined : pt.num.eq(version),
-						pt.txt.isNull,
+						version === null ? undefined : pf.num.eq(version),
+						pf.txt.isNull,
 					),
 				),
 			),
 	);
 
-	let mainPIdWNumAsLastVersionAtPPIdObj = assert1Row(mainPIdWNumAsLastVersionAtPPIdObjs);
-	let lastVersion = mainPIdWNumAsLastVersionAtPPIdObj.num!;
+	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(mainPIdWNumAsLastVersionAtPPIdRows);
+	let lastVersion = mainPIdWNumAsLastVersionAtPPIdRow.num!;
 	let versionIsLastVersion = version === lastVersion;
 	if (!lastVersion && versionIsLastVersion && !deleteAllVersions) deleteAllVersions = true;
 
 	if (deleteAllVersions || versionIsLastVersion) {
 		await moveTagCoreOrRxnCountsBy1(
 			db,
-			curPostTagIdWNumAsVersionAtPIdObjsToDelete,
-			curPostCoreIdWNumAsVrsnAtPIdObjsToDelete,
+			curPostTagIdWNumAsVersionAtPIdRowsToDelete,
+			curPostCoreIdWNumAsVrsnAtPIdRowsToDelete,
 			[],
 			false,
 		);
@@ -99,34 +99,34 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			.from(pTable)
 			.where(
 				and(
-					pt.idAsAtId(fullPostIdObj),
-					pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-					pt.num.gte0,
-					pt.txt.isNull,
+					pf.idAsAtId(fullPostIdObj),
+					pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+					pf.num.gte0,
+					pf.txt.isNull,
 				),
 			)
 			.limit(1)
 	).length;
 
-	let postIdAtBumpedRootIdObj = assertLt2Rows(postIdAtBumpedRootIdObjs);
+	let postIdAtBumpedRootIdRow = assertLt2Rows(postIdAtBumpedRootIdRows);
 	let deleteFilters: (undefined | SQL)[] = [];
 
 	if (deleteAllVersions) {
 		postIsParent &&
-			(await db.update(pTable).set({ num: 0 }).where(mainPIdWNumAsLastVersionAtPPIdObjsFilter));
+			(await db.update(pTable).set({ num: 0 }).where(mainPIdWNumAsLastVersionAtPPIdRowsFilter));
 		deleteFilters.push(
 			...(postIsParent
 				? []
 				: [
-						mainPIdWNumAsLastVersionAtPPIdObjsFilter,
+						mainPIdWNumAsLastVersionAtPPIdRowsFilter,
 						and(
-							pt.id(fullPostIdObj), //
-							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-							pt.num.gte0,
+							pf.id(fullPostIdObj), //
+							pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+							pf.num.gte0,
 						),
 					]),
 			and(
-				pt.idAsAtId(fullPostIdObj),
+				pf.idAsAtId(fullPostIdObj),
 				or(
 					...[
 						pc.currentVersionNumAndMsAtPostId,
@@ -137,26 +137,26 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						pc.exPostTagIdWithNumAsVersionAtPostId,
 						pc.currentPostCoreIdWithNumAsVersionAtPostId,
 						pc.exPostCoreIdWithNumAsVersionAtPostId,
-					].map((c) => pt.code.eq(c)),
+					].map((c) => pf.code.eq(c)),
 				),
-				pt.num.gte0,
+				pf.num.gte0,
 			),
 		);
-		if (postIdAtBumpedRootIdObj) {
-			deleteFilters.push(postIdAtBumpedRootIdObjsFilter);
+		if (postIdAtBumpedRootIdRow) {
+			deleteFilters.push(postIdAtBumpedRootIdRowsFilter);
 			let previousChildPostIdAtBumpRootIdObj = (
 				await db
 					.select()
 					.from(pTable)
 					.where(
 						and(
-							pt.atId(postIdAtBumpedRootIdObj),
-							pt.notId(fullPostIdObj),
-							pt.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-							pt.num.gte0,
+							pf.atId(postIdAtBumpedRootIdRow),
+							pf.notId(fullPostIdObj),
+							pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+							pf.num.gte0,
 						),
 					)
-					.orderBy(pt.ms.desc)
+					.orderBy(pf.ms.desc)
 					.limit(1)
 			)[0];
 			hasParent(fullPostIdObj) &&
@@ -164,8 +164,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 					...(previousChildPostIdAtBumpRootIdObj
 						? getFullIdObj(previousChildPostIdAtBumpRootIdObj)
 						: {
-								...getAtIdObj(postIdAtBumpedRootIdObj),
-								...getAtIdObjAsIdObj(postIdAtBumpedRootIdObj),
+								...getAtIdObj(postIdAtBumpedRootIdRow),
+								...getAtIdObjAsIdObj(postIdAtBumpedRootIdRow),
 							}),
 					code: pc.postIdAtBumpedRootId,
 					num: 0,
@@ -177,14 +177,14 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	}
 
 	let checkForNum0Tags =
-		curPostTagIdWNumAsVersionAtPIdObjsToDelete.length ||
-		exPostTagIdWithNumAsVersionAtPostIdObjs.length;
+		curPostTagIdWNumAsVersionAtPIdRowsToDelete.length ||
+		exPostTagIdWithNumAsVersionAtPostIdRows.length;
 	let checkForNum0Cores =
-		curPostCoreIdWNumAsVrsnAtPIdObjsToDelete.length ||
-		exPostCoreIdWithNumAsVersionAtPostIdObjs.length;
+		curPostCoreIdWNumAsVrsnAtPIdRowsToDelete.length ||
+		exPostCoreIdWithNumAsVersionAtPostIdRows.length;
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: num0tagIdAndTxtWithNumAsCountObjs = [],
-		[pc.coreId8AndTxtWithNumAsCount]: num0coreIdAndTxtWithNumAsCountObjs = [],
+		[pc.tagId8AndTxtWithNumAsCount]: num0tagIdAndTxtWithNumAsCountRows = [],
+		[pc.coreId8AndTxtWithNumAsCount]: num0coreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		checkForNum0Tags || checkForNum0Cores
 			? await db
@@ -194,32 +194,32 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						or(
 							checkForNum0Tags
 								? and(
-										pt.noParent,
-										pt.ms.gt0,
+										pf.noParent,
+										pf.ms.gt0,
 										or(
 											...makePartsUniqueById([
-												...curPostTagIdWNumAsVersionAtPIdObjsToDelete,
-												...exPostTagIdWithNumAsVersionAtPostIdObjs,
-											]).map((r) => pt.id(r)),
+												...curPostTagIdWNumAsVersionAtPIdRowsToDelete,
+												...exPostTagIdWithNumAsVersionAtPostIdRows,
+											]).map((r) => pf.id(r)),
 										),
-										pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
-										pt.num.eq0,
-										pt.txt.isNotNull,
+										pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+										pf.num.eq0,
+										pf.txt.isNotNull,
 									)
 								: undefined,
 							checkForNum0Cores
 								? and(
-										pt.noParent,
-										pt.ms.gt0,
+										pf.noParent,
+										pf.ms.gt0,
 										or(
 											...makePartsUniqueById([
-												...curPostCoreIdWNumAsVrsnAtPIdObjsToDelete,
-												...exPostCoreIdWithNumAsVersionAtPostIdObjs,
-											]).map((r) => pt.id(r)),
+												...curPostCoreIdWNumAsVrsnAtPIdRowsToDelete,
+												...exPostCoreIdWithNumAsVersionAtPostIdRows,
+											]).map((r) => pf.id(r)),
 										),
-										pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
-										pt.num.eq0,
-										pt.txt.isNotNull,
+										pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+										pf.num.eq0,
+										pf.txt.isNotNull,
 									)
 								: undefined,
 						),
@@ -229,14 +229,14 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	await selectTagOrCoreTxtRowsToDelete(
 		db,
 		fullPostIdObj,
-		num0tagIdAndTxtWithNumAsCountObjs,
+		num0tagIdAndTxtWithNumAsCountRows,
 		deleteFilters,
 		true,
 	);
 	await selectTagOrCoreTxtRowsToDelete(
 		db,
 		fullPostIdObj,
-		num0coreIdAndTxtWithNumAsCountObjs,
+		num0coreIdAndTxtWithNumAsCountRows,
 		deleteFilters,
 		false,
 	);

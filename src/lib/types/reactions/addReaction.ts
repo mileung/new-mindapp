@@ -6,18 +6,18 @@ import {
 	assert1Row,
 	assertLt2Rows,
 	channelPartsByCode,
-	getBaseInput,
+	getWhoWhereObj,
 	type PartInsert,
 } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { getFullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
 export let addReaction = async (rxn: Reaction) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	let baseInput = await getBaseInput();
+	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
 		? trpc().addReaction.mutate({ ...baseInput, rxn }) //
 		: _addReaction(await gsdb(), rxn);
@@ -43,8 +43,8 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 	];
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdObj = [],
-		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -52,36 +52,36 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 			.where(
 				or(
 					and(
-						pt.atIdAsId(reactionIdWithEmojiTxtAtPostIdObj),
-						pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-						pt.num.gte0,
-						pt.txt.isNull,
+						pf.atIdAsId(reactionIdWithEmojiTxtAtPostIdObj),
+						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.num.gte0,
+						pf.txt.isNull,
 					),
 					and(
-						pt.atId(reactionIdWithEmojiTxtAtPostIdObj),
-						pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-						pt.num.gte0,
-						pt.txt.eq(rxn.emoji),
+						pf.atId(reactionIdWithEmojiTxtAtPostIdObj),
+						pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+						pf.num.gte0,
+						pf.txt.eq(rxn.emoji),
 					),
 				),
 			),
 	);
-	if (reactionIdWithEmojiTxtAtPostIdObjs.length) throw new Error(`Already added this reaction`);
-	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdObj);
-	let reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdObj = assertLt2Rows(
+	if (reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Already added this reaction`);
+	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdRows);
+	let reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdRow = assertLt2Rows(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				and(
-					pt.atId(reactionIdWithEmojiTxtAtPostIdObj),
-					pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-					pt.num.gte0,
-					pt.txt.eq(rxn.emoji),
+					pf.atId(reactionIdWithEmojiTxtAtPostIdObj),
+					pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+					pf.num.gte0,
+					pf.txt.eq(rxn.emoji),
 				),
 			),
 	);
-	if (reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdObj) {
+	if (reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdRow) {
 		await moveTagCoreOrRxnCountsBy1(db, [], [], [{ ...rxn, ms }], true);
 	} else {
 		partsToInsert.push({

@@ -2,15 +2,15 @@ import { trpc } from '$lib/trpc/client';
 import { and, or, SQL } from 'drizzle-orm';
 import { ReactionSchema, type Reaction } from '.';
 import { gsdb, type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode, getBaseInput } from '../parts';
+import { assert1Row, channelPartsByCode, getWhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
 export let removeReaction = async (rxn: Reaction) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	let baseInput = await getBaseInput();
+	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
 		? trpc().removeReaction.mutate({ ...baseInput, rxn }) //
 		: _removeReaction(await gsdb(), rxn);
@@ -18,9 +18,9 @@ export let removeReaction = async (rxn: Reaction) => {
 
 export let _removeReaction = async (db: Database, rxn: Reaction) => {
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdObj = [],
-		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdObjs = [],
-		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmTxtWUnqMsAndNumAsCtAtPostIdObjs = [],
+		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
+		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmTxtWUnqMsAndNumAsCtAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -28,50 +28,50 @@ export let _removeReaction = async (db: Database, rxn: Reaction) => {
 			.where(
 				or(
 					and(
-						pt.atIdAsId(rxn),
-						pt.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-						pt.num.gte0,
-						pt.txt.isNull,
+						pf.atIdAsId(rxn),
+						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.num.gte0,
+						pf.txt.isNull,
 					),
 					and(
-						pt.atId(rxn),
-						pt.by_ms.eq(rxn.by_ms),
-						pt.in_ms.eq(rxn.in_ms),
-						pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-						pt.num.eq0,
-						pt.txt.eq(rxn.emoji),
+						pf.atId(rxn),
+						pf.by_ms.eq(rxn.by_ms),
+						pf.in_ms.eq(rxn.in_ms),
+						pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+						pf.num.eq0,
+						pf.txt.eq(rxn.emoji),
 					),
 					and(
-						pt.atId(rxn),
-						pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-						pt.num.gte0,
-						pt.txt.eq(rxn.emoji),
+						pf.atId(rxn),
+						pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+						pf.num.gte0,
+						pf.txt.eq(rxn.emoji),
 					),
 				),
 			),
 	);
-	if (!reactionIdWithEmojiTxtAtPostIdObjs.length) throw new Error(`Reaction dne`);
-	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdObj);
+	if (!reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Reaction dne`);
+	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdRows);
 	let deleteFilters: (undefined | SQL)[] = [
 		and(
-			pt.atId(rxn),
-			pt.by_ms.eq(rxn.by_ms),
-			pt.in_ms.eq(rxn.in_ms),
-			pt.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-			pt.num.eq0,
-			pt.txt.eq(rxn.emoji),
+			pf.atId(rxn),
+			pf.by_ms.eq(rxn.by_ms),
+			pf.in_ms.eq(rxn.in_ms),
+			pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+			pf.num.eq0,
+			pf.txt.eq(rxn.emoji),
 		),
 	];
-	let rEmTxtWUnqMsAndNumAsCtAtPostIdObj = assert1Row(rEmTxtWUnqMsAndNumAsCtAtPostIdObjs);
-	if (rEmTxtWUnqMsAndNumAsCtAtPostIdObj.num! > 1) {
+	let rEmTxtWUnqMsAndNumAsCtAtPostIdRow = assert1Row(rEmTxtWUnqMsAndNumAsCtAtPostIdRows);
+	if (rEmTxtWUnqMsAndNumAsCtAtPostIdRow.num! > 1) {
 		await moveTagCoreOrRxnCountsBy1(db, [], [], [rxn], false);
 	} else {
 		deleteFilters.push(
 			and(
-				pt.atId(rEmTxtWUnqMsAndNumAsCtAtPostIdObj),
-				pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-				pt.num.eq(1),
-				pt.txt.eq(rxn.emoji),
+				pf.atId(rEmTxtWUnqMsAndNumAsCtAtPostIdRow),
+				pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+				pf.num.eq(1),
+				pf.txt.eq(rxn.emoji),
 			),
 		);
 	}

@@ -3,7 +3,7 @@ import { and, or, SQL, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { idObjMatchesIdObj, type PartInsert, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pt } from '../parts/partFilters';
+import { pf } from '../parts/partFilters';
 import { idsRegex, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import type { Reaction } from '../reactions';
@@ -99,24 +99,24 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 			or(
 				tagIdObjs.length
 					? and(
-							pt.at_ms.eq0,
-							pt.at_by_ms.eq0,
-							pt.at_in_ms.eq0,
-							or(...tagIdObjs.map((tagIdObj) => pt.id(tagIdObj))),
-							pt.code.eq(pc.tagId8AndTxtWithNumAsCount),
-							pt.num.gte0,
-							pt.txt.isNotNull,
+							pf.at_ms.eq0,
+							pf.at_by_ms.eq0,
+							pf.at_in_ms.eq0,
+							or(...tagIdObjs.map((tagIdObj) => pf.id(tagIdObj))),
+							pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+							pf.num.gte0,
+							pf.txt.isNotNull,
 						)
 					: undefined,
 				coreIdObjs.length
 					? and(
-							pt.at_ms.eq0,
-							pt.at_by_ms.eq0,
-							pt.at_in_ms.eq0,
-							or(...coreIdObjs.map((coreIdObj) => pt.id(coreIdObj))),
-							pt.code.eq(pc.coreId8AndTxtWithNumAsCount),
-							pt.num.gte0,
-							pt.txt.isNotNull,
+							pf.at_ms.eq0,
+							pf.at_by_ms.eq0,
+							pf.at_in_ms.eq0,
+							or(...coreIdObjs.map((coreIdObj) => pf.id(coreIdObj))),
+							pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+							pf.num.gte0,
+							pf.txt.isNotNull,
 						)
 					: undefined,
 				rxns.length
@@ -124,15 +124,15 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 							or(
 								...rxns.map((rxn) =>
 									and(
-										pt.atId(rxn), //
-										pt.txt.eq(rxn.emoji),
-										pt.in_ms.eq(rxn.in_ms),
+										pf.atId(rxn), //
+										pf.txt.eq(rxn.emoji),
+										pf.in_ms.eq(rxn.in_ms),
 									),
 								),
 							),
-							pt.ms.gt0,
-							pt.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-							pt.num.gte0,
+							pf.ms.gt0,
+							pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
+							pf.num.gte0,
 						)
 					: undefined,
 			),
@@ -155,19 +155,19 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 							.from(pTable)
 							.where(
 								and(
-									pt.notIdAsAtId(postIdObj),
-									pt.id(tagOrCoreIdObj),
+									pf.notIdAsAtId(postIdObj),
+									pf.id(tagOrCoreIdObj),
 									isTag
 										? or(
-												pt.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-												pt.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
 											)
 										: or(
-												pt.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
-												pt.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
 											),
-									pt.num.gte0,
-									pt.txt.isNull,
+									pf.num.gte0,
+									pf.txt.isNull,
 								),
 							)
 							.limit(1)
@@ -183,23 +183,23 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 		tagOrCoreTxtRowsToDel.length &&
 			deleteFilters.push(
 				and(
-					pt.at_ms.eq0,
-					pt.at_by_ms.eq0,
-					pt.at_in_ms.eq0,
+					pf.at_ms.eq0,
+					pf.at_by_ms.eq0,
+					pf.at_in_ms.eq0,
 					or(
 						...tagOrCoreTxtRowsToDel.map((r) =>
 							and(
-								pt.id(r), //
-								pt.txt.eq(r.txt!),
+								pf.id(r), //
+								pf.txt.eq(r.txt!),
 							),
 						),
 					),
-					pt.code.eq(
+					pf.code.eq(
 						isTag
 							? pc.tagId8AndTxtWithNumAsCount //
 							: pc.coreId8AndTxtWithNumAsCount,
 					),
-					pt.num.eq0,
+					pf.num.eq0,
 				),
 			);
 	}

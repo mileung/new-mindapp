@@ -88,7 +88,7 @@
 			// TODO: touchstart, touchmove, and touchend for mobile web
 			if (draggingHeight) {
 				let deltaY = startY - moveEvent.clientY;
-				let newHeight = Math.min(window.innerHeight - 100, Math.max(133, startHeight + deltaY));
+				let newHeight = Math.min(window.innerHeight - 100, Math.max(123, startHeight + deltaY));
 				document.documentElement.style.setProperty('--h-post-writer', `${newHeight}px`);
 			}
 		};
@@ -139,7 +139,7 @@
 	<div class="flex group bg-bg4 relative w-full">
 		<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
 		<button
-			class="truncate flex-1 h-8 pl-2 text-left fx gap-1"
+			class="flex-1 h-8 pl-2 fx gap-1 truncate text-left"
 			onclick={() => {
 				let post = gs.writingEdit || gs.writingTo;
 				post && scrollToHighlight(getIdStr(post));
@@ -174,16 +174,22 @@
 					{emoji}
 				</button>
 			{/each}
-			<button class="hidden w-7 xy hover:bg-bg8 hover:text-fg3">
+			<button class="hidden w-7 xy hover:bg-bg7 hover:text-fg3">
 				<IconMoodPlus class="w-4.5" />
 			</button>
 		{/if}
-		<button class="w-8 xy hover:bg-bg7 hover:text-fg3" onclick={() => resetBottomOverlay()}>
+		<button
+			class="w-8 xy hover:bg-bg7 hover:text-fg3"
+			onclick={() => {
+				// TODO: cycle through main, flat at, and cited blocks
+				resetBottomOverlay();
+			}}
+		>
 			<IconX class="w-5" />
 		</button>
 		<Highlight
 			noScrollTo
-			postId={gs.writingTo
+			postIdStr={gs.writingTo
 				? getIdStr(gs.writingTo)
 				: gs.writingEdit
 					? getIdStr(gs.writingEdit)
@@ -224,7 +230,7 @@
 			bind:this={tagsIpt}
 			bind:value={gs.writerTagVal}
 			autocomplete="off"
-			class="flex-1 px-2 text-lg"
+			class="flex-1 px-2 text-lg border-l-2 border-bg8"
 			placeholder={m.tags()}
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
@@ -332,14 +338,14 @@
 			bind:this={coreTa}
 			bind:value={gs.writerCore}
 			placeholder={m.organizeToday()}
-			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9"
+			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9 border-l-2 border-bg8"
 			onkeydown={(e) => {
 				e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 				e.metaKey && e.key === 'Enter' && submit();
 			}}
 		></textarea>
 		<div
-			class="top-0 right-0 absolute xy h-10 w-10 cursor-grab active:cursor-grabbing hover:text-fg3"
+			class="top-0 right-0 absolute xy h-8 w-8 cursor-grab active:cursor-grabbing hover:text-fg3"
 			onmousedown={(e) => {
 				e.preventDefault();
 				draggingHeight = true;
@@ -350,10 +356,10 @@
 			<IconGripVertical class="w-5" />
 		</div>
 		<button
-			class="bottom-1 right-1 absolute xy h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3"
+			class="bottom-0 right-0 absolute xy h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
 			onclick={submit}
 		>
-			<IconArrowUp class="h-9 w-9" />
+			<IconArrowUp class="h-8 w-8" />
 		</button>
 	</div>
 </div>

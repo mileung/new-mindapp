@@ -2,23 +2,30 @@ import { PopupMessage } from './background';
 
 let dev = import.meta.env.VITE_ENV === 'DEV';
 let preview = import.meta.env.VITE_ENV === 'PREVIEW';
-chrome.runtime.onMessage.addListener((msg) => {
-	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type)) openPopup(true);
-});
 
-let mindappPreviewUrl = 'http://localhost:1111';
-let mindappNewDevUrl = 'http://localhost:8888';
-let mindappNewUrl = 'https://new.mindapp.cc';
-let mindappOldDevUrl = 'http://localhost:1234';
-let mindappOldUrl = 'https://mindapp.cc';
+// TODO: Users should be able to assign shortcuts in /settings
+// The frontend and bg script would send messages and
+// save settings in chrome.storage.sync
+
+let oldMindappDevUrl = 'http://localhost:1234';
+let oldMindappUrl = 'https://mindapp.cc';
+
+let newMindappDevUrl = 'http://localhost:8888';
+let newMindappPreviewUrl = 'http://localhost:1111';
+let newMindappUrl = 'https://new.mindapp.cc';
+
+chrome.runtime.onMessage.addListener((msg) => {
+	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type))
+		openPopup(newMindappUrl);
+});
 
 if (
 	[
-		mindappPreviewUrl,
-		mindappNewDevUrl,
-		mindappNewUrl, //
-		mindappOldDevUrl,
-		mindappOldUrl,
+		oldMindappDevUrl,
+		oldMindappUrl,
+		newMindappDevUrl,
+		newMindappPreviewUrl,
+		newMindappUrl, //
 	].some((url) => location.href.startsWith(url))
 ) {
 	window.addEventListener('message', async (event) => {
@@ -35,26 +42,27 @@ if (
 }
 
 window.addEventListener('keydown', (e) => {
-	let openingNewMindapp = e.key === 'µ'; // alt m
-	if (
-		(e.key === '©' || // alt g
-			openingNewMindapp) &&
-		!['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName)
-	) {
-		openPopup(openingNewMindapp);
+	let baseUrl = '';
+	if (e.key === 'µ') {
+		// alt m
+		baseUrl = newMindappUrl;
+	} else if (e.key === '¬') {
+		// alt l
+		baseUrl = newMindappDevUrl;
+	} else if (e.key === 'π') {
+		// alt p
+		baseUrl = newMindappPreviewUrl;
+	} else if (e.key === '©') {
+		// alt g
+		baseUrl = oldMindappDevUrl;
+	}
+
+	if (baseUrl && !['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName)) {
+		openPopup(baseUrl, e.key !== '©');
 	}
 });
 
-let openPopup = (openingNewMindapp?: boolean) => {
-	let baseUrl = openingNewMindapp
-		? preview
-			? mindappPreviewUrl
-			: dev
-				? mindappNewDevUrl
-				: mindappNewUrl
-		: dev || preview
-			? mindappOldDevUrl
-			: mindappOldUrl;
+let openPopup = (baseUrl: string, sendBgMessage = false) => {
 	let selector =
 		urlSelectors[location.host + location.pathname]?.() || urlSelectors[location.host]?.();
 
@@ -69,7 +77,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 			getTitle()
 		).trim();
 
-	if (openingNewMindapp) {
+	if (sendBgMessage) {
 		chrome.runtime.sendMessage({
 			type: '1-content-amd-background-scripts-save-page-info',
 			url: window.location.href,
@@ -99,7 +107,7 @@ let openPopup = (openingNewMindapp?: boolean) => {
 		}),
 	});
 	window.open(
-		openingNewMindapp //
+		sendBgMessage //
 			? baseUrl + '?extension'
 			: `${baseUrl}?${new URLSearchParams(JSON.parse(json)).toString()}`,
 		'_blank',
@@ -213,6 +221,7 @@ let urlSelectors: Record<
 	},
 };
 
-function getTitle() {
-	return document.querySelector('meta[name="title"]')?.getAttribute('content') || document.title;
-}
+let getTitle = () =>
+	document //
+		.querySelector('meta[name="title"]')
+		?.getAttribute('content') || document.title;

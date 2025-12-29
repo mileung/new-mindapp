@@ -24,7 +24,7 @@ self.addEventListener('install', (event) => {
 		try {
 			await cache.addAll(ASSETS);
 		} catch (error) {
-			console.log('error:', error);
+			console.error(error);
 		}
 	}
 

@@ -13,7 +13,7 @@
 		miniCites?: boolean;
 	} = $props();
 
-	function separateCites(text: string) {
+	let separateCites = (text: string) => {
 		let matches = text.matchAll(idsRegex);
 		let result: string[] = [];
 		let start = 0;
@@ -23,7 +23,7 @@
 		}
 		start < text.length && result.push(text.substring(start));
 		return result.map((s) => s.trim());
-	}
+	};
 	let coreSegs = $derived(separateCites(p.core));
 	// $effect(() => {
 	// 	console.log(coreSegs);
@@ -33,7 +33,7 @@
 {#each coreSegs as str, i}
 	{#if i % 2}
 		{#if p.miniCites}
-			<MiniCitedPost {...p} postId={str} depth={p.depth + 1} />
+			<MiniCitedPost {...p} postIdStr={str} depth={p.depth + 1} />
 		{:else if gs.idToPostMap[str]}
 			<CitedPost {...p} post={gs.idToPostMap[str]} depth={p.depth + 1} />
 		{:else}

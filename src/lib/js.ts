@@ -1,12 +1,9 @@
 import { m } from './paraglide/messages';
 import { minute, second } from './time';
 
-export function copyToClipboard(text: string): void {
+export let copyToClipboard = (text: string) => {
 	if (navigator?.clipboard?.writeText) {
-		navigator.clipboard
-			.writeText(text)
-			.then(() => true)
-			.catch(() => false);
+		navigator.clipboard.writeText(text);
 	} else {
 		let textArea = document.createElement('textarea');
 		textArea.value = text;
@@ -16,14 +13,14 @@ export function copyToClipboard(text: string): void {
 		document.body.removeChild(textArea);
 		Promise.resolve(success);
 	}
-}
+};
 
-export function poll(
+export let poll = (
 	callback: () => any,
 	initialInterval: number = second,
 	incrementFunction: (currentInterval: number) => number = (n) => n * 1.5,
 	maxInterval: number = minute,
-) {
+) => {
 	let currentInterval = initialInterval;
 	let executePoll = async () => {
 		if (await callback()) return;
@@ -31,23 +28,23 @@ export function poll(
 		setTimeout(executePoll, currentInterval);
 	};
 	setTimeout(executePoll, currentInterval);
-}
+};
 
-export function debounce<T extends (...args: any[]) => any>(
+export let debounce = <T extends (...args: any[]) => any>(
 	func: T,
 	wait: number = 400,
-): (...args: Parameters<T>) => void {
+): ((...args: Parameters<T>) => void) => {
 	let timeout: NodeJS.Timeout | null = null;
 	return function (this: any, ...args: Parameters<T>): void {
 		let context = this;
-		let later = function () {
+		let later = () => {
 			timeout = null;
 			func.apply(context, args);
 		};
 		if (timeout) clearTimeout(timeout);
 		timeout = setTimeout(later, wait);
 	};
-}
+};
 
 export let throttle = <T extends unknown[]>(callback: (...args: T) => void, delay: number) => {
 	let isWaiting = false;
@@ -59,16 +56,15 @@ export let throttle = <T extends unknown[]>(callback: (...args: T) => void, dela
 	};
 };
 
-export function isRecord(value: unknown) {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+export let isRecord = (value: unknown) =>
+	typeof value === 'object' && value !== null && !Array.isArray(value);
 
-export function isStringifiedRecord(value?: string) {
+export let isStringifiedRecord = (value?: string) => {
 	try {
 		return isRecord(JSON.parse(value!));
 	} catch (e) {}
 	return false;
-}
+};
 
 // prettier-ignore
 let KATAKANA = "アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン";
@@ -116,11 +112,11 @@ export let identikana = (input: number, romanized = true) => {
 		.join('');
 };
 
-export let strIsInt = (s: string) => /^\d+$/.test(s);
+export let isStrInt = (s: string) => /^\d+$/.test(s);
 
 let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-export let makeRandomStr = (length = 64) =>
-	[...Array(length)].map((_) => chars[Math.round(Math.random() * chars.length)]).join('');
+export let ranStr = (length = 88) =>
+	[...Array(length)].map((_) => chars[Math.floor(Math.random() * chars.length)]).join('');
 
 export let sortObjectProps = (obj: Record<string, any>) => {
 	Object.keys(obj)

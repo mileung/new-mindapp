@@ -30,24 +30,14 @@ let filterAtIdObj = (idObjAtIdObj: AtIdObj) =>
 		eq(pTable.at_in_ms, idObjAtIdObj.at_in_ms),
 	);
 
-let filterFullIdObj = (fullIdObj: FullIdObj) =>
-	and(
-		eq(pTable.at_ms, fullIdObj.at_ms),
-		eq(pTable.at_by_ms, fullIdObj.at_by_ms),
-		eq(pTable.at_in_ms, fullIdObj.at_in_ms),
-		eq(pTable.ms, fullIdObj.ms),
-		eq(pTable.by_ms, fullIdObj.by_ms),
-		eq(pTable.in_ms, fullIdObj.in_ms),
-	);
-
-export let pt = {
+export let pf = {
 	id: filterIdObj,
-	notId: (io: IdObj) => not(filterIdObj(io)!),
-	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
 	idAsAtId: filterIdObjAsAtIdObj,
 	atIdAsId: filterAtIdObjAsIdObj,
 	atId: filterAtIdObj,
-	notFullId: (fio: FullIdObj) => not(filterFullIdObj(fio)!),
+	notId: (io: IdObj) => not(filterIdObj(io)!),
+	notAtId: (aio: AtIdObj) => not(filterAtIdObj(aio)!),
+	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
 
 	noParent: and(
 		eq(pTable.at_ms, 0), //
@@ -73,14 +63,15 @@ export let pt = {
 		gt0: gt(pTable.at_in_ms, 0),
 	},
 	ms: {
-		lte: (v: number) => lte(pTable.ms, v),
 		asc: asc(pTable.ms),
 		desc: desc(pTable.ms),
 		eq: (v: number) => eq(pTable.ms, v),
 		eq0: eq(pTable.ms, 0),
 		notEq: (v: number) => not(eq(pTable.ms, v)),
-		gte: (v: number) => gte(pTable.ms, v),
+		gt: (v: number) => gt(pTable.ms, v),
 		gt0: gt(pTable.ms, 0),
+		gte: (v: number) => gte(pTable.ms, v),
+		lte: (v: number) => lte(pTable.ms, v),
 	},
 	by_ms: {
 		eq: (v: number) => eq(pTable.by_ms, v),
@@ -100,8 +91,9 @@ export let pt = {
 	num: {
 		eq: (v: number) => eq(pTable.num, v),
 		eq0: eq(pTable.num, 0),
-		gte0: gte(pTable.num, 0),
 		notEq: (v: number) => not(eq(pTable.num, v)),
+		gt0: gt(pTable.num, 0),
+		gte0: gte(pTable.num, 0),
 		lte: (v: number) => lte(pTable.num, v),
 	},
 	txt: {

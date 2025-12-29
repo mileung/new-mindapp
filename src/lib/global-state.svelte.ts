@@ -1,9 +1,8 @@
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import { identikana, sortObjectProps } from './js';
-import { m } from './paraglide/messages';
-import type { Account } from './types/accounts';
+import { sortObjectProps } from './js';
+import type { MyAccount } from './types/accounts';
 import type { Post } from './types/posts';
-import type { Space } from './types/spaces';
+import type { Invite, Space } from './types/spaces';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
@@ -11,10 +10,15 @@ class GlobalState {
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
 	currentSpaceMs = $state<number>();
-	idToSpaceMap = $state<Record<number, undefined | Space>>({});
-	accounts = $state<undefined | Account[]>();
-	indentifierToFeedMap = $state<Record<string, undefined | (null | string)[]>>({});
+
+	accounts = $state<undefined | MyAccount[]>();
+	pendingInvite = $state<Invite>();
+
+	msToSpaceMap = $state<Record<number, undefined | Space>>({});
+	msToAccountMap = $state<Record<number, undefined | Space>>({});
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
+	indentifierToFeedMap = $state<Record<string, undefined | string[]>>({});
+
 	writingNew = $state<null | true>(null);
 	writingEdit = $state<null | Post>(null);
 	writingTo = $state<null | Post>(null);
@@ -26,16 +30,6 @@ class GlobalState {
 
 export let gs = new GlobalState();
 
-export let spaceMsToSpaceName = (ms: number) => {
-	return ms === 8
-		? m.personal()
-		: ms === 1
-			? m.global()
-			: ms
-				? gs.idToSpaceMap[ms]?.name || identikana(ms)
-				: m.local();
-};
-
 export let makeFeedIdentifier = (p: {
 	view: 'nested' | 'flat';
 	sortedBy: 'bumped' | 'new' | 'old';
@@ -45,6 +39,9 @@ export let makeFeedIdentifier = (p: {
 }) => {
 	return JSON.stringify(sortObjectProps(p));
 };
+
+export let getBottomOverlayShown = () =>
+	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;
 
 export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
 	except !== 'rh' && (gs.showReactionHistory = null);
