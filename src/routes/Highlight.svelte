@@ -13,7 +13,7 @@
 		evenBg?: boolean;
 	} = $props();
 
-	let urlId = $derived(page.state.modalId || page.params.id);
+	let urlId = $derived(page.state.postIdStr || page.params.tid);
 	let spotId = $derived(urlId?.startsWith('__') ? '' : urlId);
 	let moreOpaque = $derived(
 		p.evenBg ||

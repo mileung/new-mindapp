@@ -111,7 +111,7 @@
 					<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
 						<p class="pr-0.5">
-							{spaceMsToName(p.post.in_ms)}
+							{spaceMsToName(p.post.in_ms).txt}
 						</p>
 					</div>
 				</Apush>
@@ -267,7 +267,8 @@
 								m.areYouSureYouWantToDeleteThisPost(),
 							);
 						if (ok) {
-							let useRpc = getIdStrAsIdObj(page.state.modalId || page.params.id || '').in_ms !== 0;
+							let useRpc =
+								getIdStrAsIdObj(page.state.postIdStr || page.params.tid || '').in_ms !== 0;
 							let { soft } = await deletePost(getFullIdObj(p.post), null, useRpc);
 							if (soft) gs.idToPostMap[postIdStr]!.history = null;
 							else {

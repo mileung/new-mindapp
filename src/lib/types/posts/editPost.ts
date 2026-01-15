@@ -45,8 +45,8 @@ export let _editPost = async (db: Database, post: Post) => {
 
 	let {
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVrsnAtPIdRows = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRows = [],
+		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVrsnAtPIdRows = [],
+		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -58,8 +58,8 @@ export let _editPost = async (db: Database, post: Post) => {
 						pf.idAsAtId(post),
 						or(
 							...[
-								pc.currentPostTagIdWithNumAsVersionAtPostId,
-								pc.currentPostCoreIdWithNumAsVersionAtPostId,
+								pc.currentPostTagIdWithVersionNumAtPostId,
+								pc.currentPostCoreIdWithVersionNumAtPostId,
 							].map((code) => pf.code.eq(code)),
 						),
 						eq(pTable.num, curLastVersion),
@@ -83,7 +83,7 @@ export let _editPost = async (db: Database, post: Post) => {
 			...id0,
 			...getIdObjAsAtIdObj(post),
 			ms,
-			code: pc.currentVersionNumAndMsAtPostId,
+			code: pc.currentVersionNumMsAtPostId,
 			num: newLastVersion,
 		},
 	];
@@ -189,22 +189,22 @@ export let _editPost = async (db: Database, post: Post) => {
 	);
 	await db
 		.update(pTable)
-		.set({ code: pc.exPostTagIdWithNumAsVersionAtPostId })
+		.set({ code: pc.exPostTagIdWithVersionNumAtPostId })
 		.where(
 			and(
 				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
-				pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
+				pf.code.eq(pc.currentPostTagIdWithVersionNumAtPostId),
 				pf.txt.isNull,
 				eq(pTable.num, curLastVersion),
 			),
 		);
 	await db
 		.update(pTable)
-		.set({ code: pc.exPostCoreIdWithNumAsVersionAtPostId })
+		.set({ code: pc.exPostCoreIdWithVersionNumAtPostId })
 		.where(
 			and(
 				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
-				pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
+				pf.code.eq(pc.currentPostCoreIdWithVersionNumAtPostId),
 				eq(pTable.num, curLastVersion),
 			),
 		);
@@ -214,14 +214,14 @@ export let _editPost = async (db: Database, post: Post) => {
 		.where(mainPIdWNumAsLastVersionAtPPIdRowsFilter);
 	await db
 		.update(pTable)
-		.set({ code: pc.exVersionNumAndMsAtPostId })
+		.set({ code: pc.exVersionNumMsAtPostId })
 		.where(
 			and(
 				pf.idAsAtId(post),
 				pf.ms.gt0,
 				pf.by_ms.eq0,
 				pf.in_ms.eq0,
-				pf.code.eq(pc.currentVersionNumAndMsAtPostId),
+				pf.code.eq(pc.currentVersionNumMsAtPostId),
 				pf.num.eq(curLastVersion),
 				pf.txt.isNull,
 			),
@@ -301,8 +301,8 @@ let processStuff = (
 			by_ms: tagTxtRow.by_ms,
 			in_ms: tagTxtRow.in_ms,
 			code: isTag
-				? pc.currentPostTagIdWithNumAsVersionAtPostId
-				: pc.currentPostCoreIdWithNumAsVersionAtPostId,
+				? pc.currentPostTagIdWithVersionNumAtPostId
+				: pc.currentPostCoreIdWithVersionNumAtPostId,
 			num: newLastVersion,
 		});
 	}

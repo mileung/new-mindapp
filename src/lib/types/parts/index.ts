@@ -1,16 +1,30 @@
 import { gs } from '$lib/global-state.svelte';
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
 import { gsdb } from '../../local-db';
 import { pf } from './partFilters';
-import { getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
+import { getAtIdStr, getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
 import { pTable } from './partsTable';
 
 export type PartInsert = typeof pTable.$inferInsert;
 export type PartSelect = typeof pTable.$inferSelect;
 
-export let PartInsertSchema = createInsertSchema(pTable);
-export let PartSelectSchema = createSelectSchema(pTable);
+export let GranularBinPropByMsSchema = z.object({
+	ms: z.number(),
+	by_ms: z.number(),
+	num: z.number().min(0).max(1),
+});
+export type GranularBinPropByMs = z.infer<typeof GranularBinPropByMsSchema>;
+
+export let GranularTxtPropSchema = z.object({
+	ms: z.number(),
+	txt: z.string(),
+});
+export type GranularTxtProp = z.infer<typeof GranularTxtPropSchema>;
+
+export let GranularTxtPropByMsSchema = GranularTxtPropSchema.merge(
+	z.object({ by_ms: z.number() }), //
+);
+export type GranularTxtPropByMs = z.infer<typeof GranularTxtPropByMsSchema>;
 
 export let WhoObjSchema = z.object({
 	callerMs: z.number(),
@@ -86,6 +100,20 @@ export let makePartsUniqueById = (parts: PartSelect[]) => {
 		let partIdStr = getIdStr(part);
 		if (!idSet.has(partIdStr)) {
 			idSet.add(partIdStr);
+			uniqueParts.push(part);
+		}
+	}
+	return uniqueParts;
+};
+
+export let makePartsUniqueByAtId = (parts: PartSelect[]) => {
+	let atIdSet = new Set<string>();
+	let uniqueParts: PartSelect[] = [];
+	for (let i = 0; i < parts.length; i++) {
+		let part = parts[i];
+		let partAtIdStr = getAtIdStr(part);
+		if (!atIdSet.has(partAtIdStr)) {
+			atIdSet.add(partAtIdStr);
 			uniqueParts.push(part);
 		}
 	}

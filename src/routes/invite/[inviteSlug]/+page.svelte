@@ -6,33 +6,23 @@
 	import { trpc } from '$lib/trpc/client';
 	import { getWhoObj } from '$lib/types/parts';
 	import { IconChevronRight } from '@tabler/icons-svelte';
+	import { onMount } from 'svelte';
 
 	let validInvite = $state(true);
 
-	$effect(() => {
-		(async () => {
-			if (page.params.inviteSlug) {
-				let pendingInvite = (
-					await trpc().checkInvite.mutate({
-						...(await getWhoObj()),
-						inviteSlug: page.params.inviteSlug,
-						useIfValid: false,
-					})
-				).invite;
-				if (!pendingInvite) validInvite = false;
-				else {
-					gs.pendingInvite = pendingInvite;
-					gs.msToSpaceMap = {
-						...gs.msToSpaceMap,
-						[pendingInvite.in_ms]: {
-							ms: pendingInvite.in_ms,
-							name: pendingInvite.spaceName,
-						},
-					};
-					goto(`/__${pendingInvite.in_ms}`);
-				}
-			}
-		})();
+	onMount(async () => {
+		if (!page.params.inviteSlug) return;
+		let pendingInvite = (
+			await trpc().checkInvite.mutate({
+				...(await getWhoObj()),
+				inviteSlug: page.params.inviteSlug,
+				useIfValid: false,
+			})
+		).invite;
+		if (pendingInvite) {
+			gs.pendingInvite = pendingInvite;
+			goto(`/__${pendingInvite.in_ms}`);
+		} else validInvite = false;
 	});
 </script>
 

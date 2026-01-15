@@ -1,8 +1,8 @@
 import { tdb } from '$lib/server/db';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and } from 'drizzle-orm';
-import { type Invite } from '.';
-import type { WhoObj } from '../parts';
+import { defaultSpaceProps, type Invite } from '.';
+import { assertLt2Rows, type WhoObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { id0 } from '../parts/partIds';
@@ -20,19 +20,18 @@ export let _checkInvite = async (
 			.from(pTable)
 			.where(
 				and(
-					pf.at_ms.eq(1),
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
+					pf.noParent,
 					pf.ms.gt0,
 					pf.by_ms.eq0,
-					pf.in_ms.eq0,
-					pf.code.eq(pc.inviteMsByMsWithNumAsUseCountAndTxtAsSlugAtSpaceId),
+					pf.in_ms.eq(1),
+					pf.code.eq(pc.inviteIdWithNumAsUseCountAndTxtAsSlug),
 					pf.num.gt0,
 					pf.txt.eq('init'),
 				),
 			)
 			.limit(1);
-		if (initInviteRows.length) return {};
+		let initInviteRow = assertLt2Rows(initInviteRows);
+		if (initInviteRow) return {};
 		if (input.useIfValid) {
 			await tdb.insert(pTable).values([
 				{
@@ -44,13 +43,13 @@ export let _checkInvite = async (
 				{
 					...id0,
 					at_ms: 1,
-					code: pc.spaceVisibilityIdNum,
+					code: pc.spaceVisibilityBinId,
 					num: 1,
 				},
 				{
 					...id0,
 					at_ms: 1,
-					code: pc.newUsersCanPostIdNum,
+					code: pc.newUsersCanPostBinId,
 					num: 1,
 				},
 				{
@@ -58,21 +57,37 @@ export let _checkInvite = async (
 					at_in_ms: 1,
 					ms,
 					by_ms: input.callerMs,
-					code: pc.joinMsByMsAtInviteId,
+					code: pc.acceptMsByMsAtInviteId,
 					num: 0,
 				},
 				{
 					...id0,
 					at_ms: input.callerMs,
+					ms,
 					in_ms: 1,
 					code: pc.promotionToOwnerIdAtAccountId,
 					num: 0,
 				},
 				{
 					...id0,
-					at_ms: 1,
+					at_ms: input.callerMs,
+					ms,
 					in_ms: 1,
-					code: pc.inviteMsByMsWithNumAsUseCountAndTxtAsSlugAtSpaceId,
+					code: pc.canPostBinIdAtAccountId,
+					num: 1,
+				},
+				{
+					...id0,
+					at_ms: input.callerMs,
+					ms,
+					in_ms: 1,
+					code: pc.canReactBinIdAtAccountId,
+					num: 1,
+				},
+				{
+					...id0,
+					in_ms: 1,
+					code: pc.inviteIdWithNumAsUseCountAndTxtAsSlug,
 					num: 1,
 					txt: input.inviteSlug,
 				},
@@ -85,9 +100,16 @@ export let _checkInvite = async (
 				by_ms: 0,
 				in_ms: 1,
 				slug: 'init',
+				byNameTxt: '',
+				space: {
+					...defaultSpaceProps,
+					ms: 1, //
+					isPublic: { ms: 0, by_ms: 0, num: 1 },
+				},
 			},
 		};
 	} else {
+		// space
 	}
 	return {};
 };

@@ -1,3 +1,4 @@
+import { page } from '$app/state';
 import { z } from 'zod';
 
 export let IdObjSchema = z.object({
@@ -19,6 +20,7 @@ export type FullIdObj = z.infer<typeof FullIdObjSchema>;
 
 export let idRegex = /^\d+_\d+_\d+$/;
 export let idsRegex = /(?<!\S)(\d+_\d+_\d+)(?!\S)/g;
+export let hasTemplateIdRegex = /\d*_\d*_\d+/;
 export let templateIdRegex = /^\d*_\d*_\d+$/;
 
 export let isTemplateId = (str = '') => templateIdRegex.test(str);
@@ -68,20 +70,51 @@ export let getIdObjAsAtIdObj = (io: IdObj) => ({
 	at_in_ms: io.in_ms,
 });
 
-export let getIdStrAsIdObj = (id: string) => {
-	let s = id.split('_', 3);
+export let getIdStrAsIdObj = (idStr: string) => {
+	let s = idStr.split('_', 3);
+	let ms = +s[0];
+	let by_ms = +s[1];
+	let in_ms = +s[2];
+	if (
+		!s[0] ||
+		!s[1] ||
+		!s[2] || //
+		!Number.isInteger(ms) ||
+		!Number.isInteger(by_ms) ||
+		!Number.isInteger(in_ms)
+	)
+		throw new Error(`invalid idStr`);
 	return {
-		ms: +s[0],
-		by_ms: +s[1],
-		in_ms: +s[2],
+		ms,
+		by_ms,
+		in_ms,
 	} as const;
 };
 
-export let getIdStrAsAtIdObj = (id: string) => {
-	let s = id.split('_', 3);
+export let getIdStrAsAtIdObj = (idStr: string) => {
+	let s = idStr.split('_', 3);
+	let at_ms = +s[0];
+	let at_by_ms = +s[1];
+	let at_in_ms = +s[2];
+	if (
+		!s[0] ||
+		!s[1] ||
+		!s[2] ||
+		!Number.isInteger(at_ms) ||
+		!Number.isInteger(at_by_ms) ||
+		!Number.isInteger(at_in_ms)
+	)
+		throw new Error(`invalid idStr`);
 	return {
-		at_ms: +s[0],
-		at_by_ms: +s[1],
-		at_in_ms: +s[2],
+		at_ms,
+		at_by_ms,
+		at_in_ms,
 	} as const;
+};
+
+export let getUrlInMs = () => {
+	let tid = isIdStr(page.state.postIdStr)
+		? page.state.postIdStr //
+		: page.params.tid;
+	return tid ? +tid.split('_', 3)[2] : undefined;
 };

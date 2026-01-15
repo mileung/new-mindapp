@@ -230,7 +230,7 @@
 			bind:this={tagsIpt}
 			bind:value={gs.writerTagVal}
 			autocomplete="off"
-			class="flex-1 px-2 text-lg border-l-2 border-bg8"
+			class="flex-1 px-2 text-lg border-l-0 border-bg8"
 			placeholder={m.tags()}
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
@@ -338,7 +338,7 @@
 			bind:this={coreTa}
 			bind:value={gs.writerCore}
 			placeholder={m.organizeToday()}
-			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9 border-l-2 border-bg8"
+			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9 border-l-0 border-bg8"
 			onkeydown={(e) => {
 				e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 				e.metaKey && e.key === 'Enter' && submit();

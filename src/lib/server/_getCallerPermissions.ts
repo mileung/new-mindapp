@@ -1,7 +1,7 @@
 import { ranStr } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { deleteSessionCookies, getValidSessionCookies, setCookie } from '$lib/server/sessions';
+import { deleteSessionKeyCookie, getValidAuthCookie, setCookie } from '$lib/server/sessions';
 import { hour } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { assertLt2Rows, channelPartsByCode } from '$lib/types/parts';
@@ -21,46 +21,50 @@ export let _getCallerPermissions = async (
 		spaceIsPublic?: boolean;
 		signedIn?: boolean;
 		callerRole?: boolean;
-		canWrite?: boolean;
+		canReact?: boolean;
+		canPost?: boolean;
 	} = {},
 ) => {
-	if (!get.signedIn && (get.callerRole || get.canWrite))
-		throw new Error(`must get signed in to get callerRole or canWrite`);
+	if (!get.signedIn && (get.callerRole || get.canReact || get.canPost))
+		throw new Error(`must get signed in to get callerRole, canReact, or canPost`);
 	if (get.spaceIsPublic && !input.spaceMs) throw new Error(`input.spaceMs must be gt0`);
 
 	let spaceIsPublic = input.spaceMs === 1;
 	let signedIn = false;
 	let callerRole: null | 'member' | 'mod' | 'owner' = null;
-	let canWrite = false;
+	let canReact = false;
+	let canPost = false;
 
 	let ms = Date.now();
-	let { sessionMs, sessionKey } = getValidSessionCookies(ctx);
+	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
 	let sessionKeyTxtMsAtAccountIdFilter: undefined | SQL;
-	if (get.signedIn && sessionMs && sessionKey) {
+	if (input.callerMs && get.signedIn && sessionKey) {
 		sessionKeyTxtMsAtAccountIdFilter = and(
 			pf.at_ms.eq(input.callerMs),
 			pf.at_by_ms.eq0,
 			pf.at_in_ms.eq0,
-			pf.ms.eq(sessionMs),
+			pf.ms.eq(sessionKey.ms),
 			pf.by_ms.eq0,
 			pf.in_ms.eq0,
 			pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 			pf.num.eq0,
-			pf.txt.eq(sessionKey),
+			pf.txt.eq(sessionKey.txt),
 		);
 	}
 
 	let callerId: IdObj = { ms: input.callerMs, by_ms: 0, in_ms: 0 };
 	let {
-		[pc.spaceVisibilityIdNum]: spaceVisibilityIdNumRows = [],
+		[pc.spaceVisibilityBinId]: spaceVisibilityIdNumRows = [],
 		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
-		[pc.joinMsByMsAtInviteId]: joinMsByMsAtInviteIdRows = [],
+		[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
 		[pc.promotionToModIdAtAccountId]: promotionToModIdAtAccountIdRows = [],
 		[pc.promotionToOwnerIdAtAccountId]: promotionToOwnerIdAtAccountIdRows = [],
-		[pc.canWriteIdNumAtAccountId]: canWriteIdNumAtAccountIdRows = [],
+		[pc.canReactBinIdAtAccountId]: canReactIdNumAtAccountIdRows = [],
+		[pc.canPostBinIdAtAccountId]: canPostIdNumAtAccountIdRows = [],
 	} = channelPartsByCode(
 		get.spaceIsPublic ||
-			(sessionKeyTxtMsAtAccountIdFilter && (get.signedIn || get.callerRole || get.canWrite))
+			(sessionKeyTxtMsAtAccountIdFilter &&
+				(get.signedIn || get.callerRole || get.canReact || get.canPost))
 			? await tdb
 					.select()
 					.from(pTable)
@@ -71,8 +75,8 @@ export let _getCallerPermissions = async (
 								? [
 										get.spaceIsPublic
 											? and(
-													pf.at_in_ms.eq(input.spaceMs), //
-													pf.code.eq(pc.spaceVisibilityIdNum),
+													pf.at_ms.eq(input.spaceMs), //
+													pf.code.eq(pc.spaceVisibilityBinId),
 													pf.txt.isNull,
 												)
 											: undefined,
@@ -83,7 +87,7 @@ export let _getCallerPermissions = async (
 														pf.ms.gt0,
 														pf.by_ms.eq(input.callerMs),
 														pf.in_ms.eq0,
-														pf.code.eq(pc.joinMsByMsAtInviteId),
+														pf.code.eq(pc.acceptMsByMsAtInviteId),
 														pf.num.eq0,
 														pf.txt.isNull,
 													),
@@ -105,11 +109,19 @@ export let _getCallerPermissions = async (
 													),
 												]
 											: []),
-										get.canWrite
+										get.canReact
 											? and(
 													pf.idAsAtId(callerId),
 													pf.in_ms.eq(input.spaceMs),
-													pf.code.eq(pc.canWriteIdNumAtAccountId),
+													pf.code.eq(pc.canReactBinIdAtAccountId),
+													pf.txt.isNull,
+												)
+											: undefined,
+										get.canPost
+											? and(
+													pf.idAsAtId(callerId),
+													pf.in_ms.eq(input.spaceMs),
+													pf.code.eq(pc.canPostBinIdAtAccountId),
 													pf.txt.isNull,
 												)
 											: undefined,
@@ -120,13 +132,6 @@ export let _getCallerPermissions = async (
 			: [],
 	);
 
-	if (get.spaceIsPublic) {
-		let visibilityMsByMsNumAtSpaceIdRow = assertLt2Rows(spaceVisibilityIdNumRows);
-		if (visibilityMsByMsNumAtSpaceIdRow) {
-			spaceIsPublic = visibilityMsByMsNumAtSpaceIdRow.num === 1;
-		} else throw new Error(m.spaceNotFound());
-	}
-
 	let sessionKeyTxtMsAtAccountIdRow = assertLt2Rows(sessionKeyTxtMsAtAccountIdRows);
 	if (sessionKeyTxtMsAtAccountIdRow) {
 		if (get.signedIn) {
@@ -134,19 +139,21 @@ export let _getCallerPermissions = async (
 			if (get.callerRole) {
 				if (promotionToOwnerIdAtAccountIdRows.length) callerRole = 'owner';
 				else if (promotionToModIdAtAccountIdRows.length) callerRole = 'mod';
-				else if (joinMsByMsAtInviteIdRows.length) callerRole = 'member';
+				else if (acceptMsByMsAtInviteIdRows.length) callerRole = 'member';
 			}
-			if (get.canWrite) {
-				canWrite = assertLt2Rows(canWriteIdNumAtAccountIdRows)?.num === 1;
+			if (get.canReact) {
+				canReact = assertLt2Rows(canReactIdNumAtAccountIdRows)?.num === 1;
+			}
+			if (get.canPost) {
+				canPost = assertLt2Rows(canPostIdNumAtAccountIdRows)?.num === 1;
 			}
 		}
-		if (ms - sessionKeyTxtMsAtAccountIdRow.ms > (hour && 0)) {
-			let newSessionKey = ranStr();
-			setCookie(ctx, 'sessionMs', '' + ms);
-			setCookie(ctx, 'sessionKey', newSessionKey);
+		if (ms - sessionKeyTxtMsAtAccountIdRow.ms > hour) {
+			sessionKey = { ms, txt: ranStr() };
+			setCookie(ctx, 'sessionKey', JSON.stringify(sessionKey));
 			await tdb
 				.update(pTable)
-				.set({ ms, txt: newSessionKey })
+				.set(sessionKey)
 				.where(
 					and(
 						pf.at_ms.gt0,
@@ -161,13 +168,22 @@ export let _getCallerPermissions = async (
 					),
 				);
 		}
-	} else if ((sessionMs || sessionKey) && (get.callerRole || get.canWrite || get.signedIn)) {
-		deleteSessionCookies(ctx);
+	} else if (sessionKey && (get.callerRole || get.canReact || get.canPost || get.signedIn)) {
+		deleteSessionKeyCookie(ctx);
 	}
+
+	if (get.spaceIsPublic) {
+		let visibilityMsByMsNumAtSpaceIdRow = assertLt2Rows(spaceVisibilityIdNumRows);
+		if (visibilityMsByMsNumAtSpaceIdRow) {
+			spaceIsPublic = visibilityMsByMsNumAtSpaceIdRow.num === 1;
+		} else if (!callerRole) throw new Error(m.spaceNotFound());
+	}
+
 	return {
 		signedIn,
 		spaceIsPublic,
 		callerRole,
-		canWrite,
+		canReact,
+		canPost,
 	};
 };

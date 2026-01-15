@@ -89,6 +89,7 @@ export let pf = {
 		eq: (v: number) => eq(pTable.code, v),
 	},
 	num: {
+		desc: desc(pTable.num),
 		eq: (v: number) => eq(pTable.num, v),
 		eq0: eq(pTable.num, 0),
 		notEq: (v: number) => not(eq(pTable.num, v)),
@@ -97,6 +98,7 @@ export let pf = {
 		lte: (v: number) => lte(pTable.num, v),
 	},
 	txt: {
+		asc: asc(pTable.txt),
 		eq: (v: string) => eq(pTable.txt, v),
 		notEq: (v: string) => not(eq(pTable.txt, v)),
 		like: (v: string) => like(pTable.txt, v),

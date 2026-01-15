@@ -18,9 +18,9 @@ export let getPostHistory = async (postIdObj: IdObj, version: number) => {
 // TODO: paginate history versions?
 export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
-		[pc.exVersionNumAndMsAtPostId]: exVersionNumAndMsAtPostIdRows = [],
-		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
-		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
+		[pc.exVersionNumMsAtPostId]: exVersionNumAndMsAtPostIdRows = [],
+		[pc.exPostTagIdWithVersionNumAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.exPostCoreIdWithVersionNumAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -30,9 +30,9 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 					pf.idAsAtId(postIdObj),
 					or(
 						...[
-							pc.exVersionNumAndMsAtPostId,
-							pc.exPostTagIdWithNumAsVersionAtPostId,
-							pc.exPostCoreIdWithNumAsVersionAtPostId,
+							pc.exVersionNumMsAtPostId,
+							pc.exPostTagIdWithVersionNumAtPostId,
+							pc.exPostCoreIdWithVersionNumAtPostId,
 						].map((code) => pf.code.eq(code)),
 					),
 					eq(pTable.num, version),
@@ -87,9 +87,9 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 
 	for (let i = 0; i < parts.length; i++) {
 		let part = parts[i];
-		if (part.code === pc.exPostTagIdWithNumAsVersionAtPostId) {
+		if (part.code === pc.exPostTagIdWithVersionNumAtPostId) {
 			history[version]!.tags = [getIdStr(part), ...(history[version]!.tags || [])];
-		} else if (part.code === pc.exPostCoreIdWithNumAsVersionAtPostId) {
+		} else if (part.code === pc.exPostCoreIdWithVersionNumAtPostId) {
 			history[version]!.core = getIdStr(part);
 		} else if (part.code === pc.tagId8AndTxtWithNumAsCount) {
 			tagIdToTxtMap[getIdStr(part)] = part.txt!;

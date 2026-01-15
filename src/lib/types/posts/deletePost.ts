@@ -47,10 +47,10 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	let {
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdRows = [],
 		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdRows = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
-		[pc.exPostTagIdWithNumAsVersionAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRowsToDelete = [],
-		[pc.exPostCoreIdWithNumAsVersionAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
+		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
+		[pc.exPostTagIdWithVersionNumAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRowsToDelete = [],
+		[pc.exPostCoreIdWithVersionNumAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -63,10 +63,10 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						pf.idAsAtId(fullPostIdObj),
 						pf.ms.gt0,
 						or(
-							pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-							pf.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
-							pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
-							pf.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
+							pf.code.eq(pc.currentPostTagIdWithVersionNumAtPostId),
+							pf.code.eq(pc.exPostTagIdWithVersionNumAtPostId),
+							pf.code.eq(pc.currentPostCoreIdWithVersionNumAtPostId),
+							pf.code.eq(pc.exPostCoreIdWithVersionNumAtPostId),
 						),
 						version === null ? undefined : pf.num.eq(version),
 						pf.txt.isNull,
@@ -129,14 +129,14 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 				pf.idAsAtId(fullPostIdObj),
 				or(
 					...[
-						pc.currentVersionNumAndMsAtPostId,
-						pc.exVersionNumAndMsAtPostId,
-						pc.currentSoftDeletedVersionNumAndMsAtPostId,
-						pc.exSoftDeletedVersionNumAndMsAtPostId,
-						pc.currentPostTagIdWithNumAsVersionAtPostId,
-						pc.exPostTagIdWithNumAsVersionAtPostId,
-						pc.currentPostCoreIdWithNumAsVersionAtPostId,
-						pc.exPostCoreIdWithNumAsVersionAtPostId,
+						pc.currentVersionNumMsAtPostId,
+						pc.exVersionNumMsAtPostId,
+						pc.currentSoftDeletedVersionNumMsAtPostId,
+						pc.exSoftDeletedVersionNumMsAtPostId,
+						pc.currentPostTagIdWithVersionNumAtPostId,
+						pc.exPostTagIdWithVersionNumAtPostId,
+						pc.currentPostCoreIdWithVersionNumAtPostId,
+						pc.exPostCoreIdWithVersionNumAtPostId,
 					].map((c) => pf.code.eq(c)),
 				),
 				pf.num.gte0,

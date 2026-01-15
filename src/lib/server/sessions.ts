@@ -1,4 +1,3 @@
-import { isStrInt } from '$lib/js';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { pc } from '$lib/types/parts/partCodes';
@@ -7,9 +6,11 @@ import { pTable } from '$lib/types/parts/partsTable';
 import { and, or } from 'drizzle-orm';
 import { tdb } from './db';
 
-export let getCookie = (ctx: Context, name: string) => ctx.event.cookies.get(name);
+type CookieName = 'clientKey' | 'sessionKey';
 
-export let setCookie = (ctx: Context, name: string, val: string) =>
+export let getCookie = (ctx: Context, name: CookieName) => ctx.event.cookies.get(name);
+
+export let setCookie = (ctx: Context, name: CookieName, val: string) =>
 	ctx.event.cookies.set(name, val, {
 		httpOnly: true,
 		secure: true,
@@ -18,38 +19,41 @@ export let setCookie = (ctx: Context, name: string, val: string) =>
 		sameSite: 'lax',
 	});
 
-export let deleteCookie = (ctx: Context, name: string) => {
+export let deleteCookie = (ctx: Context, name: CookieName) => {
 	ctx.event.cookies.delete(name, { path: '/' });
 };
 
-export let deleteSessionCookies = (ctx: Context) => {
+export let deleteSessionKeyCookie = (ctx: Context) => {
 	console.log('deleteSessionCookies');
-	deleteCookie(ctx, 'sessionMs');
 	deleteCookie(ctx, 'sessionKey');
 };
 
-let getValidAuthCookies = (ctx: Context, msCookieName: string, keyCookieName: string) => {
-	let msStr = getCookie(ctx, msCookieName);
-	let ms = msStr && isStrInt(msStr) ? +msStr : undefined;
-	let key = getCookie(ctx, keyCookieName);
-	let now = Date.now();
-	if (key?.length !== 88 || !ms || ms > now || now - ms > week) {
-		deleteCookie(ctx, msCookieName);
-		deleteCookie(ctx, keyCookieName);
-		return { ms: undefined, key: undefined };
+export let getValidAuthCookie = (ctx: Context, cookieName: CookieName) => {
+	let cookieStr = getCookie(ctx, cookieName);
+	if (cookieStr) {
+		try {
+			let cookieObj = JSON.parse(cookieStr) as { ms: number; txt: string };
+			let { ms, txt } = cookieObj;
+			let now = Date.now();
+			if (txt.length !== 88 || !ms || ms > now || now - ms > week) {
+				deleteCookie(ctx, cookieName);
+				return undefined;
+			}
+			return { ms, txt };
+		} catch (error) {}
 	}
-	return { ms, key };
+	return undefined;
 };
 
-export let getValidClientCookies = (ctx: Context) => {
-	let { ms, key } = getValidAuthCookies(ctx, 'clientMs', 'clientKey');
-	return { clientMs: ms, clientKey: key };
-};
+// export let getValidClientKeyCookie = (ctx: Context) => {
+// 	let { ms, txt } = getValidAuthCookies(ctx, 'clientKey');
+// 	return { clientMs: ms, clientKey: txt };
+// };
 
-export let getValidSessionCookies = (ctx: Context) => {
-	let { ms, key } = getValidAuthCookies(ctx, 'sessionMs', 'sessionKey');
-	return { sessionMs: ms, sessionKey: key };
-};
+// export let getValidSessionKeyCookie = (ctx: Context) => {
+// 	let { ms, txt } = getValidAuthCookies(ctx, 'sessionKey');
+// 	return { sessionMs: ms, sessionKey: txt };
+// };
 
 export let deleteExpiredAuthRows = async () => {
 	await tdb //

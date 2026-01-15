@@ -2,7 +2,7 @@ import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { sortObjectProps } from './js';
 import type { MyAccount } from './types/accounts';
 import type { Post } from './types/posts';
-import type { Invite, Space } from './types/spaces';
+import type { Invite } from './types/spaces';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
@@ -14,8 +14,9 @@ class GlobalState {
 	accounts = $state<undefined | MyAccount[]>();
 	pendingInvite = $state<Invite>();
 
-	msToSpaceMap = $state<Record<number, undefined | Space>>({});
-	msToAccountMap = $state<Record<number, undefined | Space>>({});
+	msToAccountNameTxtMap = $state<Record<number, undefined | string>>({});
+	msToSpaceNameMap = $state<Record<number, undefined | string>>({});
+
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
 	indentifierToFeedMap = $state<Record<string, undefined | string[]>>({});
 

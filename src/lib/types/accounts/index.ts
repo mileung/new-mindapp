@@ -3,71 +3,60 @@ import { identikana } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { and } from 'drizzle-orm';
 import { z } from 'zod';
-import { type PartInsert } from '../parts';
+import { GranularTxtPropSchema, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 
 export let OtherAccountSchema = z
 	.object({
 		ms: z.number(),
-		name: z.string().optional(),
-		nameMs: z.number().optional(),
-		bio: z.string().optional(),
-		bioMs: z.number().optional(),
+		name: GranularTxtPropSchema,
+		bio: GranularTxtPropSchema.optional(),
 	})
 	.strict();
 export type OtherAccount = z.infer<typeof OtherAccountSchema>;
 
 export let MyAccountSchema = OtherAccountSchema.merge(
 	z.object({
-		email: z.string().optional(),
-		emailMs: z.number().optional(),
-		savedTags: z.array(z.string()),
-		savedTagsMs: z.number().optional(),
-		spaceMss: z.array(z.number()),
-		spaceMssMs: z.number().optional(),
-		// No good reason to include pwHash, pwHashMs, clientKey, or clientKeyMs
+		email: GranularTxtPropSchema,
+		savedTags: GranularTxtPropSchema,
+		// spaceMss: z.array(z.number()),
+		// spaceMssMs: z.number().optional(),
+		// spaceRoles
+		// invites
+
+		// No good reason to include pwHash, clientKey, or clientKeyMs
 		signedIn: z.boolean().optional(),
 	}),
-)
-	.strict()
-	.refine(
-		(a) =>
-			a.ms === 0
-				? Object.keys(a).every((key) => ['ms', 'savedTags', 'spaceMss', 'signedIn'].includes(key))
-				: true,
-		{
-			message: 'If ms is 0, the only properties allowed are savedTags and spaceMss',
-		},
-	);
+).strict();
 
 export type MyAccount = z.infer<typeof MyAccountSchema>;
 
 export let getDefaultAccount = () =>
 	({
 		ms: 0,
-		spaceMss: [],
-		savedTags: [],
+		name: { ms: 0, txt: '' },
+		bio: { ms: 0, txt: '' },
+		email: { ms: 0, txt: '' },
+		savedTags: { ms: 0, txt: JSON.stringify([]) },
+		// spaceMss: [],
 	}) satisfies MyAccount;
 
+export type MyAccountUpdates = Partial<MyAccount>;
 export let reduceAccountRows = (rows: PartInsert[]) => {
-	let account: Partial<MyAccount> = {};
+	let account: MyAccountUpdates = {};
 	for (let i = 0; i < rows.length; i++) {
 		let part = rows[i];
 		if (part.code === pc.accountId) {
 			account.ms = part.ms!;
-		} else if (part.code === pc.emailMsTxtAtAccountId) {
-			account.email = part.txt!;
-			account.emailMs = part.ms!;
-		} else if (part.code === pc.nameMsTxtAtAccountId) {
-			account.name = part.txt!;
-			account.nameMs = part.ms!;
-		} else if (part.code === pc.bioMsTxtAtAccountId) {
-			account.bio = part.txt!;
-			account.bioMs = part.ms!;
-		} else if (part.code === pc.savedTagsMsTxtAtAccountId) {
-			account.savedTags = JSON.parse(part.txt!);
-			account.savedTagsMs = part.ms!;
+		} else if (part.code === pc.emailTxtMsAtAccountId) {
+			account.email = { ms: part.ms, txt: part.txt! };
+		} else if (part.code === pc.nameTxtMsAtAccountId) {
+			account.name = { ms: part.ms, txt: part.txt! };
+		} else if (part.code === pc.bioTxtMsAtAccountId) {
+			account.bio = { ms: part.ms, txt: part.txt! };
+		} else if (part.code === pc.savedTagsTxtMsAtAccountId) {
+			account.savedTags = { ms: part.ms, txt: part.txt! };
 		}
 		// TODO: get account spaces
 		// if (prop === 'spaceMss' || prop === 'savedTags') {
@@ -94,15 +83,16 @@ export let filterAccountPwHashRow = (accountMs: number) =>
 		pf.ms.gt0,
 		pf.by_ms.eq0,
 		pf.in_ms.eq0,
-		pf.code.eq(pc.pwHashMsTxtAtAccountId),
+		pf.code.eq(pc.pwHashTxtMsAtAccountId),
 		pf.num.eq0,
 		pf.txt.isNotNull,
 	);
 
-export let accountMsToName = (ms: number, isSystem = false) => {
+export let msToAccountNameTxt = (ms: number, isSystem = false) => {
 	return !ms
-		? gs.currentSpaceMs || isSystem
-			? m.system()
+		? isSystem
+			? // ? gs.currentSpaceMs || isSystem
+				m.system()
 			: m.anon()
-		: gs.msToAccountMap[ms]?.name || identikana(ms);
+		: gs.msToAccountNameTxtMap[ms] || identikana(ms);
 };

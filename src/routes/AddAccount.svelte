@@ -31,14 +31,14 @@
 		type: showingPw ? '' : 'password',
 		minlength: 8,
 		maxlength: 64,
-		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8',
+		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8',
 	});
 
 	$effect(() => {
 		email = page.state.email || '';
 	});
 
-	let onAccountClaimed = (account?: MyAccount) => {
+	let onAccountAuth = (account?: MyAccount) => {
 		if (account) {
 			updateLocalCache((lc) => ({
 				...lc,
@@ -174,7 +174,7 @@
 							if (res.fail) return alert(m.anErrorOccurred());
 							strike = res.strike;
 							expiredOtp = res.expiredOtp;
-							onAccountClaimed(res.account);
+							onAccountAuth(res.account);
 						} else if (p.resettingPassword) {
 							let res = await trpc().checkOtp.mutate({
 								otpMs,
@@ -205,7 +205,7 @@
 				<p class="mt-2 font-bold">{m.oneTimePin()}</p>
 				<input
 					bind:value={pin}
-					class="bg-bg4 w-full px-2 h-9 text-lg border-l-2 border-bg8"
+					class="bg-bg4 w-full px-2 h-9 text-lg border-l-0 border-bg8"
 					required
 					maxlength={8}
 					minlength={8}
@@ -236,10 +236,9 @@
 						let normalizedEmail = email.trim().toLowerCase();
 						if (p.signingIn) {
 							let signedInAccount = gs.accounts?.find(
-								(a) => a.signedIn && a.email === normalizedEmail,
+								(a) => a.signedIn && a.email.txt === normalizedEmail,
 							);
 							if (signedInAccount) {
-								console.log('signedInAccount:', signedInAccount);
 								updateLocalCache((lc) => ({
 									...lc,
 									accounts: [
@@ -259,7 +258,7 @@
 								email = normalizedEmail;
 								pin = dev ? '00000000' : '';
 							}
-							onAccountClaimed(res.account);
+							onAccountAuth(res.account);
 						} else {
 							let res = await trpc().sendOtp.mutate({
 								email,
@@ -286,7 +285,7 @@
 						type="name"
 						maxlength={88}
 						autocomplete="given-name"
-						class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8"
+						class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8"
 					/>
 				{/if}
 				<p class="mt-2 font-bold">{m.email()}</p>
@@ -297,7 +296,7 @@
 					minlength={6}
 					maxlength={254}
 					autocomplete="username"
-					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-2 border-bg8"
+					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8"
 				/>
 				{#if p.creatingAccount || p.signingIn}
 					{@render pwInputs()}

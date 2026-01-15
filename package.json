@@ -52,7 +52,7 @@
 	"dependencies": {
 		"@inlang/paraglide-js": "^2.0.0",
 		"@libsql/client": "^0.14.0",
-		"@tabler/icons-svelte": "^3.34.0",
+		"@tabler/icons-svelte": "^3.36.1",
 		"@trpc/client": "^10.45.2",
 		"@trpc/server": "^10.45.2",
 		"argon2": "^0.44.0",

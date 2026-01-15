@@ -18,5 +18,5 @@
 		<IconUserFilled class={`text-fg1 ${p.class}`} />
 	{/if}
 {:else}
-	<Identicon data={'' + p.ms} class={p.class} />
+	<Identicon {...p} />
 {/if}

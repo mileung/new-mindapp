@@ -15,6 +15,7 @@ export let makeLimiter = (pings: number, minutes: number) => {
 			try {
 				await limiter.consume(ctx.event.getClientAddress());
 			} catch (e) {
+				console.log('e:', e);
 				throw new TRPCError({
 					code: 'TOO_MANY_REQUESTS',
 					message: m.tooManyRequests(),

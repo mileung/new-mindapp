@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { scrollToHighlight, scrollToLastY, textInputFocused } from '$lib/dom';
 	import {
@@ -16,6 +15,7 @@
 		getAtIdStr,
 		getIdStr,
 		getIdStrAsIdObj,
+		getUrlInMs,
 		id0,
 		idsRegex,
 		isIdStr,
@@ -59,14 +59,13 @@
 
 	let byMssRegex = /(^|\s)\/_\d+_\/($|\s)/g;
 	let quoteRegex = /"([^"]+)"/g;
-	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; idParam?: string } = $props();
+	let p: { hidden?: boolean; modal?: boolean; qSearchParam: string; tidStr?: string } = $props();
 	let postIdStrFeed = $state<string[]>([]);
 	let postAtBumpedPostIdObjsExclude = $state<FullIdObj[]>();
 	let endReached = $state(false);
 	let feedError = $state('');
 	let viewPostToastId = $state('');
-	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
-	let inLocal = $derived(!idParamObj?.in_ms);
+	let urlInMs = $derived(getUrlInMs());
 
 	let view = $derived<'flat' | 'nested'>(
 		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
@@ -85,37 +84,23 @@
 		!shown && !p.hidden && (shown = true);
 	});
 	let identifier = $derived(
-		shown && gs.accounts && p.idParam
+		shown && gs.accounts && p.tidStr
 			? makeFeedIdentifier({
 					view,
 					sortedBy,
 					qSearchParam: p.qSearchParam,
-					idParam: p.idParam,
-					byMs: p.idParam !== '__0' && p.idParam !== '__8' ? gs.accounts[0].ms : 0,
+					idParam: p.tidStr,
+					byMs: p.tidStr !== '__0' && p.tidStr !== '__8' ? gs.accounts[0].ms : 0,
 				})
 			: '',
 	);
 	let nested = $derived(view === 'nested');
 	let isViewOnly = $derived((gs.accounts?.[0].ms || 0) > 0);
 	//
-	let showYourTurn = $derived(!isViewOnly && (idParamObj?.in_ms || 0) > 0);
-	let spotId = $derived(isIdStr(p.idParam) && p.idParam!);
+	let showYourTurn = $derived(!isViewOnly && (urlInMs || 0) > 0);
+	let spotId = $derived(isIdStr(p.tidStr) && p.tidStr!);
 	let promptSignIn = $derived(getPromptSigningIn());
 	let allowNewWriting = $derived(!p.modal && !promptSignIn && gs.currentSpaceMs !== 1);
-
-	let secondsRemaining = $state(-1);
-	let countDownTimer = $state<NodeJS.Timeout>();
-
-	let startCountDown = () => {
-		secondsRemaining = 8;
-		let decrement = () => {
-			secondsRemaining--;
-			if (secondsRemaining > 0) {
-				countDownTimer = setTimeout(decrement, 1000);
-			} else goto('/user-guide');
-		};
-		countDownTimer = setTimeout(decrement, 1000);
-	};
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
@@ -139,7 +124,6 @@
 					!gs.writingEdit
 				) {
 					e.preventDefault();
-					clearTimeout(countDownTimer);
 					resetBottomOverlay();
 					gs.writingNew = true;
 				}
@@ -149,19 +133,11 @@
 		return () => {
 			resetBottomOverlay();
 			window.removeEventListener('keydown', handler);
-			clearTimeout(countDownTimer);
 		};
 	});
 
-	$effect(() => {
-		if (gs.writingNew || p.idParam !== '__0') {
-			clearTimeout(countDownTimer);
-			secondsRemaining = -1;
-		}
-	});
-
 	// $effect(() => {
-	// 	if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !inLocal && !gs.accounts?.[0].ms) {
+	// 	if ((gs.writingNew || gs.writingTo || gs.writingEdit) && !!urlInMs && !gs.accounts?.[0].ms) {
 	// 		alert(m.signInToPostInThisSpace());
 	// 		resetBottomOverlay();
 	// 	}
@@ -185,7 +161,7 @@
 
 		// TODO: load locally saved postIdStrFeed and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 
-		if (!idParamObj || !gs.accounts || promptSignIn) return;
+		if (urlInMs === undefined || !gs.accounts || promptSignIn) return;
 		if (endReached) return e.detail.complete();
 		let lastPostIdStr = (postIdStrFeed as (undefined | string)[]).slice(-1)[0];
 		let lastPostIdObj = lastPostIdStr ? getIdStrAsIdObj(lastPostIdStr) : null;
@@ -202,7 +178,7 @@
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
-			inMssInclude: [idParamObj.in_ms],
+			inMssInclude: [urlInMs],
 			postIdObjsExclude: [],
 			postIdObjsInclude: [],
 			tagsExclude: [],
@@ -289,17 +265,6 @@
 			postIdStrFeed = [...new Set([...postIdStrFeed, ...newPostIdStrFeed])];
 			newPostIdStrFeed.length && e.detail.loaded();
 			endReached && e.detail.complete();
-
-			// console.log('cool', JSON.stringify(gs.idToPostMap['587026800000_0_0'], null, 2));
-			if (
-				p.idParam === '__0' &&
-				!p.qSearchParam &&
-				endReached &&
-				!postIdStrFeed.length &&
-				!newPostIdStrFeed.length
-			) {
-				startCountDown();
-			}
 		} catch (error) {
 			// @ts-ignore
 			feedError = String(error?.message || m.placeholderError());
@@ -329,7 +294,7 @@
 			// 	post.tags = await editPost(post, true);
 			// 	await overwriteLocalPost(post);
 			// };
-			// if (inLocal) {
+			// if (!urlInMs) {
 			// 	Number.isInteger(post.in_ms) ? updateInCloud() : (post.tags = await editPost(post, false));
 			// } else updateInCloud();
 			post.history![newLastVersion]!.ms = (await editPost(post)).ms;
@@ -358,7 +323,7 @@
 				post.ms = (await addPost(post)).ms;
 				post.history![1]!.ms = post.ms;
 				post.subIds = [];
-				if (!inLocal) await addPost(post, true);
+				if (!!urlInMs) await addPost(post, true);
 			} catch (error) {
 				console.error(error);
 				return alert(error);
@@ -411,13 +376,13 @@
 	id={p.hidden ? '' : 'feed'}
 	class={`z-50 flex flex-col ${gs.pendingInvite ? 'h- screen-[calc(100vh-36px)]' : 'h- screen'} ${p.hidden ? 'hidden' : ''}`}
 >
-	{#if !idParamObj}
+	{#if urlInMs === undefined}
 		<!--  -->
 	{:else if promptSignIn}
 		<PromptSignIn />
-		<!-- {:else if idParamObj?.in_ms === 1}
+		<!-- {:else if urlInMs === 1}
 		patience -->
-	{:else if idParamObj}
+	{:else}
 		{#if isViewOnly}
 			<div class="shrink-0 h-9 fx">
 				<IconEye class="w-6 ml-0.5 mr-2" />
@@ -497,17 +462,10 @@
 				{feedError}
 			</p>
 		</InfiniteLoading>
-		{#if secondsRemaining >= 0}
-			<div class="xy">
-				<p class="">
-					{@html secondsRemaining === -1 ? m.newHere__2() : m.newHere___({ secondsRemaining })}
-				</p>
-			</div>
-		{/if}
 	{/if}
-	{#if p.modal}
+	{#if p.modal && urlInMs !== undefined}
 		<a
-			href={`/__${idParamObj.in_ms}`}
+			href={`/__${urlInMs}`}
 			onclick={scrollToLastY}
 			class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
 		>

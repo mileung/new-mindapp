@@ -7,8 +7,9 @@
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { day } from '$lib/time';
-	import { getLocalCache, signOut } from '$lib/types/local-cache';
-	import { type PartInsert } from '$lib/types/parts';
+	import { trpc } from '$lib/trpc/client';
+	import { signOut, updateLocalCache } from '$lib/types/local-cache';
+	import { getWhoObj, type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pf } from '$lib/types/parts/partFilters';
 	import { getIdObjAsAtIdObj, getIdStr, id0 } from '$lib/types/parts/partIds';
@@ -20,15 +21,14 @@
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import SpaceOrAccountHeader from '../SpaceOrAccountHeader.svelte';
-	let setAccountsAndSpaces = () => {
-		let localCache = getLocalCache();
-		gs.accounts = localCache.accounts;
-		gs.msToSpaceMap = localCache.msToSpaceMap;
-	};
 	let language = $state('en');
+
+	// TODO: allow user to put in domain patterns that render as iframes
+	// like if you want to render other mindapp instances hosted elsewhere,
+	// you'd list that domain and their urls render iframes in the feed
 </script>
 
-<div class="flex flex-col items-start gap-2 p-2 w-full max-w-lg">
+<div class="p-2 w-full max-w-lg">
 	{#if gs.localDbFailed || gs.invalidLocalCache}
 		<p class="text-red-500 border-red-500 border-2 p-2">
 			{gs.localDbFailed
@@ -39,17 +39,26 @@
 	<p class="text-xl font-bold">{m.account()}</p>
 	{#if gs.accounts}
 		<SpaceOrAccountHeader
-			isAccount
-			ms={gs.accounts[0].ms}
-			name="teste"
-			bio="this is a test"
-			onChange={(changes) => {
-				console.log('changes:', changes);
+			account={gs.accounts[0]}
+			onChange={async (changes) => {
+				let { ms } = await trpc().changeAccountNameOrBio.mutate({
+					...(await getWhoObj()),
+					...changes,
+				});
+				updateLocalCache((lc) => {
+					if (changes.nameTxt !== undefined) {
+						lc.accounts[0].name = { ms, txt: changes.nameTxt };
+					}
+					if (changes.bioTxt !== undefined) {
+						lc.accounts[0].bio = { ms, txt: changes.bioTxt };
+					}
+					return lc;
+				});
 			}}
 		/>
-		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-		<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
 		{#if gs.accounts[0].ms}
+			<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
 			<button
 				class="xy px-2 py-1 bg-bg5 hover:bg-bg7 text-fg1"
 				onclick={() => signOut(gs.accounts![0].ms, true)}
@@ -184,7 +193,6 @@
 								// 	...overwrites.map((o) => overwriteLocalPost(o)),
 								// ]);
 								console.timeEnd('import_time');
-								setAccountsAndSpaces();
 								alert(m.dataSuccessfullyMerged());
 							} else {
 								alert(m.invalidJsonFile());
@@ -227,7 +235,6 @@
 			alert(m.localDatabaseDeleted());
 			gs.indentifierToFeedMap = {};
 			await initLocalDb();
-			setAccountsAndSpaces();
 
 			// TODO: not great to assume the new local db works after deleting the old one - same for localCache
 			gs.localDbFailed = gs.invalidLocalCache = false;
@@ -247,7 +254,6 @@
 				}
 				gs.indentifierToFeedMap = {};
 				await initLocalDb();
-				setAccountsAndSpaces();
 				let testTags: string[] = [];
 				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
 				let beginning = new Date('1988-08-08').getTime();

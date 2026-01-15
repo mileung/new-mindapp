@@ -6,18 +6,18 @@
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import {
-		refreshCurrentAccount,
+		refreshSignedInAccounts,
 		signOut,
 		unsaveAccount,
 		updateLocalCache,
 		updateSavedTags,
 	} from '$lib/types/local-cache';
-	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
-	import { spaceMsToName, type Space } from '$lib/types/spaces';
+	import { defaultSpaceProps, spaceMsToName, type Space } from '$lib/types/spaces';
 	import {
 		IconDotsVertical,
-		IconHelpSquareRounded,
+		IconHelpSquare,
 		IconLogout,
 		IconPuzzle,
 		IconSearch,
@@ -25,6 +25,7 @@
 		IconSquarePlus2,
 		IconTags,
 		IconUserPlus,
+		IconUserSquare,
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
@@ -47,11 +48,17 @@
 	let showSpaceMenu = $state(false);
 	let tagIndex = $state(-1);
 
-	let idParamObj = $derived(page.params.id ? getIdStrAsIdObj(page.params.id) : null);
+	let urlInMs = $derived(getUrlInMs());
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
-	let savedTagsSet = $derived(new Set(gs.accounts?.[0].savedTags || []));
+	let savedTagsSet = $derived(
+		new Set(
+			gs.accounts //
+				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
+				: [],
+		),
+	);
 	let showSuggestedTags = $derived(searchIptFocused && tagFilter);
 	let suggestedTags = $derived.by(() => {
 		if (!showSuggestedTags) return [];
@@ -82,15 +89,12 @@
 						setTimeout(() => goto(`/__${gs.currentSpaceMs}`), 0);
 					}
 				}
-
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					let currentSpaceMsIndex = gs.accounts[0].spaceMss.indexOf(gs.currentSpaceMs);
+					let currentSpaceMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.currentSpaceMs);
 					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
-					if (newSpaceMsIndex >= gs.accounts[0].spaceMss.length)
-						newSpaceMsIndex = gs.accounts[0].spaceMss.length - 1;
-					let inMs = gs.accounts[0].spaceMss[newSpaceMsIndex];
-					goto(`/__${inMs}`);
+					if (newSpaceMsIndex >= sidebarSpaces.length) newSpaceMsIndex = sidebarSpaces.length - 1;
+					goto(`/__${sidebarSpaces[newSpaceMsIndex].ms}`);
 				}
 			}
 		};
@@ -118,53 +122,52 @@
 			if (e.metaKey) open(urlPath, '_blank');
 			else {
 				// TODO: this stuff
-				pushState(urlPath, { modalId: urlPath });
+				pushState(urlPath, { postIdStr: urlPath });
 			}
 		}
 	};
 
-	$effect(() => {
-		// console.log($inspect(gs.accounts?.[0]));
-		// console.log(gs.currentSpaceMs);
-		// console.log(gs.accounts[0]?.id);
-		// console.log($inspect(gs.accounts[0]?.spaceMss));
-		// console.log('page.url.pathname:', page.url.pathname);
-	});
+	let sidebarSpaces = $derived<Space[]>([
+		// local space ms - everything private in OPFS
+		defaultSpaceProps,
+		// personal space ms placeholder - everything private in cloud
+		{ ...defaultSpaceProps, ms: gs.accounts?.[0].ms || 8 },
+		// global space ms - everything public in cloud
+		{ ...defaultSpaceProps, ms: 1 },
 
-	let sidebarSpaces = $derived<Space[]>(
-		[
-			...new Set([
-				0,
-				8,
-				1,
-				...(gs.pendingInvite?.in_ms ? [gs.pendingInvite.in_ms] : []),
-				...(gs.accounts?.[0].spaceMss || []),
-			]),
-		]
-			.map(
-				(ms) =>
-					gs.msToSpaceMap[ms] ||
+		...(gs.pendingInvite && gs.pendingInvite.in_ms !== 1
+			? [
 					{
-						0: { ms: 0, name: spaceMsToName(0) }, // local space ms - everything local
-						8: { ms: 8, name: spaceMsToName(8) }, // personal space ms placeholder - everything private in cloud
-						1: { ms: 1, name: spaceMsToName(1) }, // global space ms - everything public in cloud
-					}[ms],
-			)
-			.filter((s) => !!s),
-	);
+						...defaultSpaceProps,
+						ms: gs.pendingInvite.in_ms,
+						name: { ms: 0, by_ms: 0, txt: gs.pendingInvite.space.name.txt },
+					},
+				]
+			: []),
+		// ...(gs.accounts?.[0].spaceMss || []),
+	]);
+
+	// $effect(() => {
+	// 	if (
+	// 		gs.accounts &&
+	// 		gs.currentSpaceMs !== undefined &&
+	// 		!sidebarSpaces.find((s) => s.ms === gs.currentSpaceMs)
+	// 	)
+	// 		goto('/__0');
+	// });
 </script>
 
 <!-- TODO: remember PostDrop states (open, parsed, etc) when switching spaces -->
 
 <aside class="z-50 bottom-0 fixed w-screen xs:h-screen xs:w-[var(--w-sidebar)] bg-bg2">
-	<div
+	<!-- <div
 		class="hidden xs:block z-50 absolute right-0 h-screen cursor-col-resize w-0.5 hover:w-4"
 		onmousedown={() => {
 			// TODO: resizable sidebar. Might be better to just make the whole sidebar draggable.
 			// If dragging on button or a tag, disable so it doesn't fire on moue up
 			// Or just make the Search Icon draggable? IconGripHorizontal on hover an no text input?
 		}}
-	></div>
+	></div> -->
 	<div class="h-full flex flex-col-reverse xs:flex-col">
 		<div class="flex h-9">
 			<button
@@ -321,9 +324,9 @@
 										...lc,
 										accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
 									}));
-									refreshCurrentAccount();
+									refreshSignedInAccounts();
 								} else {
-									goto('/sign-in', { state: { email: a.email } });
+									goto('/sign-in', { state: { email: a.email.txt } });
 								}
 							}}
 						>
@@ -335,7 +338,7 @@
 							</div>
 							<!-- TODO: getNameByAccountMs -->
 							<div class="flex-1 overflow-scroll text-nowrap fx justify-start">
-								{a.ms === 0 ? m.anon() : a.name || identikana(a.ms)}
+								{a.ms === 0 ? m.anon() : a.name.txt || identikana(a.ms)}
 							</div>
 							{#if a.ms && !a.signedIn}
 								<p class="group-hover:hidden text-nowrap text-fg2 self-center text-sm">
@@ -396,20 +399,18 @@
 					<p class="truncate">{m.addSpace()}</p>
 				</a>
 				{#each sidebarSpaces as space (space.ms)}
-					<div
-						class={`flex group/space ${space.ms === idParamObj?.in_ms ? 'bg-bg5' : ''} hover:bg-bg5`}
-					>
+					<div class={`flex group/space ${space.ms === urlInMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<a
 							href={`/__${space.ms}`}
 							class={`relative flex-1 fx h-10 pl-2 gap-2 truncate font-medium`}
 						>
 							{#if space.ms === gs.currentSpaceMs}
 								<div
-									class={`absolute left-0 h-full w-0.5 ${page.params.id ? 'bg-hl1' : 'bg-fg2'}`}
+									class={`absolute left-0 h-full w-0.5 ${page.params.tid ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
 							{/if}
 							<SpaceIcon ms={space.ms} class="shrink-0 w-6" />
-							<p class="truncate">{spaceMsToName(space.ms)}</p>
+							<p class="truncate">{spaceMsToName(space.ms).txt}</p>
 						</a>
 						<!-- TODO: IconCalendar -->
 						<a
@@ -430,10 +431,17 @@
 			<div class="flex-1" onclick={(e) => e.stopPropagation()}></div>
 			<div class={`${showAccountMenu ? '' : 'hidden xs:block'}`}>
 				<a
+					href={`/_${gs.accounts?.[0].ms || 0}_`}
+					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+				>
+					<IconUserSquare class="shrink-0 w-6" />
+					<p class="truncate">{m.profile()}</p>
+				</a>
+				<a
 					href="/user-guide"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
-					<IconHelpSquareRounded class="shrink-0 w-6" />
+					<IconHelpSquare class="shrink-0 w-6" />
 					<p class="truncate">{m.userGuide()}</p>
 				</a>
 				<a

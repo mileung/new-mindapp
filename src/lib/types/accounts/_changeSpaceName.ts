@@ -5,18 +5,18 @@ import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 
-export let _changeSpaceName = async (input: WhoWhereObj & { newName: string }) => {
+export let _changeSpaceName = async (input: WhoWhereObj & { nameTxt: string }) => {
 	let ms = Date.now();
 	await tdb
 		.update(pTable)
-		.set({ ms, by_ms: input.callerMs, txt: input.newName })
+		.set({ ms, by_ms: input.callerMs, txt: input.nameTxt })
 		.where(
 			and(
 				pf.noParent,
 				pf.ms.gt0,
 				pf.by_ms.gt0,
 				pf.in_ms.eq(input.spaceMs),
-				pf.code.eq(pc.spaceNameIdTxt),
+				pf.code.eq(pc.spaceNameTxtId),
 				pf.num.eq0,
 			),
 		);

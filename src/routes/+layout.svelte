@@ -5,11 +5,9 @@
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
-	import { trpc } from '$lib/trpc/client';
-	import { accountMsToName } from '$lib/types/accounts';
-	import { getLocalCache, refreshCurrentAccount, updateLocalCache } from '$lib/types/local-cache';
-	import { getWhoWhereObj } from '$lib/types/parts';
-	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
+	import { msToAccountNameTxt } from '$lib/types/accounts';
+	import { getLocalCache, refreshSignedInAccounts, updateLocalCache } from '$lib/types/local-cache';
+	import { getUrlInMs, hasTemplateIdRegex } from '$lib/types/parts/partIds';
 	import { spaceMsToName, usePendingInvite } from '$lib/types/spaces';
 	import { IconChevronRight, IconX } from '@tabler/icons-svelte';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
@@ -28,7 +26,6 @@
 
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.msToSpaceMap = localCache.msToSpaceMap;
 		gs.currentSpaceMs = localCache.currentSpaceMs;
 
 		try {
@@ -41,30 +38,7 @@
 			goto('/settings');
 		}
 
-		let oldSignedInAccountMss = gs.accounts.filter((a) => a.signedIn).map((a) => a.ms);
-		if (oldSignedInAccountMss.length) {
-			let res = await trpc().checkSignedInAccountMss.mutate({
-				...(await getWhoWhereObj()),
-				accountMss: oldSignedInAccountMss,
-			});
-			updateLocalCache((lc) => ({
-				...lc,
-				accounts: lc.accounts.map((a) => ({
-					...a,
-					signedIn: res.signedInAccountMss.includes(a.ms),
-				})),
-			}));
-			refreshCurrentAccount();
-		}
-		updateLocalCache((lc) => ({
-			...lc,
-			accounts: lc.accounts.sort((a, b) => {
-				if (a.signedIn && b.signedIn) return 0;
-				if (a.signedIn && !b.signedIn) return -1;
-				if (!a.signedIn && b.signedIn) return 1;
-				return a.ms - b.ms;
-			}),
-		}));
+		refreshSignedInAccounts();
 
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {
@@ -82,13 +56,31 @@
 			});
 		}
 	});
+
+	let urlInMs = $derived(getUrlInMs());
+	let lastHref = '';
 	$effect(() => {
-		if (page.params.id) {
-			let { in_ms } = getIdStrAsIdObj(page.params.id);
-			gs.currentSpaceMs !== in_ms &&
+		if (gs.accounts && urlInMs === 8) {
+			if (gs.accounts[0].ms) {
+				let newHref =
+					page.url.pathname.replace(
+						hasTemplateIdRegex, //
+						`__${gs.accounts[0].ms}`,
+					) + page.url.search;
+				if (newHref !== lastHref) {
+					goto(newHref);
+					gs.currentSpaceMs = gs.accounts[0].ms;
+					lastHref = newHref;
+				}
+			}
+		}
+	});
+	$effect(() => {
+		if (page.params.tid && urlInMs !== undefined) {
+			gs.currentSpaceMs !== urlInMs &&
 				updateLocalCache((lc) => ({
 					...lc,
-					currentSpaceMs: in_ms,
+					currentSpaceMs: urlInMs,
 				}));
 		}
 	});
@@ -105,7 +97,7 @@
 			<div class="fx">
 				<AccountIcon isSystem ms={gs.pendingInvite!.by_ms} class="w-6 ml-0.5 mr-2" />
 				<p class="font-bold">
-					{accountMsToName(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToName(
+					{msToAccountNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToName(
 						gs.pendingInvite!.in_ms,
 					)}
 				</p>

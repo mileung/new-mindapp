@@ -6,7 +6,7 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		interface PageState {
-			modalId?: string;
+			postIdStr?: string;
 			lastScrollY?: number;
 			email?: string;
 		}

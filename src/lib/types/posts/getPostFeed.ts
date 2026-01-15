@@ -355,10 +355,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 						or(...postIdObs.map((io) => pf.idAsAtId(io))),
 						or(
 							...[
-								pc.currentPostTagIdWithNumAsVersionAtPostId,
-								pc.currentPostCoreIdWithNumAsVersionAtPostId,
-								pc.currentVersionNumAndMsAtPostId,
-								pc.currentSoftDeletedVersionNumAndMsAtPostId,
+								pc.currentPostTagIdWithVersionNumAtPostId,
+								pc.currentPostCoreIdWithVersionNumAtPostId,
+								pc.currentVersionNumMsAtPostId,
+								pc.currentSoftDeletedVersionNumMsAtPostId,
 							].map((code) =>
 								and(
 									pf.code.eq(code),
@@ -388,10 +388,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	let {
 		[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows = [],
-		[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
-		[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdRows = [],
-		[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
+		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows = [],
+		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
+		[pc.currentVersionNumMsAtPostId]: curVersionNumAndMsAtPostIdRows = [],
+		[pc.currentSoftDeletedVersionNumMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
 		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdRows = [],
 		[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIdRows = [],
 	} = channelPartsByCode(
@@ -404,10 +404,10 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	if (atCitedIdObjsThatNeedFetching.length) {
 		let {
 			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows_ = [],
-			[pc.currentPostTagIdWithNumAsVersionAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows_ = [],
-			[pc.currentPostCoreIdWithNumAsVersionAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows_ = [],
-			[pc.currentVersionNumAndMsAtPostId]: curVersionNumAndMsAtPostIdRows_ = [],
-			[pc.currentSoftDeletedVersionNumAndMsAtPostId]: curSDeletedVersionNumAndMsAtPostIdRows_ = [],
+			[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows_ = [],
+			[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows_ = [],
+			[pc.currentVersionNumMsAtPostId]: curVersionNumAndMsAtPostIdRows_ = [],
+			[pc.currentSoftDeletedVersionNumMsAtPostId]: curSDeletedVersionNumAndMsAtPostIdRows_ = [],
 			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdRows_ = [],
 			[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIdRows_ = [],
 		} = channelPartsByCode(await getPostParts(atCitedIdObjsThatNeedFetching, true));
@@ -482,13 +482,13 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 		let part = subParts[i];
 		let partIdStr = getIdStr(part);
 		let partAtIdStr = getAtIdStr(part);
-		if (part.code === pc.currentPostTagIdWithNumAsVersionAtPostId) {
+		if (part.code === pc.currentPostTagIdWithVersionNumAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags!.push(tagIdToTxtMap[partIdStr]);
-		} else if (part.code === pc.currentPostCoreIdWithNumAsVersionAtPostId) {
+		} else if (part.code === pc.currentPostCoreIdWithVersionNumAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.core = coreIdToTxtMap[partIdStr];
-		} else if (part.code === pc.currentVersionNumAndMsAtPostId) {
+		} else if (part.code === pc.currentVersionNumMsAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.ms = part.ms!;
-		} else if (part.code === pc.currentSoftDeletedVersionNumAndMsAtPostId) {
+		} else if (part.code === pc.currentSoftDeletedVersionNumMsAtPostId) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
 		} else if (part.code === pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId) {
 			idToPostMap[partAtIdStr].rxnCount = {

@@ -1,8 +1,7 @@
 <script lang="ts">
 	let p: {
-		data?: string;
+		ms?: number;
 		class?: string;
-		size?: number;
 	} = $props();
 
 	let largePrimeNumber = 2654435761;
@@ -18,8 +17,8 @@
 		'fill-pink-500',
 	];
 
-	let gridSize = $derived(p.size ?? 5);
-	let data = $derived(p.data || '');
+	let gridSize = 5;
+	let data = $derived('' + p.ms);
 	// data = '' + Math.random();
 
 	let overlap = 0.8;

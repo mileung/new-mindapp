@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
-	import { getIdStrAsIdObj } from '$lib/types/parts/partIds';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { getPromptSigningIn, spaceMsToName } from '$lib/types/spaces';
 	import { getSpaceTags, tagsPerLoad } from '$lib/types/spaces/getSpaceTags';
 	import { IconSquare, IconSquareCheckFilled } from '@tabler/icons-svelte';
@@ -11,7 +10,7 @@
 	import Apush from '../../Apush.svelte';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
-	let idParamObj = $derived(getIdStrAsIdObj(page.params.id!));
+	let urlInMs = $derived(getUrlInMs());
 	// let numTags = $state(0);
 	let tags = $state<
 		{
@@ -21,7 +20,7 @@
 	>([]);
 
 	$effect(() => {
-		idParamObj?.in_ms;
+		urlInMs;
 		tags = [];
 	});
 
@@ -36,7 +35,6 @@
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
 		tags = [...tags, ...res.tags];
-		e.detail.loaded();
 		let endReached = res.tags.length < tagsPerLoad;
 		if (endReached) {
 			e.detail.complete();
@@ -47,10 +45,16 @@
 		}
 	};
 
-	let savedTags = $derived(new Set(gs.accounts?.[0].savedTags));
+	let savedTags = $derived(
+		new Set(
+			gs.accounts //
+				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
+				: [],
+		),
+	);
 </script>
 
-{#if !idParamObj}
+{#if urlInMs === undefined}
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
@@ -58,9 +62,9 @@
 	<div class="p-2 w-full max-w-lg">
 		<p class="text-xl font-bold">
 			<!-- {numTags === 1
-				? m.oneSpaceNameTag({ spaceName: spaceMsToName(idParamObj.in_ms) })
-				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(idParamObj.in_ms) })} -->
-			{m.spaceNameTags({ spaceName: spaceMsToName(idParamObj.in_ms) })}
+				? m.oneSpaceNameTag({ spaceName: spaceMsToName(urlInMs) })
+				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(urlInMs) })} -->
+			{m.spaceNameTags({ spaceName: spaceMsToName(urlInMs).txt })}
 		</p>
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
@@ -83,9 +87,14 @@
 				</button>
 			</div>
 		{/each}
-		<InfiniteLoading identifier={idParamObj.in_ms} spinner="spiral" on:infinite={loadMoreTags}>
-			<p slot="noMore" class="mb-2 text-lg text-fg2">{m.endOfList()}</p>
-			<!-- <p slot="error" class="mb-2 text-lg text-fg2">{m.placeholderError()}</p> -->
+		<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
+			<p slot="noResults" class="m-2 text-lg text-fg2">
+				{m.noTagsFound()}
+			</p>
+			<p slot="noMore" class="m-2 text-lg text-fg2">{m.endOfList()}</p>
+			<p slot="error" class="m-2 text-lg text-fg2">
+				{m.placeholderError()}
+			</p>
 		</InfiniteLoading>
 	</div>
 {/if}

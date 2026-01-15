@@ -20,7 +20,7 @@
 				if (urlObj.search) {
 					// TODO:
 				} else {
-					pushState(p.href, { modalId: idStr, lastScrollY: window.scrollY });
+					pushState(p.href, { postIdStr: idStr, lastScrollY: window.scrollY });
 				}
 				console.log(urlObj);
 			} else throw new Error(`Apush href must have an id param`);

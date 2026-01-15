@@ -159,12 +159,12 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 									pf.id(tagOrCoreIdObj),
 									isTag
 										? or(
-												pf.code.eq(pc.currentPostTagIdWithNumAsVersionAtPostId),
-												pf.code.eq(pc.exPostTagIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.currentPostTagIdWithVersionNumAtPostId),
+												pf.code.eq(pc.exPostTagIdWithVersionNumAtPostId),
 											)
 										: or(
-												pf.code.eq(pc.currentPostCoreIdWithNumAsVersionAtPostId),
-												pf.code.eq(pc.exPostCoreIdWithNumAsVersionAtPostId),
+												pf.code.eq(pc.currentPostCoreIdWithVersionNumAtPostId),
+												pf.code.eq(pc.exPostCoreIdWithVersionNumAtPostId),
 											),
 									pf.num.gte0,
 									pf.txt.isNull,

@@ -89,11 +89,11 @@ export let _addPost = async (db: Database, post: Post) => {
 			code:
 				layer.tags === null
 					? isLastVersion
-						? pc.currentSoftDeletedVersionNumAndMsAtPostId
-						: pc.exSoftDeletedVersionNumAndMsAtPostId
+						? pc.currentSoftDeletedVersionNumMsAtPostId
+						: pc.exSoftDeletedVersionNumMsAtPostId
 					: isLastVersion
-						? pc.currentVersionNumAndMsAtPostId
-						: pc.exVersionNumAndMsAtPostId,
+						? pc.currentVersionNumMsAtPostId
+						: pc.exVersionNumMsAtPostId,
 			num: version,
 		});
 
@@ -251,8 +251,8 @@ export let _addPost = async (db: Database, post: Post) => {
 						by_ms: tagRow.by_ms,
 						in_ms: tagRow.in_ms,
 						code: isLastVersion
-							? pc.currentPostTagIdWithNumAsVersionAtPostId
-							: pc.exPostTagIdWithNumAsVersionAtPostId,
+							? pc.currentPostTagIdWithVersionNumAtPostId
+							: pc.exPostTagIdWithVersionNumAtPostId,
 						num: version,
 					});
 				}
@@ -265,8 +265,8 @@ export let _addPost = async (db: Database, post: Post) => {
 					by_ms: coreRow.by_ms,
 					in_ms: coreRow.in_ms,
 					code: isLastVersion
-						? pc.currentPostCoreIdWithNumAsVersionAtPostId
-						: pc.exPostCoreIdWithNumAsVersionAtPostId,
+						? pc.currentPostCoreIdWithVersionNumAtPostId
+						: pc.exPostCoreIdWithVersionNumAtPostId,
 					num: version,
 				});
 			}

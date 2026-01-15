@@ -6,7 +6,7 @@ export let _updateSavedTags = async (
 		remove: boolean;
 	},
 ) => {
-	let now = Date.now();
+	let ms = Date.now();
 	// let savedTagsRowFilter = and(
 	// 	pt.at_ms.e0,
 	// 	pt.at_by_ms.e0,
@@ -29,9 +29,9 @@ export let _updateSavedTags = async (
 	// await tdb
 	// 	.update(pTable)
 	// 	.set({
-	// 		ms: now,
+	// 		ms,
 	// 		txt: JSON.stringify(newSavedTags),
 	// 	})
 	// 	.where(savedTagsRowFilter);
-	return { savedTagsMs: now };
+	return { ms };
 };

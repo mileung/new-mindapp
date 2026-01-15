@@ -1,5 +1,5 @@
 import { tdb } from '$lib/server/db';
-import { getValidSessionCookies } from '$lib/server/sessions';
+import { getValidAuthCookie } from '$lib/server/sessions';
 import type { Context } from '$lib/trpc/context';
 import { type WhoObj } from '$lib/types/parts';
 import { and, or } from 'drizzle-orm';
@@ -8,8 +8,8 @@ import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean }) => {
-	let { sessionMs, sessionKey } = getValidSessionCookies(ctx);
-	if (sessionMs && sessionKey) {
+	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
+	if (sessionKey) {
 		await tdb
 			.delete(pTable)
 			.where(
@@ -32,12 +32,12 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 							pf.at_ms.eq(input.callerMs),
 							pf.at_by_ms.eq0,
 							pf.at_in_ms.eq0,
-							pf.ms.eq(sessionMs),
+							pf.ms.eq(sessionKey.ms),
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
 							pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 							pf.num.eq0,
-							pf.txt.eq(sessionKey),
+							pf.txt.eq(sessionKey.txt),
 						),
 			);
 	}
