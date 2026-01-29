@@ -41,7 +41,7 @@
 		<SpaceOrAccountHeader
 			account={gs.accounts[0]}
 			onChange={async (changes) => {
-				let { ms } = await trpc().changeAccountNameOrBio.mutate({
+				let { ms } = await trpc().changeMyAccountNameOrBio.mutate({
 					...(await getWhoObj()),
 					...changes,
 				});

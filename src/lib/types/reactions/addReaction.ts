@@ -15,11 +15,10 @@ import { getFullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let addReaction = async (rxn: Reaction) => {
+export let addReaction = async (rxn: Reaction, useRpc: boolean) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	let baseInput = await getWhoWhereObj();
-	return baseInput.spaceMs
-		? trpc().addReaction.mutate({ ...baseInput, rxn }) //
+	return useRpc
+		? trpc().addReaction.mutate({ ...(await getWhoWhereObj()), rxn }) //
 		: _addReaction(await gsdb(), rxn);
 };
 

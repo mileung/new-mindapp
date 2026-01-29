@@ -12,7 +12,7 @@ export let _getMyAccountUpdates = async (
 		nameMs: number;
 		bioMs: number;
 		savedTagsMs: number;
-		// spaceMssMs: number;
+		spaceMssMs: number;
 	},
 ) => {
 	let accountUpdates = reduceAccountRows(
@@ -22,9 +22,7 @@ export let _getMyAccountUpdates = async (
 			.where(
 				or(
 					and(
-						pf.at_ms.eq(input.callerMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(input.callerMs),
 						pf.ms.gt(input.emailMs),
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
@@ -33,35 +31,34 @@ export let _getMyAccountUpdates = async (
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(input.callerMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						pf.ms.gt(input.nameMs),
-						pf.by_ms.eq0,
-						pf.in_ms.eq0,
+						pf.msAsAtId(input.callerMs),
+						pf.msAsId(input.nameMs),
 						pf.code.eq(pc.nameTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(input.callerMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						pf.ms.gt(input.bioMs),
-						pf.by_ms.eq0,
-						pf.in_ms.eq0,
+						pf.msAsAtId(input.callerMs),
+						pf.msAsId(input.bioMs),
 						pf.code.eq(pc.bioTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(input.callerMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(input.callerMs),
 						pf.ms.gt(input.savedTagsMs),
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
 						pf.code.eq(pc.savedTagsTxtMsAtAccountId),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+					and(
+						pf.msAsAtId(input.callerMs),
+						pf.ms.gt(input.spaceMssMs),
+						pf.by_ms.eq0,
+						pf.in_ms.eq0,
+						pf.code.eq(pc.spaceMssTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),

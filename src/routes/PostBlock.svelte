@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
-	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
+	import { msToAccountNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
@@ -110,11 +110,9 @@
 							<div
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
-								<!-- TODO: text color matches UserIcon -->
-								<p class={`font-bold ${gs.idToPostMap[atPost.by_ms] ? '' : 'italic'}`}>
-									<!-- TODO: names for users -->
-									<!-- {atPost.by_ms ? accountMsToName(...) || identikana(atPost.by_ms) : m.anon()} -->
-									{identikana(atPost.by_ms)}
+								<!-- TODO: text color matches UserIcon? -->
+								<p class={`font-bold ${gs.msToAccountNameTxtMap[atPost.by_ms] ? '' : 'italic'}`}>
+									{msToAccountNameTxt(atPost.by_ms)}
 								</p>
 							</div>
 						</Apush>

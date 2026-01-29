@@ -1,7 +1,7 @@
 import { ranStr } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { deleteSessionKeyCookie, getValidAuthCookie, setCookie } from '$lib/server/sessions';
+import { getValidAuthCookie, setCookie } from '$lib/server/sessions';
 import { hour } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { assertLt2Rows, channelPartsByCode } from '$lib/types/parts';
@@ -40,12 +40,8 @@ export let _getCallerPermissions = async (
 	let sessionKeyTxtMsAtAccountIdFilter: undefined | SQL;
 	if (input.callerMs && get.signedIn && sessionKey) {
 		sessionKeyTxtMsAtAccountIdFilter = and(
-			pf.at_ms.eq(input.callerMs),
-			pf.at_by_ms.eq0,
-			pf.at_in_ms.eq0,
-			pf.ms.eq(sessionKey.ms),
-			pf.by_ms.eq0,
-			pf.in_ms.eq0,
+			pf.msAsAtId(input.callerMs),
+			pf.msAsId(sessionKey.ms),
 			pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 			pf.num.eq0,
 			pf.txt.eq(sessionKey.txt),
@@ -54,7 +50,7 @@ export let _getCallerPermissions = async (
 
 	let callerId: IdObj = { ms: input.callerMs, by_ms: 0, in_ms: 0 };
 	let {
-		[pc.spaceVisibilityBinId]: spaceVisibilityIdNumRows = [],
+		[pc.spacePublicBinId]: spaceVisibilityIdNumRows = [],
 		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
 		[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
 		[pc.promotionToModIdAtAccountId]: promotionToModIdAtAccountIdRows = [],
@@ -76,7 +72,7 @@ export let _getCallerPermissions = async (
 										get.spaceIsPublic
 											? and(
 													pf.at_ms.eq(input.spaceMs), //
-													pf.code.eq(pc.spaceVisibilityBinId),
+													pf.code.eq(pc.spacePublicBinId),
 													pf.txt.isNull,
 												)
 											: undefined,
@@ -159,17 +155,13 @@ export let _getCallerPermissions = async (
 						pf.at_ms.gt0,
 						pf.at_by_ms.eq0,
 						pf.at_in_ms.eq0,
-						pf.ms.eq(sessionKeyTxtMsAtAccountIdRow.ms),
-						pf.by_ms.eq0,
-						pf.in_ms.eq0,
+						pf.msAsId(sessionKeyTxtMsAtAccountIdRow.ms),
 						pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.eq(sessionKeyTxtMsAtAccountIdRow.txt!),
 					),
 				);
 		}
-	} else if (sessionKey && (get.callerRole || get.canReact || get.canPost || get.signedIn)) {
-		deleteSessionKeyCookie(ctx);
 	}
 
 	if (get.spaceIsPublic) {

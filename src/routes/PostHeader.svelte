@@ -1,23 +1,17 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
-	import { page } from '$app/state';
 	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
-	import { copyToClipboard, identikana } from '$lib/js';
+	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
+	import { msToAccountNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
-	import {
-		getAtIdStr,
-		getFullIdObj,
-		getIdObjAsAtIdObj,
-		getIdStr,
-		getIdStrAsIdObj,
-	} from '$lib/types/parts/partIds';
+	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import type { Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import { reactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { spaceMsToName } from '$lib/types/spaces';
+	import { spaceMsToNameTxt } from '$lib/types/spaces';
 	import {
 		IconBrowserMinus,
 		IconBrowserShare,
@@ -26,12 +20,14 @@
 		IconCheck,
 		IconCopy,
 		IconCornerUpLeft,
+		IconCrownFilled,
 		IconCube,
 		IconCube3dSphere,
 		IconDots,
 		IconMoodPlus,
 		IconPencil,
 		IconShare2,
+		IconShieldFilled,
 		IconSquarePlus2,
 		IconTrash,
 		IconX,
@@ -91,27 +87,29 @@
 			</Apush>
 			<Apush
 				href={`/_${p.post.by_ms}_${p.post.in_ms}`}
-				class={`fx group hover:text-fg1 ${gs.idToPostMap[p.post.by_ms] ? '' : 'italic'}`}
+				class={`fx group text-fg1 hover:text-fg3 ${gs.msToAccountNameTxtMap[p.post.by_ms] ? '' : 'italic'}`}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-					<AccountIcon ms={p.post.by_ms} class="mr-0.5 shrink-0 w-4" />
+					{#if gs.spaceMsToMapOwnerAccountMs[p.post.in_ms]?.[p.post.by_ms]}
+						<IconCrownFilled class="w-4" />
+					{:else if gs.spaceMsToMapModAccountMs[p.post.in_ms]?.[p.post.by_ms]}
+						<IconShieldFilled class="w-4" />
+					{/if}
+					<AccountIcon ms={p.post.by_ms} class="mx-0.5 shrink-0 w-4" />
 					<p class="pr-1">
-						<!-- TODO: names for users -->
-						<!-- {p.post.by_ms ? accountMsToName(...) || identikana(p.post.by_ms) : m.anon()} -->
-						<!-- TODO: getNameByAccountMs -->
-						{identikana(p.post.by_ms)}
+						{msToAccountNameTxt(p.post.by_ms)}
 					</p>
 				</div>
 			</Apush>
 			{#if p.post.in_ms !== gs.currentSpaceMs}
 				<Apush
 					href={`/__${p.post.in_ms}`}
-					class={`fx group hover:text-fg1 ${p.post.in_ms ? '' : 'italic'}`}
+					class={`fx group hover:text-fg1 ${gs.msToSpaceNameTxtMap[p.post.in_ms] ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
 						<p class="pr-0.5">
-							{spaceMsToName(p.post.in_ms).txt}
+							{spaceMsToNameTxt(p.post.in_ms)}
 						</p>
 					</div>
 				</Apush>
@@ -267,9 +265,8 @@
 								m.areYouSureYouWantToDeleteThisPost(),
 							);
 						if (ok) {
-							let useRpc =
-								getIdStrAsIdObj(page.state.postIdStr || page.params.tid || '').in_ms !== 0;
-							let { soft } = await deletePost(getFullIdObj(p.post), null, useRpc);
+							let { soft } = await deletePost(getFullIdObj(p.post), null);
+							console.log('soft:', soft);
 							if (soft) gs.idToPostMap[postIdStr]!.history = null;
 							else {
 								let parentPostIdStr = getAtIdStr(p.post);

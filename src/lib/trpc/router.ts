@@ -4,7 +4,7 @@ import { throwIf } from '$lib/server/errors';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { passwordRegexStr } from '$lib/types/accounts';
-import { _changeAccountNameOrBio } from '$lib/types/accounts/_changeAccountName';
+import { _changeMyAccountNameOrBio } from '$lib/types/accounts/_changeMyAccountNameOrBio';
 import { _changeSpaceName } from '$lib/types/accounts/_changeSpaceName';
 import { _createAccount } from '$lib/types/accounts/_createAccount';
 import { _refreshSignedInAccounts } from '$lib/types/accounts/_refreshSignedInAccounts';
@@ -29,6 +29,7 @@ import { _getReactionHistory } from '$lib/types/reactions/getReactionHistory';
 import { _removeReaction } from '$lib/types/reactions/removeReaction';
 import { _checkInvite } from '$lib/types/spaces/_checkInvite';
 import { _createInvite } from '$lib/types/spaces/_createInvite';
+import { _getMySpaceMembership } from '$lib/types/spaces/_getMySpaceMembership';
 import { _getSpaceMembers } from '$lib/types/spaces/_getSpaceMembers';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 import { initTRPC } from '@trpc/server';
@@ -89,13 +90,15 @@ export let router = t.router({
 	refreshSignedInAccounts: generalProcedure
 		.input(
 			z.object({
-				callerTimestamps: z.object({
-					email: GranularTxtPropSchema,
-					name: GranularTxtPropSchema,
-					bio: GranularTxtPropSchema,
-					savedTags: GranularTxtPropSchema,
-					// spaceMss: z.array(z.number()).max(888),
-				}),
+				callerAttributes: z
+					.object({
+						email: GranularTxtPropSchema,
+						name: GranularTxtPropSchema,
+						bio: GranularTxtPropSchema,
+						savedTags: GranularTxtPropSchema,
+						spaceMss: GranularTxtPropSchema,
+					})
+					.optional(),
 				accountMss: z
 					.array(z.number())
 					.min(1)
@@ -208,7 +211,14 @@ export let router = t.router({
 			throwIf(!p.signedIn && input.useIfValid);
 			return _checkInvite(input);
 		}),
-	changeAccountNameOrBio: whoProcedure
+	getMySpaceMembership: whoWhereProcedure.query(async ({ ctx, input }) => {
+		let p = await _getCallerPermissions(ctx, input, {
+			signedIn: true,
+		});
+		throwIf(!p.signedIn);
+		return _getMySpaceMembership(input);
+	}),
+	changeMyAccountNameOrBio: whoProcedure
 		.input(
 			z.object({
 				nameTxt: normalizingNameSchema.optional(),
@@ -219,7 +229,7 @@ export let router = t.router({
 			throwIf(input.nameTxt === undefined && input.bioTxt === undefined);
 			let p = await _getCallerPermissions(ctx, input, { signedIn: true });
 			throwIf(!p.signedIn);
-			return _changeAccountNameOrBio(input);
+			return _changeMyAccountNameOrBio(input);
 		}),
 	changeSpaceName: whoWhereProcedure
 		.input(z.object({ nameTxt: z.string() }))
@@ -238,8 +248,8 @@ export let router = t.router({
 			let { post } = input;
 			// TODO: allow non zero ms if the caller is an owner of the space (useful for importing old posts)
 			if (post.ms) throw new Error('post ms must be 0');
-			if (!post.in_ms || post.in_ms !== input.callerMs) throw new Error('Invalid in_ms');
-			if (!post.by_ms || post.by_ms !== input.spaceMs) throw new Error('Invalid by_ms');
+			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid by_ms');
+			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid in_ms');
 			if (!post.history || Object.keys(post.history).length !== 1 || !post.history['1'])
 				throw new Error('History must have only version 1');
 			if (post.history['1'].ms) throw new Error('history ms must be 1');
@@ -273,9 +283,9 @@ export let router = t.router({
 		)
 		.mutation(async ({ input, ctx }) => {
 			await postLimiter.ping(ctx);
-			let { fullPostIdObj, callerMs: callerMs, spaceMs } = input;
+			let { fullPostIdObj, callerMs, spaceMs } = input;
 			if (!callerMs || fullPostIdObj.by_ms !== callerMs) throw new Error('Invalid callerMs');
-			if (!spaceMs || fullPostIdObj.in_ms !== spaceMs) throw new Error('Invalid callerMs');
+			if (!spaceMs || fullPostIdObj.in_ms !== spaceMs) throw new Error('Invalid spaceMs');
 			let p = await _getCallerPermissions(ctx, input, { signedIn: true });
 			throwIf(!p.signedIn);
 			return _deletePost(tdb, fullPostIdObj, input.version);
@@ -286,7 +296,7 @@ export let router = t.router({
 			await reactionLimiter.ping(ctx);
 			let { rxn } = input;
 			if (!rxn.in_ms || rxn.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
-			if (!rxn.by_ms || rxn.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			if (!rxn.by_ms || rxn.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
 			if (rxn.ms) throw new Error('rxn ms must be 0');
 			let p = await _getCallerPermissions(ctx, input, {
 				signedIn: true,
@@ -307,9 +317,8 @@ export let router = t.router({
 			return _removeReaction(tdb, rxn);
 		}),
 	getSpaceMembers: whoWhereProcedure
-		.input(z.object({ fromMs: z.number() }))
+		.input(z.object({ fromMs: z.number().optional() }))
 		.query(async ({ input, ctx }) => {
-			// console.log('input:', input);
 			// if (!input.callerMs) throw new Error('anon disallowed');
 			let p = await _getCallerPermissions(ctx, input, {
 				spaceIsPublic: true,
@@ -382,6 +391,7 @@ export let router = t.router({
 				signedIn: true,
 				spaceIsPublic: true,
 			});
+			throwIf(input.callerMs && !p.signedIn);
 			throwIf(!p.spaceIsPublic && (!p.signedIn || !p.callerRole));
 			return _getPostFeed(tdb, input);
 		}),

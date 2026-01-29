@@ -16,7 +16,7 @@ let newMindappUrl = 'https://new.mindapp.cc';
 
 chrome.runtime.onMessage.addListener((msg) => {
 	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type))
-		openPopup(newMindappUrl);
+		openPopup(newMindappUrl, true);
 });
 
 if (

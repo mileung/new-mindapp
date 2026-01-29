@@ -8,11 +8,15 @@
 	import { msToAccountNameTxt } from '$lib/types/accounts';
 	import { getLocalCache, refreshSignedInAccounts, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs, hasTemplateIdRegex } from '$lib/types/parts/partIds';
-	import { spaceMsToName, usePendingInvite } from '$lib/types/spaces';
+	import {
+		spaceMsToNameTxt,
+		updateCurrentSpaceMembership,
+		usePendingInvite,
+	} from '$lib/types/spaces';
 	import { IconChevronRight, IconX } from '@tabler/icons-svelte';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
-	import { onMount, type Snippet } from 'svelte';
+	import { onMount, untrack, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import AccountIcon from './AccountIcon.svelte';
@@ -27,18 +31,19 @@
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
 		gs.currentSpaceMs = localCache.currentSpaceMs;
-
-		try {
-			await initLocalDb();
-			let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
-			gs.db = drizzle(driver, batchDriver);
-		} catch (error) {
-			console.error(error);
-			gs.localDbFailed = true;
-			goto('/settings');
-		}
-
 		refreshSignedInAccounts();
+
+		if (!false) {
+			try {
+				await initLocalDb();
+				let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
+				gs.db = drizzle(driver, batchDriver);
+			} catch (error) {
+				console.error(error);
+				gs.localDbFailed = true;
+				goto('/settings');
+			}
+		}
 
 		if ('serviceWorker' in navigator) {
 			window.addEventListener('load', () => {
@@ -75,13 +80,21 @@
 			}
 		}
 	});
+
 	$effect(() => {
-		if (page.params.tid && urlInMs !== undefined) {
-			gs.currentSpaceMs !== urlInMs &&
-				updateLocalCache((lc) => ({
-					...lc,
-					currentSpaceMs: urlInMs,
-				}));
+		if (urlInMs !== undefined && gs.currentSpaceMs !== urlInMs) {
+			updateLocalCache((lc) => ({
+				...lc,
+				currentSpaceMs: urlInMs,
+			}));
+		}
+	});
+	let membership = $derived(
+		gs.accountMsToSpaceMsToMembershipMap[gs.accounts?.[0].ms || 0]?.[gs.currentSpaceMs || 0],
+	);
+	$effect(() => {
+		if (membership === undefined) {
+			untrack(() => updateCurrentSpaceMembership());
 		}
 	});
 
@@ -97,7 +110,7 @@
 			<div class="fx">
 				<AccountIcon isSystem ms={gs.pendingInvite!.by_ms} class="w-6 ml-0.5 mr-2" />
 				<p class="font-bold">
-					{msToAccountNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToName(
+					{msToAccountNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToNameTxt(
 						gs.pendingInvite!.in_ms,
 					)}
 				</p>

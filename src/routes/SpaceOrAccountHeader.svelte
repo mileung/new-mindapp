@@ -5,7 +5,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
 	import { msToAccountNameTxt, type OtherAccount } from '$lib/types/accounts';
-	import { spaceMsToName, type Space } from '$lib/types/spaces';
+	import { spaceMsToNameTxt, type Space } from '$lib/types/spaces';
 	import { IconDeviceFloppy, IconEdit, IconLockFilled, IconX } from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
@@ -43,13 +43,10 @@
 	let slug = $derived(p.account ? `_${p.account.ms}_` : `__${p.space?.ms}`);
 
 	let userCanEdit = $derived.by(() => {
-		if (accountOrSpaceMs) {
-			if (p.space) {
-				// if owner => true
-			}
-			if (p.account && gs.accounts) {
-				return p.account.ms === gs.accounts[0].ms;
-			}
+		if (accountOrSpaceMs && gs.accounts) {
+			if (p.space)
+				return gs.accountMsToSpaceMsToMembershipMap[gs.accounts[0].ms]?.[p.space.ms]?.promo?.owner;
+			if (p.account) return p.account.ms === gs.accounts[0].ms;
 		}
 		return false;
 	});
@@ -171,7 +168,7 @@
 		<div class="flex">
 			<p class="text-xl font-bold">
 				{draftSettings.name.txt ||
-					(p.account ? msToAccountNameTxt : spaceMsToName)(accountOrSpaceMs).txt}
+					(p.account ? msToAccountNameTxt : spaceMsToNameTxt)(accountOrSpaceMs)}
 			</p>
 			{#if p.space && !p.space.isPublic}
 				<IconLockFilled class="self-center h-5 mb-0.5" />
@@ -184,7 +181,7 @@
 			<a class="hover:text-fg1 hover:underline hover:bg-bg3" href={`${page.url.origin}/${slug}`}>
 				{slug}
 			</a>
-			{#if accountOrSpaceMs}
+			{#if accountOrSpaceMs > 1}
 				<p class="">{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}</p>
 			{/if}
 		</div>

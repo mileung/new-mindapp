@@ -129,6 +129,8 @@
 	"reactingDisabledBy": "Reacting disabled by",
 	"postingEnabledBy": "Posting enabled by",
 	"reactingEnabledBy": "Reacting enabled by",
+	"youMayContributeToThisSpaceOnceYouReInvited": "You may contribute to this space once you're invited",
+	"noPostsAwaitingYourResponse": "No posts awaiting your response",
 	"profile": "Profile",
 	"userGuide": "User Guide",
 	"setPassword": "Set password",

@@ -99,9 +99,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 			or(
 				tagIdObjs.length
 					? and(
-							pf.at_ms.eq0,
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.noParent,
 							or(...tagIdObjs.map((tagIdObj) => pf.id(tagIdObj))),
 							pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
 							pf.num.gte0,
@@ -110,9 +108,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 					: undefined,
 				coreIdObjs.length
 					? and(
-							pf.at_ms.eq0,
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.noParent,
 							or(...coreIdObjs.map((coreIdObj) => pf.id(coreIdObj))),
 							pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
 							pf.num.gte0,
@@ -183,9 +179,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 		tagOrCoreTxtRowsToDel.length &&
 			deleteFilters.push(
 				and(
-					pf.at_ms.eq0,
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
+					pf.noParent,
 					or(
 						...tagOrCoreTxtRowsToDel.map((r) =>
 							and(

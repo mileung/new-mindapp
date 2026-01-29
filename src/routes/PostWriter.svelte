@@ -43,7 +43,13 @@
 
 	let writtenTags = $derived(gs.writerTags.filter((t) => t[0] !== ' '));
 	let tagFilter = $derived(gs.writerTagVal.trim());
-	let savedTagsSet = $derived(new Set(gs.accounts ? gs.accounts[0].savedTags : []));
+	let savedTagsSet = $derived(
+		new Set(
+			gs.accounts //
+				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
+				: [],
+		),
+	);
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');

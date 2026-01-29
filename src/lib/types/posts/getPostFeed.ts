@@ -35,7 +35,7 @@ export let bracketRegex = /\[([^\[\]]+)]/g;
 export let GetPostFeedSchema = z.object({
 	view: z.enum(['nested', 'flat']),
 	sortedBy: z.enum(['bumped', 'new', 'old']),
-	fromMs: z.number(),
+	fromMs: z.number().optional(),
 	postAtBumpedPostIdObjsExclude: z.array(FullIdObjSchema).optional(),
 
 	byMssExclude: z.array(z.number()),
@@ -76,7 +76,7 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 
 	let postIdAtBumpedRootIdRowsFilter = bumpedFirst
 		? and(
-				pf.ms.lte(q.fromMs),
+				pf.ms.lte(q.fromMs || Number.MAX_SAFE_INTEGER),
 				// pt.at_ms.gt0,
 				// ...(q.baseInput.spaceMs? [pt.at_by_ms.gt0, pt.at_in_ms.gt0] : []),
 				// pf.ms.gt0,
@@ -256,7 +256,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 						pf.noParent,
 						// ...(q.baseInput.spaceMs? [pt.by_ms.gt0, pt.in_ms.gt0] : []),
 						// pf.ms.gt0,
-						(oldFirst ? pf.ms.gte : pf.ms.lte)(q.fromMs),
+						oldFirst
+							? pf.ms.gte(q.fromMs || 0) //
+							: pf.ms.lte(q.fromMs || Number.MAX_SAFE_INTEGER),
 						// byMssFilter,
 						// inMssFilter,
 						...excludePostIdsFilter,
@@ -304,7 +306,9 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 										or(...postIdAtBumpedRootIdRows.map((aRio) => pf.atIdAsId(aRio))),
 									]
 								: []),
-							(oldFirst ? pf.ms.gte : pf.ms.lte)(q.fromMs),
+							oldFirst
+								? pf.ms.gte(q.fromMs || 0) //
+								: pf.ms.lte(q.fromMs || Number.MAX_SAFE_INTEGER),
 							...excludePostIdsFilter,
 							pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 							pf.num.gte0,
@@ -337,12 +341,42 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	// );
 	// export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
 
-	let getPostParts = async (postIdObs: IdObj[], omitPostIdAtCitedPostId = false) =>
-		await db
+	let getPostParts = async (postIdObs: IdObj[], omitPostIdAtCitedPostId = false) => {
+		// let accountMss = [...new Set(postIdObs.map((idObj)=>idObj.by_ms))];
+		// let accountIdObjs
+		return await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
+					and(
+						or(
+							...postIdObs.map((idObj) =>
+								and(pf.msAsAtId(idObj.by_ms), pf.ms.gt0, pf.in_ms.eq(idObj.in_ms)),
+							),
+						),
+						pf.code.eq(pc.promotionToModIdAtAccountId),
+					),
+					and(
+						or(
+							...postIdObs.map((idObj) =>
+								and(pf.msAsAtId(idObj.by_ms), pf.ms.gt0, pf.in_ms.eq(idObj.in_ms)),
+							),
+						),
+						pf.code.eq(pc.promotionToOwnerIdAtAccountId),
+					),
+					and(
+						// TODO: idk if filtering down arrays to be unique is worth it here. Same for querying promos
+						// or(...postIdObs.map((idObj) => pf.msAsAtId(idObj.by_ms))),
+						or(
+							...[...new Set(postIdObs.map((idObj) => idObj.by_ms))].map((byMs) =>
+								pf.msAsAtId(byMs),
+							),
+						),
+						pf.by_ms.eq0,
+						pf.in_ms.eq0,
+						pf.code.eq(pc.nameTxtMsAtAccountId),
+					),
 					and(
 						or(...postIdObs.map((idObj) => pf.id(idObj))),
 						or(
@@ -384,8 +418,12 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 					),
 				),
 			);
+	};
 
 	let {
+		[pc.promotionToModIdAtAccountId]: promotionToModIdAtAccountIdRows = [],
+		[pc.promotionToOwnerIdAtAccountId]: promotionToOwnerIdAtAccountIdRows = [],
+		[pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
 		[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows = [],
@@ -397,6 +435,26 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 	} = channelPartsByCode(
 		postsToFetchByIdObjs.length ? await getPostParts(postsToFetchByIdObjs) : [],
 	);
+
+	let msToAccountNameTxtMap: Record<number, string> = {};
+	for (let i = 0; i < nameTxtMsAtAccountIdRows.length; i++) {
+		let { txt, at_ms } = nameTxtMsAtAccountIdRows[i];
+		msToAccountNameTxtMap[at_ms] = txt!;
+	}
+
+	let spaceMsToMapOwnerAccountMs: Record<number, Record<number, boolean>> = {};
+	for (let i = 0; i < promotionToOwnerIdAtAccountIdRows.length; i++) {
+		let { in_ms, at_ms } = promotionToOwnerIdAtAccountIdRows[i];
+		if (!spaceMsToMapOwnerAccountMs[in_ms]) spaceMsToMapOwnerAccountMs[in_ms] = {};
+		spaceMsToMapOwnerAccountMs[in_ms]![at_ms] = true;
+	}
+
+	let spaceMsToMapModAccountMs: Record<number, Record<number, boolean>> = {};
+	for (let i = 0; i < promotionToModIdAtAccountIdRows.length; i++) {
+		let { in_ms, at_ms } = promotionToModIdAtAccountIdRows[i];
+		if (!spaceMsToMapModAccountMs[in_ms]) spaceMsToMapModAccountMs[in_ms] = {};
+		spaceMsToMapModAccountMs[in_ms]![at_ms] = true;
+	}
 
 	let atCitedIdObjsThatNeedFetching = postIdAtCitedPostIdRows
 		.filter((aio) => !postsToFetchByIdObjs.find((fetchedIo) => atIdObjMatchesIdObj(aio, fetchedIo)))
@@ -508,5 +566,12 @@ export let _getPostFeed = async (db: Database, q: GetPostFeedQuery) => {
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
 	// console.log('getPostFeed:', postIdStrFeed, idToPostMap);
-	return { postIdStrFeed, idToPostMap, postAtBumpedPostIdObjsExclude };
+	return {
+		postIdStrFeed,
+		idToPostMap,
+		postAtBumpedPostIdObjsExclude,
+		msToAccountNameTxtMap,
+		spaceMsToMapOwnerAccountMs,
+		spaceMsToMapModAccountMs,
+	};
 };

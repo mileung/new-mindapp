@@ -40,9 +40,7 @@ export let _createAccount = async (
 				.from(pTable)
 				.where(
 					and(
-						pf.at_ms.eq0,
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.noParent,
 						pf.ms.gt0,
 						pf.in_ms.eq(1),
 						pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
@@ -94,6 +92,14 @@ export let _createAccount = async (
 			code: pc.savedTagsTxtMsAtAccountId,
 			num: 0,
 			txt: JSON.stringify(top888MostUsedGlobalTags),
+		},
+		{
+			...id0,
+			at_ms: ms,
+			ms,
+			code: pc.spaceMssTxtMsAtAccountId,
+			num: 0,
+			txt: JSON.stringify([]),
 		},
 	];
 	let account = reduceMyAccountRows(myAccountRows);

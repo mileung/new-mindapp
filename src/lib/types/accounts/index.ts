@@ -18,12 +18,10 @@ export type OtherAccount = z.infer<typeof OtherAccountSchema>;
 
 export let MyAccountSchema = OtherAccountSchema.merge(
 	z.object({
+		bio: GranularTxtPropSchema,
 		email: GranularTxtPropSchema,
 		savedTags: GranularTxtPropSchema,
-		// spaceMss: z.array(z.number()),
-		// spaceMssMs: z.number().optional(),
-		// spaceRoles
-		// invites
+		spaceMss: GranularTxtPropSchema,
 
 		// No good reason to include pwHash, clientKey, or clientKeyMs
 		signedIn: z.boolean().optional(),
@@ -39,7 +37,7 @@ export let getDefaultAccount = () =>
 		bio: { ms: 0, txt: '' },
 		email: { ms: 0, txt: '' },
 		savedTags: { ms: 0, txt: JSON.stringify([]) },
-		// spaceMss: [],
+		spaceMss: { ms: 0, txt: JSON.stringify([]) },
 	}) satisfies MyAccount;
 
 export type MyAccountUpdates = Partial<MyAccount>;
@@ -57,12 +55,9 @@ export let reduceAccountRows = (rows: PartInsert[]) => {
 			account.bio = { ms: part.ms, txt: part.txt! };
 		} else if (part.code === pc.savedTagsTxtMsAtAccountId) {
 			account.savedTags = { ms: part.ms, txt: part.txt! };
+		} else if (part.code === pc.spaceMssTxtMsAtAccountId) {
+			account.spaceMss = { ms: part.ms, txt: part.txt! };
 		}
-		// TODO: get account spaces
-		// if (prop === 'spaceMss' || prop === 'savedTags') {
-		// 	a[`${prop}Ms`] = row.ms!;
-		// 	a[prop] = JSON.parse(row.txt!);
-		// }
 	}
 	return account;
 };
@@ -77,9 +72,7 @@ export let passwordRegexStr = '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,64}';
 
 export let filterAccountPwHashRow = (accountMs: number) =>
 	and(
-		pf.at_ms.eq(accountMs),
-		pf.at_by_ms.eq0,
-		pf.at_in_ms.eq0,
+		pf.msAsAtId(accountMs),
 		pf.ms.gt0,
 		pf.by_ms.eq0,
 		pf.in_ms.eq0,

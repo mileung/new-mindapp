@@ -32,9 +32,7 @@ export let _getSpaceTags = async (
 		.from(pTable)
 		.where(
 			and(
-				pf.at_ms.eq0,
-				pf.at_by_ms.eq0,
-				pf.at_in_ms.eq0,
+				pf.noParent,
 				pf.ms.gt0,
 				pf.in_ms.eq(input.spaceMs),
 				pf.code.eq(pc.tagId8AndTxtWithNumAsCount),

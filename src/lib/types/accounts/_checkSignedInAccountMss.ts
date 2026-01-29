@@ -19,12 +19,8 @@ export let _checkSignedInAccountMss = async (ctx: Context, input: { accountMss: 
 			.from(pTable)
 			.where(
 				and(
-					or(...input.accountMss.map((ms) => pf.at_ms.eq(ms))),
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
-					pf.ms.eq(sessionKey.ms),
-					pf.by_ms.eq0,
-					pf.in_ms.eq0,
+					or(...input.accountMss.map((ms) => pf.msAsAtId(ms))),
+					pf.msAsId(sessionKey.ms),
 					pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 					pf.num.eq0,
 					pf.txt.eq(sessionKey.txt),

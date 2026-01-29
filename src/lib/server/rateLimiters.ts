@@ -12,6 +12,7 @@ export let makeLimiter = (pings: number, minutes: number) => {
 	});
 	return {
 		ping: async (ctx: Context) => {
+			if (dev) return;
 			try {
 				await limiter.consume(ctx.event.getClientAddress());
 			} catch (e) {

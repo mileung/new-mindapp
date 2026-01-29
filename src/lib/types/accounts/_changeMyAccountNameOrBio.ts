@@ -5,7 +5,7 @@ import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 
-export let _changeAccountNameOrBio = async (
+export let _changeMyAccountNameOrBio = async (
 	input: WhoObj & {
 		nameTxt?: string;
 		bioTxt?: string; //
@@ -18,9 +18,7 @@ export let _changeAccountNameOrBio = async (
 			.set({ ms, txt: input.nameTxt })
 			.where(
 				and(
-					pf.at_ms.eq(input.callerMs),
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
+					pf.msAsAtId(input.callerMs),
 					pf.ms.gt0,
 					pf.by_ms.eq0,
 					pf.in_ms.eq0,
@@ -35,9 +33,7 @@ export let _changeAccountNameOrBio = async (
 			.set({ ms, txt: input.bioTxt })
 			.where(
 				and(
-					pf.at_ms.eq(input.callerMs),
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
+					pf.msAsAtId(input.callerMs),
 					pf.ms.gt0,
 					pf.by_ms.eq0,
 					pf.in_ms.eq0,

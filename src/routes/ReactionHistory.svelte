@@ -2,9 +2,9 @@
 	import { scrollToHighlight } from '$lib/dom';
 	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 
-	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
+	import { msToAccountNameTxt } from '$lib/types/accounts';
 	import { getIdStr, type IdObj } from '$lib/types/parts/partIds';
 	import type { Reaction } from '$lib/types/reactions';
 	import { getReactionHistory, reactionsPerLoad } from '$lib/types/reactions/getReactionHistory';
@@ -69,14 +69,12 @@
 				{rxn.emoji}
 				<Apush
 					href={`/_${post.by_ms}_${post.in_ms}`}
-					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.idToPostMap[post.by_ms] ? '' : 'italic'}`}
+					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.msToAccountNameTxtMap[rxn.by_ms] ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx`}>
 						<AccountIcon isUser ms={post.by_ms} class="mr-0.5 shrink-0 w-4" />
 						<p class="pr-1">
-							<!-- TODO: names for users -->
-							<!-- {post.by_ms ? accountMsToName(...) || identikana(post.by_ms) : m.anon()} -->
-							{identikana(post.by_ms)}
+							{msToAccountNameTxt(rxn.by_ms)}
 						</p>
 					</div>
 				</Apush>

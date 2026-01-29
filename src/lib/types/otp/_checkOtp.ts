@@ -19,9 +19,7 @@ export let _checkOtp = async (
 	if (Date.now() - input.otpMs > otpMaxMinAge * minute) return { expiredOtp: true };
 	let otpRowsFilter = and(
 		pf.noParent,
-		pf.ms.eq(input.otpMs),
-		pf.by_ms.eq0,
-		pf.in_ms.eq0,
+		pf.msAsId(input.otpMs),
 		pf.code.eq(input.partCode),
 		pf.num.gte0,
 		like(pTable.txt, `${input.email}:%`),

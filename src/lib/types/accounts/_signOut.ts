@@ -15,9 +15,7 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 			.where(
 				input.everywhere
 					? and(
-							pf.at_ms.eq(input.callerMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.msAsAtId(input.callerMs),
 							pf.ms.gt0,
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
@@ -29,12 +27,8 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 							pf.txt.isNotNull,
 						)
 					: and(
-							pf.at_ms.eq(input.callerMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
-							pf.ms.eq(sessionKey.ms),
-							pf.by_ms.eq0,
-							pf.in_ms.eq0,
+							pf.msAsAtId(input.callerMs),
+							pf.msAsId(sessionKey.ms),
 							pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 							pf.num.eq0,
 							pf.txt.eq(sessionKey.txt),

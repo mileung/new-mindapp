@@ -60,12 +60,8 @@ export let _signIn = async (
 				.from(pTable)
 				.where(
 					and(
-						pf.at_ms.eq(accountMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						pf.ms.eq(clientKey.ms),
-						pf.by_ms.eq0,
-						pf.in_ms.eq0,
+						pf.msAsAtId(accountMs),
+						pf.msAsId(clientKey.ms),
 						pf.code.eq(pc.clientKeyTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.eq(clientKey.txt),
@@ -96,10 +92,11 @@ export let _signIn = async (
 	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
 	let {
 		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
-		[pc.emailTxtMsAtAccountId]: emailMsTxtAtAccountIdRows = [],
-		[pc.nameTxtMsAtAccountId]: nameMsTxtAtAccountIdRows = [],
-		[pc.bioTxtMsAtAccountId]: bioMsTxtAtAccountIdRows = [],
-		[pc.savedTagsTxtMsAtAccountId]: savedTagsMsTxtAtAccountIdRows = [],
+		[pc.emailTxtMsAtAccountId]: emailTxtMsAtAccountIdRows = [],
+		[pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
+		[pc.bioTxtMsAtAccountId]: bioTxtMsAtAccountIdRows = [],
+		[pc.savedTagsTxtMsAtAccountId]: savedTagsTxtMsAtAccountIdRows = [],
+		[pc.spaceMssTxtMsAtAccountId]: spaceMssTxtMsAtAccountIdRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -108,12 +105,8 @@ export let _signIn = async (
 				or(
 					sessionKey
 						? and(
-								pf.at_ms.eq(accountMs),
-								pf.at_by_ms.eq0,
-								pf.at_in_ms.eq0,
-								pf.ms.eq(sessionKey.ms),
-								pf.by_ms.eq0,
-								pf.in_ms.eq0,
+								pf.msAsAtId(accountMs),
+								pf.msAsId(sessionKey.ms),
 								pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 								pf.num.eq0,
 								// omitting pf.txt.eq(sessionKey.txt) since this check is to see if
@@ -121,9 +114,7 @@ export let _signIn = async (
 							)
 						: undefined,
 					and(
-						pf.at_ms.eq(accountMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(accountMs),
 						pf.ms.gt0,
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
@@ -132,9 +123,7 @@ export let _signIn = async (
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(accountMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(accountMs),
 						pf.ms.gt0,
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
@@ -143,9 +132,7 @@ export let _signIn = async (
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(accountMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(accountMs),
 						pf.ms.gt0,
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
@@ -154,9 +141,7 @@ export let _signIn = async (
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.at_ms.eq(accountMs),
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
+						pf.msAsAtId(accountMs),
 						pf.ms.gt0,
 						pf.by_ms.eq0,
 						pf.in_ms.eq0,
@@ -188,10 +173,11 @@ export let _signIn = async (
 			code: pc.accountId,
 			num: 0,
 		},
-		...emailMsTxtAtAccountIdRows,
-		...nameMsTxtAtAccountIdRows,
-		...bioMsTxtAtAccountIdRows,
-		...savedTagsMsTxtAtAccountIdRows,
+		...emailTxtMsAtAccountIdRows,
+		...nameTxtMsAtAccountIdRows,
+		...bioTxtMsAtAccountIdRows,
+		...savedTagsTxtMsAtAccountIdRows,
+		...spaceMssTxtMsAtAccountIdRows,
 	]);
 	if (partsToInsert.length) await tdb.insert(pTable).values(partsToInsert).returning();
 	return { account };

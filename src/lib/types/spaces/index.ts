@@ -1,11 +1,17 @@
 import { goto } from '$app/navigation';
 import { page } from '$app/state';
 import { gs } from '$lib/global-state.svelte';
+import { identikana } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
 import type { LayoutServerData } from '../../../routes/$types';
-import { getWhoObj, GranularBinPropByMsSchema, GranularTxtPropByMsSchema } from '../parts';
+import {
+	getWhoObj,
+	getWhoWhereObj,
+	GranularBinPropByMsSchema,
+	GranularTxtPropByMsSchema,
+} from '../parts';
 import { getUrlInMs } from '../parts/partIds';
 
 export let SpaceSchema = z
@@ -48,6 +54,32 @@ export let InviteSchema = z
 	.strict();
 export type Invite = z.infer<typeof InviteSchema>;
 
+export type Membership = {
+	invite: {
+		by_ms: number;
+		in_ms: number;
+	};
+	accept: {
+		ms: number;
+		by_ms: number;
+	};
+	canReactBin: {
+		num: number;
+		ms: number;
+		by_ms: number;
+	};
+	canPostBin: {
+		num: number;
+		ms: number;
+		by_ms: number;
+	};
+	promo?: {
+		owner?: true;
+		ms: number;
+		by_ms: number;
+	};
+};
+
 export let getPromptSigningIn = () => {
 	let urlInMs = getUrlInMs();
 	let signedIn = (page.data as LayoutServerData).sessionExists || !!gs.accounts?.[0].ms;
@@ -57,14 +89,14 @@ export let getPromptSigningIn = () => {
 	return page.url.pathname.endsWith('/dots');
 };
 
-export let spaceMsToName = (ms: number) => {
+export let spaceMsToNameTxt = (ms: number) => {
 	return ms === 8 || ms === gs.accounts?.[0].ms
-		? { ms: 0, by_ms: 0, txt: m.personal() }
+		? m.personal()
 		: ms === 1
-			? { ms: 0, by_ms: 0, txt: m.global() }
+			? m.global()
 			: ms
-				? gs.msToSpaceNameMap[ms] || { ms: 0, by_ms: 0, txt: '' }
-				: { ms: 0, by_ms: 0, txt: m.local() };
+				? gs.msToSpaceNameTxtMap[ms] || identikana(ms)
+				: m.local();
 };
 
 export let usePendingInvite = async () => {
@@ -80,4 +112,39 @@ export let usePendingInvite = async () => {
 			: alert(m.invalidInvite());
 		gs.pendingInvite = undefined;
 	}
+};
+
+export let getCurrentSpacePermissions = () => {
+	let urlInMs = getUrlInMs();
+	let canReact = false;
+	let canPost = false;
+	if (urlInMs !== undefined && gs.accounts) {
+		if (!urlInMs || urlInMs === gs.accounts[0].ms) {
+			canReact = true;
+			canPost = true;
+		} else if (gs.accounts) {
+			let membership = gs.accountMsToSpaceMsToMembershipMap[gs.accounts[0].ms]?.[urlInMs];
+			if (membership) {
+				canReact = !!membership.canReactBin.num;
+				canPost = !!membership.canPostBin.num;
+			}
+		}
+	}
+	return { canReact, canPost };
+};
+
+export let updateCurrentSpaceMembership = async () => {
+	let whoWhereObj = await getWhoWhereObj();
+	let membership: null | Membership = null;
+	if (whoWhereObj.callerMs && whoWhereObj.spaceMs && whoWhereObj.callerMs !== whoWhereObj.spaceMs) {
+		membership = (await trpc().getMySpaceMembership.query(whoWhereObj)).membership;
+	}
+	console.log('membership:', membership);
+	gs.accountMsToSpaceMsToMembershipMap = {
+		...gs.accountMsToSpaceMsToMembershipMap,
+		[whoWhereObj.callerMs]: {
+			...gs.accountMsToSpaceMsToMembershipMap[whoWhereObj.callerMs],
+			[whoWhereObj.spaceMs]: membership,
+		},
+	};
 };

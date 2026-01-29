@@ -39,6 +39,19 @@ export let pf = {
 	notAtId: (aio: AtIdObj) => not(filterAtIdObj(aio)!),
 	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
 
+	msAsId: (ms: number) =>
+		filterIdObj({
+			ms,
+			by_ms: 0,
+			in_ms: 0,
+		}),
+	msAsAtId: (at_ms: number) =>
+		filterAtIdObj({
+			at_ms,
+			at_by_ms: 0,
+			at_in_ms: 0,
+		}),
+
 	noParent: and(
 		eq(pTable.at_ms, 0), //
 		eq(pTable.at_by_ms, 0),

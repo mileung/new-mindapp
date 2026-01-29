@@ -2,7 +2,7 @@ import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { sortObjectProps } from './js';
 import type { MyAccount } from './types/accounts';
 import type { Post } from './types/posts';
-import type { Invite } from './types/spaces';
+import type { Invite, Membership } from './types/spaces';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
@@ -10,12 +10,26 @@ class GlobalState {
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
 	currentSpaceMs = $state<number>();
+	accountMsToSpaceMsToMembershipMap = $state<
+		Record<
+			number,
+			| undefined //
+			| Record<
+					number,
+					| undefined
+					| null // null means no membership, undefined means hasn't loaded yet
+					| Membership
+			  >
+		>
+	>({});
 
 	accounts = $state<undefined | MyAccount[]>();
 	pendingInvite = $state<Invite>();
 
 	msToAccountNameTxtMap = $state<Record<number, undefined | string>>({});
-	msToSpaceNameMap = $state<Record<number, undefined | string>>({});
+	msToSpaceNameTxtMap = $state<Record<number, undefined | string>>({});
+	spaceMsToMapOwnerAccountMs = $state<Record<number, undefined | Record<number, boolean>>>({});
+	spaceMsToMapModAccountMs = $state<Record<number, undefined | Record<number, boolean>>>({});
 
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
 	indentifierToFeedMap = $state<Record<string, undefined | string[]>>({});

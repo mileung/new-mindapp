@@ -8,11 +8,10 @@ import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let removeReaction = async (rxn: Reaction) => {
+export let removeReaction = async (rxn: Reaction, useRpc: boolean) => {
 	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	let baseInput = await getWhoWhereObj();
-	return baseInput.spaceMs
-		? trpc().removeReaction.mutate({ ...baseInput, rxn }) //
+	return useRpc
+		? trpc().removeReaction.mutate({ ...(await getWhoWhereObj()), rxn }) //
 		: _removeReaction(await gsdb(), rxn);
 };
 

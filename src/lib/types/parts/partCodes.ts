@@ -29,7 +29,7 @@ export let pc = uniqueMapVals({
 	spaceId: 40,
 	spaceNameTxtId: 41,
 	spaceDescriptionTxtId: 42,
-	spaceVisibilityBinId: 43,
+	spacePublicBinId: 43,
 	newUsersCanReactBinId: 44,
 	newUsersCanPostBinId: 45,
 	canReactBinIdAtAccountId: 46,
@@ -43,6 +43,7 @@ export let pc = uniqueMapVals({
 	nameTxtMsAtAccountId: 53,
 	bioTxtMsAtAccountId: 54,
 	savedTagsTxtMsAtAccountId: 55,
+	spaceMssTxtMsAtAccountId: 56,
 
 	clientKeyTxtMsAtAccountId: 60,
 	sessionKeyTxtMsAtAccountId: 61,

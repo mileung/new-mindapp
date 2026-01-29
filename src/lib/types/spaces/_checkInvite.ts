@@ -43,7 +43,7 @@ export let _checkInvite = async (
 				{
 					...id0,
 					at_ms: 1,
-					code: pc.spaceVisibilityBinId,
+					code: pc.spacePublicBinId,
 					num: 1,
 				},
 				{

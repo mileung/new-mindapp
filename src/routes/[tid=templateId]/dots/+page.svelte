@@ -11,9 +11,10 @@
 		defaultSpaceProps,
 		getPromptSigningIn,
 		type Invite,
+		type Membership,
 		type Space,
 	} from '$lib/types/spaces';
-	import { membersPerLoad, type Membership } from '$lib/types/spaces/_getSpaceMembers';
+	import { membersPerLoad } from '$lib/types/spaces/_getSpaceMembers';
 	import {
 		IconCopy,
 		IconCrown,
@@ -52,8 +53,8 @@
 	});
 
 	let loadMoreAccounts = async (e: InfiniteEvent) => {
-		if (!gs.accounts || gs.currentSpaceMs === undefined) return;
-		let fromMs = memberships.slice(-1)[0]?.accept.ms || Number.MAX_SAFE_INTEGER;
+		if (!gs.accounts || urlInMs === undefined) return;
+		let fromMs = memberships.slice(-1)[0]?.accept.ms;
 		let res = await trpc().getSpaceMembers.query({
 			...(await getWhoWhereObj()),
 			fromMs,
@@ -220,18 +221,17 @@
 			<p class="text-xl font-black">{m.members()}</p>
 			{#each memberships as membership}
 				<div class="fx h-8">
-					<AccountIcon ms={membership.accept.by_ms} class="h-6 w-6" />
-					<p class={`mx-2 font-medium text-lg`}>
-						{msToAccountNameTxt(membership.accept.by_ms)}
-					</p>
 					{#if !membership.promo?.owner}
 						<IconShield />
-					{/if}
-					{#if membership.promo?.owner}
+					{:else if membership.promo?.owner}
 						<IconCrown />
 					{/if}
-					<!-- <IconMoodSmile />
-					<IconPencil /> -->
+					<AccountIcon ms={membership.accept.by_ms} class="mx-1 h-6 w-6" />
+					<p
+						class={`font-medium text-lg ${gs.msToAccountNameTxtMap[membership.accept.by_ms] ? '' : 'italic'}`}
+					>
+						{msToAccountNameTxt(membership.accept.by_ms)}
+					</p>
 					<div class="flex-1"></div>
 					{#if !false}
 						<button
@@ -292,9 +292,9 @@
 					<div class="fx justify-between">
 						<div class="fx">
 							<p class="mr-1">{m.acceptedInviteBy()}</p>
-							<a class="fx hover:text-fg1" href={`/_${membership.inviterMs}_`}>
-								<AccountIcon isSystem class="w-5 mr-0.5" ms={membership.inviterMs} />
-								{msToAccountNameTxt(membership.inviterMs, true)}
+							<a class="fx hover:text-fg1" href={`/_${membership.invite.by_ms}_`}>
+								<AccountIcon isSystem class="w-5 mr-0.5" ms={membership.invite.by_ms} />
+								{msToAccountNameTxt(membership.invite.by_ms, true)}
 							</a>
 						</div>
 						<p class="">{formatMs(membership.accept.ms, 'day')}</p>

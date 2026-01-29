@@ -14,10 +14,10 @@
 	} from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
-	import { defaultSpaceProps, spaceMsToName, type Space } from '$lib/types/spaces';
+	import { defaultSpaceProps, spaceMsToNameTxt, type Space } from '$lib/types/spaces';
 	import {
+		IconBook2,
 		IconDotsVertical,
-		IconHelpSquare,
 		IconLogout,
 		IconPuzzle,
 		IconSearch,
@@ -71,12 +71,12 @@
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
-			if (!textInputFocused() && gs.currentSpaceMs !== undefined) {
+			if (!textInputFocused() && urlInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
 				e.key === '/' && setTimeout(() => searchIpt.focus(), 0);
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
-				e.key === 'h' && goto(`/__${gs.currentSpaceMs}`);
+				e.key === 'h' && goto(`/__${urlInMs}`);
 				e.key === 's' && goto(`/settings`);
 				e.key === 'u' && goto(`/user-guide`);
 				if (e.key === 'Escape') {
@@ -86,11 +86,11 @@
 						showAccountMenu = showSpaceMenu = false;
 					} else {
 						scrollToLastY(); // setTimeout helps prevents scroll flicker
-						setTimeout(() => goto(`/__${gs.currentSpaceMs}`), 0);
+						setTimeout(() => goto(`/__${urlInMs}`), 0);
 					}
 				}
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					let currentSpaceMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.currentSpaceMs);
+					let currentSpaceMsIndex = sidebarSpaces.findIndex((s) => s.ms === urlInMs);
 					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 					if (newSpaceMsIndex >= sidebarSpaces.length) newSpaceMsIndex = sidebarSpaces.length - 1;
@@ -118,7 +118,7 @@
 	let searchInput = (e: KeyboardEvent) => {
 		let q = encodeURIComponent(searchVal.trim());
 		if (q && gs.accounts) {
-			let urlPath = `/__${gs.currentSpaceMs}?q=${q}`;
+			let urlPath = `/__${urlInMs}?q=${q}`;
 			if (e.metaKey) open(urlPath, '_blank');
 			else {
 				// TODO: this stuff
@@ -150,8 +150,8 @@
 	// $effect(() => {
 	// 	if (
 	// 		gs.accounts &&
-	// 		gs.currentSpaceMs !== undefined &&
-	// 		!sidebarSpaces.find((s) => s.ms === gs.currentSpaceMs)
+	// 		urlInMs !== undefined &&
+	// 		!sidebarSpaces.find((s) => s.ms === urlInMs)
 	// 	)
 	// 		goto('/__0');
 	// });
@@ -197,7 +197,7 @@
 				{#if showSpaceMenu}
 					<IconX class="h-6 w-6" />
 				{:else if gs.accounts}
-					<SpaceIcon ms={gs.currentSpaceMs!} class="h-6 w-6" />
+					<SpaceIcon ms={urlInMs!} class="h-6 w-6" />
 				{/if}
 			</button>
 			<input
@@ -336,7 +336,6 @@
 							<div class="self-center xy h-6 w-6">
 								<AccountIcon isUser ms={a.ms} class="h-6 w-6" />
 							</div>
-							<!-- TODO: getNameByAccountMs -->
 							<div class="flex-1 overflow-scroll text-nowrap fx justify-start">
 								{a.ms === 0 ? m.anon() : a.name.txt || identikana(a.ms)}
 							</div>
@@ -404,24 +403,24 @@
 							href={`/__${space.ms}`}
 							class={`relative flex-1 fx h-10 pl-2 gap-2 truncate font-medium`}
 						>
-							{#if space.ms === gs.currentSpaceMs}
+							{#if space.ms === urlInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.tid ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
 							{/if}
 							<SpaceIcon ms={space.ms} class="shrink-0 w-6" />
-							<p class="truncate">{spaceMsToName(space.ms).txt}</p>
+							<p class="truncate">{spaceMsToNameTxt(space.ms)}</p>
 						</a>
 						<!-- TODO: IconCalendar -->
 						<a
 							href={`/__${space.ms}/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
 							href={`/__${space.ms}/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.currentSpaceMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>
@@ -441,7 +440,7 @@
 					href="/user-guide"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
-					<IconHelpSquare class="shrink-0 w-6" />
+					<IconBook2 class="shrink-0 w-6" />
 					<p class="truncate">{m.userGuide()}</p>
 				</a>
 				<a

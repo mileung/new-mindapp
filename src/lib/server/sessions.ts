@@ -24,7 +24,8 @@ export let deleteCookie = (ctx: Context, name: CookieName) => {
 };
 
 export let deleteSessionKeyCookie = (ctx: Context) => {
-	console.log('deleteSessionCookies');
+	// console.log('deleteSessionCookies');
+	throw new Error(`deleteSessionCookies`);
 	deleteCookie(ctx, 'sessionKey');
 };
 

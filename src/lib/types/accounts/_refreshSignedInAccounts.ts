@@ -15,11 +15,12 @@ import { pTable } from '../parts/partsTable';
 export let _refreshSignedInAccounts = async (
 	ctx: Context,
 	input: {
-		callerTimestamps: {
+		callerAttributes?: {
 			email: GranularTxtProp;
 			name: GranularTxtProp;
 			bio: GranularTxtProp;
 			savedTags: GranularTxtProp;
+			spaceMss: GranularTxtProp;
 		};
 		accountMss: number[];
 	},
@@ -27,14 +28,15 @@ export let _refreshSignedInAccounts = async (
 	let currentAccountUpdates: undefined | MyAccountUpdates;
 	let signedInAccountMss: undefined | number[];
 	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
-	if (sessionKey) {
+	if (input.callerAttributes && sessionKey) {
 		let currentAccountMs = input.accountMss[0];
 		let {
 			[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
-			[pc.emailTxtMsAtAccountId]: emailMsTxtAtAccountIdRows = [],
-			[pc.nameTxtMsAtAccountId]: nameMsTxtAtAccountIdRows = [],
-			[pc.bioTxtMsAtAccountId]: bioMsTxtAtAccountIdRows = [],
-			[pc.savedTagsTxtMsAtAccountId]: savedTagsMsTxtAtAccountIdRows = [],
+			[pc.emailTxtMsAtAccountId]: emailTxtMsAtAccountIdRows = [],
+			[pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
+			[pc.bioTxtMsAtAccountId]: bioTxtMsAtAccountIdRows = [],
+			[pc.savedTagsTxtMsAtAccountId]: savedTagsTxtMsAtAccountIdRows = [],
+			[pc.spaceMssTxtMsAtAccountId]: spaceMssTxtMsAtAccountIdRows = [],
 		} = channelPartsByCode(
 			await tdb
 				.select()
@@ -42,67 +44,66 @@ export let _refreshSignedInAccounts = async (
 				.where(
 					or(
 						and(
-							or(...input.accountMss.map((ms) => pf.at_ms.eq(ms))),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
-							pf.ms.eq(sessionKey.ms),
-							pf.by_ms.eq0,
-							pf.in_ms.eq0,
+							or(...input.accountMss.map((ms) => pf.msAsAtId(ms))),
+							pf.msAsId(sessionKey.ms),
 							pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 							pf.num.eq0,
 							pf.txt.eq(sessionKey.txt),
 						),
 						and(
-							pf.at_ms.eq(currentAccountMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.msAsAtId(currentAccountMs),
+							or(
+								pf.ms.gt(input.callerAttributes.email.ms),
+								pf.txt.notEq(input.callerAttributes.email.txt),
+							),
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
 							pf.code.eq(pc.emailTxtMsAtAccountId),
 							pf.num.eq0,
-							or(
-								pf.ms.gt(input.callerTimestamps.email.ms),
-								pf.txt.notEq(input.callerTimestamps.email.txt),
-							),
 						),
 						and(
-							pf.at_ms.eq(currentAccountMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.msAsAtId(currentAccountMs),
+							or(
+								pf.ms.gt(input.callerAttributes.name.ms),
+								pf.txt.notEq(input.callerAttributes.name.txt),
+							),
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
 							pf.code.eq(pc.nameTxtMsAtAccountId),
 							pf.num.eq0,
-							or(
-								pf.ms.gt(input.callerTimestamps.name.ms),
-								pf.txt.notEq(input.callerTimestamps.name.txt),
-							),
 						),
 						and(
-							pf.at_ms.eq(currentAccountMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.msAsAtId(currentAccountMs),
+							or(
+								pf.ms.gt(input.callerAttributes.bio.ms),
+								pf.txt.notEq(input.callerAttributes.bio.txt),
+							),
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
 							pf.code.eq(pc.bioTxtMsAtAccountId),
 							pf.num.eq0,
-							or(
-								pf.ms.gt(input.callerTimestamps.bio.ms),
-								pf.txt.notEq(input.callerTimestamps.bio.txt),
-							),
 						),
 						and(
-							pf.at_ms.eq(currentAccountMs),
-							pf.at_by_ms.eq0,
-							pf.at_in_ms.eq0,
+							pf.msAsAtId(currentAccountMs),
+							or(
+								pf.ms.gt(input.callerAttributes.savedTags.ms),
+								pf.txt.notEq(input.callerAttributes.savedTags.txt),
+							),
 							pf.by_ms.eq0,
 							pf.in_ms.eq0,
 							pf.code.eq(pc.savedTagsTxtMsAtAccountId),
 							pf.num.eq0,
+						),
+						and(
+							pf.msAsAtId(currentAccountMs),
 							or(
-								pf.ms.gt(input.callerTimestamps.savedTags.ms),
-								pf.txt.notEq(input.callerTimestamps.savedTags.txt),
+								pf.ms.gt(input.callerAttributes.spaceMss.ms),
+								pf.txt.notEq(input.callerAttributes.spaceMss.txt),
 							),
+							pf.by_ms.eq0,
+							pf.in_ms.eq0,
+							pf.code.eq(pc.spaceMssTxtMsAtAccountId),
+							pf.num.eq0,
 						),
 					),
 				),
@@ -110,10 +111,11 @@ export let _refreshSignedInAccounts = async (
 		signedInAccountMss = sessionKeyTxtMsAtAccountIdRows.map((r) => r.at_ms);
 		if (signedInAccountMss.length && currentAccountMs === signedInAccountMss[0]) {
 			currentAccountUpdates = reduceAccountRows([
-				...emailMsTxtAtAccountIdRows,
-				...nameMsTxtAtAccountIdRows,
-				...bioMsTxtAtAccountIdRows,
-				...savedTagsMsTxtAtAccountIdRows,
+				...emailTxtMsAtAccountIdRows,
+				...nameTxtMsAtAccountIdRows,
+				...bioTxtMsAtAccountIdRows,
+				...savedTagsTxtMsAtAccountIdRows,
+				...spaceMssTxtMsAtAccountIdRows,
 			]);
 		} else deleteSessionKeyCookie(ctx);
 	} else await deleteExpiredAuthRows();

@@ -31,7 +31,7 @@
 		postsPerLoad,
 		type GetPostFeedQuery,
 	} from '$lib/types/posts/getPostFeed';
-	import { getPromptSigningIn } from '$lib/types/spaces';
+	import { getCurrentSpacePermissions, getPromptSigningIn } from '$lib/types/spaces';
 	import {
 		IconArchive,
 		IconChevronRight,
@@ -95,12 +95,22 @@
 			: '',
 	);
 	let nested = $derived(view === 'nested');
-	let isViewOnly = $derived((gs.accounts?.[0].ms || 0) > 0);
-	//
-	let showYourTurn = $derived(!isViewOnly && (urlInMs || 0) > 0);
+	let permissions = $derived(getCurrentSpacePermissions());
+	let membership = $derived(
+		gs.accountMsToSpaceMsToMembershipMap[gs.accounts?.[0].ms || 0]?.[gs.currentSpaceMs || 0],
+	);
+	let isViewOnly = $derived(
+		gs.currentSpaceMs &&
+			gs.accounts?.[0].ms !== gs.currentSpaceMs &&
+			(membership === null ||
+				(membership && //
+					!permissions?.canReact &&
+					!permissions?.canPost)),
+	);
+	let showYourTurn = $derived(!!membership);
 	let spotId = $derived(isIdStr(p.tidStr) && p.tidStr!);
 	let promptSignIn = $derived(getPromptSigningIn());
-	let allowNewWriting = $derived(!p.modal && !promptSignIn && gs.currentSpaceMs !== 1);
+	let allowPosting = $derived(!p.modal && !promptSignIn && permissions?.canPost);
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
@@ -116,13 +126,7 @@
 
 				// TODO: press left/right to highlight next adjacent post
 				// TODO: press shift left/right to highlight next depth 0 post
-				if (
-					allowNewWriting &&
-					e.key === 'n' &&
-					!gs.writingNew &&
-					!gs.writingTo &&
-					!gs.writingEdit
-				) {
+				if (allowPosting && e.key === 'n' && !gs.writingNew && !gs.writingTo && !gs.writingEdit) {
 					e.preventDefault();
 					resetBottomOverlay();
 					gs.writingNew = true;
@@ -171,10 +175,9 @@
 			sortedBy,
 			postAtBumpedPostIdObjsExclude,
 			fromMs:
-				sortedBy === 'bumped'
-					? postAtBumpedPostIdObjsExclude?.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER
-					: lastPostIdObj?.ms || //
-						(sortedBy === 'old' ? 0 : Number.MAX_SAFE_INTEGER),
+				sortedBy === 'bumped' //
+					? postAtBumpedPostIdObjsExclude?.slice(-1)[0]?.ms
+					: lastPostIdObj?.ms,
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
@@ -238,6 +241,31 @@
 				postAtBumpedPostIdObjsExclude = postFeed.postAtBumpedPostIdObjsExclude;
 			}
 			let { postIdStrFeed: newPostIdStrFeed, idToPostMap: newIdToPostMap } = postFeed;
+			gs.msToAccountNameTxtMap = {
+				...gs.msToAccountNameTxtMap,
+				...postFeed.msToAccountNameTxtMap,
+			};
+
+			Object.entries(postFeed.spaceMsToMapOwnerAccountMs).forEach(
+				([spaceMs, ownerAccountMsMap]) => {
+					let ms = +spaceMs;
+					if (!gs.spaceMsToMapOwnerAccountMs[ms]) gs.spaceMsToMapOwnerAccountMs[ms] = {};
+					gs.spaceMsToMapOwnerAccountMs[ms] = {
+						...gs.spaceMsToMapOwnerAccountMs[ms],
+						...ownerAccountMsMap,
+					};
+				},
+			);
+
+			Object.entries(postFeed.spaceMsToMapModAccountMs).forEach(([spaceMs, modAccountMsMap]) => {
+				let ms = +spaceMs;
+				if (!gs.spaceMsToMapModAccountMs[ms]) gs.spaceMsToMapModAccountMs[ms] = {};
+				gs.spaceMsToMapModAccountMs[ms] = {
+					...gs.spaceMsToMapModAccountMs[ms],
+					...modAccountMsMap,
+				};
+			});
+
 			let newPostMapEntries = Object.entries(newIdToPostMap);
 			for (let i = 0; i < newPostMapEntries.length; i++) {
 				let [id, post] = newPostMapEntries[i];
@@ -389,16 +417,22 @@
 				<p class="font-bold text-xl">{m.viewOnlyMode()}</p>
 			</div>
 			<p class="ml-1.5">
-				{"You may contribute to this space once you're invited"}
+				{m.youMayContributeToThisSpaceOnceYouReInvited()}
 			</p>
 		{:else if showYourTurn}
 			<div class="shrink-0 h-9 fx">
 				<IconInbox class="w-6 ml-0.5 mr-2" />
 				<p class="font-bold text-xl">{m.yourTurn()}</p>
 			</div>
-			<p class="ml-1.5">
-				{@html m.signInToSeePostsAwaitingYourResponse()}
-			</p>
+			{#if gs.accounts}
+				{#if gs.accounts[0].ms}
+					<p class="ml-1.5 text-fg2">{m.noPostsAwaitingYourResponse()}</p>
+				{:else}
+					<p class="ml-1.5">
+						{@html m.signInToSeePostsAwaitingYourResponse()}
+					</p>
+				{/if}
+			{/if}
 			<div class="mt-2 fx">
 				<IconStack2 class="w-6 ml-0.5 mr-2" />
 				<p class="font-bold text-xl leading-4">{m.nextUp()}</p>
@@ -471,7 +505,7 @@
 		>
 			<IconX class="w-8" />
 		</a>
-	{:else if allowNewWriting}
+	{:else if allowPosting}
 		<button
 			class="z-40 fixed xy right-0 bottom-9 xs:bottom-0 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
 			onclick={() => (gs.writingNew = true)}

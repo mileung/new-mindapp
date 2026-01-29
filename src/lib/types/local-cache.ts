@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
 import { getDefaultAccount, MyAccountSchema, type MyAccount } from './accounts';
-import { getWhoObj } from './parts';
+import { getWhoObj, GranularTxtPropSchema } from './parts';
 import { normalizeTags } from './posts';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
@@ -12,6 +12,8 @@ export let LocalCacheSchema = z
 	.object({
 		currentSpaceMs: z.number(),
 		accounts: z.array(MyAccountSchema),
+		// memberships:
+		msToSpaceNameMap: z.record(GranularTxtPropSchema),
 	})
 	.strict();
 
@@ -21,6 +23,7 @@ let getDefaultLocalCache = () =>
 	structuredClone({
 		currentSpaceMs: 0,
 		accounts: [getDefaultAccount()],
+		msToSpaceNameMap: {},
 	} satisfies LocalCache);
 
 export let getLocalCache = () => {
@@ -91,51 +94,42 @@ export let updateSavedTags = async (tags: string[], remove = false) => {
 export let refreshSignedInAccounts = async () => {
 	if (!gs.accounts) throw new Error(`gs.accounts dne`);
 	let oldSignedInAccountMss = gs.accounts.filter((a) => a.signedIn).map((a) => a.ms);
-	let currentAccountMs = oldSignedInAccountMss[0];
 	let currentAccountUpdates: undefined | Partial<MyAccount>;
 	let signedInAccountMss: number[] = [];
 	if (oldSignedInAccountMss.length) {
 		let res = await trpc().refreshSignedInAccounts.query({
 			...(await getWhoObj()),
-			callerTimestamps: {
+			callerAttributes: {
 				email: gs.accounts[0].email,
 				name: gs.accounts[0].name,
 				bio: gs.accounts[0].bio,
 				savedTags: gs.accounts[0].savedTags,
-				// spaceMssMs: gs.accounts[0].spaceMssMs || 0,
+				spaceMss: gs.accounts[0].spaceMss,
 			},
 			accountMss: oldSignedInAccountMss,
 		});
 		currentAccountUpdates = res.currentAccountUpdates;
 		signedInAccountMss = res.signedInAccountMss || [];
 	}
-	if (gs.accounts[0].ms === currentAccountMs && currentAccountUpdates) {
-		updateLocalCache((lc) => {
+	updateLocalCache((lc) => {
+		if (lc.accounts[0].ms === oldSignedInAccountMss[0] && currentAccountUpdates) {
 			lc.accounts[0] = {
 				...lc.accounts[0],
 				...currentAccountUpdates,
 			};
-			return lc;
-		});
-	}
-	updateLocalCache((lc) => ({
-		...lc,
-		accounts: lc.accounts.map((a) => ({
-			...a,
-			signedIn: signedInAccountMss.includes(a.ms),
-		})),
-	}));
-	updateLocalCache((lc) => ({
-		...lc,
-		accounts: lc.accounts.sort((a, b) => {
-			if (a.signedIn && b.signedIn) return 0;
-			if (a.signedIn && !b.signedIn) return -1;
-			if (!a.signedIn && b.signedIn) return 1;
-			if (!a.ms && b.ms) return -1;
-			if (a.ms && !b.ms) return 1;
-			return 0;
-		}),
-	}));
+		}
+		lc.accounts = lc.accounts
+			.map((a) => ({
+				...a,
+				signedIn: signedInAccountMss.includes(a.ms),
+			}))
+			.sort((a, b) => {
+				let aPriority = !a.ms || a.signedIn ? 0 : 1;
+				let bPriority = !b.ms || b.signedIn ? 0 : 1;
+				return aPriority - bPriority;
+			});
+		return lc;
+	});
 };
 
 export let unsaveAccount = (accountMs: number) => {

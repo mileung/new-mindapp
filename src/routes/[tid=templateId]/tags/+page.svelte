@@ -3,7 +3,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
-	import { getPromptSigningIn, spaceMsToName } from '$lib/types/spaces';
+	import { getPromptSigningIn, spaceMsToNameTxt } from '$lib/types/spaces';
 	import { getSpaceTags, tagsPerLoad } from '$lib/types/spaces/getSpaceTags';
 	import { IconSquare, IconSquareCheckFilled } from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
@@ -45,7 +45,7 @@
 		}
 	};
 
-	let savedTags = $derived(
+	let savedTagsSet = $derived(
 		new Set(
 			gs.accounts //
 				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
@@ -64,7 +64,7 @@
 			<!-- {numTags === 1
 				? m.oneSpaceNameTag({ spaceName: spaceMsToName(urlInMs) })
 				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(urlInMs) })} -->
-			{m.spaceNameTags({ spaceName: spaceMsToName(urlInMs).txt })}
+			{m.spaceNameTags({ spaceName: spaceMsToNameTxt(urlInMs) })}
 		</p>
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
@@ -78,11 +78,11 @@
 				</Apush>
 				<button
 					class="group flex-1 hover:bg-bg3 pr-1"
-					onclick={() => updateSavedTags([tag.txt], savedTags.has(tag.txt))}
+					onclick={() => updateSavedTags([tag.txt], savedTagsSet.has(tag.txt))}
 				>
-					<IconSquare class={`ml-auto w-5 ${savedTags.has(tag.txt) ? 'hidden' : 'block'}`} />
+					<IconSquare class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'hidden' : 'block'}`} />
 					<IconSquareCheckFilled
-						class={`ml-auto w-5 ${savedTags.has(tag.txt) ? 'block' : 'hidden'}`}
+						class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'block' : 'hidden'}`}
 					/>
 				</button>
 			</div>

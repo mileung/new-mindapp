@@ -1,3 +1,4 @@
+import { gs } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
 import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
@@ -16,15 +17,12 @@ import { pf } from '../parts/partFilters';
 import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let deletePost = async (
-	fullPostIdObj: FullIdObj,
-	version: null | number,
-	forceUsingLocalDb?: boolean,
-) => {
+export let deletePost = async (fullPostIdObj: FullIdObj, version: null | number) => {
+	let useRpc = gs.currentSpaceMs! > 0;
 	let baseInput = await getWhoWhereObj();
-	return forceUsingLocalDb || !baseInput.spaceMs
-		? _deletePost(await gsdb(), fullPostIdObj, version)
-		: trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version });
+	return useRpc || baseInput.spaceMs
+		? trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version })
+		: _deletePost(await gsdb(), fullPostIdObj, version);
 };
 
 export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version: null | number) => {
@@ -75,6 +73,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			),
 	);
 
+	console.log('mainPIdWNumAsLastVersionAtPPIdRows:', mainPIdWNumAsLastVersionAtPPIdRows);
 	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(mainPIdWNumAsLastVersionAtPPIdRows);
 	let lastVersion = mainPIdWNumAsLastVersionAtPPIdRow.num!;
 	let versionIsLastVersion = version === lastVersion;
