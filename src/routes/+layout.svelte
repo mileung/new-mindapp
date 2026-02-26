@@ -93,6 +93,7 @@
 		if (
 			gs.accounts !== undefined &&
 			gs.urlInMs !== undefined &&
+			gs.urlInMs !== 8 &&
 			gs.urlInMs === urlInMs &&
 			!gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms]?.[gs.urlInMs]
 		) {
@@ -122,6 +123,7 @@
 
 				let oldSpaceContext = gs.accounts[0].spaceMsToContextMap[spaceMs];
 
+				console.log('spaceContext:', spaceContext);
 				let get: GetCallerContextGetArg = {
 					...(spaceContext
 						? {}
@@ -150,8 +152,6 @@
 							}
 						: {}),
 				};
-
-				console.log('get:', get);
 				if (Object.values(get).some((v) => !!v)) {
 					try {
 						get.signedIn = !!callerMs;
@@ -163,25 +163,25 @@
 						console.log('getCallerContext res:', res);
 						signedIn = res.signedIn;
 						signedInAccountMss = res.signedInAccountMss;
-						if (res.signedIn) {
+						if (res.signedIn || !callerMs) {
 							currentAccountUpdates = res.currentAccountUpdates;
 							spaceContext = spaceContext || {
 								isPublic:
 									res.isPublic === null
-										? null //
-										: res.isPublic || oldSpaceContext!.isPublic,
+										? undefined //
+										: res.isPublic || oldSpaceContext?.isPublic,
 								pinnedQuery:
 									res.pinnedQuery === null
-										? null //
-										: res.pinnedQuery || oldSpaceContext!.pinnedQuery,
+										? undefined //
+										: res.pinnedQuery || oldSpaceContext?.pinnedQuery,
 								roleCode:
 									res.roleCode === null
-										? null //
-										: res.roleCode || oldSpaceContext!.roleCode,
+										? undefined //
+										: res.roleCode || oldSpaceContext?.roleCode,
 								permissionCode:
 									res.permissionCode === null
-										? null
-										: res.permissionCode || oldSpaceContext!.permissionCode,
+										? undefined //
+										: res.permissionCode || oldSpaceContext?.permissionCode,
 							};
 							// spaceMssAwaitingResponse: res.spaceMssAwaitingResponse,
 						} else {

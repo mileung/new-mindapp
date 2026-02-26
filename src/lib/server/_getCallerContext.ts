@@ -34,8 +34,7 @@ export let _getCallerContext = async (
 	if (get.isPublic && !input.spaceMs) throw new Error('input.spaceMs must be gt0');
 	if (get.permissionCode && !get.roleCode)
 		throw new Error('must get permissionCode to get roleCode');
-	if (get.pinnedQuery && (!get.isPublic || !get.roleCode))
-		throw new Error('Must get isPublic and roleCode to get pinnedQuery');
+	if (get.pinnedQuery && !get.isPublic) throw new Error('Must get isPublic to get pinnedQuery');
 
 	let signedIn: undefined | boolean;
 	let isPublic: undefined | null | GranularNumProp;
