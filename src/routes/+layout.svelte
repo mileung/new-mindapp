@@ -144,48 +144,53 @@
 									spaceMss: gs.accounts[0].spaceMss,
 								},
 							}),
-					...(firstTimeChecking
+					...(firstTimeChecking && oldSignedInAccountMss.length
 						? {
 								signedInAccountMssFrom: oldSignedInAccountMss, //
 							}
 						: {}),
 				};
 
+				console.log('get:', get);
 				if (Object.values(get).some((v) => !!v)) {
-					get.signedIn = !!callerMs;
-					let res = await trpc().getCallerContext.query({
-						callerMs,
-						spaceMs,
-						get,
-					});
-					console.log('getCallerContext res:', res);
-					signedIn = res.signedIn;
-					signedInAccountMss = res.signedInAccountMss;
-					if (res.signedIn) {
-						currentAccountUpdates = res.currentAccountUpdates;
-						spaceContext = spaceContext || {
-							isPublic:
-								res.isPublic === null
-									? null //
-									: res.isPublic || oldSpaceContext!.isPublic,
-							pinnedQuery:
-								res.pinnedQuery === null
-									? null //
-									: res.pinnedQuery || oldSpaceContext!.pinnedQuery,
-							roleCode:
-								res.roleCode === null
-									? null //
-									: res.roleCode || oldSpaceContext!.roleCode,
-							permissionCode:
-								res.permissionCode === null
-									? null
-									: res.permissionCode || oldSpaceContext!.permissionCode,
-						};
-						// spaceMssAwaitingResponse: res.spaceMssAwaitingResponse,
-					} else {
-						signedInAccountMss = (signedInAccountMss || oldSignedInAccountMss).filter(
-							(ms) => ms !== callerMs,
-						);
+					try {
+						get.signedIn = !!callerMs;
+						let res = await trpc().getCallerContext.query({
+							callerMs,
+							spaceMs,
+							get,
+						});
+						console.log('getCallerContext res:', res);
+						signedIn = res.signedIn;
+						signedInAccountMss = res.signedInAccountMss;
+						if (res.signedIn) {
+							currentAccountUpdates = res.currentAccountUpdates;
+							spaceContext = spaceContext || {
+								isPublic:
+									res.isPublic === null
+										? null //
+										: res.isPublic || oldSpaceContext!.isPublic,
+								pinnedQuery:
+									res.pinnedQuery === null
+										? null //
+										: res.pinnedQuery || oldSpaceContext!.pinnedQuery,
+								roleCode:
+									res.roleCode === null
+										? null //
+										: res.roleCode || oldSpaceContext!.roleCode,
+								permissionCode:
+									res.permissionCode === null
+										? null
+										: res.permissionCode || oldSpaceContext!.permissionCode,
+							};
+							// spaceMssAwaitingResponse: res.spaceMssAwaitingResponse,
+						} else {
+							signedInAccountMss = (signedInAccountMss || oldSignedInAccountMss).filter(
+								(ms) => ms !== callerMs,
+							);
+						}
+					} catch (error) {
+						console.log('error:', error);
 					}
 				}
 

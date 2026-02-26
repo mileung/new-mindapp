@@ -122,61 +122,62 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 
 	tagStrsFromAllLayers = [...new Set(tagStrsFromAllLayers)];
 	coreStrsFromAllLayers = [...new Set(coreStrsFromAllLayers)];
+
+	let filters = [
+		...(getIdToCitedPostMap
+			? citedPostIds.map(
+					(id) => and(),
+					// TODO: get cited posts
+				)
+			: []),
+		...(postIsChild
+			? [
+					and(
+						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
+						pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+						pf.num.gte0,
+						pf.txt.isNull,
+					),
+					and(
+						pf.noAtId,
+						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
+						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.num.gte0,
+						pf.txt.isNull,
+					),
+				]
+			: []),
+		tagStrsFromAllLayers.length
+			? and(
+					pf.noAtId,
+					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
+					pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+					pf.num.gte0,
+					or(...tagStrsFromAllLayers.map((t) => pf.txt.eq(t))),
+				)
+			: undefined,
+		coreStrsFromAllLayers.length
+			? and(
+					pf.noAtId,
+					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
+					pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+					pf.num.gte0,
+					or(...coreStrsFromAllLayers.map((t) => pf.txt.eq(t))),
+				)
+			: undefined,
+	];
+
 	let {
 		[pc.childPostIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdRows = [],
 		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountRows = [],
 		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
-		postIsChild || tagStrsFromAllLayers.length || coreStrsFromAllLayers.length
+		filters.some((f) => f)
 			? await db
 					.select()
 					.from(pTable)
-					.where(
-						or(
-							...(getIdToCitedPostMap
-								? citedPostIds.map(
-										(id) => and(),
-										// TODO: get cited posts
-									)
-								: []),
-							...(postIsChild
-								? [
-										and(
-											pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
-											pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
-											pf.num.gte0,
-											pf.txt.isNull,
-										),
-										and(
-											pf.noAtId,
-											pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
-											pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-											pf.num.gte0,
-											pf.txt.isNull,
-										),
-									]
-								: []),
-							tagStrsFromAllLayers.length
-								? and(
-										pf.noAtId,
-										pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-										pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
-										pf.num.gte0,
-										or(...tagStrsFromAllLayers.map((t) => pf.txt.eq(t))),
-									)
-								: undefined,
-							coreStrsFromAllLayers.length
-								? and(
-										pf.noAtId,
-										pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-										pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
-										pf.num.gte0,
-										or(...coreStrsFromAllLayers.map((t) => pf.txt.eq(t))),
-									)
-								: undefined,
-						),
-					)
+					.where(or(...filters))
 			: [],
 	);
 

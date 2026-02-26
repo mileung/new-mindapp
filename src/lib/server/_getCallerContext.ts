@@ -130,6 +130,62 @@ export let _getCallerContext = async (
 		);
 	}
 
+	let filters = [
+		sessionKeyTxtMsAtAccountIdFilter,
+		...(input.spaceMs
+			? [
+					get.isPublic && input.spaceMs > 1 && input.spaceMs !== input.callerMs
+						? and(
+								pf.in_ms.eq(input.spaceMs), //
+								get.isPublic === true ? undefined : pf.num.notEq(get.isPublic.num),
+								pf.code.eq(pc.spaceIsPublicBinId),
+								pf.txt.isNull,
+							)
+						: undefined,
+					get.pinnedQuery
+						? and(
+								pf.in_ms.eq(input.spaceMs), //
+								get.pinnedQuery === true
+									? undefined
+									: or(
+											pf.ms.notEq(get.pinnedQuery.ms || 0),
+											pf.txt.notEq(get.pinnedQuery.txt), //
+										),
+								pf.code.eq(pc.spacePinnedQueryTxtId),
+								pf.txt.isNotNull,
+							)
+						: undefined,
+					get.roleCode && input.spaceMs && input.spaceMs !== input.callerMs
+						? and(
+								pf.atId({ at_ms: input.callerMs }),
+								pf.ms.gt0,
+								pf.in_ms.eq(input.spaceMs),
+								pf.code.eq(pc.roleCodeNumIdAtAccountId),
+								pf.txt.isNull,
+							)
+						: undefined,
+					get.permissionCode && input.spaceMs && input.spaceMs !== input.callerMs
+						? and(
+								pf.atId({ at_ms: input.callerMs }),
+								pf.ms.gt0,
+								pf.in_ms.eq(input.spaceMs),
+								pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+								get.permissionCode === true
+									? undefined
+									: or(
+											pf.ms.notEq(get.permissionCode.ms || 0),
+											pf.num.notEq(get.permissionCode.num), //
+										),
+								pf.txt.isNull,
+							)
+						: undefined,
+				]
+			: []),
+		signedInAccountMssFilter,
+		yourTurnIndicatorsFilter,
+		accountUpdatesFilter,
+	];
+
 	let {
 		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
 
@@ -144,68 +200,15 @@ export let _getCallerContext = async (
 		[pc.accountSavedTagsTxtMsByMs]: savedTagsTxtMsAtAccountIdRows = [],
 		[pc.accountSpaceMssTxtMsByMs]: spaceMssTxtMsAtAccountIdRows = [],
 	} = channelPartsByCode(
-		await tdb
-			.select()
-			.from(pTable)
-			.where(
-				or(
-					sessionKeyTxtMsAtAccountIdFilter,
-					...(input.spaceMs
-						? [
-								get.isPublic && input.spaceMs > 1 && input.spaceMs !== input.callerMs
-									? and(
-											pf.in_ms.eq(input.spaceMs), //
-											get.isPublic === true ? undefined : pf.num.notEq(get.isPublic.num),
-											pf.code.eq(pc.spaceIsPublicBinId),
-											pf.txt.isNull,
-										)
-									: undefined,
-								get.pinnedQuery
-									? and(
-											pf.in_ms.eq(input.spaceMs), //
-											get.pinnedQuery === true
-												? undefined
-												: or(
-														pf.ms.notEq(get.pinnedQuery.ms || 0),
-														pf.txt.notEq(get.pinnedQuery.txt), //
-													),
-											pf.code.eq(pc.spacePinnedQueryTxtId),
-											pf.txt.isNotNull,
-										)
-									: undefined,
-								get.roleCode && input.spaceMs && input.spaceMs !== input.callerMs
-									? and(
-											pf.atId({ at_ms: input.callerMs }),
-											pf.ms.gt0,
-											pf.in_ms.eq(input.spaceMs),
-											pf.code.eq(pc.roleCodeNumIdAtAccountId),
-											pf.txt.isNull,
-										)
-									: undefined,
-								get.permissionCode && input.spaceMs && input.spaceMs !== input.callerMs
-									? and(
-											pf.atId({ at_ms: input.callerMs }),
-											pf.ms.gt0,
-											pf.in_ms.eq(input.spaceMs),
-											pf.code.eq(pc.permissionCodeNumIdAtAccountId),
-											get.permissionCode === true
-												? undefined
-												: or(
-														pf.ms.notEq(get.permissionCode.ms || 0),
-														pf.num.notEq(get.permissionCode.num), //
-													),
-											pf.txt.isNull,
-										)
-									: undefined,
-							]
-						: []),
-					signedInAccountMssFilter,
-					yourTurnIndicatorsFilter,
-					accountUpdatesFilter,
-				),
-			),
+		filters.some((f) => f)
+			? await tdb
+					.select()
+					.from(pTable)
+					.where(or(...filters))
+			: [],
 	);
 
+	// console.log('sessionKeyTxtMsAtAccountIdRows:', sessionKeyTxtMsAtAccountIdRows);
 	let sessionKeyTxtMsAtAccountIdRowForCaller = sessionKeyTxtMsAtAccountIdRows.find(
 		(row) => row.at_ms === input.callerMs,
 	);
