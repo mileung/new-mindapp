@@ -38,7 +38,7 @@
 	let copiedInviteSlug = $state('');
 	let myInvites = $state<Invite[]>([]);
 	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
-	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode !== undefined);
+	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode);
 
 	let memberships = $state<Membership[]>([]);
 	let accountMsToModPromotionMsByMsMap = $state<Record<number, { ms: number; byMs: number }>>({});
@@ -252,10 +252,12 @@
 			{#each memberships as membership}
 				<MembershipBlock {membership} />
 			{/each}
-			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>
-				<p slot="noMore" class="mb-2 text-lg text-fg2">{m.theEnd()}</p>
-				<!-- <p slot="error" class="mb-2 text-lg text-fg2">{m.placeholderError()}</p> -->
-			</InfiniteLoading>
+			{#if canView}
+				<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>
+					<p slot="noMore" class="mb-2 text-lg text-fg2">{m.theEnd()}</p>
+					<!-- <p slot="error" class="mb-2 text-lg text-fg2">{m.placeholderError()}</p> -->
+				</InfiniteLoading>
+			{/if}
 		{/if}
 	</div>
 {/if}

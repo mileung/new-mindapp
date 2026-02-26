@@ -21,6 +21,9 @@
 		tags = [];
 	});
 
+	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
+	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode);
+
 	let loadMoreTags = async (e: InfiniteEvent) => {
 		if (!gs.accounts || gs.urlInMs === undefined) return;
 		let lastCount = tags.slice(-1)[0]?.num || Number.MAX_SAFE_INTEGER;
@@ -79,14 +82,16 @@
 				</button>
 			</div>
 		{/each}
-		<InfiniteLoading identifier={gs.urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
-			<p slot="noResults" class="m-2 text-lg text-fg2">
-				{m.noTagsFound()}
-			</p>
-			<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
-			<p slot="error" class="m-2 text-lg text-fg2">
-				{m.placeholderError()}
-			</p>
-		</InfiniteLoading>
+		{#if canView}
+			<InfiniteLoading identifier={gs.urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
+				<p slot="noResults" class="m-2 text-lg text-fg2">
+					{m.noTagsFound()}
+				</p>
+				<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+				<p slot="error" class="m-2 text-lg text-fg2">
+					{m.placeholderError()}
+				</p>
+			</InfiniteLoading>
+		{/if}
 	</div>
 {/if}

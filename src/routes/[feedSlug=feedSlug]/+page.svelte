@@ -70,7 +70,7 @@
 		return isIdStr(feedSlug) ? feedSlug : undefined;
 	});
 	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
-	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode !== undefined);
+	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode);
 	let showViewOnly = $derived(canView && !spaceContext?.permissionCode);
 	let showYourTurn = $derived(
 		gs.urlInMs && gs.urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,
@@ -380,9 +380,6 @@
 				<IconEye class="shrink-0 w-6 ml-0.5 mr-2" />
 				<p class="font-bold text-xl">{m.viewOnly()}</p>
 			</div>
-			<p class="ml-1.5">
-				{m.youMayContributeToThisSpaceOnceYouReInvited()}
-			</p>
 		{:else if showYourTurn}
 			<div class="h-9 fx">
 				<IconInbox class="shrink-0 w-6 ml-0.5 mr-2" />

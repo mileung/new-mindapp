@@ -205,7 +205,7 @@ export let router = t.router({
 				signedIn: input.useIfValid,
 				roleCode: input.useIfValid,
 			});
-			if (c.roleCode !== undefined) throw new Error(m.alreadyJoinedThisSpace());
+			if (c.roleCode) throw new Error(m.alreadyJoinedThisSpace());
 			throwIf(!c.signedIn && input.useIfValid);
 			return _checkInvite(input);
 		}),
