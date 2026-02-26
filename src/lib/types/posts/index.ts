@@ -55,7 +55,11 @@ export let PostSchema = z
 			.transform((history) => {
 				if (history === null) return null;
 				let keys = Object.keys(history)
-					.map((k) => +k)
+					.map((k) => {
+						let version = +k;
+						if (Number.isNaN(version) || version < 1) throw new Error('version num must be gt0');
+						return version;
+					})
 					.sort((a, b) => a - b);
 				for (let i = 1; i < keys.length; i++) {
 					if (keys[i] - keys[i - 1] !== 1)
@@ -99,7 +103,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 			or(
 				tagIdObjs.length
 					? and(
-							pf.noParent,
+							pf.noAtId,
 							or(...tagIdObjs.map((tagIdObj) => pf.id(tagIdObj))),
 							pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
 							pf.num.gte0,
@@ -108,7 +112,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 					: undefined,
 				coreIdObjs.length
 					? and(
-							pf.noParent,
+							pf.noAtId,
 							or(...coreIdObjs.map((coreIdObj) => pf.id(coreIdObj))),
 							pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
 							pf.num.gte0,
@@ -179,7 +183,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 		tagOrCoreTxtRowsToDel.length &&
 			deleteFilters.push(
 				and(
-					pf.noParent,
+					pf.noAtId,
 					or(
 						...tagOrCoreTxtRowsToDel.map((r) =>
 							and(

@@ -46,8 +46,8 @@ window.addEventListener('keydown', (e) => {
 	if (e.key === 'µ') {
 		// alt m
 		baseUrl = newMindappUrl;
-	} else if (e.key === '¬') {
-		// alt l
+	} else if (e.key === '∂') {
+		// alt ∂
 		baseUrl = newMindappDevUrl;
 	} else if (e.key === 'π') {
 		// alt p

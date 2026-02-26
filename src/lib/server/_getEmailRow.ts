@@ -12,13 +12,11 @@ export let _getEmailRow = async (email: string) =>
 			.from(pTable)
 			.where(
 				and(
-					pf.at_ms.gt0,
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
+					pf.noAtId,
 					pf.ms.gt0,
-					pf.by_ms.eq0,
+					pf.by_ms.gt0,
 					pf.in_ms.eq0,
-					pf.code.eq(pc.emailTxtMsAtAccountId),
+					pf.code.eq(pc.accountEmailTxtMsByMs),
 					pf.num.eq0,
 					pf.txt.eq(email),
 				),

@@ -1,13 +1,8 @@
-type UniqueValues<T extends Record<string, number>> = {
-	[K in keyof T]: T[K] extends T[Exclude<keyof T, K>] ? never : T[K];
-};
-let uniqueMapVals = <const T extends Record<string, number>>(dict: UniqueValues<T>): T => dict;
+import { uniqueMapVals } from '$lib/js';
 
 export let pc = uniqueMapVals({
 	postIdWithNumAsLastVersionAtParentPostId: 0,
-	childPostIdWithNumAsDepthAtRootId: 1, // TODO: grandchildren and later
-	// remoteDescendantPostIdWithNumAsDepthAtRootId
-	// NumAsDepth isn't actually necessary
+	childPostIdWithNumAsDepthAtRootId: 1,
 	postIdAtCitedPostId: 2,
 	reactionIdWithEmojiTxtAtPostId: 3,
 	// TODO: Calendar events? Just make it a reserved tag?
@@ -19,6 +14,31 @@ export let pc = uniqueMapVals({
 
 	currentPostTagIdWithVersionNumAtPostId: 20,
 	exPostTagIdWithVersionNumAtPostId: 21,
+
+	// TODO: numAtTag  AtPostId: 30,
+	// ot numAtTagId8: 30,
+	// basically attach the num field to a tag
+	// latitude:123.456789
+	// latitude
+	// 123.456789
+	// Tag Name=23423.234234
+	// TagTxtVal
+	// TagNumVal
+	// TagTxtSubVal
+	// TagNumSubVal
+	// TagSubTxt
+	// TagSubNum
+	// TagId8SubTxtAtPostIdWithInMsAsVersion
+	// TagId8SubNumAtPostIdWithInMsAsVersion
+
+	// Tag
+	// TagWithParsedNum
+	// year=2026
+	// month=1
+	// day=31
+	// hour=31
+	// TagWithParsedDate
+
 	currentPostCoreIdWithVersionNumAtPostId: 22,
 	exPostCoreIdWithVersionNumAtPostId: 23,
 
@@ -26,36 +46,30 @@ export let pc = uniqueMapVals({
 	coreId8AndTxtWithNumAsCount: 31,
 	reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId: 32,
 
-	spaceId: 40,
-	spaceNameTxtId: 41,
+	spaceIsPublicBinId: 40,
+	spaceNameTxtIdAndMemberCountNum: 41,
 	spaceDescriptionTxtId: 42,
-	spacePublicBinId: 43,
-	newUsersCanReactBinId: 44,
-	newUsersCanPostBinId: 45,
-	canReactBinIdAtAccountId: 46,
-	canPostBinIdAtAccountId: 47,
-	promotionToModIdAtAccountId: 48,
-	promotionToOwnerIdAtAccountId: 49,
+	spacePinnedQueryTxtId: 43,
+	newMemberPermissionCodeId: 44,
+	permissionCodeNumIdAtAccountId: 45,
+	roleCodeNumIdAtAccountId: 46,
 
-	accountId: 50,
-	emailTxtMsAtAccountId: 51,
-	pwHashTxtMsAtAccountId: 52,
-	nameTxtMsAtAccountId: 53,
-	bioTxtMsAtAccountId: 54,
-	savedTagsTxtMsAtAccountId: 55,
-	spaceMssTxtMsAtAccountId: 56,
+	accountEmailTxtMsByMs: 50,
+	accountPwHashTxtMsByMs: 51,
+	accountNameTxtMsByMs: 52,
+	accountBioTxtMsByMs: 53,
+	accountSavedTagsTxtMsByMs: 54,
+	accountSpaceMssTxtMsByMs: 55,
 
 	clientKeyTxtMsAtAccountId: 60,
 	sessionKeyTxtMsAtAccountId: 61,
-	createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 62,
-	signInOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 63,
-	resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount: 64,
+	createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 62,
+	signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 63,
+	resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 64,
 
-	inviteIdWithNumAsUseCountAndTxtAsSlug: 70,
-	validForNumAtInviteId: 71,
-	maxUsesNumAtInviteId: 72,
-	acceptMsByMsAtInviteId: 73,
-	revokeMsByMsAtInviteId: 74,
+	inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug: 70,
+	acceptMsByMsAtInviteId: 71,
+	revokeMsByMsAtInviteId: 72,
 
 	postIdAtBumpedRootId: 80,
 	lastSpaceViewId: 81,

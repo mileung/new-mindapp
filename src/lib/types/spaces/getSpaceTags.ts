@@ -32,7 +32,7 @@ export let _getSpaceTags = async (
 		.from(pTable)
 		.where(
 			and(
-				pf.noParent,
+				pf.noAtId,
 				pf.ms.gt0,
 				pf.in_ms.eq(input.spaceMs),
 				pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
@@ -48,7 +48,7 @@ export let _getSpaceTags = async (
 		tags: tagIdAndTxtWithNumAsCountRows.map((r) => ({
 			...getIdObj(r),
 			txt: r.txt!, //
-			num: r.num!,
+			num: r.num,
 		})),
 	};
 };

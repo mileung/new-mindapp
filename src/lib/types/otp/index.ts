@@ -13,6 +13,6 @@ export let OtpSchema = z
 export type Otp = z.infer<typeof OtpSchema>;
 
 export type OtpPartCode =
-	| typeof pc.createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount
-	| typeof pc.signInOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount
-	| typeof pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount;
+	| typeof pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount
+	| typeof pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount
+	| typeof pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount;

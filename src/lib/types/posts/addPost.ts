@@ -42,8 +42,10 @@ export let addPost = async (post: Post, forceUsingLocalDb?: boolean) => {
 		: trpc().addPost.mutate({ ...baseInput, post: parsedPost.data });
 };
 
-export let _addPost = async (db: Database, post: Post) => {
+export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = false) => {
 	let lastVersion = getLastVersion(post);
+	let citedPostIds: string[] = [];
+	let idToCitedPostMap: Record<string, Post> = {};
 	let mainPostIdWithNumAsLastVersionAtParentPostIdObj: PartInsert = {
 		at_ms: post.at_ms,
 		at_by_ms: post.at_by_ms,
@@ -105,8 +107,9 @@ export let _addPost = async (db: Database, post: Post) => {
 			coreStrsFromAllLayers.push(layer.core);
 			if (isLastVersion) {
 				currentCoreStr = layer.core;
+				citedPostIds = getCitedPostIds(layer.core);
 				partsToInsert.push(
-					...getCitedPostIds(layer.core).map((id) => ({
+					...citedPostIds.map((id) => ({
 						...getIdStrAsAtIdObj(id),
 						...postIdObj,
 						code: pc.postIdAtCitedPostId,
@@ -131,6 +134,12 @@ export let _addPost = async (db: Database, post: Post) => {
 					.from(pTable)
 					.where(
 						or(
+							...(getIdToCitedPostMap
+								? citedPostIds.map(
+										(id) => and(),
+										// TODO: get cited posts
+									)
+								: []),
 							...(postIsChild
 								? [
 										and(
@@ -140,7 +149,7 @@ export let _addPost = async (db: Database, post: Post) => {
 											pf.txt.isNull,
 										),
 										and(
-											pf.noParent,
+											pf.noAtId,
 											pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
 											pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
 											pf.num.gte0,
@@ -150,7 +159,7 @@ export let _addPost = async (db: Database, post: Post) => {
 								: []),
 							tagStrsFromAllLayers.length
 								? and(
-										pf.noParent,
+										pf.noAtId,
 										pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 										pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
 										pf.num.gte0,
@@ -159,7 +168,7 @@ export let _addPost = async (db: Database, post: Post) => {
 								: undefined,
 							coreStrsFromAllLayers.length
 								? and(
-										pf.noParent,
+										pf.noAtId,
 										pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 										pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
 										pf.num.gte0,
@@ -186,7 +195,7 @@ export let _addPost = async (db: Database, post: Post) => {
 			...postIdObj,
 			code: pc.childPostIdWithNumAsDepthAtRootId,
 			txt: null,
-			num: (parentIsRoot ? 0 : parentRow.num!) + 1,
+			num: (parentIsRoot ? 0 : parentRow.num) + 1,
 		});
 		let bumpedRootRow = await db
 			.update(pTable)
@@ -275,8 +284,7 @@ export let _addPost = async (db: Database, post: Post) => {
 
 	await db.insert(pTable).values(partsToInsert);
 
-	// console.log('partsToInsert:', partsToInsert);
-	return { ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms };
+	return { idToCitedPostMap, ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms };
 };
 
 let addNewTagOrCoreRows = (
@@ -311,5 +319,6 @@ let addNewTagOrCoreRows = (
 			partsToInsert.push(tagOrCoreRow);
 		}
 	}
+
 	return txtToIdAndTxtWithNumAsCountObjMap;
 };

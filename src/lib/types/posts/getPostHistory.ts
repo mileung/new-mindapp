@@ -55,14 +55,14 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 					.where(
 						or(
 							and(
-								pf.noParent,
+								pf.noAtId,
 								or(...exPostTagIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
 								pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
 							and(
-								pf.noParent,
+								pf.noAtId,
 								or(...exPostCoreIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
 								pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
 								pf.num.gte0,
@@ -82,7 +82,7 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 	let tagIdToTxtMap: Record<string, string> = {};
 	let coreIdToTxtMap: Record<string, string> = {};
 	let history: Post['history'] = {
-		[version]: { ms: exVersionNumAndMsAtPostIdRow.ms!, tags: [], core: '' },
+		[version]: { ms: exVersionNumAndMsAtPostIdRow.ms, tags: [], core: '' },
 	};
 
 	for (let i = 0; i < parts.length; i++) {

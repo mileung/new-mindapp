@@ -12,11 +12,11 @@ export let _changeSpaceName = async (input: WhoWhereObj & { nameTxt: string }) =
 		.set({ ms, by_ms: input.callerMs, txt: input.nameTxt })
 		.where(
 			and(
-				pf.noParent,
+				pf.noAtId,
 				pf.ms.gt0,
 				pf.by_ms.gt0,
 				pf.in_ms.eq(input.spaceMs),
-				pf.code.eq(pc.spaceNameTxtId),
+				pf.code.eq(pc.spaceNameTxtIdAndMemberCountNum),
 				pf.num.eq0,
 			),
 		);

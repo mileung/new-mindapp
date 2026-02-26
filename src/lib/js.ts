@@ -138,3 +138,11 @@ export let ranInt = (a: number, b: number) => {
 export let supportsCredentiallessIframe =
 	typeof HTMLIFrameElement !== 'undefined' && //
 	'credentialless' in HTMLIFrameElement.prototype;
+
+export let deepClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
+
+type UniqueValues<T extends Record<string, number>> = {
+	[K in keyof T]: T[K] extends T[Exclude<keyof T, K>] ? never : T[K];
+};
+export let uniqueMapVals = <const T extends Record<string, number>>(dict: UniqueValues<T>): T =>
+	dict;

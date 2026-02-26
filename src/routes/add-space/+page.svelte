@@ -25,7 +25,7 @@
 						e.preventDefault();
 						try {
 							let res = await trpc().checkOtp.mutate;
-							// goto(`/__${gs.currentSpaceMs}`, {});
+							// goto(`/__${gs.urlInMs}`, {});
 						} catch (error) {
 							console.error(error);
 							alert(error);
@@ -62,7 +62,7 @@
 					e.preventDefault();
 					try {
 						// let res = await trpc().auth.verifyOtp.mutate
-						// goto(`/__${gs.currentSpaceMs}`, {});
+						// goto(`/__${gs.urlInMs}`, {});
 					} catch (error) {
 						console.error(error);
 						alert(error);

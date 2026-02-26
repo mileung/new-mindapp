@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { msToAccountNameTxt } from '$lib/types/accounts';
+	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
 	import type { RxnEmoji } from '$lib/types/reactions';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { IconChartBarPopular, IconCornerUpLeft, IconMinus, IconPlus } from '@tabler/icons-svelte';
-	import Apush from './Apush.svelte';
+	import { IconChartBarPopular, IconMessage2Plus, IconMinus, IconPlus } from '@tabler/icons-svelte';
 	import CoreParser from './CoreParser.svelte';
 	import Highlight from './Highlight.svelte';
 	import Self from './PostBlock.svelte';
@@ -106,24 +105,26 @@
 			>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
-						<Apush href={`/_${atPost.by_ms}_${atPost.in_ms}`} class={`fx group hover:text-fg1`}>
+						<!-- Apush -->
+						<a href={`/__${atPost.by_ms}_`} class="fx group hover:text-fg1">
 							<div
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
 								<!-- TODO: text color matches UserIcon? -->
-								<p class={`font-bold ${gs.msToAccountNameTxtMap[atPost.by_ms] ? '' : 'italic'}`}>
-									{msToAccountNameTxt(atPost.by_ms)}
+								<p class={`font-bold ${gs.accountMsToNameTxtMap[atPost.by_ms] ? '' : 'italic'}`}>
+									{accountMsToNameTxt(atPost.by_ms)}
 								</p>
 							</div>
-						</Apush>
-						<Apush
-							href={'/' + getIdStr(atPost)}
+						</a>
+						<!-- Apush -->
+						<a
+							href={`/${getIdStr(atPost)}`}
 							class={`fx hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 						>
 							<p class={`mr-1 ${atPostDeleted ? 'text-fg2 font-bold italic text-xs' : ''}`}>
 								: {atPostTxt}
 							</p>
-						</Apush>
+						</a>
 						<button
 							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 							onclick={() => {
@@ -132,7 +133,7 @@
 									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost;
 							}}
 						>
-							<IconCornerUpLeft class="w-5" />
+							<IconMessage2Plus class="w-5" />
 						</button>
 						<Highlight reply {evenBg} postIdStr={atPostIdStr} />
 					</div>
@@ -164,12 +165,13 @@
 					{#if tags?.length || rxnCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags || [] as tag (tag)}
-								<Apush
-									href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag}]`)}`}
+								<!-- Apush -->
+								<a
+									href={`/__${gs.urlInMs}?q=${`[${tag}]`}`}
 									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}
-								</Apush>
+								</a>
 							{/each}
 							{#each rxnCountEntries as [emoji, count], i}
 								<button
@@ -187,7 +189,7 @@
 											...getIdObjAsAtIdObj(p.post),
 											ms: 0,
 											by_ms: gs.accounts![0].ms,
-											in_ms: gs.currentSpaceMs!,
+											in_ms: gs.urlInMs!,
 											emoji,
 										});
 									}}

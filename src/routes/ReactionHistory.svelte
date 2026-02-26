@@ -4,7 +4,7 @@
 
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { msToAccountNameTxt } from '$lib/types/accounts';
+	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { getIdStr, type IdObj } from '$lib/types/parts/partIds';
 	import type { Reaction } from '$lib/types/reactions';
 	import { getReactionHistory, reactionsPerLoad } from '$lib/types/reactions/getReactionHistory';
@@ -12,7 +12,6 @@
 	import { onMount } from 'svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import AccountIcon from './AccountIcon.svelte';
-	import Apush from './Apush.svelte';
 	import Highlight from './Highlight.svelte';
 
 	let post = $derived(gs.showReactionHistory);
@@ -27,7 +26,7 @@
 	});
 
 	let loadMoreReactions = async (e: InfiniteEvent) => {
-		if (!gs.accounts || gs.currentSpaceMs === undefined || !post) return;
+		if (!gs.accounts || gs.urlInMs === undefined || !post) return;
 		let fromMs = reactions.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER;
 		let rxnIdObjsExclude: IdObj[] = [];
 		for (let i = reactions.length - 1; i >= 0; i--) {
@@ -67,17 +66,18 @@
 		{#each reactions || [] as rxn, i (getIdStr(rxn))}
 			<div class="px-1 flex">
 				{rxn.emoji}
-				<Apush
-					href={`/_${post.by_ms}_${post.in_ms}`}
-					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.msToAccountNameTxtMap[rxn.by_ms] ? '' : 'italic'}`}
+				<!-- Apush -->
+				<a
+					href={`/_${post.by_ms}_`}
+					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.accountMsToNameTxtMap[rxn.by_ms] ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx`}>
 						<AccountIcon isUser ms={post.by_ms} class="mr-0.5 shrink-0 w-4" />
 						<p class="pr-1">
-							{msToAccountNameTxt(rxn.by_ms)}
+							{accountMsToNameTxt(rxn.by_ms)}
 						</p>
 					</div>
-				</Apush>
+				</a>
 				<p class="text-fg2">{formatMs(rxn.ms)}</p>
 			</div>
 		{/each}
@@ -86,7 +86,7 @@
 			spinner="spiral"
 			on:infinite={loadMoreReactions}
 		>
-			<p slot="noMore" class="mb-2 text-lg text-fg2">{m.endOfList()}</p>
+			<p slot="noMore" class="mb-2 text-lg text-fg2">{m.theEnd()}</p>
 			<!-- <p slot="error" class="mb-2 text-lg text-fg2">{m.placeholderError()}</p> -->
 		</InfiniteLoading>
 	</div>

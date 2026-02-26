@@ -105,7 +105,7 @@ export let _editPost = async (db: Database, post: Post) => {
 					.where(
 						or(
 							and(
-								pf.noParent,
+								pf.noAtId,
 								or(
 									...curPostTagIdWNumAsVrsnAtPIdRows.map((r) => pf.id(r)),
 									...newPostTagStrs.map((t) => pf.txt.eq(t)),
@@ -114,7 +114,7 @@ export let _editPost = async (db: Database, post: Post) => {
 								pf.num.gte0,
 							),
 							and(
-								pf.noParent,
+								pf.noAtId,
 								or(
 									...curPostCoreIdWNumAsVrsnAtPIdRows.map((cio) => pf.id(cio)),
 									pf.txt.eq(newPostCoreStr),

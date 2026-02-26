@@ -2,18 +2,16 @@ import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
 import { gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
-import { getDefaultAccount, MyAccountSchema, type MyAccount } from './accounts';
-import { getWhoObj, GranularTxtPropSchema } from './parts';
+import { getDefaultAccount, MyAccountSchema } from './accounts';
+import { getWhoObj } from './parts';
 import { normalizeTags } from './posts';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
 
 export let LocalCacheSchema = z
 	.object({
-		currentSpaceMs: z.number(),
+		urlInMs: z.number(),
 		accounts: z.array(MyAccountSchema),
-		// memberships:
-		msToSpaceNameMap: z.record(GranularTxtPropSchema),
 	})
 	.strict();
 
@@ -21,9 +19,8 @@ export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
 let getDefaultLocalCache = () =>
 	structuredClone({
-		currentSpaceMs: 0,
+		urlInMs: 0,
 		accounts: [getDefaultAccount()],
-		msToSpaceNameMap: {},
 	} satisfies LocalCache);
 
 export let getLocalCache = () => {
@@ -60,14 +57,14 @@ export let updateLocalCache = async (updater: (old: LocalCache) => LocalCache) =
 			});
 			throw new Error('Invalid local cache update');
 		}
-		gs.currentSpaceMs = newLocalCache.currentSpaceMs;
+		gs.urlInMs = newLocalCache.urlInMs;
 		gs.accounts = newLocalCache.accounts;
 		localStorage.setItem(localCacheLocalStorageKey, JSON.stringify(newLocalCache));
 	}
 };
 
-// TODO: debounce
 export let updateSavedTags = async (tags: string[], remove = false) => {
+	// TODO: debounce
 	await updateLocalCache((lc) => {
 		let savedTags = JSON.parse(lc.accounts[0].savedTags.txt) as string[];
 		lc.accounts[0].savedTags.txt = JSON.stringify(
@@ -91,47 +88,6 @@ export let updateSavedTags = async (tags: string[], remove = false) => {
 	}
 };
 
-export let refreshSignedInAccounts = async () => {
-	if (!gs.accounts) throw new Error(`gs.accounts dne`);
-	let oldSignedInAccountMss = gs.accounts.filter((a) => a.signedIn).map((a) => a.ms);
-	let currentAccountUpdates: undefined | Partial<MyAccount>;
-	let signedInAccountMss: number[] = [];
-	if (oldSignedInAccountMss.length) {
-		let res = await trpc().refreshSignedInAccounts.query({
-			...(await getWhoObj()),
-			callerAttributes: {
-				email: gs.accounts[0].email,
-				name: gs.accounts[0].name,
-				bio: gs.accounts[0].bio,
-				savedTags: gs.accounts[0].savedTags,
-				spaceMss: gs.accounts[0].spaceMss,
-			},
-			accountMss: oldSignedInAccountMss,
-		});
-		currentAccountUpdates = res.currentAccountUpdates;
-		signedInAccountMss = res.signedInAccountMss || [];
-	}
-	updateLocalCache((lc) => {
-		if (lc.accounts[0].ms === oldSignedInAccountMss[0] && currentAccountUpdates) {
-			lc.accounts[0] = {
-				...lc.accounts[0],
-				...currentAccountUpdates,
-			};
-		}
-		lc.accounts = lc.accounts
-			.map((a) => ({
-				...a,
-				signedIn: signedInAccountMss.includes(a.ms),
-			}))
-			.sort((a, b) => {
-				let aPriority = !a.ms || a.signedIn ? 0 : 1;
-				let bPriority = !b.ms || b.signedIn ? 0 : 1;
-				return aPriority - bPriority;
-			});
-		return lc;
-	});
-};
-
 export let unsaveAccount = (accountMs: number) => {
 	updateLocalCache((lc) => ({
 		...lc,
@@ -147,4 +103,9 @@ export let signOut = async (callerMs: number, allCallerMsSessions = false) => {
 		});
 	} catch (error) {}
 	unsaveAccount(callerMs);
+	gs.urlToFeedMap = {};
+	gs.accountMsToSpaceMsToCheckedMap = {
+		...gs.accountMsToSpaceMsToCheckedMap,
+		[callerMs]: {},
+	};
 };

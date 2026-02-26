@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { dev } from '$app/environment';
+	import { promptSum } from '$lib/dom';
 	import { exportTextAsFile } from '$lib/files';
 	import { gs } from '$lib/global-state.svelte';
 	import { ranInt } from '$lib/js';
@@ -7,20 +7,17 @@
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { day } from '$lib/time';
-	import { trpc } from '$lib/trpc/client';
-	import { signOut, updateLocalCache } from '$lib/types/local-cache';
-	import { getWhoObj, type PartInsert } from '$lib/types/parts';
+	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pf } from '$lib/types/parts/partFilters';
 	import { getIdObjAsAtIdObj, getIdStr, id0 } from '$lib/types/parts/partIds';
 	import { pTable } from '$lib/types/parts/partsTable';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
-	import { IconArrowMerge, IconDownload, IconLogout2, IconTrash } from '@tabler/icons-svelte';
+	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
 	import { and, asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
-	import SpaceOrAccountHeader from '../SpaceOrAccountHeader.svelte';
 	let language = $state('en');
 
 	// TODO: allow user to put in domain patterns that render as iframes
@@ -28,7 +25,7 @@
 	// you'd list that domain and their urls render iframes in the feed
 </script>
 
-<div class="p-2 w-full max-w-lg">
+<div class="p-2 max-w-lg">
 	{#if gs.localDbFailed || gs.invalidLocalCache}
 		<p class="text-red-500 border-red-500 border-2 p-2">
 			{gs.localDbFailed
@@ -36,39 +33,6 @@
 				: m.somethingIsWrongWithYourLocalCache___()}
 		</p>
 	{/if}
-	<p class="text-xl font-bold">{m.account()}</p>
-	{#if gs.accounts}
-		<SpaceOrAccountHeader
-			account={gs.accounts[0]}
-			onChange={async (changes) => {
-				let { ms } = await trpc().changeMyAccountNameOrBio.mutate({
-					...(await getWhoObj()),
-					...changes,
-				});
-				updateLocalCache((lc) => {
-					if (changes.nameTxt !== undefined) {
-						lc.accounts[0].name = { ms, txt: changes.nameTxt };
-					}
-					if (changes.bioTxt !== undefined) {
-						lc.accounts[0].bio = { ms, txt: changes.bioTxt };
-					}
-					return lc;
-				});
-			}}
-		/>
-		{#if gs.accounts[0].ms}
-			<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-			<p>{m.email()}: <span class="font-medium">{gs.accounts[0].email}</span></p>
-			<button
-				class="xy px-2 py-1 bg-bg5 hover:bg-bg7 text-fg1"
-				onclick={() => signOut(gs.accounts![0].ms, true)}
-			>
-				<IconLogout2 class="w-5 mr-1" />
-				{m.signOutEverywhere()}
-			</button>
-		{/if}
-	{/if}
-	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.theme()}</p>
 	<!-- TODO: make this not flash "system" when refreshing page with light/dark selected -->
 	<select
@@ -214,30 +178,23 @@
 	<button
 		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
 		onclick={async () => {
-			let requireSumPrompt = !dev;
-			// requireSumPrompt = true;
-			if (requireSumPrompt) {
-				let a = Math.floor(Math.random() * 90) + 10;
-				let b = Math.floor(Math.random() * 90) + 10;
-				let sum = prompt(m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }));
-				if (!sum) return;
-				if (a + b !== +sum) return alert(m.incorrect());
-			}
+			if (
+				promptSum((a, b) => m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }))
+			) {
+				try {
+					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
+				} catch (e) {
+					alert('Error deleting db' + String(e));
+					console.error('error deleteDatabaseFile:', e);
+					// deleteDatabaseFile is slow and unreliable
+					await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
+				}
+				alert(m.localDatabaseDeleted());
+				await initLocalDb();
 
-			try {
-				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
-			} catch (e) {
-				alert('Error deleting db' + String(e));
-				console.error('error deleteDatabaseFile:', e);
-				// deleteDatabaseFile is slow and unreliable
-				await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
+				// TODO: not great to assume the new local db works after deleting the old one - same for localCache
+				gs.localDbFailed = gs.invalidLocalCache = false;
 			}
-			alert(m.localDatabaseDeleted());
-			gs.indentifierToFeedMap = {};
-			await initLocalDb();
-
-			// TODO: not great to assume the new local db works after deleting the old one - same for localCache
-			gs.localDbFailed = gs.invalidLocalCache = false;
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
 	<!-- {#if dev} -->
@@ -252,7 +209,6 @@
 				} catch (e) {
 					console.error('error deleteDatabaseFile:', e);
 				}
-				gs.indentifierToFeedMap = {};
 				await initLocalDb();
 				let testTags: string[] = [];
 				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
@@ -285,7 +241,7 @@
 				console.time('adding posts');
 				for (let post of posts) {
 					try {
-						await addPost(post, false);
+						await addPost(post, true);
 					} catch (error) {
 						alert(String(error));
 					}

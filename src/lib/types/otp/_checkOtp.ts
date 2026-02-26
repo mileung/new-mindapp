@@ -18,11 +18,11 @@ export let _checkOtp = async (
 ): Promise<{ strike?: number; expiredOtp?: true }> => {
 	if (Date.now() - input.otpMs > otpMaxMinAge * minute) return { expiredOtp: true };
 	let otpRowsFilter = and(
-		pf.noParent,
-		pf.msAsId(input.otpMs),
+		pf.noAtId,
+		pf.id({ ms: input.otpMs }),
 		pf.code.eq(input.partCode),
 		pf.num.gte0,
-		like(pTable.txt, `${input.email}:%`),
+		like(pTable.txt, `${input.email} %`),
 	);
 	let otpRow = assert1Row(
 		await tdb
@@ -31,8 +31,8 @@ export let _checkOtp = async (
 			.where(otpRowsFilter)
 			.limit(1),
 	);
-	if (otpRow.txt !== `${input.email}:${input.pin}`) {
-		let strike = otpRow.num!;
+	if (otpRow.txt !== `${input.email} ${input.pin}`) {
+		let strike = otpRow.num;
 		await tdb
 			.update(pTable) //
 			.set({ num: ++strike })

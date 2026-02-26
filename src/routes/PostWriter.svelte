@@ -12,8 +12,8 @@
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
-		IconCornerUpLeft,
 		IconGripVertical,
+		IconMessage2Plus,
 		IconMoodPlus,
 		IconPencil,
 		IconPencilPlus,
@@ -152,7 +152,7 @@
 			}}
 		>
 			{#if gs.writingTo}
-				<IconCornerUpLeft class="w-5" />
+				<IconMessage2Plus class="w-5" />
 			{:else if gs.writingNew}
 				<IconPencilPlus class="w-5" />
 			{:else}
@@ -172,7 +172,7 @@
 							...getIdObjAsAtIdObj(gs.writingTo!),
 							ms: 0,
 							by_ms: gs.accounts![0].ms,
-							in_ms: gs.currentSpaceMs!,
+							in_ms: gs.urlInMs!,
 							emoji,
 						});
 					}}
@@ -235,6 +235,7 @@
 		<input
 			bind:this={tagsIpt}
 			bind:value={gs.writerTagVal}
+			maxlength={888}
 			autocomplete="off"
 			class="flex-1 px-2 text-lg border-l-0 border-bg8"
 			placeholder={m.tags()}
@@ -343,6 +344,7 @@
 		<textarea
 			bind:this={coreTa}
 			bind:value={gs.writerCore}
+			maxlength={888888}
 			placeholder={m.organizeToday()}
 			class="bg-bg3 h-full resize-none block w-full px-2 py-0.5 text-lg pr-9 border-l-0 border-bg8"
 			onkeydown={(e) => {

@@ -18,11 +18,11 @@ export let _changeMyAccountNameOrBio = async (
 			.set({ ms, txt: input.nameTxt })
 			.where(
 				and(
-					pf.msAsAtId(input.callerMs),
+					pf.atId({ at_ms: input.callerMs }),
 					pf.ms.gt0,
 					pf.by_ms.eq0,
 					pf.in_ms.eq0,
-					pf.code.eq(pc.nameTxtMsAtAccountId),
+					pf.code.eq(pc.accountNameTxtMsByMs),
 					pf.num.eq0,
 				),
 			);
@@ -33,11 +33,11 @@ export let _changeMyAccountNameOrBio = async (
 			.set({ ms, txt: input.bioTxt })
 			.where(
 				and(
-					pf.msAsAtId(input.callerMs),
+					pf.atId({ at_ms: input.callerMs }),
 					pf.ms.gt0,
 					pf.by_ms.eq0,
 					pf.in_ms.eq0,
-					pf.code.eq(pc.bioTxtMsAtAccountId),
+					pf.code.eq(pc.accountBioTxtMsByMs),
 					pf.num.eq0,
 				),
 			);

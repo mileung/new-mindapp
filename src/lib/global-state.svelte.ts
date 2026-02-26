@@ -1,38 +1,58 @@
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import { sortObjectProps } from './js';
-import type { MyAccount } from './types/accounts';
+import type { MyAccount, Profile } from './types/accounts';
+import type { FullIdObj } from './types/parts/partIds';
 import type { Post } from './types/posts';
-import type { Invite, Membership } from './types/spaces';
+import type { Invite, Membership, Space } from './types/spaces';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
 	localDbFailed = $state(false);
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
-	currentSpaceMs = $state<number>();
-	accountMsToSpaceMsToMembershipMap = $state<
+	pendingInvite = $state<Invite>();
+
+	// local-cache
+	urlInMs = $state<number>();
+	accounts = $state<undefined | MyAccount[]>();
+	//
+
+	idToPostMap = $state<Record<string, undefined | null | Post>>({});
+	accountMsToNameTxtMap = $state<Record<number, undefined | string>>({});
+	msToSpaceNameTxtMap = $state<Record<number, undefined | string>>({});
+	spaceMsToAccountMsToRoleNumMap = $state<Record<number, undefined | Record<number, number>>>({});
+
+	accountMsToSpaceMsToCheckedMap = $state<
 		Record<
-			number,
-			| undefined //
-			| Record<
-					number,
-					| undefined
-					| null // null means no membership, undefined means hasn't loaded yet
-					| Membership
-			  >
+			number, //
+			undefined | Record<number, boolean>
 		>
 	>({});
 
-	accounts = $state<undefined | MyAccount[]>();
-	pendingInvite = $state<Invite>();
-
-	msToAccountNameTxtMap = $state<Record<number, undefined | string>>({});
-	msToSpaceNameTxtMap = $state<Record<number, undefined | string>>({});
-	spaceMsToMapOwnerAccountMs = $state<Record<number, undefined | Record<number, boolean>>>({});
-	spaceMsToMapModAccountMs = $state<Record<number, undefined | Record<number, boolean>>>({});
-
-	idToPostMap = $state<Record<string, undefined | null | Post>>({});
-	indentifierToFeedMap = $state<Record<string, undefined | string[]>>({});
+	urlToFeedMap = $state<
+		Record<
+			string,
+			| undefined
+			| {
+					topLvlPostIdStrs?: string[];
+					endReached?: boolean;
+					postAtBumpedPostIdObjsExclude?: FullIdObj[];
+					error?: string;
+			  }
+		>
+	>({});
+	msToProfileMap = $state<Record<number, undefined | Profile>>({});
+	spaceMsToDotsMap = $state<
+		Record<
+			string,
+			| undefined
+			| {
+					space?: Space;
+					endReached?: boolean;
+					memberships?: Membership[];
+					error?: string;
+			  }
+		>
+	>({});
 
 	writingNew = $state<null | true>(null);
 	writingEdit = $state<null | Post>(null);
@@ -44,16 +64,6 @@ class GlobalState {
 }
 
 export let gs = new GlobalState();
-
-export let makeFeedIdentifier = (p: {
-	view: 'nested' | 'flat';
-	sortedBy: 'bumped' | 'new' | 'old';
-	byMs: number;
-	idParam: string;
-	qSearchParam: string;
-}) => {
-	return JSON.stringify(sortObjectProps(p));
-};
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;

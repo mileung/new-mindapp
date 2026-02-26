@@ -20,6 +20,6 @@ export let toggleReaction = async (rxn: Reaction) => {
 	}
 	gs.idToPostMap[postIdStr]!.myRxns = myRxns;
 	gs.idToPostMap[postIdStr]!.rxnCount = rxnCount;
-	let useRpc = gs.currentSpaceMs! > 0;
+	let useRpc = gs.urlInMs! > 0;
 	await (adding ? addReaction : removeReaction)(rxn, useRpc);
 };

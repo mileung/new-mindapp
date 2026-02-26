@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
-	import { identikana } from '$lib/js';
+	import { deepClone, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { msToAccountNameTxt, type OtherAccount } from '$lib/types/accounts';
-	import { spaceMsToNameTxt, type Space } from '$lib/types/spaces';
-	import { IconDeviceFloppy, IconEdit, IconLockFilled, IconX } from '@tabler/icons-svelte';
+	import { accountMsToNameTxt, type Profile } from '$lib/types/accounts';
+	import { permissionCodes, roleCodes, spaceMsToNameTxt, type Space } from '$lib/types/spaces';
+	import { IconDeviceFloppy, IconEdit, IconX } from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
@@ -14,48 +14,55 @@
 		nameTxt?: string;
 		bioTxt?: string;
 		descriptionTxt?: string;
-		isPublicBin?: number;
-		newUsersCanReactBin?: number;
-		newUsersCanPostBin?: number;
+		pinnedQueryTxt?: string;
+		isPublicNum?: number;
+		newMemberPermissionCodeNum?: number;
 	};
 
 	let p: {
-		account?: OtherAccount;
+		account?: Profile;
 		space?: Space;
 		onChange: (changes: Changes) => void;
 	} = $props();
-
 	let currentSettings = $derived({
-		name: p.space?.name || p.account!.name,
-		bioOrDescription: p.account?.bio || p.space!.description,
-		isPublic: p.space?.isPublic,
-		newUsersCanReact: p.space?.newUsersCanReact,
-		newUsersCanPost: p.space?.newUsersCanPost,
+		isPublicNum: p.space?.isPublic.num,
+		nameTxt: (p.space || p.account)!.name.txt,
+		bioOrDescriptionTxt: p.space?.description.txt || p.account?.bio.txt || '',
+		pinnedQueryTxt: p.space?.pinnedQuery.txt,
+		newMemberPermissionCodeNum: p.space?.newMemberPermissionCode.num,
 	});
 	let editing = $state(false);
-	let draftSettings = $state((() => ({ ...currentSettings }))());
+	let draftSettings = $state((() => deepClone(currentSettings))());
 
 	$effect(() => {
-		draftSettings = { ...currentSettings };
+		draftSettings = deepClone(currentSettings);
 	});
 
 	let accountOrSpaceMs = $derived(p.account?.ms ?? p.space!.ms);
 	let slug = $derived(p.account ? `_${p.account.ms}_` : `__${p.space?.ms}`);
 
+	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
 	let userCanEdit = $derived.by(() => {
 		if (accountOrSpaceMs && gs.accounts) {
-			if (p.space)
-				return gs.accountMsToSpaceMsToMembershipMap[gs.accounts[0].ms]?.[p.space.ms]?.promo?.owner;
+			if (p.space) return spaceContext?.roleCode?.num === roleCodes.owner;
 			if (p.account) return p.account.ms === gs.accounts[0].ms;
 		}
 		return false;
 	});
+
+	let spaceNote = $derived(
+		gs.urlInMs === gs.accounts?.[0].ms
+			? m.personalSpaceNote()
+			: gs.urlInMs === 1
+				? m.globalSpaceNote()
+				: !gs.urlInMs && m.localSpaceNote(),
+	);
 </script>
 
 <div class="w-full max-w-lg">
 	<div class="flex justify-between h-10">
 		{#if p.account}
-			<AccountIcon class="h-10 w-10" ms={accountOrSpaceMs} />
+			<AccountIcon isUser class="h-10 w-10" ms={accountOrSpaceMs} />
 		{:else}
 			<SpaceIcon class="h-10 w-10" ms={accountOrSpaceMs} />
 		{/if}
@@ -75,34 +82,30 @@
 					onclick={() => {
 						editing = false;
 						let changes: Changes = {};
-						if (draftSettings.name.txt.trim() !== currentSettings.name.txt) {
-							changes.nameTxt = draftSettings.name.txt.trim();
+						if (draftSettings.nameTxt.trim() !== currentSettings.nameTxt) {
+							changes.nameTxt = draftSettings.nameTxt.trim();
+						}
+						if (draftSettings.bioOrDescriptionTxt.trim() !== currentSettings.bioOrDescriptionTxt) {
+							if (p.account) changes.bioTxt = draftSettings.bioOrDescriptionTxt.trim();
+							else changes.descriptionTxt = draftSettings.bioOrDescriptionTxt.trim();
 						}
 						if (
-							draftSettings.bioOrDescription.txt.trim() !== currentSettings.bioOrDescription.txt
+							currentSettings.isPublicNum &&
+							draftSettings.isPublicNum !== currentSettings.isPublicNum
 						) {
-							if (p.account) changes.bioTxt = draftSettings.bioOrDescription.txt.trim();
-							else changes.descriptionTxt = draftSettings.bioOrDescription.txt.trim();
+							changes.isPublicNum = draftSettings.isPublicNum;
+						}
+						if (draftSettings.pinnedQueryTxt !== currentSettings.pinnedQueryTxt) {
+							changes.pinnedQueryTxt = draftSettings.pinnedQueryTxt;
 						}
 						if (
-							draftSettings.isPublic &&
-							draftSettings.isPublic.num !== currentSettings.isPublic?.num
+							draftSettings.newMemberPermissionCodeNum !==
+							currentSettings.newMemberPermissionCodeNum
 						) {
-							changes.isPublicBin = draftSettings.isPublic.num;
+							changes.newMemberPermissionCodeNum = draftSettings.newMemberPermissionCodeNum;
 						}
-						if (
-							draftSettings.newUsersCanReact &&
-							draftSettings.newUsersCanReact.num !== currentSettings.newUsersCanReact?.num
-						) {
-							changes.newUsersCanReactBin = draftSettings.newUsersCanReact.num;
-						}
-						if (
-							draftSettings.newUsersCanPost &&
-							draftSettings.newUsersCanPost.num !== currentSettings.newUsersCanPost?.num
-						) {
-							changes.newUsersCanPostBin = draftSettings.newUsersCanPost.num;
-						}
-						p.onChange(changes);
+						console.log('changes:', changes);
+						if (Object.keys(changes).length) p.onChange(changes);
 					}}
 				>
 					<IconDeviceFloppy class="w-5 mr-1" />
@@ -122,12 +125,12 @@
 	{#if editing}
 		<p class="font-bold">{m.name()}</p>
 		<input
-			bind:value={draftSettings.name}
+			bind:value={draftSettings.nameTxt}
 			class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
 		/>
 		<p class="mt-1 font-bold">{p.account ? m.bio() : m.description()}</p>
 		<textarea
-			bind:value={draftSettings.bioOrDescription}
+			bind:value={draftSettings.bioOrDescriptionTxt}
 			class="resize-y w-full px-2 py-0.5 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4 block"
 		></textarea>
 		{#if p.space}
@@ -137,28 +140,23 @@
 					<select
 						name={m.visibility()}
 						class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
-						bind:value={draftSettings.isPublic}
+						bind:value={draftSettings.isPublicNum}
 					>
-						<option value={false}>{m.private()}</option>
-						<option value={true}>{m.public()}</option>
+						<option value={0}>{m.private()}</option>
+						<option value={1}>{m.public()}</option>
 					</select>
 				</div>
-				<div class="flex-2">
+				<div class="flex-1">
 					<p class="text-sm font-bold">{m.newMembers()}</p>
 					<div class="flex">
 						<select
 							class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
-							bind:value={draftSettings.newUsersCanReact}
+							bind:value={draftSettings.newMemberPermissionCodeNum}
 						>
-							<option value={false}>{m.cannotReact()}</option>
-							<option value={true}>{m.canReact()}</option>
-						</select>
-						<select
-							class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
-							bind:value={draftSettings.newUsersCanPost}
-						>
-							<option value={false}>{m.cannotPost()}</option>
-							<option value={true}>{m.canPost()}</option>
+							<option value={permissionCodes.viewOnly}>{m.viewOnly()}</option>
+							<option value={permissionCodes.reactOnly}>{m.canReact()}</option>
+							<option value={permissionCodes.postOnly}>{m.canPost()}</option>
+							<option value={permissionCodes.reactAndPost}>{m.canReactAndPost()}</option>
 						</select>
 					</div>
 				</div>
@@ -167,14 +165,16 @@
 	{:else}
 		<div class="flex">
 			<p class="text-xl font-bold">
-				{draftSettings.name.txt ||
-					(p.account ? msToAccountNameTxt : spaceMsToNameTxt)(accountOrSpaceMs)}
+				{(p.account ? accountMsToNameTxt : spaceMsToNameTxt)(accountOrSpaceMs)}
 			</p>
-			{#if p.space && !p.space.isPublic}
-				<IconLockFilled class="self-center h-5 mb-0.5" />
-			{/if}
-			{#if accountOrSpaceMs > 8}
-				<p class="self-end ml-1 text-fg2">{identikana(accountOrSpaceMs)}</p>
+			{#if draftSettings.nameTxt}
+				<p class="self-end ml-1 text-fg2">
+					{(accountOrSpaceMs > 8
+						? identikana
+						: p.space //
+							? spaceMsToNameTxt
+							: accountMsToNameTxt)(accountOrSpaceMs)}
+				</p>
 			{/if}
 		</div>
 		<div class="text-sm overflow-scroll gap-2 fx justify-between text-nowrap text-fg2">
@@ -185,6 +185,17 @@
 				<p class="">{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}</p>
 			{/if}
 		</div>
-		<p class="">{draftSettings.bioOrDescription.txt}</p>
+		<p class="whitespace-pre-wrap">{draftSettings.bioOrDescriptionTxt}</p>
+		{#if draftSettings.pinnedQueryTxt}
+			<div class="fx">
+				<a class="b" href={`/__${accountOrSpaceMs}?q=${draftSettings.pinnedQueryTxt}`}
+					>{m.pinnedQuery()}</a
+				>
+				<p class="text-fg2">{draftSettings.pinnedQueryTxt}</p>
+			</div>
+		{:else}
+			<p class="text-fg2">Nothing pinned</p>
+		{/if}
+		{#if spaceNote}<p class="text-fg2">{spaceNote}</p>{/if}
 	{/if}
 </div>

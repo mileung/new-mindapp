@@ -2,15 +2,12 @@
 	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
-	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { getPromptSigningIn, spaceMsToNameTxt } from '$lib/types/spaces';
 	import { getSpaceTags, tagsPerLoad } from '$lib/types/spaces/getSpaceTags';
 	import { IconSquare, IconSquareCheckFilled } from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
-	import Apush from '../../Apush.svelte';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
-	let urlInMs = $derived(getUrlInMs());
 	// let numTags = $state(0);
 	let tags = $state<
 		{
@@ -20,12 +17,12 @@
 	>([]);
 
 	$effect(() => {
-		urlInMs;
+		gs.urlInMs;
 		tags = [];
 	});
 
 	let loadMoreTags = async (e: InfiniteEvent) => {
-		if (!gs.accounts || gs.currentSpaceMs === undefined) return;
+		if (!gs.accounts || gs.urlInMs === undefined) return;
 		let lastCount = tags.slice(-1)[0]?.num || Number.MAX_SAFE_INTEGER;
 		let lastTagsWithSameCount: string[] = [];
 		for (let i = tags.length - 1; i >= 0; i--) {
@@ -35,14 +32,9 @@
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
 		tags = [...tags, ...res.tags];
+		if (tags.length) e.detail.loaded();
 		let endReached = res.tags.length < tagsPerLoad;
-		if (endReached) {
-			e.detail.complete();
-			// numTags = tags.length;
-		} else {
-			// numTags = res.tagCount;
-			e.detail.loaded();
-		}
+		if (endReached) e.detail.complete();
 	};
 
 	let savedTagsSet = $derived(
@@ -54,7 +46,7 @@
 	);
 </script>
 
-{#if urlInMs === undefined}
+{#if gs.urlInMs === undefined}
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
@@ -64,18 +56,18 @@
 			<!-- {numTags === 1
 				? m.oneSpaceNameTag({ spaceName: spaceMsToName(urlInMs) })
 				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(urlInMs) })} -->
-			{m.spaceNameTags({ spaceName: spaceMsToNameTxt(urlInMs) })}
+			{m.spaceNameTags({ spaceName: spaceMsToNameTxt(gs.urlInMs) })}
 		</p>
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
 				{tag.num} -
-				<!-- use Apush here? -->
-				<Apush
-					href={`/__${gs.currentSpaceMs}?q=${encodeURIComponent(`[${tag.txt}]`)}`}
+				<!-- Apush -->
+				<a
+					href={`/__${gs.urlInMs}?q=${`[${tag.txt}]`}`}
 					class="px-1 font-bold hover:underline hover:bg-bg3"
 				>
 					{tag.txt}
-				</Apush>
+				</a>
 				<button
 					class="group flex-1 hover:bg-bg3 pr-1"
 					onclick={() => updateSavedTags([tag.txt], savedTagsSet.has(tag.txt))}
@@ -87,11 +79,11 @@
 				</button>
 			</div>
 		{/each}
-		<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
+		<InfiniteLoading identifier={gs.urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
 			<p slot="noResults" class="m-2 text-lg text-fg2">
 				{m.noTagsFound()}
 			</p>
-			<p slot="noMore" class="m-2 text-lg text-fg2">{m.endOfList()}</p>
+			<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 			<p slot="error" class="m-2 text-lg text-fg2">
 				{m.placeholderError()}
 			</p>

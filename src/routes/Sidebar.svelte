@@ -1,18 +1,16 @@
 <script lang="ts">
 	import { goto, pushState } from '$app/navigation';
 	import { page } from '$app/state';
-	import { scrollToLastY, textInputFocused } from '$lib/dom';
+	import { textInputFocused } from '$lib/dom';
 	import { getBottomOverlayShown, gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import {
-		refreshSignedInAccounts,
 		signOut,
 		unsaveAccount,
 		updateLocalCache,
 		updateSavedTags,
 	} from '$lib/types/local-cache';
-	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import { defaultSpaceProps, spaceMsToNameTxt, type Space } from '$lib/types/spaces';
 	import {
@@ -31,7 +29,6 @@
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
-	import Apush from './Apush.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
 	let searchIpt: HTMLInputElement;
@@ -48,7 +45,6 @@
 	let showSpaceMenu = $state(false);
 	let tagIndex = $state(-1);
 
-	let urlInMs = $derived(getUrlInMs());
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
@@ -71,27 +67,22 @@
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
-			if (!textInputFocused() && urlInMs !== undefined) {
+			if (!textInputFocused() && gs.urlInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
 				e.key === '/' && setTimeout(() => searchIpt.focus(), 0);
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
-				e.key === 'h' && goto(`/__${urlInMs}`);
+				e.key === 'h' && goto(`/__${gs.urlInMs}`);
 				e.key === 's' && goto(`/settings`);
-				e.key === 'u' && goto(`/user-guide`);
+				(e.key === 'u' || e.key === '?') && goto(`/user-guide`);
 				if (e.key === 'Escape') {
-					if (getBottomOverlayShown()) {
-						resetBottomOverlay();
-					} else if (showAccountMenu || showSpaceMenu) {
-						showAccountMenu = showSpaceMenu = false;
-					} else {
-						scrollToLastY(); // setTimeout helps prevents scroll flicker
-						setTimeout(() => goto(`/__${urlInMs}`), 0);
-					}
+					if (getBottomOverlayShown()) resetBottomOverlay();
+					else if (showAccountMenu || showSpaceMenu) showAccountMenu = showSpaceMenu = false;
+					else window.scrollTo({ top: 0 });
 				}
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					let currentSpaceMsIndex = sidebarSpaces.findIndex((s) => s.ms === urlInMs);
-					let newSpaceMsIndex = currentSpaceMsIndex + (e.shiftKey ? -1 : 1);
+					let urlInMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.urlInMs);
+					let newSpaceMsIndex = urlInMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 					if (newSpaceMsIndex >= sidebarSpaces.length) newSpaceMsIndex = sidebarSpaces.length - 1;
 					goto(`/__${sidebarSpaces[newSpaceMsIndex].ms}`);
@@ -115,18 +106,6 @@
 		setTimeout(() => searchIpt!.scrollTo({ left: Number.MAX_SAFE_INTEGER }), 0);
 	};
 
-	let searchInput = (e: KeyboardEvent) => {
-		let q = encodeURIComponent(searchVal.trim());
-		if (q && gs.accounts) {
-			let urlPath = `/__${urlInMs}?q=${q}`;
-			if (e.metaKey) open(urlPath, '_blank');
-			else {
-				// TODO: this stuff
-				pushState(urlPath, { postIdStr: urlPath });
-			}
-		}
-	};
-
 	let sidebarSpaces = $derived<Space[]>([
 		// local space ms - everything private in OPFS
 		defaultSpaceProps,
@@ -135,26 +114,17 @@
 		// global space ms - everything public in cloud
 		{ ...defaultSpaceProps, ms: 1 },
 
-		...(gs.pendingInvite && gs.pendingInvite.in_ms !== 1
-			? [
-					{
-						...defaultSpaceProps,
-						ms: gs.pendingInvite.in_ms,
-						name: { ms: 0, by_ms: 0, txt: gs.pendingInvite.space.name.txt },
-					},
-				]
-			: []),
+		// ...(gs.pendingInvite && gs.pendingInvite.in_ms !== 1
+		// 	? [
+		// 			{
+		// 				...defaultSpaceProps,
+		// 				ms: gs.pendingInvite.in_ms,
+		// 				name: { ms: 0, by_ms: 0, txt: gs.pendingInvite.space.name.txt },
+		// 			},
+		// 		]
+		// 	: []),
 		// ...(gs.accounts?.[0].spaceMss || []),
 	]);
-
-	// $effect(() => {
-	// 	if (
-	// 		gs.accounts &&
-	// 		urlInMs !== undefined &&
-	// 		!sidebarSpaces.find((s) => s.ms === urlInMs)
-	// 	)
-	// 		goto('/__0');
-	// });
 </script>
 
 <!-- TODO: remember PostDrop states (open, parsed, etc) when switching spaces -->
@@ -197,7 +167,7 @@
 				{#if showSpaceMenu}
 					<IconX class="h-6 w-6" />
 				{:else if gs.accounts}
-					<SpaceIcon ms={urlInMs!} class="h-6 w-6" />
+					<SpaceIcon ms={gs.urlInMs!} class="h-6 w-6" />
 				{/if}
 			</button>
 			<input
@@ -217,11 +187,18 @@
 					if (e.key === 'Escape') setTimeout(() => searchIpt.blur(), 0);
 					if (e.key === 'Enter') {
 						let tag = suggestedTags[tagIndex];
-						tagXFocused
-							? updateSavedTags([tag], true)
-							: tag
-								? addTagToSearchInput(tag)
-								: searchInput(e);
+						if (tagXFocused) updateSavedTags([tag], true);
+						else if (tag) addTagToSearchInput(tag);
+						else {
+							let q = searchVal.trim();
+							if (q) {
+								let href = `/__${gs.urlInMs}?q=${q}`;
+								let { pathname, search } = new URL(href, page.url.origin);
+								e.metaKey
+									? open(href, '_blank') //
+									: pushState(href, { modal: { pathname, search } });
+							}
+						}
 					}
 					if (e.key === 'Tab' && !tagFilter) return;
 					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
@@ -257,14 +234,16 @@
 					}
 				}}
 			/>
-			<Apush
+			<!-- Apush -->
+			<!-- noPush={!isFeedPathname()} -->
+			<a
 				class={`xy -ml-9 w-9 group ${searchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
-				href={`/?q=${encodeURIComponent(searchVal)}`}
+				href={`/__${gs.urlInMs}?q=${searchVal}`}
 			>
 				<div class={`xy ${searchIptFocused ? 'h-8 w-8' : 'h-9 w-9'} group-hover:bg-bg5`}>
 					<IconSearch class="h-6 w-6" />
 				</div>
-			</Apush>
+			</a>
 		</div>
 		<div
 			class={`${showSuggestedTags || showAccountMenu || showSpaceMenu ? '' : 'hidden'} ${showSuggestedTags ? 'max-h-18' : 'max-h-38'} xs:max-h-none relative flex-1 xs:flex flex-col overflow-scroll`}
@@ -302,7 +281,9 @@
 							<button
 								bind:this={unsaveTagXRefs[i]}
 								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg3 ${tagXFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-								onclick={() => updateSavedTags([tag], true)}
+								onclick={() => {
+									updateSavedTags([tag], true);
+								}}
 							>
 								<IconX class="h-5 w-5" />
 							</button>
@@ -318,16 +299,13 @@
 					<div class={`group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<button
 							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 font-medium flex-1 ${a.name ? '' : 'italic'}`}
-							onclick={async () => {
-								if (a.signedIn || !a.ms) {
-									updateLocalCache((lc) => ({
-										...lc,
-										accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
-									}));
-									refreshSignedInAccounts();
-								} else {
-									goto('/sign-in', { state: { email: a.email.txt } });
-								}
+							onclick={() => {
+								a.signedIn || !a.ms
+									? updateLocalCache((lc) => ({
+											...lc,
+											accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
+										}))
+									: goto('/sign-in', { state: { email: a.email.txt } });
 							}}
 						>
 							{#if !i}
@@ -385,28 +363,26 @@
 						<IconX class="h-5" />
 					</button>
 				</div>
-				<!-- <div class="h-10 flex">
-						<a href="/contacts" class="flex-1 xy hover:bg-bg5">
-							<IconAddressBook />
-						</a>
-					</div> -->
 				<a
 					href="/add-space"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
 				>
 					<IconSquarePlus2 class="shrink-0 w-6" />
-					<p class="truncate">{m.addSpace()}</p>
+					<p class="truncate">{m.createSpace()}</p>
 				</a>
 				{#each sidebarSpaces as space (space.ms)}
-					<div class={`flex group/space ${space.ms === urlInMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
+					<div class={`flex group/space ${space.ms === gs.urlInMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<a
 							href={`/__${space.ms}`}
 							class={`relative flex-1 fx h-10 pl-2 gap-2 truncate font-medium`}
 						>
-							{#if space.ms === urlInMs}
+							{#if space.ms === gs.urlInMs}
 								<div
-									class={`absolute left-0 h-full w-0.5 ${page.params.tid ? 'bg-hl1' : 'bg-fg2'}`}
+									class={`absolute left-0 h-full w-0.5 ${page.params.feedSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
+							{/if}
+							{#if space.ms === gs.urlInMs}
+								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
 							{/if}
 							<SpaceIcon ms={space.ms} class="shrink-0 w-6" />
 							<p class="truncate">{spaceMsToNameTxt(space.ms)}</p>
@@ -414,13 +390,13 @@
 						<!-- TODO: IconCalendar -->
 						<a
 							href={`/__${space.ms}/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
 							href={`/__${space.ms}/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>
@@ -431,7 +407,7 @@
 			<div class={`${showAccountMenu ? '' : 'hidden xs:block'}`}>
 				<a
 					href={`/_${gs.accounts?.[0].ms || 0}_`}
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
 				>
 					<IconUserSquare class="shrink-0 w-6" />
 					<p class="truncate">{m.profile()}</p>

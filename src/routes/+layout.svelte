@@ -5,18 +5,25 @@
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
-	import { msToAccountNameTxt } from '$lib/types/accounts';
-	import { getLocalCache, refreshSignedInAccounts, updateLocalCache } from '$lib/types/local-cache';
-	import { getUrlInMs, hasTemplateIdRegex } from '$lib/types/parts/partIds';
+	import { trpc } from '$lib/trpc/client';
 	import {
+		accountMsToNameTxt,
+		type GetCallerContextGetArg,
+		type MyAccountUpdates,
+		type SpaceContext,
+	} from '$lib/types/accounts';
+	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
+	import { getIdStrAsIdObj, isIdStr, isSpaceSlug } from '$lib/types/parts/partIds';
+	import {
+		permissionCodes,
+		roleCodes,
 		spaceMsToNameTxt,
-		updateCurrentSpaceMembership,
 		usePendingInvite,
 	} from '$lib/types/spaces';
 	import { IconChevronRight, IconX } from '@tabler/icons-svelte';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
-	import { onMount, untrack, type Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData } from './$types';
 	import AccountIcon from './AccountIcon.svelte';
@@ -30,8 +37,7 @@
 
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.currentSpaceMs = localCache.currentSpaceMs;
-		refreshSignedInAccounts();
+		gs.urlInMs = localCache.urlInMs;
 
 		if (!false) {
 			try {
@@ -62,39 +68,177 @@
 		}
 	});
 
-	let urlInMs = $derived(getUrlInMs());
 	let lastHref = '';
 	$effect(() => {
-		if (gs.accounts && urlInMs === 8) {
-			if (gs.accounts[0].ms) {
-				let newHref =
-					page.url.pathname.replace(
-						hasTemplateIdRegex, //
-						`__${gs.accounts[0].ms}`,
-					) + page.url.search;
-				if (newHref !== lastHref) {
-					goto(newHref);
-					gs.currentSpaceMs = gs.accounts[0].ms;
-					lastHref = newHref;
-				}
+		if (gs.accounts?.[0].ms && page.url.pathname.includes('_8')) {
+			let newHref = page.url.pathname.replace('_8', `_${gs.accounts[0].ms}`) + page.url.search;
+			if (newHref !== lastHref) {
+				goto(newHref);
+				lastHref = newHref;
 			}
 		}
 	});
 
-	$effect(() => {
-		if (urlInMs !== undefined && gs.currentSpaceMs !== urlInMs) {
-			updateLocalCache((lc) => ({
-				...lc,
-				currentSpaceMs: urlInMs,
-			}));
-		}
+	let urlInMs = $derived.by(() => {
+		let slug = page.url.pathname.split('/')[1];
+		if (isSpaceSlug(slug)) return +slug.slice(2);
+		if (isIdStr(slug)) return getIdStrAsIdObj(slug).in_ms;
 	});
-	let membership = $derived(
-		gs.accountMsToSpaceMsToMembershipMap[gs.accounts?.[0].ms || 0]?.[gs.currentSpaceMs || 0],
-	);
 	$effect(() => {
-		if (membership === undefined) {
-			untrack(() => updateCurrentSpaceMembership());
+		if (urlInMs !== undefined && gs.urlInMs !== urlInMs)
+			updateLocalCache((lc) => ({ ...lc, urlInMs }));
+	});
+
+	$effect(() => {
+		if (
+			gs.accounts !== undefined &&
+			gs.urlInMs !== undefined &&
+			gs.urlInMs === urlInMs &&
+			!gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms]?.[gs.urlInMs]
+		) {
+			(async () => {
+				let spaceMs = gs.urlInMs;
+				if (gs.accounts === undefined || spaceMs === undefined) return;
+				let callerMs = gs.accounts?.[0].ms;
+
+				let firstTimeChecking = !Object.keys(gs.accountMsToSpaceMsToCheckedMap).length;
+				let oldSignedInAccountMss = gs.accounts.filter((a) => a.signedIn).map((a) => a.ms);
+
+				let signedIn: undefined | boolean;
+
+				let signedInAccountMss: undefined | number[];
+				let currentAccountUpdates: undefined | MyAccountUpdates;
+				let spaceContext: undefined | SpaceContext;
+
+				if (!spaceMs || callerMs === spaceMs) {
+					spaceContext = {
+						isPublic: { num: 0 },
+						roleCode: { num: roleCodes.owner },
+						permissionCode: { num: permissionCodes.reactAndPost },
+					};
+				} else if (spaceMs === 1 && !callerMs) {
+					spaceContext = { isPublic: { num: 1 } };
+				}
+
+				let oldSpaceContext = gs.accounts[0].spaceMsToContextMap[spaceMs];
+
+				let get: GetCallerContextGetArg = {
+					...(spaceContext
+						? {}
+						: {
+								isPublic: oldSpaceContext?.isPublic || true,
+								pinnedQuery: oldSpaceContext?.pinnedQuery || true,
+								roleCode: callerMs ? oldSpaceContext?.roleCode || true : false,
+								permissionCode: callerMs ? oldSpaceContext?.permissionCode || true : false,
+							}),
+					// spaceMssAwaitingResponse:
+					// yourTurnIndicatorsFromSpaceMsToLastCheckMsMap: gs.accounts[0].spaceMss,
+					...(!callerMs || gs.accountMsToSpaceMsToCheckedMap[callerMs]
+						? {}
+						: {
+								latestAccountAttributesFromCallerAttributes: {
+									email: gs.accounts[0].email,
+									name: gs.accounts[0].name,
+									bio: gs.accounts[0].bio,
+									savedTags: gs.accounts[0].savedTags,
+									spaceMss: gs.accounts[0].spaceMss,
+								},
+							}),
+					...(firstTimeChecking
+						? {
+								signedInAccountMssFrom: oldSignedInAccountMss, //
+							}
+						: {}),
+				};
+
+				if (Object.values(get).some((v) => !!v)) {
+					get.signedIn = !!callerMs;
+					let res = await trpc().getCallerContext.query({
+						callerMs,
+						spaceMs,
+						get,
+					});
+					console.log('getCallerContext res:', res);
+					signedIn = res.signedIn;
+					signedInAccountMss = res.signedInAccountMss;
+					if (res.signedIn) {
+						currentAccountUpdates = res.currentAccountUpdates;
+						spaceContext = spaceContext || {
+							isPublic:
+								res.isPublic === null
+									? null //
+									: res.isPublic || oldSpaceContext!.isPublic,
+							pinnedQuery:
+								res.pinnedQuery === null
+									? null //
+									: res.pinnedQuery || oldSpaceContext!.pinnedQuery,
+							roleCode:
+								res.roleCode === null
+									? null //
+									: res.roleCode || oldSpaceContext!.roleCode,
+							permissionCode:
+								res.permissionCode === null
+									? null
+									: res.permissionCode || oldSpaceContext!.permissionCode,
+						};
+						// spaceMssAwaitingResponse: res.spaceMssAwaitingResponse,
+					} else {
+						signedInAccountMss = (signedInAccountMss || oldSignedInAccountMss).filter(
+							(ms) => ms !== callerMs,
+						);
+					}
+				}
+
+				// if (!callerMs || signedIn)
+				gs.accountMsToSpaceMsToCheckedMap = {
+					...gs.accountMsToSpaceMsToCheckedMap,
+					[callerMs]: {
+						...gs.accountMsToSpaceMsToCheckedMap[callerMs],
+						[spaceMs]: true,
+					},
+				};
+
+				updateLocalCache((lc) => {
+					if (spaceContext) {
+						lc.accounts[0] = {
+							...lc.accounts[0],
+							spaceMsToContextMap: {
+								...lc.accounts[0].spaceMsToContextMap,
+								[spaceMs]: spaceContext,
+							},
+						};
+					}
+					if (currentAccountUpdates) {
+						lc.accounts[0] = {
+							...lc.accounts[0],
+							...currentAccountUpdates,
+						};
+					}
+					if (signedInAccountMss) {
+						lc.accounts = lc.accounts
+							.map((a) => ({
+								...a,
+								signedIn: signedInAccountMss.includes(a.ms),
+							}))
+							.sort((a, b) => {
+								let aPriority = !a.ms || a.signedIn ? 0 : 1;
+								let bPriority = !b.ms || b.signedIn ? 0 : 1;
+								return aPriority - bPriority;
+							});
+					}
+					return lc;
+				});
+				gs.accountMsToNameTxtMap = {
+					...gs.accountMsToNameTxtMap,
+					...gs.accounts.reduce(
+						(obj, account) => ({
+							...obj, //
+							[account.ms]: account.name.txt,
+						}),
+						{},
+					),
+				};
+			})();
 		}
 	});
 
@@ -110,7 +254,7 @@
 			<div class="fx">
 				<AccountIcon isSystem ms={gs.pendingInvite!.by_ms} class="w-6 ml-0.5 mr-2" />
 				<p class="font-bold">
-					{msToAccountNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToNameTxt(
+					{accountMsToNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToNameTxt(
 						gs.pendingInvite!.in_ms,
 					)}
 				</p>

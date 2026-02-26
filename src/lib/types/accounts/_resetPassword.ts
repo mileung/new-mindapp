@@ -17,7 +17,7 @@ export let _resetPassword = async (input: {
 		{
 			...input,
 			deleteIfCorrect: true,
-			partCode: pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+			partCode: pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 		},
 		8,
 	);

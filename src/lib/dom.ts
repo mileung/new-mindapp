@@ -1,4 +1,6 @@
+import { dev } from '$app/environment';
 import { page } from '$app/state';
+import { m } from './paraglide/messages';
 
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
@@ -151,7 +153,8 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 		headline: (
 			scraped?.headline ||
 			externalDom.querySelector('meta[name="title"]')?.getAttribute('content') ||
-			externalDom.title
+			externalDom.title ||
+			decodeURIComponent(externalUrl.slice(externalUrl.lastIndexOf('/') + 1))
 		).trim(),
 		url: scraped?.url || externalUrl,
 	};
@@ -160,4 +163,16 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 export let getHoverColors = () => {
 	// TODO: for borders, bgs, etc
 	// Difference in hover and default state should be 2 or 3 levels idk yet
+};
+
+export let promptSum = (cb: (a: number, b: number) => string) => {
+	let requireSumPrompt = !!dev;
+	if (requireSumPrompt) {
+		let a = Math.floor(Math.random() * 90) + 10;
+		let b = Math.floor(Math.random() * 90) + 10;
+		let sum = prompt(cb(a, b));
+		if (!sum) return;
+		if (a + b !== +sum) return alert(m.incorrect());
+	}
+	return true;
 };

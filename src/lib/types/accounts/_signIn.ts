@@ -38,14 +38,14 @@ export let _signIn = async (
 			otpMs,
 			pin,
 			deleteIfCorrect: true,
-			partCode: pc.signInOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+			partCode: pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 		});
 		if (res.strike || res.expiredOtp) return res;
 		otpVerified = true;
 	}
 	let emailRow = await _getEmailRow(input.email);
 	if (!emailRow) return { fail: true };
-	let accountMs = emailRow!.at_ms!;
+	let accountMs = emailRow.by_ms;
 	let pwHashRow = assert1Row(
 		await tdb.select().from(pTable).where(filterAccountPwHashRow(accountMs)),
 	);
@@ -60,8 +60,8 @@ export let _signIn = async (
 				.from(pTable)
 				.where(
 					and(
-						pf.msAsAtId(accountMs),
-						pf.msAsId(clientKey.ms),
+						pf.atId({ at_ms: accountMs }),
+						pf.id({ ms: clientKey.ms }),
 						pf.code.eq(pc.clientKeyTxtMsAtAccountId),
 						pf.num.eq0,
 						pf.txt.eq(clientKey.txt),
@@ -77,7 +77,7 @@ export let _signIn = async (
 			partsToInsert.push({
 				...id0,
 				at_ms: accountMs,
-				ms,
+				ms: clientKey.ms,
 				code: pc.clientKeyTxtMsAtAccountId,
 				num: 0,
 				txt: clientKey.txt,
@@ -85,18 +85,18 @@ export let _signIn = async (
 		} else {
 			return await _sendOtp({
 				...input,
-				partCode: pc.signInOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+				partCode: pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 			});
 		}
 	}
 	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
 	let {
 		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
-		[pc.emailTxtMsAtAccountId]: emailTxtMsAtAccountIdRows = [],
-		[pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
-		[pc.bioTxtMsAtAccountId]: bioTxtMsAtAccountIdRows = [],
-		[pc.savedTagsTxtMsAtAccountId]: savedTagsTxtMsAtAccountIdRows = [],
-		[pc.spaceMssTxtMsAtAccountId]: spaceMssTxtMsAtAccountIdRows = [],
+		[pc.accountEmailTxtMsByMs]: emailTxtMsAtAccountIdRows = [],
+		[pc.accountNameTxtMsByMs]: nameTxtMsAtAccountIdRows = [],
+		[pc.accountBioTxtMsByMs]: bioTxtMsAtAccountIdRows = [],
+		[pc.accountSavedTagsTxtMsByMs]: savedTagsTxtMsAtAccountIdRows = [],
+		[pc.accountSpaceMssTxtMsByMs]: spaceMssTxtMsAtAccountIdRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -105,8 +105,8 @@ export let _signIn = async (
 				or(
 					sessionKey
 						? and(
-								pf.msAsAtId(accountMs),
-								pf.msAsId(sessionKey.ms),
+								pf.atId({ at_ms: accountMs }),
+								pf.id({ ms: sessionKey.ms }),
 								pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
 								pf.num.eq0,
 								// omitting pf.txt.eq(sessionKey.txt) since this check is to see if
@@ -114,38 +114,38 @@ export let _signIn = async (
 							)
 						: undefined,
 					and(
-						pf.msAsAtId(accountMs),
+						pf.noAtId,
 						pf.ms.gt0,
-						pf.by_ms.eq0,
+						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.emailTxtMsAtAccountId),
+						pf.code.eq(pc.accountEmailTxtMsByMs),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.msAsAtId(accountMs),
+						pf.noAtId,
 						pf.ms.gt0,
-						pf.by_ms.eq0,
+						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.nameTxtMsAtAccountId),
+						pf.code.eq(pc.accountNameTxtMsByMs),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.msAsAtId(accountMs),
+						pf.noAtId,
 						pf.ms.gt0,
-						pf.by_ms.eq0,
+						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.bioTxtMsAtAccountId),
+						pf.code.eq(pc.accountBioTxtMsByMs),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 					and(
-						pf.msAsAtId(accountMs),
+						pf.noAtId,
 						pf.ms.gt0,
-						pf.by_ms.eq0,
+						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.savedTagsTxtMsAtAccountId),
+						pf.code.eq(pc.accountSavedTagsTxtMsByMs),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
@@ -167,12 +167,6 @@ export let _signIn = async (
 		});
 	}
 	let account = reduceMyAccountRows([
-		{
-			...id0,
-			ms: accountMs,
-			code: pc.accountId,
-			num: 0,
-		},
 		...emailTxtMsAtAccountIdRows,
 		...nameTxtMsAtAccountIdRows,
 		...bioTxtMsAtAccountIdRows,

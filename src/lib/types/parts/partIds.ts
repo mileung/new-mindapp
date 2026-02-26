@@ -20,10 +20,11 @@ export type FullIdObj = z.infer<typeof FullIdObjSchema>;
 
 export let idRegex = /^\d+_\d+_\d+$/;
 export let idsRegex = /(?<!\S)(\d+_\d+_\d+)(?!\S)/g;
-export let hasTemplateIdRegex = /\d*_\d*_\d+/;
-export let templateIdRegex = /^\d*_\d*_\d+$/;
+export let spaceSlugRegex = /^__\d+$/;
+export let profileSlugRegex = /^_\d+_$/;
 
-export let isTemplateId = (str = '') => templateIdRegex.test(str);
+export let isSpaceSlug = (str = '') => spaceSlugRegex.test(str);
+export let isProfileSlug = (str = '') => profileSlugRegex.test(str);
 export let isIdStr = (str = '') => idRegex.test(str);
 export let getIdStr = (io: IdObj) => `${io.ms}_${io.by_ms}_${io.in_ms}`;
 export let getAtIdStr = (aio: AtIdObj) => `${aio.at_ms}_${aio.at_by_ms}_${aio.at_in_ms}`;
@@ -112,9 +113,8 @@ export let getIdStrAsAtIdObj = (idStr: string) => {
 	} as const;
 };
 
-export let getUrlInMs = () => {
-	let tid = isIdStr(page.state.postIdStr)
-		? page.state.postIdStr //
-		: page.params.tid;
-	return tid ? +tid.split('_', 3)[2] : undefined;
+export let isFeedPathname = () => {
+	let pathname = page.url.pathname;
+	let s = pathname.slice(1);
+	return isSpaceSlug(s) || isIdStr(s);
 };

@@ -5,8 +5,10 @@ export let minute = 60 * second;
 export let hour = 60 * minute;
 export let day = 24 * hour;
 export let week = 7 * day;
-export let month = 30 * day;
-export let year = 365 * day;
+export let getMonthLength = (year: number, month: number) =>
+	new Date(year, month, 0).getDate() * day;
+let isLeapYear = (year = 0) => (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+export let getYearLength = (year: number) => (isLeapYear(year) ? 366 : 365) * day;
 
 let pad = (n: number) => n.toString().padStart(2, '0');
 
@@ -42,5 +44,5 @@ export let formatMs = (ms: number, downToThe?: '' | 'ms' | 'min' | 'day') => {
 	let dd = pad(date.getDate());
 	let hh = pad(date.getHours());
 	let min = pad(date.getMinutes());
-	return abs < year ? `${mm}-${dd} ${hh}:${min}` : `${yyyy}-${mm}-${dd}`;
+	return abs < 365 * day ? `${mm}-${dd} ${hh}:${min}` : `${yyyy}-${mm}-${dd}`;
 };

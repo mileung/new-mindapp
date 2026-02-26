@@ -8,32 +8,55 @@ import { pTable } from './partsTable';
 export type PartInsert = typeof pTable.$inferInsert;
 export type PartSelect = typeof pTable.$inferSelect;
 
-export let GranularBinPropByMsSchema = z.object({
-	ms: z.number(),
-	by_ms: z.number(),
-	num: z.number().min(0).max(1),
+export let GranularNumPropSchema = z.object({
+	ms: z.number().optional(),
+	by_ms: z.number().optional(),
+	num: z.number(),
 });
-export type GranularBinPropByMs = z.infer<typeof GranularBinPropByMsSchema>;
+export type GranularNumProp = z.infer<typeof GranularNumPropSchema>;
+export let getGranularNumProp = (part: PartInsert) =>
+	({
+		ms: part.ms,
+		by_ms: part.by_ms,
+		num: part.num,
+	}) satisfies GranularNumProp;
 
 export let GranularTxtPropSchema = z.object({
-	ms: z.number(),
+	ms: z.number().optional(),
+	by_ms: z.number().optional(),
 	txt: z.string(),
 });
 export type GranularTxtProp = z.infer<typeof GranularTxtPropSchema>;
+export let getGranularTxtProp = (part: PartInsert) =>
+	({
+		ms: part.ms,
+		by_ms: part.by_ms,
+		txt: part.txt!,
+	}) satisfies GranularTxtProp;
 
-export let GranularTxtPropByMsSchema = GranularTxtPropSchema.merge(
-	z.object({ by_ms: z.number() }), //
-);
-export type GranularTxtPropByMs = z.infer<typeof GranularTxtPropByMsSchema>;
+export let GranularNumTxtPropSchema = z.object({
+	ms: z.number().optional(),
+	by_ms: z.number().optional(),
+	num: z.number(),
+	txt: z.string(),
+});
+export type GranularNumTxtProp = z.infer<typeof GranularNumTxtPropSchema>;
+export let getGranularNumTxtProp = (part: PartInsert) =>
+	({
+		ms: part.ms,
+		by_ms: part.by_ms,
+		num: part.num,
+		txt: part.txt!,
+	}) satisfies GranularNumTxtProp;
 
 export let WhoObjSchema = z.object({
-	callerMs: z.number(),
+	callerMs: z.number().gte(0),
 });
 export type WhoObj = z.infer<typeof WhoObjSchema>;
 
 export let WhoWhereObjSchema = WhoObjSchema.merge(
 	z.object({
-		spaceMs: z.number(),
+		spaceMs: z.number().gte(0),
 	}),
 );
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
@@ -51,13 +74,13 @@ export let getWhoObj = async () => {
 
 export let getWhoWhereObj = async () => {
 	let attempts = 0;
-	while (gs.accounts === undefined || gs.currentSpaceMs === undefined) {
+	while (gs.accounts === undefined || gs.urlInMs === undefined) {
 		if (++attempts > 888) throw new Error(`getWhoWhereObj timed out`);
 		await new Promise((res) => setTimeout(res, 42));
 	}
 	return {
 		callerMs: gs.accounts[0].ms,
-		spaceMs: gs.currentSpaceMs,
+		spaceMs: gs.urlInMs,
 	} satisfies WhoWhereObj;
 };
 

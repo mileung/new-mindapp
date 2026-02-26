@@ -18,7 +18,7 @@ import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../
 import { pTable } from '../parts/partsTable';
 
 export let deletePost = async (fullPostIdObj: FullIdObj, version: null | number) => {
-	let useRpc = gs.currentSpaceMs! > 0;
+	let useRpc = gs.urlInMs! > 0;
 	let baseInput = await getWhoWhereObj();
 	return useRpc || baseInput.spaceMs
 		? trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version })
@@ -75,7 +75,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 
 	console.log('mainPIdWNumAsLastVersionAtPPIdRows:', mainPIdWNumAsLastVersionAtPPIdRows);
 	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(mainPIdWNumAsLastVersionAtPPIdRows);
-	let lastVersion = mainPIdWNumAsLastVersionAtPPIdRow.num!;
+	let lastVersion = mainPIdWNumAsLastVersionAtPPIdRow.num;
 	let versionIsLastVersion = version === lastVersion;
 	if (!lastVersion && versionIsLastVersion && !deleteAllVersions) deleteAllVersions = true;
 
@@ -193,7 +193,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						or(
 							checkForNum0Tags
 								? and(
-										pf.noParent,
+										pf.noAtId,
 										pf.ms.gt0,
 										or(
 											...makePartsUniqueById([
@@ -208,7 +208,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 								: undefined,
 							checkForNum0Cores
 								? and(
-										pf.noParent,
+										pf.noAtId,
 										pf.ms.gt0,
 										or(
 											...makePartsUniqueById([

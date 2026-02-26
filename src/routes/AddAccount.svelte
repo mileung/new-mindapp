@@ -47,9 +47,14 @@
 					...lc.accounts.filter((a) => a.ms !== account.ms),
 				],
 			}));
+			gs.urlToFeedMap = {};
+			gs.accountMsToSpaceMsToCheckedMap = {
+				...gs.accountMsToSpaceMsToCheckedMap,
+				[account.ms]: {},
+			};
 			gs.pendingInvite //
 				? usePendingInvite()
-				: goto(`/__${gs.currentSpaceMs}`);
+				: goto(`/__${gs.urlInMs}`);
 		}
 	};
 </script>
@@ -170,7 +175,6 @@
 										otpMs,
 										pin,
 									});
-							console.log('res:', res);
 							if (res.fail) return alert(m.anErrorOccurred());
 							strike = res.strike;
 							expiredOtp = res.expiredOtp;
@@ -180,7 +184,7 @@
 								otpMs,
 								pin,
 								email,
-								partCode: pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+								partCode: pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 							});
 							strike = res?.strike;
 							expiredOtp = res?.expiredOtp;
@@ -246,7 +250,7 @@
 										...lc.accounts.filter((a) => a.ms !== signedInAccount.ms),
 									],
 								}));
-								return goto(`/__${gs.currentSpaceMs}`);
+								return goto(`/__${gs.urlInMs}`);
 							}
 							let res = await trpc().signIn.mutate({
 								email: normalizedEmail,
@@ -263,8 +267,8 @@
 							let res = await trpc().sendOtp.mutate({
 								email,
 								partCode: p.creatingAccount
-									? pc.createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount
-									: pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+									? pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount
+									: pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 							});
 							name = name.trim();
 							otpMs = res.otpMs;

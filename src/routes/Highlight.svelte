@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { gs } from '$lib/global-state.svelte';
 	import { getSystemTheme } from '$lib/theme';
-	import { getIdStr } from '$lib/types/parts/partIds';
+	import { getIdStr, isIdStr } from '$lib/types/parts/partIds';
 
 	let p: {
 		postIdStr?: string;
@@ -13,7 +13,13 @@
 		evenBg?: boolean;
 	} = $props();
 
-	let urlId = $derived(page.state.postIdStr || page.params.tid);
+	let urlId = $derived.by(() => {
+		let pathname = page.url.pathname;
+		let s = pathname.slice(1);
+		let slashIndex = s.indexOf('/');
+		if (slashIndex > 0) s = s.slice(0, slashIndex);
+		if (isIdStr(s)) return s;
+	});
 	let spotId = $derived(urlId?.startsWith('__') ? '' : urlId);
 	let moreOpaque = $derived(
 		p.evenBg ||

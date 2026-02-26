@@ -4,6 +4,10 @@
 	import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-svelte';
 	import CredentiallessIframe from './CredentiallessIframe.svelte';
 
+	// TODO: detect when an embedded YouTube video finishes and play next vid
+	// TODO: player controls in sidebar?
+	// https://developers.google.com/youtube/iframe_api_reference
+
 	let ytRegex =
 		/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 
@@ -21,7 +25,7 @@
 {#snippet thumbnail()}
 	<!-- TODO: make an iframe widget that renders img urls cuz img tags don't have a credentialless option -->
 	<img
-		class="-mb-2 -mt-1 h-42 bg-bg3 aspect-video object-cover"
+		class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
 		src={`https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`}
 		alt={m.youTubeThumbnail()}
 	/>

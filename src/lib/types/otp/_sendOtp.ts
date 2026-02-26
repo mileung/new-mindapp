@@ -11,8 +11,8 @@ export let _sendOtp = async (input: { email: string; partCode: OtpPartCode }) =>
 	let accountRow = await _getEmailRow(input.email);
 	throwIf(
 		accountRow
-			? input.partCode === pc.createAccountOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount
-			: input.partCode === pc.resetPasswordOtpMsWithTxtAsEmailColonPinAndNumAsStrikeCount,
+			? input.partCode === pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount
+			: input.partCode === pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 	);
 
 	let pin = ('' + Math.random()).slice(-8);
@@ -32,7 +32,7 @@ export let _sendOtp = async (input: { email: string; partCode: OtpPartCode }) =>
 		ms,
 		code: input.partCode,
 		num: 0,
-		txt: `${input.email}:${pin}`,
+		txt: `${input.email} ${pin}`,
 	});
 	return { otpMs: ms };
 };

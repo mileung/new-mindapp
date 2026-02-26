@@ -30,7 +30,7 @@
 	<div class="h-screen xy fy gap-2">
 		<p class="text-2xl font-black">{m.invalidInvite()}</p>
 		<a
-			href={`/__${gs.currentSpaceMs}`}
+			href={`/__${gs.urlInMs}`}
 			class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 		>
 			{m.goHome()}

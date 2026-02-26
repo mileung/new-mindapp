@@ -6,7 +6,10 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		interface PageState {
-			postIdStr?: string;
+			modal?: {
+				pathname: string;
+				search: string;
+			};
 			lastScrollY?: number;
 			email?: string;
 		}
