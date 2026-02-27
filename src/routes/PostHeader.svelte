@@ -1,12 +1,19 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
+	import { page } from '$app/state';
 	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
-	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
+	import {
+		getAtIdStr,
+		getFullIdObj,
+		getIdObjAsAtIdObj,
+		getIdStr,
+		isIdStr,
+	} from '$lib/types/parts/partIds';
 	import type { Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import { reactionList } from '$lib/types/reactions/reactionList';
@@ -80,13 +87,24 @@
 <div class="group/div h-5 fx w-full overflow-x-scroll overflow-y-hidden">
 	<div class="fx flex-1 text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
-			<!-- Apush -->
-			<a href={`/${postIdStr}`} class="fx group hover:text-fg1" title={isoMsLabel}>
+			<a
+				href={`/${postIdStr}`}
+				class="fx group hover:text-fg1"
+				title={isoMsLabel}
+				onclick={(e) => {
+					if (
+						!e.metaKey &&
+						!e.shiftKey &&
+						!e.ctrlKey && //
+						!isIdStr(page.params.feedSlug)
+					)
+						gs.lastScrollY = window.scrollY;
+				}}
+			>
 				<div class={`pr-1 ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					{msLabel}
 				</div>
 			</a>
-			<!-- Apush -->
 			<a
 				href={`/_${p.post.by_ms}_`}
 				class={`fx group text-fg1 hover:text-fg3 ${gs.accountMsToNameTxtMap[p.post.by_ms] ? '' : 'italic'}`}

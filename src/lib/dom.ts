@@ -1,16 +1,10 @@
 import { dev } from '$app/environment';
-import { page } from '$app/state';
 import { m } from './paraglide/messages';
 
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
 export let getPostWriterHeight = () =>
 	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
-
-export let scrollToLastY = () => {
-	let { lastScrollY = 0 } = page.state;
-	setTimeout(() => window.scrollTo({ top: lastScrollY }), 1);
-};
 
 export let scrollToHighlight = (id: string) => {
 	let hlc =
@@ -166,7 +160,7 @@ export let getHoverColors = () => {
 };
 
 export let promptSum = (cb: (a: number, b: number) => string) => {
-	let requireSumPrompt = !!dev;
+	let requireSumPrompt = !dev;
 	if (requireSumPrompt) {
 		let a = Math.floor(Math.random() * 90) + 10;
 		let b = Math.floor(Math.random() * 90) + 10;

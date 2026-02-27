@@ -1,5 +1,8 @@
+import { browser } from '$app/environment';
 import { m } from './paraglide/messages';
 import { minute, second } from './time';
+
+export let isTouchScreen = browser ? 'ontouchstart' in window || !!navigator.maxTouchPoints : false;
 
 export let copyToClipboard = (text: string) => {
 	if (navigator?.clipboard?.writeText) {

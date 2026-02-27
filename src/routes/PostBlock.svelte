@@ -105,7 +105,6 @@
 			>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
-						<!-- Apush -->
 						<a href={`/__${atPost.by_ms}_`} class="fx group hover:text-fg1">
 							<div
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
@@ -116,7 +115,6 @@
 								</p>
 							</div>
 						</a>
-						<!-- Apush -->
 						<a
 							href={`/${getIdStr(atPost)}`}
 							class={`fx hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -165,7 +163,6 @@
 					{#if tags?.length || rxnCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags || [] as tag (tag)}
-								<!-- Apush -->
 								<a
 									href={`/__${gs.urlInMs}?q=${`[${tag}]`}`}
 									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}

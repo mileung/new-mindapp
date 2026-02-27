@@ -6,11 +6,6 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		interface PageState {
-			modal?: {
-				pathname: string;
-				search: string;
-			};
-			lastScrollY?: number;
 			email?: string;
 		}
 		// interface Platform {}

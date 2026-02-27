@@ -64,7 +64,6 @@
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
 				{tag.num} -
-				<!-- Apush -->
 				<a
 					href={`/__${gs.urlInMs}?q=${`[${tag.txt}]`}`}
 					class="px-1 font-bold hover:underline hover:bg-bg3"

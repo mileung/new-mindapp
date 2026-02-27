@@ -10,6 +10,7 @@ class GlobalState {
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
 	pendingInvite = $state<Invite>();
+	lastScrollY = $state(0);
 
 	// local-cache
 	urlInMs = $state<number>();

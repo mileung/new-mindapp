@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { scrollToHighlight, scrollToLastY, textInputFocused } from '$lib/dom';
+	import { scrollToHighlight, textInputFocused } from '$lib/dom';
 	import { getBottomOverlayShown, gs, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
@@ -478,7 +478,9 @@
 	{#if postIdStr}
 		<a
 			href={`/__${gs.urlInMs}`}
-			onclick={scrollToLastY}
+			onclick={() => {
+				gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
+			}}
 			class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
 		>
 			<IconX class="w-8" />
@@ -502,7 +504,6 @@
 		{/if}
 	</div>
 	{#if viewPostToastId}
-		<!-- Apush -->
 		<a
 			href={'/' + viewPostToastId}
 			class="z-50 fixed bottom-2 self-center fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"

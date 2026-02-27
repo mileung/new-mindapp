@@ -194,6 +194,7 @@
 
 				// TODO: not great to assume the new local db works after deleting the old one - same for localCache
 				gs.localDbFailed = gs.invalidLocalCache = false;
+				gs.urlToFeedMap = {};
 			}
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
@@ -247,6 +248,7 @@
 					}
 					console.log('added post');
 				}
+				gs.urlToFeedMap = {};
 				console.timeEnd('adding posts');
 			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
 		>

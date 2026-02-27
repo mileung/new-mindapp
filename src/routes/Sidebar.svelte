@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { goto, pushState } from '$app/navigation';
+	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
 	import { getBottomOverlayShown, gs, resetBottomOverlay } from '$lib/global-state.svelte';
-	import { identikana } from '$lib/js';
+	import { identikana, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		signOut,
@@ -35,7 +35,7 @@
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 
-	let hideExtensionLink = $state(false);
+	let hideExtensionLink = $state(isTouchScreen);
 	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
 
 	let searchIptFocused = $state(false);
@@ -193,10 +193,7 @@
 							let q = searchVal.trim();
 							if (q) {
 								let href = `/__${gs.urlInMs}?q=${q}`;
-								let { pathname, search } = new URL(href, page.url.origin);
-								e.metaKey
-									? open(href, '_blank') //
-									: pushState(href, { modal: { pathname, search } });
+								e.metaKey ? open(href, '_blank') : goto(href);
 							}
 						}
 					}
@@ -234,8 +231,6 @@
 					}
 				}}
 			/>
-			<!-- Apush -->
-			<!-- noPush={!isFeedPathname()} -->
 			<a
 				class={`xy -ml-9 w-9 group ${searchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
 				href={`/__${gs.urlInMs}?q=${searchVal}`}

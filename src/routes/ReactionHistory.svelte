@@ -66,7 +66,6 @@
 		{#each reactions || [] as rxn, i (getIdStr(rxn))}
 			<div class="px-1 flex">
 				{rxn.emoji}
-				<!-- Apush -->
 				<a
 					href={`/_${post.by_ms}_`}
 					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.accountMsToNameTxtMap[rxn.by_ms] ? '' : 'italic'}`}
