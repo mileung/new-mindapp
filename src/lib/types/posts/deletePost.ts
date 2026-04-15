@@ -1,13 +1,12 @@
-import { gs } from '$lib/global-state.svelte';
+import { getWhoWhereObj, gs, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
 import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
-import { gsdb, type Database } from '../../local-db';
+import { type Database } from '../../local-db';
 import {
 	assert1Row,
 	assertLt2Rows,
 	channelPartsByCode,
-	getWhoWhereObj,
 	hasParent,
 	makePartsUniqueById,
 	type PartInsert,
@@ -18,7 +17,7 @@ import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../
 import { pTable } from '../parts/partsTable';
 
 export let deletePost = async (fullPostIdObj: FullIdObj, version: null | number) => {
-	let useRpc = gs.urlInMs! > 0;
+	let useRpc = gs.lastSeenInMs! > 0;
 	let baseInput = await getWhoWhereObj();
 	return useRpc || baseInput.spaceMs
 		? trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version })

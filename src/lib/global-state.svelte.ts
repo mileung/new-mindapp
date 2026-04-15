@@ -1,31 +1,74 @@
+import { dev } from '$app/environment';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import type { MyAccount, Profile } from './types/accounts';
-import type { FullIdObj } from './types/parts/partIds';
+import { identikana } from './js';
+import { m } from './paraglide/messages';
+import { getDefaultAccount, type MyAccount, type PublicProfile } from './types/accounts';
+import { updateLocalCache } from './types/local-cache';
+import type { GranularNumProp, GranularTxtProp, WhoObj, WhoWhereObj } from './types/parts';
+import { getUrlInMs, type FullIdObj } from './types/parts/partIds';
 import type { Post } from './types/posts';
-import type { Invite, Membership, Space } from './types/spaces';
+import {
+	accentCodes,
+	getDefaultSpace,
+	permissionCodes,
+	roleCodes,
+	type Invite,
+	type Membership,
+	type Space,
+	type SpaceContext,
+} from './types/spaces';
+import type { CheckedInvite } from './types/spaces/_checkInvite';
 
 class GlobalState {
 	invalidLocalCache = $state(false);
 	localDbFailed = $state(false);
 	theme = $state<'light' | 'dark' | 'system'>();
 	db = $state<SqliteRemoteDatabase<Record<string, never>>>();
-	pendingInvite = $state<Invite>();
+	checkedInvite = $state<CheckedInvite>();
 	lastScrollY = $state(0);
 
 	// local-cache
-	urlInMs = $state<number>();
+	devMode = $state(dev);
+	lastSeenInMs = $state<number>();
 	accounts = $state<undefined | MyAccount[]>();
+	msToSpaceMap = $state<Record<number | string, undefined | Space>>({});
 	//
-
-	idToPostMap = $state<Record<string, undefined | null | Post>>({});
-	accountMsToNameTxtMap = $state<Record<number, undefined | string>>({});
-	msToSpaceNameTxtMap = $state<Record<number, undefined | string>>({});
-	spaceMsToAccountMsToRoleNumMap = $state<Record<number, undefined | Record<number, number>>>({});
 
 	accountMsToSpaceMsToCheckedMap = $state<
 		Record<
 			number, //
 			undefined | Record<number, boolean>
+		>
+	>({});
+
+	msToProfileMap = $state<Record<number, undefined | PublicProfile>>({});
+	idToPostMap = $state<Record<string, undefined | null | Post>>({});
+	spaceMsToTagsMap = $state<
+		Record<
+			number,
+			| undefined
+			| {
+					endReached: boolean;
+					tags: {
+						txt: string;
+						num: number;
+					}[];
+			  }
+		>
+	>({});
+	// spaceMsToAccountMsToRoleNumMap = $state<Record<number, undefined | Record<number, number>>>({});
+	spaceMsToAccountMsToRoleFlairMap = $state<
+		Record<
+			number,
+			| undefined
+			| Record<
+					number,
+					| undefined
+					| {
+							role?: GranularNumProp;
+							flair?: GranularTxtProp;
+					  }
+			  >
 		>
 	>({});
 
@@ -41,17 +84,21 @@ class GlobalState {
 			  }
 		>
 	>({});
-	msToProfileMap = $state<Record<number, undefined | Profile>>({});
-	spaceMsToDotsMap = $state<
+
+	accountMsToSpaceMsToDots = $state<
 		Record<
-			string,
+			number, //
 			| undefined
-			| {
-					space?: Space;
-					endReached?: boolean;
-					memberships?: Membership[];
-					error?: string;
-			  }
+			| Record<
+					number,
+					| undefined
+					| {
+							invites: Invite[];
+							memberships: Membership[];
+							endReached?: boolean;
+							error?: string;
+					  }
+			  >
 		>
 	>({});
 
@@ -66,6 +113,20 @@ class GlobalState {
 
 export let gs = new GlobalState();
 
+export let gsdb = async () => {
+	let attempts = 0;
+	while (!gs.db) {
+		if (++attempts > 888) {
+			alert(m.localDatabaseTimedOut());
+			throw new Error(m.localDatabaseTimedOut());
+		}
+		await new Promise((res) => setTimeout(res, 42));
+	}
+	return gs.db;
+};
+
+export let getPromptSigningIn = () => !gs.accounts?.[0].ms && getUrlInMs() === 8;
+
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;
 
@@ -74,4 +135,138 @@ export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
 	except !== 'wn' && (gs.writingNew = null);
 	except !== 'we' && (gs.writingEdit = null);
 	except !== 'wt' && (gs.writingTo = null);
+};
+
+export let msToSpaceNameTxt = (ms: number) => {
+	return ms === 8 || (ms && ms === gs.accounts?.[0].ms)
+		? m.personal()
+		: ms === 1
+			? m.global()
+			: ms
+				? gs.msToSpaceMap[ms]?.name?.txt || identikana(ms)
+				: m.local();
+};
+
+export let msToAccountNameTxt = (ms: number, isSystem = false) => {
+	return !ms
+		? isSystem
+			? m.system()
+			: m.anon()
+		: gs.msToProfileMap[ms]?.name?.txt || identikana(ms);
+};
+
+export let getWhoObj = async () => {
+	let attempts = 0;
+	while (gs.accounts === undefined) {
+		if (++attempts > 888) throw new Error(`getWhoObj timed out`);
+		await new Promise((res) => setTimeout(res, 42));
+	}
+	return {
+		callerMs: gs.accounts[0].ms,
+	} satisfies WhoObj;
+};
+
+export let getWhoWhereObj = async (forceUsingLocalDb?: boolean) => {
+	let attempts = 0;
+	let urlInMs = forceUsingLocalDb ? 0 : getUrlInMs();
+	if (urlInMs === undefined) throw new Error('urlInMs === undefined');
+	while (gs.accounts === undefined) {
+		if (++attempts > 888) throw new Error('getWhoWhereObj timed out');
+		await new Promise((res) => setTimeout(res, 42));
+	}
+	return {
+		callerMs: gs.accounts[0].ms,
+		spaceMs: urlInMs,
+	} satisfies WhoWhereObj;
+};
+
+export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, string>) => {
+	gs.msToProfileMap = {
+		...gs.msToProfileMap,
+		...Object.entries(msToAccountNameTxtMap).reduce(
+			(obj, [ms, nt]) => ({
+				...obj,
+				[ms]: {
+					...(gs.msToProfileMap[+ms] || getDefaultAccount()),
+					name: { txt: nt },
+				} satisfies PublicProfile,
+			}),
+			{},
+		),
+	};
+};
+
+export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, string>) => {
+	updateLocalCache((lc) => {
+		lc.msToSpaceMap = {
+			...lc.msToSpaceMap,
+			...Object.entries(msToSpaceNameTxtMap).reduce(
+				(obj, [ms, nt]) => ({
+					...obj,
+					[ms]: {
+						...(gs.msToSpaceMap[+ms] || getDefaultSpace()),
+						ms: +ms,
+						name: { txt: nt },
+					} satisfies Space,
+				}),
+				{},
+			),
+		};
+		return lc;
+	});
+};
+
+export let mergeSpaceMsToAccountMsToRoleFlairMap = (
+	spaceMsToAccountMsToRoleFlairMap: Record<
+		number,
+		Record<
+			number,
+			{
+				role?: GranularNumProp;
+				flair?: GranularTxtProp;
+			}
+		>
+	>,
+) => {
+	// TODO: exclude fetching already fetched role and flair in post feed
+	// Only going to dots should override entries, right?
+	Object.entries(spaceMsToAccountMsToRoleFlairMap).forEach(
+		([spaceMsStr, accountMsToRoleFlairMap]) => {
+			let spaceMs = +spaceMsStr;
+			Object.entries(accountMsToRoleFlairMap).forEach(([accountMsStr, roleFlairMap]) => {
+				let accountMs = +accountMsStr;
+				gs.spaceMsToAccountMsToRoleFlairMap[spaceMs] ||= {};
+				gs.spaceMsToAccountMsToRoleFlairMap[spaceMs][accountMs] ||= {};
+				let gsPointer = gs.spaceMsToAccountMsToRoleFlairMap[spaceMs][accountMs];
+				if (
+					roleFlairMap.role &&
+					(!gsPointer.role || //
+						(!gsPointer.role.ms && !gsPointer.role.by_ms))
+				) {
+					gsPointer.role = roleFlairMap.role;
+				}
+				if (
+					roleFlairMap.flair &&
+					(!gsPointer.flair || //
+						(!gsPointer.flair.ms && !gsPointer.flair.by_ms))
+				) {
+					gsPointer.flair = roleFlairMap.flair;
+				}
+			});
+		},
+	);
+};
+
+export let getUrlInMsContext = (): undefined | SpaceContext => {
+	let urlInMs = getUrlInMs();
+	if (!gs.accounts || urlInMs === undefined) return;
+	let caller = gs.accounts[0];
+	return urlInMs === 0 || urlInMs === caller.ms
+		? {
+				ms: urlInMs,
+				roleCode: { num: roleCodes.owner },
+				permissionCode: { num: permissionCodes.reactAndPost },
+				accentCode: { num: accentCodes.none },
+			}
+		: caller.joinedSpaceContexts.find((c) => c.ms === urlInMs);
 };

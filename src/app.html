@@ -3,14 +3,12 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>Mindapp</title>
-		<meta name="description" content="cc = collective consciousness" />
 		<link rel="manifest" href="%sveltekit.assets%/manifest.json" />
 		<link rel="apple-touch-icon" sizes="180x180" href="%sveltekit.assets%/apple-touch-icon.png" />
 		<link rel="icon" href="%sveltekit.assets%/mindapp-logo.svg" />
 		%sveltekit.head%
 		<script>
-			let theme = localStorage.getItem('theme');
+			let theme = localStorage.getItem('mindappTheme');
 			if (
 				!theme || theme === 'system'
 					? window.matchMedia('(prefers-color-scheme: dark)').matches

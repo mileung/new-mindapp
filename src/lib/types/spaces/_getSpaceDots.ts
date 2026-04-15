@@ -1,12 +1,19 @@
 import type { Database } from '$lib/local-db';
-import { and, or, sql, SQL } from 'drizzle-orm';
-import { roleCodes, type Invite, type Membership, type Space } from '.';
+import { and, or, sql } from 'drizzle-orm';
 import {
-	assert1Row,
+	makeMyValidInvitesFilter,
+	roleCodes,
+	type Invite,
+	type Membership,
+	type SpaceDotsUpdate,
+} from '.';
+import {
+	assertLt2Rows,
 	channelPartsByCode,
 	getGranularNumProp,
-	getGranularNumTxtProp,
+	getGranularTxtProp,
 	type GranularNumProp,
+	type GranularTxtProp,
 	type PartSelect,
 	type WhoWhereObj,
 } from '../parts';
@@ -14,220 +21,284 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
-export let membersPerLoad = 88;
+export let membersPerLoad = 8;
 
 export let _getSpaceDots = async (
 	db: Database,
 	input: WhoWhereObj & {
-		msAfter?: number;
 		roleCode?: null | GranularNumProp;
+		msBefore?: number;
+		lastMemberListRoleCodeNum?: number;
+		lastAcceptByMssWithSameRoleMs?: number[];
+		memberCount?: number;
+		description?: GranularTxtProp;
+		newMemberPermissionCode?: GranularNumProp;
 	},
 ) => {
-	let space: undefined | Space;
-	let spaceAndInviteRowFilters: undefined | SQL<unknown>;
+	let {
+		spaceMs,
+		callerMs,
+		msBefore,
+		roleCode,
+		lastMemberListRoleCodeNum = roleCodes.owner,
+		lastAcceptByMssWithSameRoleMs = [],
+	} = input;
+	let spaceUpdate: undefined | SpaceDotsUpdate;
 	let invites: undefined | Invite[];
-	if (input.msAfter === undefined) {
-		spaceAndInviteRowFilters = or(
-			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				pf.in_ms.eq(input.spaceMs),
-				or(
-					pf.code.eq(pc.spaceIsPublicBinId), //
-					pf.code.eq(pc.newMemberPermissionCodeId),
-				),
-				pf.txt.isNull,
-			),
-			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				pf.in_ms.eq(input.spaceMs),
-				or(
-					pf.code.eq(pc.spaceNameTxtIdAndMemberCountNum),
-					pf.code.eq(pc.spaceDescriptionTxtId),
-					pf.code.eq(pc.spacePinnedQueryTxtId),
-				),
-				pf.txt.isNotNull,
-			),
-			input.roleCode?.num === roleCodes.mod || input.roleCode?.num === roleCodes.owner
-				? and(
-						pf.ms.gt0,
-						input.roleCode?.num === roleCodes.mod //
-							? pf.by_ms.eq(input.callerMs)
-							: undefined,
-						pf.in_ms.eq(input.spaceMs),
-						pf.code.eq(pc.inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug),
-					)
-				: undefined,
-		);
-	}
 
-	let acceptMsByMsAtInviteIdRows = await db
-		.select()
-		.from(pTable)
-		.where(
-			and(
-				pf.at_in_ms.eq(input.spaceMs),
-				pf.ms.lte(input.msAfter || Number.MAX_SAFE_INTEGER),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.acceptMsByMsAtInviteId),
-				pf.num.eq0,
-				pf.txt.isNull,
-			),
-		)
-		.orderBy(
-			...(input.msAfter === undefined
-				? [sql`CASE WHEN ${pTable.by_ms} = ${input.callerMs} THEN 0 ELSE 1 END`]
-				: []),
-			pf.ms.desc,
-		)
-		.limit(membersPerLoad);
+	let firstLoad = msBefore === undefined;
+	let isLocal = !spaceMs;
+	let isPersonal = !isLocal && callerMs === spaceMs;
+	let isLocalOrPersonal = isLocal || isPersonal;
+
+	let roleCodeNumIdAtAccountIdRows = isLocalOrPersonal
+		? []
+		: await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.at_ms.gt0,
+						...lastAcceptByMssWithSameRoleMs.map((at_ms) => pf.at_ms.notEq(at_ms)),
+						or(
+							and(
+								pf.num.eq(lastMemberListRoleCodeNum),
+								pf.ms.lt(msBefore || Number.MAX_SAFE_INTEGER),
+							),
+							pf.num.lt(lastMemberListRoleCodeNum),
+						),
+						pf.in_ms.eq(spaceMs),
+						pf.code.eq(pc.roleCodeNumIdAtAccountId),
+						pf.txt.isNull,
+					),
+				)
+				.orderBy(
+					...(firstLoad ? [sql`CASE WHEN ${pTable.by_ms} = ${callerMs} THEN 0 ELSE 1 END`] : []),
+					pf.num.desc,
+					pf.ms.desc,
+				)
+				.limit(membersPerLoad);
 
 	// TODO: sort all owners and mods to the top
 
 	let {
-		[pc.spaceIsPublicBinId]: spaceIsPublicBinIdRows = [],
-		[pc.spaceNameTxtIdAndMemberCountNum]: spaceNameTxtIdAndMemberCountNumRows = [],
-		[pc.spaceDescriptionTxtId]: spaceDescriptionTxtIdRows = [],
-		[pc.spacePinnedQueryTxtId]: spacePinnedQueryTxtIdRows = [],
-		[pc.newMemberPermissionCodeId]: newMemberPermissionCodeIdRows = [],
+		[pc.spaceDescriptionTxtIdAndMemberCountNum]: spaceDescriptionTxtIdAndMemberCountNumRows = [],
+		[pc.newMemberPermissionCodeNumId]: newMemberPermissionCodeNumIdRows = [],
 		// prettier-ignore
-		[pc.inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug]: inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlugRows = [],
-		[pc.permissionCodeNumIdAtAccountId]: permissionNumIdAtAccountIdRows = [],
-		[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
-		[pc.accountNameTxtMsByMs]: nameTxtMsAtAccountIdRows = [],
+		[pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt]: inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxtRows = [],
+		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
+		[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
+		[pc.flairTxtIdAtAccountId]: flairTxtIdAtAccountIdRows = [],
+		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					spaceAndInviteRowFilters,
-					and(
-						or(...acceptMsByMsAtInviteIdRows.map((r) => pf.atId({ at_ms: r.at_by_ms }))),
-						pf.code.eq(pc.accountNameTxtMsByMs),
-					),
-					and(
-						or(...acceptMsByMsAtInviteIdRows.map((r) => pf.atId({ at_ms: r.by_ms }))),
-						or(
-							and(
-								pf.in_ms.eq(input.spaceMs),
-								or(
-									pf.code.eq(pc.permissionCodeNumIdAtAccountId),
-									pf.code.eq(pc.roleCodeNumIdAtAccountId),
+					firstLoad
+						? or(
+								...(isLocalOrPersonal
+									? []
+									: [
+											roleCode?.num === roleCodes.mod || roleCode?.num === roleCodes.owner
+												? makeMyValidInvitesFilter(callerMs, spaceMs)
+												: undefined,
+											and(
+												pf.noAtId,
+												pf.ms.gt0,
+												pf.in_ms.eq(spaceMs),
+												input.newMemberPermissionCode &&
+													pf.notGranularNum(input.newMemberPermissionCode),
+												pf.code.eq(pc.newMemberPermissionCodeNumId),
+												pf.txt.isNull,
+											),
+										]),
+								and(
+									pf.noAtId,
+									pf.ms.gt0,
+									pf.in_ms.eq(spaceMs),
+									pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
+									or(
+										...(input.memberCount === undefined || input.description === undefined
+											? []
+											: [
+													pf.num.notEq(input.memberCount),
+													pf.txt.notEq(input.description.txt),
+													pf.ms.notEq(input.description.ms || 0),
+												]),
+									),
+									pf.txt.isNotNull,
 								),
-							),
-							and(
-								pf.by_ms.eq0,
-								pf.in_ms.eq0, //
-								pf.code.eq(pc.accountNameTxtMsByMs),
-							),
-						),
-					),
+							)
+						: undefined,
+					...(roleCodeNumIdAtAccountIdRows.length
+						? [
+								and(
+									pf.noAtId,
+									pf.ms.gt0,
+									or(
+										...[
+											...new Set(roleCodeNumIdAtAccountIdRows.flatMap((r) => [r.by_ms, r.at_ms])),
+										].map((accountMs) => pf.by_ms.eq(accountMs)),
+									),
+									pf.in_ms.eq0,
+									pf.code.eq(pc.accountNameTxtMsByMs),
+								),
+								and(
+									pf.at_in_ms.eq(spaceMs),
+									pf.ms.gt0,
+									or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.by_ms.eq(r.at_ms))),
+									pf.in_ms.eq0,
+									pf.code.eq(pc.acceptMsByMsAtInviteId),
+								),
+								and(
+									or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.atId({ at_ms: r.at_ms }))),
+									pf.ms.gt0,
+									pf.in_ms.eq(spaceMs),
+									or(
+										pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+										pf.code.eq(pc.flairTxtIdAtAccountId),
+									),
+								),
+							]
+						: []),
 				),
 			),
 	);
 
-	if (spaceAndInviteRowFilters) {
-		let spaceIsPublicBinIdRow = assert1Row(spaceIsPublicBinIdRows);
-		let spaceNameTxtIdAndMemberCountNumRow = assert1Row(spaceNameTxtIdAndMemberCountNumRows);
-		let spaceDescriptionTxtIdRow = assert1Row(spaceDescriptionTxtIdRows);
-		let spacePinnedQueryTxtIdRow = assert1Row(spacePinnedQueryTxtIdRows);
-		let newMemberPermissionCodeIdRow = assert1Row(newMemberPermissionCodeIdRows);
-		space = {
-			ms: input.spaceMs,
-			memberCount: spaceNameTxtIdAndMemberCountNumRow.num,
-			isPublic: getGranularNumProp(spaceIsPublicBinIdRow),
-			name: getGranularNumTxtProp(spaceNameTxtIdAndMemberCountNumRow),
-			description: getGranularNumTxtProp(spaceDescriptionTxtIdRow),
-			pinnedQuery: getGranularNumTxtProp(spacePinnedQueryTxtIdRow),
-			newMemberPermissionCode: getGranularNumProp(newMemberPermissionCodeIdRow),
-		};
+	if (firstLoad) {
+		spaceUpdate = { ms: spaceMs };
+		let spaceDescriptionTxtIdAndMemberCountNumRow = assertLt2Rows(
+			spaceDescriptionTxtIdAndMemberCountNumRows,
+		);
+		if (spaceDescriptionTxtIdAndMemberCountNumRow) {
+			spaceUpdate.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num;
+			spaceUpdate.description = getGranularTxtProp(spaceDescriptionTxtIdAndMemberCountNumRow);
+		}
+		let newMemberPermissionCodeNumIdRow = assertLt2Rows(newMemberPermissionCodeNumIdRows);
+		if (newMemberPermissionCodeNumIdRow) {
+			spaceUpdate.newMemberPermissionCode = getGranularNumProp(newMemberPermissionCodeNumIdRow);
+		}
 
-		invites = inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlugRows.map((row) => ({
-			ms: row.ms,
-			by_ms: row.by_ms,
-			in_ms: row.in_ms,
-			expiryMs: row.at_by_ms,
-			slug: row.txt!,
-		}));
-
-		let inviteLinkAuthorNameRowFilter =
-			input.roleCode?.num === roleCodes.owner
-				? and(
-						pf.ms.gt0,
-						// pf.in_ms.eq(input.spaceMs),
-						pf.code.eq(pc.accountNameTxtMsByMs),
-					)
-				: undefined;
+		invites = inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxtRows.map(
+			(row) => ({
+				ms: row.ms,
+				by_ms: row.by_ms,
+				in_ms: row.in_ms,
+				expiryMs: row.at_ms,
+				maxUses: row.at_in_ms,
+				useCount: row.at_by_ms,
+				slugEnd: row.txt!,
+			}),
+		);
 	}
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < nameTxtMsAtAccountIdRows.length; i++) {
-		let { txt, at_ms } = nameTxtMsAtAccountIdRows[i];
-		msToAccountNameTxtMap[at_ms] = txt!;
+	for (let i = 0; i < accountNameTxtMsByMsRows.length; i++) {
+		let { txt, by_ms } = accountNameTxtMsByMsRows[i];
+		msToAccountNameTxtMap[by_ms] = txt!;
 	}
-	let mapByAtMs = (rows: PartSelect[]) => {
-		let map: Record<number, PartSelect> = {};
-		for (let row of rows) map[row.at_ms] = row;
-		return map;
-	};
-	let accountMsToPermissionNumIdMap = mapByAtMs(permissionNumIdAtAccountIdRows);
-	let accountMsToSpaceRoleNumIdMap = mapByAtMs(roleCodeNumIdAtAccountIdRows);
-
-	let memberships: Membership[] = acceptMsByMsAtInviteIdRows.map((acceptMsByMsAtInviteIdRow) => {
-		let accountMs = acceptMsByMsAtInviteIdRow.by_ms;
-		return {
-			invite: {
-				by_ms: acceptMsByMsAtInviteIdRow.at_by_ms,
-				in_ms: acceptMsByMsAtInviteIdRow.at_in_ms,
-			},
-			accept: {
-				ms: acceptMsByMsAtInviteIdRow.ms,
-				by_ms: accountMs,
-			},
-			permission: {
-				num: accountMsToPermissionNumIdMap[accountMs].num,
-				ms: accountMsToPermissionNumIdMap[accountMs].ms,
-				by_ms: accountMsToPermissionNumIdMap[accountMs].by_ms,
-			},
-			role: {
-				num: accountMsToSpaceRoleNumIdMap[accountMs].num,
-				ms: accountMsToSpaceRoleNumIdMap[accountMs].ms,
-				by_ms: accountMsToSpaceRoleNumIdMap[accountMs].by_ms,
-			},
+	let accountMsToRoleFlairMap: Record<
+		number,
+		{
+			role: GranularNumProp;
+			flair: GranularTxtProp;
+		}
+	> = {};
+	for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
+		let { ms, num, by_ms, at_ms } = roleCodeNumIdAtAccountIdRows[i];
+		accountMsToRoleFlairMap[at_ms] = {
+			role: { num, ms, by_ms },
+			flair: { txt: '' },
 		};
-	});
+	}
+	for (let i = 0; i < flairTxtIdAtAccountIdRows.length; i++) {
+		let { ms, txt, by_ms, at_ms } = flairTxtIdAtAccountIdRows[i];
+		accountMsToRoleFlairMap[at_ms].flair = { txt: txt!, ms, by_ms };
+	}
 
-	let settingIdRows = [...roleCodeNumIdAtAccountIdRows, ...permissionNumIdAtAccountIdRows];
-	let missingNameAccountMss: number[] = [];
-	for (let i = 0; i < settingIdRows.length; i++) {
-		let settingIdRow = settingIdRows[i];
-		if (settingIdRow.by_ms && !msToAccountNameTxtMap[settingIdRow.by_ms]) {
-			missingNameAccountMss.push(settingIdRow.by_ms);
+	let accountMsToPermissionNumIdMap: Record<number, PartSelect> = {};
+	for (let row of permissionCodeNumIdAtAccountIdRows)
+		accountMsToPermissionNumIdMap[row.at_ms] = row;
+
+	let acceptMsByMsAtInviteIdMap: Record<number, PartSelect> = {};
+	for (let row of acceptMsByMsAtInviteIdRows) acceptMsByMsAtInviteIdMap[row.by_ms] = row;
+
+	let memberships: Membership[] = roleCodeNumIdAtAccountIdRows.map(
+		(roleCodeNumIdAtAccountIdRow) => {
+			let accountMs = roleCodeNumIdAtAccountIdRow.at_ms;
+			let acceptMsByMsAtInviteIdRow = acceptMsByMsAtInviteIdMap[accountMs];
+			let accountMsToPermissionNumIdRow = accountMsToPermissionNumIdMap[accountMs];
+			return {
+				invite: {
+					by_ms: acceptMsByMsAtInviteIdRow.at_by_ms,
+					in_ms: spaceMs,
+				},
+				accept: {
+					ms: acceptMsByMsAtInviteIdRow.ms,
+					by_ms: accountMs,
+				},
+				permission: {
+					num: accountMsToPermissionNumIdRow.num,
+					ms: accountMsToPermissionNumIdRow.ms,
+					by_ms: accountMsToPermissionNumIdRow.by_ms,
+				},
+				// role: {
+				// 	num: roleCodeNumIdAtAccountIdRow.num,
+				// 	ms: roleCodeNumIdAtAccountIdRow.ms,
+				// 	by_ms: roleCodeNumIdAtAccountIdRow.by_ms,
+				// },
+				// flair: {
+				// 	num: accountMsToPermissionNumIdRow.num,
+				// 	ms: accountMsToPermissionNumIdRow.ms,
+				// 	by_ms: accountMsToPermissionNumIdRow.by_ms,
+				// },
+			};
+		},
+	);
+
+	let procuredRows = [
+		...spaceDescriptionTxtIdAndMemberCountNumRows,
+		...newMemberPermissionCodeNumIdRows,
+		...permissionCodeNumIdAtAccountIdRows,
+		...acceptMsByMsAtInviteIdRows,
+		...flairTxtIdAtAccountIdRows,
+	];
+	let missingNameAccountMssSet: Set<number> = new Set();
+	for (let i = 0; i < procuredRows.length; i++) {
+		let procuredRow = procuredRows[i];
+		let procuringAccountMs =
+			pc.acceptMsByMsAtInviteId === procuredRow.code ? procuredRow.at_by_ms : procuredRow.by_ms;
+		if (procuringAccountMs && !msToAccountNameTxtMap[procuringAccountMs]) {
+			missingNameAccountMssSet.add(procuringAccountMs);
 		}
 	}
+	let missingNameAccountMss = [...missingNameAccountMssSet];
 	if (missingNameAccountMss.length) {
-		let nameTxtMsAtAccountIdRows2 = await db
+		let _accountNameTxtMsByMsRows = await db
 			.select()
 			.from(pTable)
 			.where(
 				and(
-					or(...missingNameAccountMss.map((ms) => pf.atId({ at_ms: ms }))),
-					pf.by_ms.eq0,
+					pf.noAtId,
+					pf.ms.gt0,
+					or(...missingNameAccountMss.map((ms) => pf.by_ms.eq(ms))),
 					pf.in_ms.eq0,
 					pf.code.eq(pc.accountNameTxtMsByMs),
 				),
 			);
-		for (let i = 0; i < nameTxtMsAtAccountIdRows2.length; i++) {
-			let { txt, at_ms } = nameTxtMsAtAccountIdRows2[i];
-			msToAccountNameTxtMap[at_ms] = txt!;
+		for (let i = 0; i < _accountNameTxtMsByMsRows.length; i++) {
+			let { txt, by_ms } = _accountNameTxtMsByMsRows[i];
+			msToAccountNameTxtMap[by_ms] = txt!;
 		}
 	}
 
 	return {
-		space,
+		spaceUpdate,
+		invites,
 		memberships,
 		msToAccountNameTxtMap,
+		accountMsToRoleFlairMap,
 	};
 };

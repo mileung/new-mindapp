@@ -1,7 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { scrollToHighlight, textInputFocused } from '$lib/dom';
-	import { getBottomOverlayShown, gs, resetBottomOverlay } from '$lib/global-state.svelte';
+	import {
+		getBottomOverlayShown,
+		getPromptSigningIn,
+		getUrlInMsContext,
+		gs,
+		mergeMsToAccountNameTxtMap,
+		mergeMsToSpaceNameTxtMap,
+		mergeSpaceMsToAccountMsToRoleFlairMap,
+		resetBottomOverlay,
+	} from '$lib/global-state.svelte';
+	import { alertError, makeErrorReadable } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
@@ -9,6 +19,7 @@
 		getAtIdStr,
 		getIdStr,
 		getIdStrAsIdObj,
+		getUrlInMs,
 		id0,
 		isIdStr,
 		type IdObj,
@@ -18,7 +29,7 @@
 	import { editPost } from '$lib/types/posts/editPost';
 	import { getPostFeed, postsPerLoad, type GetPostFeedArg } from '$lib/types/posts/getPostFeed';
 	import { parseSearchQuery } from '$lib/types/posts/parseSearchQuery';
-	import { getPromptSigningIn, permissionCodes } from '$lib/types/spaces';
+	import { permissionCodes } from '$lib/types/spaces';
 	import {
 		IconArchive,
 		IconChevronRight,
@@ -69,11 +80,13 @@
 		let { feedSlug } = page.params;
 		return isIdStr(feedSlug) ? feedSlug : undefined;
 	});
-	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
-	let canView = $derived(spaceContext?.isPublic || spaceContext?.roleCode);
-	let showViewOnly = $derived(canView && !spaceContext?.permissionCode);
+	let urlInMs = $derived(getUrlInMs());
+	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
+	let spaceContext = $derived(getUrlInMsContext());
+	let viewable = $derived(space?.isPublic || spaceContext?.roleCode);
+	let showViewOnly = $derived(viewable && !spaceContext?.permissionCode);
 	let showYourTurn = $derived(
-		gs.urlInMs && gs.urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,
+		urlInMs && urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
 	let allowTopLvlPosting = $derived(
@@ -82,11 +95,11 @@
 			(spaceContext?.permissionCode?.num === permissionCodes.postOnly ||
 				spaceContext?.permissionCode?.num === permissionCodes.reactAndPost),
 	);
-
+	let callerMs = $derived(gs.accounts?.[0].ms);
 	let identifier = $derived(
 		JSON.stringify({
-			canView,
-			ms: gs.accounts?.[0].ms,
+			viewable,
+			ms: callerMs,
 			href: page.url.href,
 		}),
 	);
@@ -95,9 +108,15 @@
 	let endReached = $derived(feed?.endReached);
 	let postAtBumpedPostIdObjsExclude = $derived(feed?.postAtBumpedPostIdObjsExclude || []);
 	let error = $derived(feed?.error || '');
-	let loadMorePosts = async (e: InfiniteEvent) => {
-		if (!spaceContext || promptSignIn) return;
 
+	let loadMorePosts = async (e: InfiniteEvent) => {
+		if (
+			callerMs === undefined ||
+			urlInMs === undefined ||
+			!gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] ||
+			promptSignIn
+		)
+			return;
 		// await new Promise((res) => setTimeout(res, 1000));
 		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 		if (endReached) return e.detail.complete();
@@ -119,7 +138,7 @@
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
-			inMssInclude: gs.urlInMs ? [gs.urlInMs] : [],
+			inMssInclude: urlInMs ? [urlInMs] : [],
 			postIdObjsExclude: [],
 			postIdObjsInclude: [],
 			tagsExclude: [],
@@ -149,7 +168,7 @@
 							getPostFeedArg.msAfter = lastTopLvlPostIdObj.ms - 1;
 						}
 						let lastTopLvlPostIdObjsWithSameMs: IdObj[] = [lastTopLvlPostIdObj];
-						for (let i = topLvlPostIdStrs.length - 1; i >= 0; i--) {
+						for (let i = topLvlPostIdStrs.length - 2; i >= 0; i--) {
 							let idObj = getIdStrAsIdObj((topLvlPostIdStrs as string[])[i]);
 							if (idObj.ms === lastTopLvlPostIdObj!.ms) {
 								lastTopLvlPostIdObjsWithSameMs.push(idObj);
@@ -161,24 +180,11 @@
 				postFeed = await getPostFeed(getPostFeedArg);
 			}
 			let { topLvlPostIdStrs: newTopLvlPostIdStrs, idToPostMap: newIdToPostMap } = postFeed;
-			// TODO: add accountMsToNameTxtMap to local db
-			// TODO: add msToSpaceNameTxtMap to local db
-			gs.accountMsToNameTxtMap = {
-				...gs.accountMsToNameTxtMap,
-				...postFeed.msToAccountNameTxtMap,
-			};
+			// TODO: add account and space names to to local db using msToAccountNameTxtMap and msToSpaceNameTxtMap
 
-			// console.log(
-			// 	'postFeed.spaceMsToAccountMsToRoleNumMap:',
-			// 	postFeed.spaceMsToAccountMsToRoleNumMap,
-			// );
-			for (let key in postFeed.spaceMsToAccountMsToRoleNumMap) {
-				gs.spaceMsToAccountMsToRoleNumMap[key] ||= {};
-				for (let prop in postFeed.spaceMsToAccountMsToRoleNumMap[key]) {
-					gs.spaceMsToAccountMsToRoleNumMap[key][prop] =
-						postFeed.spaceMsToAccountMsToRoleNumMap[key][prop];
-				}
-			}
+			mergeMsToAccountNameTxtMap(postFeed.msToAccountNameTxtMap);
+			mergeMsToSpaceNameTxtMap(postFeed.msToSpaceNameTxtMap);
+			mergeSpaceMsToAccountMsToRoleFlairMap(postFeed.spaceMsToAccountMsToRoleFlairMap);
 
 			Object.entries(newIdToPostMap).forEach(([id, post]) => {
 				let lastVersion = getLastVersion(newIdToPostMap[id]);
@@ -213,8 +219,7 @@
 			gs.urlToFeedMap = {
 				...gs.urlToFeedMap,
 				[identifier]: {
-					// @ts-ignore
-					error: String(error?.message || m.placeholderError()),
+					error: makeErrorReadable(error),
 				},
 			};
 			e.detail.error();
@@ -223,7 +228,7 @@
 
 	let viewPostToastId = $state('');
 	let submitPost = async (tags: string[], core: string) => {
-		if (!gs.accounts) return;
+		if (!gs.accounts || urlInMs === undefined) return;
 		await updateSavedTags(tags);
 		let post: Post;
 		if (gs.writingEdit) {
@@ -259,7 +264,7 @@
 						}
 					: {}),
 				by_ms: gs.accounts[0].ms,
-				in_ms: gs.urlInMs!,
+				in_ms: urlInMs,
 				history: {
 					1: {
 						ms: 0,
@@ -273,10 +278,9 @@
 				post.ms = (await addPost(post)).ms;
 				post.history![1]!.ms = post.ms;
 				post.subIds = [];
-				gs.urlInMs && (await addPost(post, true));
+				urlInMs && (await addPost(post, true));
 			} catch (error) {
-				console.error(error);
-				return alert(error);
+				return alertError(error);
 			}
 		}
 
@@ -321,12 +325,6 @@
 		}
 	});
 
-	let endingPanelClass = $derived(
-		gs.pendingInvite
-			? `h-[calc(100vh-36px-36px)] xs:h-[calc(100vh-36px)]`
-			: 'h-[calc(100vh-36px)]  xs:h-screen',
-	);
-
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
 			if (!textInputFocused()) {
@@ -356,14 +354,16 @@
 	});
 </script>
 
-<div
-	class={`z-50 flex flex-col ${gs.pendingInvite ? 'h- screen-[calc(100vh-36px)]' : 'h- screen'}`}
->
-	{#if gs.urlInMs === undefined}
-		<!--  -->
-	{:else if promptSignIn}
-		<PromptSignIn />
-	{:else}
+{#if urlInMs === undefined || callerMs === undefined || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]}
+	<!--  -->
+{:else if promptSignIn}
+	<PromptSignIn />
+{:else if !viewable}
+	<p class="m-2 text-lg text-fg2 text-center">
+		{m.spaceNotFound()}
+	</p>
+{:else}
+	<div class="z-50 flex flex-col">
 		{#if qSearchParam}
 			<div class="h-9 fx">
 				<IconListSearch class="shrink-0 w-6 ml-0.5 mr-2" />
@@ -405,46 +405,48 @@
 				<p class="font-bold text-xl leading-4">{m.nextUp()}</p>
 			</div>
 		{/if}
-		<div
-			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
-		>
-			<a
-				href={makeParams('nested', sortedBy)}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
+		{#if viewable}
+			<div
+				class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
 			>
-				<IconListTree stroke={2.5} class="h-4" />{m.nested()}
-			</a>
-			<a
-				href={makeParams('flat', sortedBy)}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
-			>
-				<IconList stroke={2.5} class="h-4" />{m.flat()}
-			</a>
-			<div class="xy mr-0.5">
-				<IconSquareFilled class="h-1.5 w-1.5" />
-			</div>
-			{#if !qSearchParam}
 				<a
-					href={makeParams(view, 'bumped')}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
+					href={makeParams('nested', sortedBy)}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
 				>
-					<IconMessage2Up stroke={2.5} class="h-4" />
-					{m.bumped()}
+					<IconListTree stroke={2.5} class="h-4" />{m.nested()}
 				</a>
-			{/if}
-			<a
-				href={makeParams(view, 'new')}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
-			>
-				<IconClockUp stroke={2.5} class="h-4" />{m.new()}
-			</a>
-			<a
-				href={makeParams(view, 'old')}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
-			>
-				<IconArchive stroke={2.5} class="h-4" />{m.old()}
-			</a>
-		</div>
+				<a
+					href={makeParams('flat', sortedBy)}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
+				>
+					<IconList stroke={2.5} class="h-4" />{m.flat()}
+				</a>
+				<div class="xy mr-0.5">
+					<IconSquareFilled class="h-1.5 w-1.5" />
+				</div>
+				{#if !qSearchParam}
+					<a
+						href={makeParams(view, 'bumped')}
+						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
+					>
+						<IconMessage2Up stroke={2.5} class="h-4" />
+						{m.bumped()}
+					</a>
+				{/if}
+				<a
+					href={makeParams(view, 'new')}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
+				>
+					<IconClockUp stroke={2.5} class="h-4" />{m.new()}
+				</a>
+				<a
+					href={makeParams(view, 'old')}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
+				>
+					<IconArchive stroke={2.5} class="h-4" />{m.old()}
+				</a>
+			</div>
+		{/if}
 		{#each postObjFeed as post, i (getIdStr(post))}
 			{#if postIdStr && i === 1}
 				<div class="h-9 fx">
@@ -454,62 +456,58 @@
 			{/if}
 			<PostBlock {...p} {post} depth={0} nested={postIdStr ? !i : nested} />
 		{/each}
-		{#if canView}
+		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
-				<div slot="noResults" class={endingPanelClass}>
+				<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
 					<p class="m-2 text-lg text-fg2">
 						<!-- noResults slot shows even after adding the first post -->
 						{postObjFeed?.length ? m.theEnd() : m.noPostsFound()}
 					</p>
 				</div>
-				<div slot="noMore" class={endingPanelClass}>
+				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
 					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 				</div>
 				<p slot="error" class="m-2 text-lg text-fg2">
 					{error}
 				</p>
 			</InfiniteLoading>
-		{:else}
-			<p class="m-2 text-lg text-fg2 text-center">
-				{m.spaceNotFound()}
-			</p>
 		{/if}
-	{/if}
-	{#if postIdStr}
-		<a
-			href={`/__${gs.urlInMs}`}
-			onclick={() => {
-				gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
-			}}
-			class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
+		{#if postIdStr}
+			<a
+				href={`/__${urlInMs}`}
+				onclick={() => {
+					gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
+				}}
+				class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
+			>
+				<IconX class="w-8" />
+			</a>
+		{:else if allowTopLvlPosting}
+			<button
+				class="z-40 fixed xy right-0 bottom-9 xs:bottom-0 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
+				onclick={() => (gs.writingNew = true)}
+			>
+				<IconPencilPlus class="h-8 xs:h-9" />
+			</button>
+		{/if}
+		<div class="flex-1"></div>
+		<div
+			class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}
 		>
-			<IconX class="w-8" />
-		</a>
-	{:else if allowTopLvlPosting}
-		<button
-			class="z-40 fixed xy right-0 bottom-9 xs:bottom-0 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
-			onclick={() => (gs.writingNew = true)}
-		>
-			<IconPencilPlus class="h-8 xs:h-9" />
-		</button>
-	{/if}
-	<div class="flex-1"></div>
-	<div
-		class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}
-	>
-		{#if gs.showReactionHistory}
-			<ReactionHistory />
-		{:else}
-			<PostWriter onSubmit={submitPost} />
+			{#if gs.showReactionHistory}
+				<ReactionHistory />
+			{:else}
+				<PostWriter onSubmit={submitPost} />
+			{/if}
+		</div>
+		{#if viewPostToastId}
+			<a
+				href={'/' + viewPostToastId}
+				class="z-50 fixed bottom-2 self-center fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
+			>
+				{m.viewPost()}
+				<IconChevronRight class="h-5" stroke={3} />
+			</a>
 		{/if}
 	</div>
-	{#if viewPostToastId}
-		<a
-			href={'/' + viewPostToastId}
-			class="z-50 fixed bottom-2 self-center fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
-		>
-			{m.viewPost()}
-			<IconChevronRight class="h-5" stroke={3} />
-		</a>
-	{/if}
-</div>
+{/if}

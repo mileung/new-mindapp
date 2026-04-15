@@ -9,8 +9,8 @@ import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean }) => {
-	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
-	if (sessionKey) {
+	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	if (sessionIdObj) {
 		await tdb
 			.delete(pTable)
 			.where(
@@ -19,11 +19,10 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 							and(
 								pf.atId({ at_ms: input.callerMs }),
 								pf.ms.gt0,
-								pf.by_ms.eq0,
 								pf.in_ms.eq0,
 								or(
 									pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-									pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
+									pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 								),
 								pf.num.eq0,
 								pf.txt.isNotNull,
@@ -32,25 +31,23 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 								pf.at_ms.gt0,
 								pf.at_by_ms.eq0,
 								pf.at_in_ms.eq0,
-								pf.ms.lte(Date.now() - week),
-								pf.by_ms.eq0,
+								pf.ms.lt(Date.now() - week),
 								pf.in_ms.eq0,
 								or(
 									pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-									pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
-									pf.code.eq(pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount),
-									pf.code.eq(pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount),
-									pf.code.eq(pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount),
+									pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 								),
+								pf.num.eq0,
 								pf.txt.isNotNull,
 							),
 						)
 					: and(
 							pf.atId({ at_ms: input.callerMs }),
-							pf.id({ ms: sessionKey.ms }),
-							pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
+							pf.ms.eq(sessionIdObj.ms),
+							pf.in_ms.eq0,
+							pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 							pf.num.eq0,
-							pf.txt.eq(sessionKey.txt),
+							pf.txt.eq(sessionIdObj.txt),
 						),
 			);
 	}

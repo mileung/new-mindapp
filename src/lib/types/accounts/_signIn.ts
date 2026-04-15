@@ -1,9 +1,16 @@
 import { ranStr } from '$lib/js';
+import { m } from '$lib/paraglide/messages';
 import { _getEmailRow } from '$lib/server/_getEmailRow';
 import { tdb } from '$lib/server/db';
 import { type Context } from '$lib/trpc/context';
 import { filterAccountPwHashRow, reduceMyAccountRows, type MyAccount } from '$lib/types/accounts';
-import { assert1Row, assertLt2Rows, channelPartsByCode, type PartInsert } from '$lib/types/parts';
+import {
+	assert1Row,
+	assertLt2Rows,
+	channelPartsByCode,
+	type PartInsert,
+	type PartSelect,
+} from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
 import { pf } from '$lib/types/parts/partFilters';
 import { id0 } from '$lib/types/parts/partIds';
@@ -21,9 +28,9 @@ export let _signIn = async (
 		pin?: string;
 		email: string;
 		password: string;
+		resetPassword?: boolean;
 	},
 ): Promise<{
-	fail?: true;
 	otpMs?: number;
 	strike?: number;
 	expiredOtp?: true;
@@ -38,78 +45,95 @@ export let _signIn = async (
 			otpMs,
 			pin,
 			deleteIfCorrect: true,
-			partCode: pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 		});
 		if (res.strike || res.expiredOtp) return res;
 		otpVerified = true;
 	}
 	let emailRow = await _getEmailRow(input.email);
-	if (!emailRow) return { fail: true };
+	if (!emailRow) throw new Error(m.anErrorOccurred());
 	let accountMs = emailRow.by_ms;
-	let pwHashRow = assert1Row(
-		await tdb.select().from(pTable).where(filterAccountPwHashRow(accountMs)),
-	);
-	if (!(await argon2.verify(pwHashRow.txt!, input.password))) return { fail: true };
-
 	let ms = Date.now();
-	let clientKey = getValidAuthCookie(ctx, 'clientKey');
+	let pwHashRow: PartSelect;
+	if (input.resetPassword) {
+		if (!otpVerified) throw new Error(m.anErrorOccurred());
+		pwHashRow = (
+			await tdb
+				.update(pTable)
+				.set({
+					ms,
+					txt: await argon2.hash(input.password),
+				})
+				.where(filterAccountPwHashRow(emailRow!.by_ms))
+				.returning()
+		)[0];
+	} else {
+		pwHashRow = assert1Row(
+			await tdb.select().from(pTable).where(filterAccountPwHashRow(accountMs)),
+		);
+		if (!(await argon2.verify(pwHashRow.txt!, input.password)))
+			throw new Error(m.anErrorOccurred());
+	}
 
-	let clientKeyTxtMsAtAccountIdRows = clientKey
+	let clientIdObj = getValidAuthCookie(ctx, 'clientKeyObj');
+
+	let clientIdObjTxtMsAtAccountIdRows = clientIdObj
 		? await tdb
 				.select()
 				.from(pTable)
 				.where(
 					and(
 						pf.atId({ at_ms: accountMs }),
-						pf.id({ ms: clientKey.ms }),
+						pf.id({ ms: clientIdObj.ms }),
 						pf.code.eq(pc.clientKeyTxtMsAtAccountId),
 						pf.num.eq0,
-						pf.txt.eq(clientKey.txt),
+						pf.txt.eq(clientIdObj.txt),
 					),
 				)
 		: [];
-	let clientKeyTxtMsAtAccountIdRow = assertLt2Rows(clientKeyTxtMsAtAccountIdRows);
+	console.log('clientIdObjTxtMsAtAccountIdRows:', clientIdObjTxtMsAtAccountIdRows);
+	let clientIdObjTxtMsAtAccountIdRow = assertLt2Rows(clientIdObjTxtMsAtAccountIdRows);
 	let partsToInsert: PartInsert[] = [];
-	if (!clientKeyTxtMsAtAccountIdRow) {
+	if (!clientIdObjTxtMsAtAccountIdRow) {
 		if (otpVerified) {
-			clientKey = { ms, txt: ranStr() };
-			setCookie(ctx, 'clientKey', JSON.stringify(clientKey));
+			clientIdObj = { ms, txt: ranStr() };
+			setCookie(ctx, 'clientKeyObj', clientIdObj);
 			partsToInsert.push({
 				...id0,
 				at_ms: accountMs,
-				ms: clientKey.ms,
+				ms: clientIdObj.ms,
 				code: pc.clientKeyTxtMsAtAccountId,
 				num: 0,
-				txt: clientKey.txt,
+				txt: clientIdObj.txt,
 			});
 		} else {
 			return await _sendOtp({
 				...input,
-				partCode: pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
+				will: { signIn: true },
 			});
 		}
 	}
-	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
+
+	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
 	let {
-		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
-		[pc.accountEmailTxtMsByMs]: emailTxtMsAtAccountIdRows = [],
-		[pc.accountNameTxtMsByMs]: nameTxtMsAtAccountIdRows = [],
-		[pc.accountBioTxtMsByMs]: bioTxtMsAtAccountIdRows = [],
-		[pc.accountSavedTagsTxtMsByMs]: savedTagsTxtMsAtAccountIdRows = [],
-		[pc.accountSpaceMssTxtMsByMs]: spaceMssTxtMsAtAccountIdRows = [],
+		[pc.sessionKeyTxtMs_ExpiryMs_AtAccountId]: sessionIdObjTxtMsAtAccountIdRows = [],
+		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
+		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
+		[pc.accountBioTxtMsByMs]: accountBioTxtMsByMsRows = [],
+		[pc.accountSavedTagsTxtMsByMs]: accountSavedTagsTxtMsByMsRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					sessionKey
+					sessionIdObj
 						? and(
 								pf.atId({ at_ms: accountMs }),
-								pf.id({ ms: sessionKey.ms }),
-								pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
+								pf.ms.eq(sessionIdObj.ms),
+								pf.in_ms.eq0,
+								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 								pf.num.eq0,
-								// omitting pf.txt.eq(sessionKey.txt) since this check is to see if
+								// omitting pf.txt.eq(sessionIdObj.txt) since this check is to see if
 								// there is a primary key conflict. txt is not part of pk
 							)
 						: undefined,
@@ -118,61 +142,38 @@ export let _signIn = async (
 						pf.ms.gt0,
 						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.accountEmailTxtMsByMs),
-						pf.num.eq0,
-						pf.txt.isNotNull,
-					),
-					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.by_ms.eq(accountMs),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.accountNameTxtMsByMs),
-						pf.num.eq0,
-						pf.txt.isNotNull,
-					),
-					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.by_ms.eq(accountMs),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.accountBioTxtMsByMs),
-						pf.num.eq0,
-						pf.txt.isNotNull,
-					),
-					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.by_ms.eq(accountMs),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.accountSavedTagsTxtMsByMs),
+						or(
+							pf.code.eq(pc.accountEmailTxtMsByMs),
+							pf.code.eq(pc.accountNameTxtMsByMs),
+							pf.code.eq(pc.accountBioTxtMsByMs),
+							pf.code.eq(pc.accountSavedTagsTxtMsByMs),
+						),
 						pf.num.eq0,
 						pf.txt.isNotNull,
 					),
 				),
 			),
 	);
-	if (!sessionKey) {
-		sessionKey = { ms, txt: ranStr() };
-		setCookie(ctx, 'sessionKey', JSON.stringify(sessionKey));
-	}
-	if (!sessionKeyTxtMsAtAccountIdRows.length) {
+	if (!sessionIdObjTxtMsAtAccountIdRows.length) {
+		if (!sessionIdObj) {
+			sessionIdObj = { ms, txt: ranStr() };
+			setCookie(ctx, 'sessionKeyObj', sessionIdObj);
+		}
 		partsToInsert.push({
 			...id0,
 			at_ms: accountMs,
-			ms: sessionKey.ms,
-			code: pc.sessionKeyTxtMsAtAccountId,
+			ms: sessionIdObj.ms,
+			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
 			num: 0,
-			txt: sessionKey.txt,
+			txt: sessionIdObj.txt,
 		});
 	}
 	let account = reduceMyAccountRows([
-		...emailTxtMsAtAccountIdRows,
-		...nameTxtMsAtAccountIdRows,
-		...bioTxtMsAtAccountIdRows,
-		...savedTagsTxtMsAtAccountIdRows,
-		...spaceMssTxtMsAtAccountIdRows,
+		...accountEmailTxtMsByMsRows,
+		...accountNameTxtMsByMsRows,
+		...accountBioTxtMsByMsRows,
+		...accountSavedTagsTxtMsByMsRows,
 	]);
-	if (partsToInsert.length) await tdb.insert(pTable).values(partsToInsert).returning();
+	if (partsToInsert.length) await tdb.insert(pTable).values(partsToInsert);
 	return { account };
 };

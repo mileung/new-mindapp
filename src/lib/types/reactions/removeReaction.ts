@@ -1,8 +1,9 @@
+import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or, SQL } from 'drizzle-orm';
 import { ReactionSchema, type Reaction } from '.';
-import { gsdb, type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode, getWhoWhereObj } from '../parts';
+import { type Database } from '../../local-db';
+import { assert1Row, channelPartsByCode } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';

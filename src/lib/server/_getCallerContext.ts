@@ -1,328 +1,546 @@
 import { ranStr } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { deleteSessionKeyCookie, getValidAuthCookie, setCookie } from '$lib/server/sessions';
-import { hour, week } from '$lib/time';
+import { deleteCookie, getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
+import { hour, minute } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import {
-	reducePartialAccountRows,
+	reduceMyAccountUpdateRows,
 	type CallerContext,
 	type GetCallerContextGetArg,
 	type MyAccountUpdates,
 } from '$lib/types/accounts';
 import {
-	assertLt2Rows,
 	channelPartsByCode,
+	sameGranularNum,
 	type GranularNumProp,
-	type GranularTxtProp,
+	type PartSelect,
 } from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
 import { pf } from '$lib/types/parts/partFilters';
+import { id0 } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
-import { permissionCodes, roleCodes } from '$lib/types/spaces';
-import { and, or, SQL } from 'drizzle-orm';
+import {
+	permissionCodes,
+	reduceMySpaceUpdateRows,
+	roleCodes,
+	type MySpaceUpdate,
+} from '$lib/types/spaces';
+import { and, or } from 'drizzle-orm';
+
+// export let getCallerContext = async (get: GetCallerContextGetArg) => {
+// 	let baseInput = await getWhoWhereObj();
+// 	// TODO: use local db as a fallback when cloud db can't find a post
+// 	return baseInput.spaceMs
+// 		? trpc().getCallerContext.query({ ...baseInput, get })
+// 		: _getCallerContext(await gsdb(), null, baseInput, get);
+// };
 
 export let _getCallerContext = async (
 	ctx: Context,
-	input: {
+	{
+		callerMs,
+		spaceMs,
+	}: {
 		callerMs: number;
 		spaceMs?: number;
 	},
 	get: GetCallerContextGetArg,
 ) => {
+	// console.log('get', JSON.stringify(get, null, 2));
 	if (!get.signedIn && (get.roleCode || get.permissionCode))
 		throw new Error('must get signed in to get callerRole or permissionCode');
-	if (get.isPublic && !input.spaceMs) throw new Error('input.spaceMs must be gt0');
-	if (get.permissionCode && !get.roleCode)
-		throw new Error('must get permissionCode to get roleCode');
-	if (get.pinnedQuery && !get.isPublic) throw new Error('Must get isPublic to get pinnedQuery');
-
-	let signedIn: undefined | boolean;
-	let isPublic: undefined | null | GranularNumProp;
-	let pinnedQuery: undefined | null | GranularTxtProp;
-	let roleCode: undefined | null | GranularNumProp;
-	let permissionCode: undefined | null | GranularNumProp;
-
-	let currentAccountUpdates: undefined | MyAccountUpdates;
-	let signedInAccountMss: undefined | number[];
-	let spaceMssAwaitingResponse: undefined | number[];
+	if (get.isPublic && !spaceMs) throw new Error('spaceMs must be gt0');
+	// if (!get.roleCode && get.permissionCode)
+	// 	throw new Error('must get roleCode to get permissionCode');
 
 	let ms = Date.now();
-	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
-	let sessionKeyTxtMsAtAccountIdFilter: undefined | SQL;
+	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
 
-	if (input.callerMs && get.signedIn && sessionKey && ms - sessionKey.ms < week) {
-		sessionKeyTxtMsAtAccountIdFilter = and(
-			pf.atId({ at_ms: input.callerMs }),
-			pf.id({ ms: sessionKey.ms }),
-			pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
-			pf.num.eq0,
-			pf.txt.eq(sessionKey.txt),
+	let signedIn: undefined | boolean;
+	let isPublic: undefined | GranularNumProp;
+	let roleCode: undefined | GranularNumProp;
+	let permissionCode: undefined | GranularNumProp;
+
+	let {
+		spaceUpdatesFrom = [], //
+		signedInAccountUpdatesFrom = [],
+	} = get;
+
+	if (
+		(get.signedIn || get.isPublic || get.roleCode || get.permissionCode) &&
+		(spaceUpdatesFrom.length || signedInAccountUpdatesFrom.length)
+	)
+		throw new Error(
+			`Cannot use get[signedIn/isPublic/roleCode/permissionCode] and spaceUpdatesFrom/signedInAccountUpdatesFrom at the same time`,
 		);
+
+	if (spaceMs && (get.isPublic || get.roleCode || get.permissionCode)) {
+		if (get.isPublic && spaceMs === 1) isPublic = { num: 1 };
+		else if (spaceMs === callerMs) {
+			if (get.isPublic) isPublic = { num: 0 };
+			if (get.roleCode) roleCode = { num: roleCodes.owner };
+			if (get.permissionCode) permissionCode = { num: permissionCodes.reactAndPost };
+		}
+		spaceUpdatesFrom.push({
+			ms: spaceMs,
+			isPublic,
+			roleCode,
+			permissionCode,
+		});
 	}
 
-	let signedInAccountMssFilter: undefined | SQL;
-	if (sessionKey && (get.signedInAccountMssFrom || (input.callerMs && get.signedIn))) {
-		let accountMss = [
-			...new Set([
-				...(get.signedInAccountMssFrom || []),
-				...(input.callerMs > 0 ? [input.callerMs] : []),
-			]),
-		];
+	if (!sessionIdObj) signedInAccountUpdatesFrom = [];
+	else if (
+		// get.signedIn &&
+		callerMs && //
+		!signedInAccountUpdatesFrom.some((a) => a.ms === callerMs)
+	)
+		signedInAccountUpdatesFrom.push({ ms: callerMs });
+	signedInAccountUpdatesFrom = signedInAccountUpdatesFrom.filter((a) => a.ms);
 
-		signedInAccountMssFilter = and(
-			or(...accountMss.map((ms) => pf.atId({ at_ms: ms }))),
-			pf.id({ ms: sessionKey.ms }),
-			pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
-			pf.num.eq0,
-			pf.txt.eq(sessionKey.txt),
-		);
-	}
+	// Assume spaceUpdatesFrom and signedInAccountUpdatesFrom do not
+	// have duplicate spaces/accounts otherwise garbage out
 
-	let yourTurnIndicatorsFilter: undefined | SQL;
-	if (get.yourTurnIndicatorsFromSpaceMsToLastCheckMsMap) {
-	}
+	// if ([new Set(spaceUpdatesFrom.map((s) => s.ms))].length !== spaceUpdatesFrom.length)
+	// 	throw new Error(`duplicate spaces in spaceUpdatesFrom`);
+	// if (
+	// 	[new Set(signedInAccountUpdatesFrom.map((a) => a.ms))].length !==
+	// 	signedInAccountUpdatesFrom.length
+	// )
+	// 	throw new Error(`duplicate accounts in signedInAccountUpdatesFrom`);
 
-	let accountUpdatesFilter: undefined | SQL;
-	if (get.latestAccountAttributesFromCallerAttributes) {
-		let { email, name, bio, savedTags, spaceMss } = get.latestAccountAttributesFromCallerAttributes;
-		accountUpdatesFilter = or(
-			and(
-				pf.noAtId,
-				or(pf.ms.notEq(email.ms || 0), pf.txt.notEq(email.txt)),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.accountEmailTxtMsByMs),
-				pf.num.eq0,
-			),
-			and(
-				pf.noAtId,
-				or(pf.ms.notEq(name.ms || 0), pf.txt.notEq(name.txt)),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.accountNameTxtMsByMs),
-				pf.num.eq0,
-			),
-			and(
-				pf.noAtId,
-				or(pf.ms.notEq(bio.ms || 0), pf.txt.notEq(bio.txt)),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.accountBioTxtMsByMs),
-				pf.num.eq0,
-			),
-			and(
-				pf.noAtId,
-				or(pf.ms.notEq(savedTags.ms || 0), pf.txt.notEq(savedTags.txt)),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.accountSavedTagsTxtMsByMs),
-				pf.num.eq0,
-			),
-			and(
-				pf.noAtId,
-				or(pf.ms.notEq(spaceMss.ms || 0), pf.txt.notEq(spaceMss.txt)),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.accountSpaceMssTxtMsByMs),
-				pf.num.eq0,
-			),
-		);
-	}
+	let forcedSpaceUpdateRows: PartSelect[] = [];
 
 	let filters = [
-		sessionKeyTxtMsAtAccountIdFilter,
-		...(input.spaceMs
+		...(sessionIdObj
 			? [
-					get.isPublic && input.spaceMs > 1 && input.spaceMs !== input.callerMs
+					signedInAccountUpdatesFrom.length
 						? and(
-								pf.in_ms.eq(input.spaceMs), //
-								get.isPublic === true ? undefined : pf.num.notEq(get.isPublic.num),
-								pf.code.eq(pc.spaceIsPublicBinId),
-								pf.txt.isNull,
+								or(...signedInAccountUpdatesFrom.map((a) => pf.atId({ at_ms: a.ms }))),
+								pf.id({ ms: sessionIdObj.ms }),
+								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+								pf.num.gte0,
+								pf.txt.eq(sessionIdObj.txt),
 							)
 						: undefined,
-					get.pinnedQuery
+					callerMs && get.allJoinedSpaces
 						? and(
-								pf.in_ms.eq(input.spaceMs), //
-								get.pinnedQuery === true
-									? undefined
-									: or(
-											pf.ms.notEq(get.pinnedQuery.ms || 0),
-											pf.txt.notEq(get.pinnedQuery.txt), //
-										),
-								pf.code.eq(pc.spacePinnedQueryTxtId),
-								pf.txt.isNotNull,
-							)
-						: undefined,
-					get.roleCode && input.spaceMs && input.spaceMs !== input.callerMs
-						? and(
-								pf.atId({ at_ms: input.callerMs }),
+								pf.atId({ at_ms: callerMs }),
 								pf.ms.gt0,
-								pf.in_ms.eq(input.spaceMs),
-								pf.code.eq(pc.roleCodeNumIdAtAccountId),
-								pf.txt.isNull,
-							)
-						: undefined,
-					get.permissionCode && input.spaceMs && input.spaceMs !== input.callerMs
-						? and(
-								pf.atId({ at_ms: input.callerMs }),
-								pf.ms.gt0,
-								pf.in_ms.eq(input.spaceMs),
-								pf.code.eq(pc.permissionCodeNumIdAtAccountId),
-								get.permissionCode === true
-									? undefined
-									: or(
-											pf.ms.notEq(get.permissionCode.ms || 0),
-											pf.num.notEq(get.permissionCode.num), //
-										),
+								pf.in_ms.notEq(callerMs),
+								...spaceUpdatesFrom.map((su) => pf.in_ms.notEq(su.ms)),
+								pf.in_ms.gt0,
+								or(
+									pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+									pf.code.eq(pc.roleCodeNumIdAtAccountId),
+									pf.code.eq(pc.spacePriorityIdAccentCodeNumAtAccountId),
+								),
+								pf.num.gte0,
 								pf.txt.isNull,
 							)
 						: undefined,
 				]
 			: []),
-		signedInAccountMssFilter,
-		yourTurnIndicatorsFilter,
-		accountUpdatesFilter,
+		...spaceUpdatesFrom.flatMap((su) => {
+			if (!su.ms || su.ms === callerMs) {
+				su.isPublic?.num &&
+					forcedSpaceUpdateRows.push({
+						...id0,
+						in_ms: su.ms,
+						code: pc.spaceIsPublicBinId,
+						num: 0,
+						txt: null,
+					});
+				if (su.ms === spaceMs) {
+					su.permissionCode &&
+						su.permissionCode?.num !== permissionCodes.reactAndPost &&
+						forcedSpaceUpdateRows.push({
+							...id0,
+							at_ms: callerMs,
+							ms: callerMs,
+							in_ms: callerMs,
+							code: pc.permissionCodeNumIdAtAccountId,
+							num: permissionCodes.reactAndPost,
+							txt: null,
+						});
+					// su.roleCode?.num !== roleCodes.owner &&
+					forcedSpaceUpdateRows.push({
+						...id0,
+						at_ms: callerMs,
+						ms: callerMs,
+						in_ms: callerMs,
+						code: pc.roleCodeNumIdAtAccountId,
+						num: roleCodes.owner,
+						txt: null,
+					});
+				}
+				// su.accentCode?.num &&
+				// 	forcedSpaceUpdateRows.push({
+				// 		...id0,
+				// 		code: pc.spacePriorityIdAccentCodeNumAtAccountId,
+				// 		num: accentCodes.none,
+				// 		txt: null,
+				// 	});
+			}
+			if (su.ms === 1)
+				// if (su.ms === 1 && !su.isPublic?.num)
+				forcedSpaceUpdateRows.push({
+					...id0,
+					in_ms: 1,
+					code: pc.spaceIsPublicBinId,
+					num: 1,
+					txt: null,
+				});
+			return [
+				...(su.ms && su.ms !== callerMs
+					? [
+							su.accentCode &&
+								and(
+									pf.atId({ at_ms: callerMs }),
+									pf.notGranularNum(su.accentCode),
+									pf.in_ms.eq(su.ms),
+									pf.code.eq(pc.spacePriorityIdAccentCodeNumAtAccountId),
+									pf.num.gte0,
+									pf.txt.isNull,
+								),
+						]
+					: []),
+				su.ms === spaceMs && su.pinnedQuery
+					? and(
+							pf.noAtId,
+							pf.notGranularTxt(su.pinnedQuery),
+							pf.in_ms.eq(su.ms),
+							pf.code.eq(pc.spacePinnedQueryTxtId),
+							pf.num.eq0,
+							pf.txt.isNotNull,
+						)
+					: undefined,
+				...(su.ms && su.ms !== callerMs
+					? [
+							su.ms > 1 && su.name
+								? and(
+										pf.noAtId,
+										pf.notGranularTxt(su.name),
+										pf.in_ms.eq(su.ms),
+										pf.code.eq(pc.spaceNameTxtId),
+										pf.num.eq0,
+										pf.txt.isNotNull,
+									)
+								: undefined,
+							...(su.ms === spaceMs
+								? [
+										su.ms > 1
+											? // su.ms > 1 && su.isPublic
+												and(
+													pf.noAtId,
+													// pf.notGranularNum(su.isPublic),
+													pf.in_ms.eq(su.ms),
+													pf.code.eq(pc.spaceIsPublicBinId),
+													pf.num.gte0,
+													pf.num.lte(1),
+													pf.txt.isNull,
+												)
+											: undefined,
+										su.permissionCode
+											? and(
+													pf.atId({ at_ms: callerMs }),
+													pf.notGranularNum(su.permissionCode),
+													pf.in_ms.eq(su.ms),
+													pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+													pf.num.gte0,
+													pf.txt.isNull,
+												)
+											: undefined,
+										and(
+											pf.atId({ at_ms: callerMs }),
+											pf.ms.gt0,
+											pf.in_ms.eq(su.ms),
+											pf.code.eq(pc.roleCodeNumIdAtAccountId),
+											pf.num.gte0,
+											pf.txt.isNull,
+										),
+									]
+								: []),
+						]
+					: []),
+			];
+		}),
+		...signedInAccountUpdatesFrom.flatMap((signedInAccountUpdate) => {
+			return [
+				signedInAccountUpdate.email &&
+					and(
+						pf.noAtId,
+						pf.notGranularTxt(signedInAccountUpdate.email),
+						pf.by_ms.eq(signedInAccountUpdate.ms),
+						pf.in_ms.eq0,
+						pf.code.eq(pc.accountEmailTxtMsByMs),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+				signedInAccountUpdate.name &&
+					and(
+						pf.noAtId,
+						pf.notGranularTxt(signedInAccountUpdate.name),
+						pf.by_ms.eq(signedInAccountUpdate.ms),
+						pf.in_ms.eq0,
+						pf.code.eq(pc.accountNameTxtMsByMs),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+				signedInAccountUpdate.bio &&
+					and(
+						pf.noAtId,
+						pf.notGranularTxt(signedInAccountUpdate.bio),
+						pf.by_ms.eq(signedInAccountUpdate.ms),
+						pf.in_ms.eq0,
+						pf.code.eq(pc.accountBioTxtMsByMs),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+				signedInAccountUpdate.savedTags &&
+					and(
+						pf.noAtId,
+						pf.notGranularTxt(signedInAccountUpdate.savedTags),
+						pf.by_ms.eq(signedInAccountUpdate.ms),
+						pf.in_ms.eq0,
+						pf.code.eq(pc.accountSavedTagsTxtMsByMs),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+			];
+		}),
 	];
 
 	let {
-		[pc.sessionKeyTxtMsAtAccountId]: sessionKeyTxtMsAtAccountIdRows = [],
+		[pc.sessionKeyTxtMs_ExpiryMs_AtAccountId]: sessionKeyTxtMs_ExpiryMs_AtAccountIdRows = [],
 
 		[pc.spaceIsPublicBinId]: spaceIsPublicBinIdRows = [],
+		[pc.spaceNameTxtId]: spaceNameTxtIdRows = [],
 		[pc.spacePinnedQueryTxtId]: spacePinnedQueryTxtIdRows = [],
+		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
 		[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
-		[pc.permissionCodeNumIdAtAccountId]: permissionNumIdAtAccountIdRows = [],
+		[pc.spacePriorityIdAccentCodeNumAtAccountId]: spacePriorityIdAccentCodeNumAtAccountIdRows = [],
 
-		[pc.accountEmailTxtMsByMs]: emailTxtMsAtAccountIdRows = [],
-		[pc.accountNameTxtMsByMs]: nameTxtMsAtAccountIdRows = [],
-		[pc.accountBioTxtMsByMs]: bioTxtMsAtAccountIdRows = [],
-		[pc.accountSavedTagsTxtMsByMs]: savedTagsTxtMsAtAccountIdRows = [],
-		[pc.accountSpaceMssTxtMsByMs]: spaceMssTxtMsAtAccountIdRows = [],
-	} = channelPartsByCode(
-		filters.some((f) => f)
+		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
+		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
+		[pc.accountBioTxtMsByMs]: accountBioTxtMsByMsRows = [],
+		[pc.accountSavedTagsTxtMsByMs]: accountSavedTagsTxtMsByMsRows = [],
+	} = channelPartsByCode([
+		...(filters.some((f) => f)
 			? await tdb
 					.select()
 					.from(pTable)
 					.where(or(...filters))
-			: [],
+			: []),
+		...forcedSpaceUpdateRows,
+	]);
+
+	let caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow =
+		sessionKeyTxtMs_ExpiryMs_AtAccountIdRows.find((row) => row.at_ms === callerMs);
+
+	let msToSpaceUpdatesFrom: Record<number, undefined | MySpaceUpdate> = {};
+	// console.log('spaceUpdatesFrom:', spaceUpdatesFrom);
+	for (let i = 0; i < spaceUpdatesFrom.length; i++) {
+		let u = spaceUpdatesFrom[i];
+		msToSpaceUpdatesFrom[u.ms] = u;
+	}
+	if (get.allJoinedSpaces && caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow) {
+		let unfetchedSpaceMss: number[] = [];
+		for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
+			let row = roleCodeNumIdAtAccountIdRows[i];
+			if (!msToSpaceUpdatesFrom[row.in_ms]) unfetchedSpaceMss.push(row.in_ms);
+		}
+		if (unfetchedSpaceMss.length) {
+			let {
+				[pc.spaceIsPublicBinId]: _spaceIsPublicBinIdRows = [],
+				[pc.spaceNameTxtId]: _spaceNameTxtIdRows = [],
+				[pc.spacePinnedQueryTxtId]: _spacePinnedQueryTxtIdRows = [],
+			} = channelPartsByCode(
+				await tdb
+					.select()
+					.from(pTable)
+					.where(
+						and(
+							pf.noAtId,
+							or(...unfetchedSpaceMss.map((ms) => pf.in_ms.eq(ms))),
+							or(
+								and(
+									pf.code.eq(pc.spaceIsPublicBinId),
+									pf.num.gte0, //
+									pf.num.lte(1),
+									pf.txt.isNull,
+								),
+								and(
+									or(
+										pf.code.eq(pc.spaceNameTxtId), //
+										pf.code.eq(pc.spacePinnedQueryTxtId),
+									),
+									pf.num.eq0, //
+									pf.txt.isNotNull,
+								),
+							),
+						),
+					),
+			);
+			spaceIsPublicBinIdRows.push(..._spaceIsPublicBinIdRows);
+			spaceNameTxtIdRows.push(..._spaceNameTxtIdRows);
+			spacePinnedQueryTxtIdRows.push(..._spacePinnedQueryTxtIdRows);
+		}
+	}
+
+	let spaceUpdatedRows = [
+		...spaceIsPublicBinIdRows,
+		...spaceNameTxtIdRows,
+		...spacePinnedQueryTxtIdRows,
+		...permissionCodeNumIdAtAccountIdRows,
+		...roleCodeNumIdAtAccountIdRows,
+		...spacePriorityIdAccentCodeNumAtAccountIdRows,
+	];
+	let spaceMsToRowsMap: Record<number, PartSelect[]> = {};
+	for (let i = 0; i < spaceUpdatedRows.length; i++) {
+		let row = spaceUpdatedRows[i];
+		spaceMsToRowsMap[row.in_ms] ??= [];
+		spaceMsToRowsMap[row.in_ms].push(row);
+	}
+	let joinedSpaceMss = caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow
+		? roleCodeNumIdAtAccountIdRows.map((r) => r.in_ms)
+		: [];
+	let callerJoinedSpaceMs = false;
+	let joinedSpaceUpdates: MySpaceUpdate[] = joinedSpaceMss.map((ms) => {
+		if (ms === spaceMs) callerJoinedSpaceMs = true;
+		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms] || [{ in_ms: ms }]);
+		let spaceUpdateFrom = msToSpaceUpdatesFrom[ms];
+		// Need these if statements since isPublic and roleCode don't use notGranularNum
+		if (sameGranularNum(su.isPublic, spaceUpdateFrom?.isPublic)) su.isPublic = undefined;
+		if (sameGranularNum(su.roleCode, spaceUpdateFrom?.roleCode)) su.roleCode = undefined;
+		return su;
+	});
+	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =
+		spaceMs !== undefined &&
+		!callerJoinedSpaceMs &&
+		spaceIsPublicBinIdRows.some((r) => r.in_ms === spaceMs)
+			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs] || [{ in_ms: spaceMs }])
+			: undefined;
+	if (visitingPublicSpaceUpdate) {
+		let spaceUpdateFrom = msToSpaceUpdatesFrom[visitingPublicSpaceUpdate.ms];
+		if (sameGranularNum(visitingPublicSpaceUpdate.isPublic, spaceUpdateFrom?.isPublic))
+			visitingPublicSpaceUpdate.isPublic = undefined;
+		if (sameGranularNum(visitingPublicSpaceUpdate.roleCode, spaceUpdateFrom?.roleCode))
+			visitingPublicSpaceUpdate.roleCode = undefined;
+	}
+
+	let accountUpdatedRows = [
+		...accountEmailTxtMsByMsRows,
+		...accountNameTxtMsByMsRows,
+		...accountBioTxtMsByMsRows,
+		...accountSavedTagsTxtMsByMsRows,
+	];
+	let accountMsToRowsMap: Record<number, PartSelect[]> = {};
+	for (let i = 0; i < accountUpdatedRows.length; i++) {
+		let row = accountUpdatedRows[i];
+		accountMsToRowsMap[row.by_ms] ??= [];
+		accountMsToRowsMap[row.by_ms].push(row);
+	}
+	let signedInAccountUpdates: MyAccountUpdates[] = sessionKeyTxtMs_ExpiryMs_AtAccountIdRows.map(
+		({ at_ms }) => reduceMyAccountUpdateRows(accountMsToRowsMap[at_ms] || [{ by_ms: at_ms }]),
 	);
 
-	// console.log('sessionKeyTxtMsAtAccountIdRows:', sessionKeyTxtMsAtAccountIdRows);
-	let sessionKeyTxtMsAtAccountIdRowForCaller = sessionKeyTxtMsAtAccountIdRows.find(
-		(row) => row.at_ms === input.callerMs,
-	);
-
-	if (sessionKeyTxtMsAtAccountIdRowForCaller) {
+	if (caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow) {
 		if (get.signedIn) {
 			signedIn = true;
 			if (get.roleCode) {
-				if (input.spaceMs === input.callerMs) roleCode = { num: roleCodes.owner };
+				if (spaceMs === callerMs) roleCode = { num: roleCodes.owner };
 				else {
-					let roleCodeNumIdAtAccountIdRow = assertLt2Rows(roleCodeNumIdAtAccountIdRows);
-					if (roleCodeNumIdAtAccountIdRow) {
-						roleCode = {
-							ms: roleCodeNumIdAtAccountIdRow.ms,
-							num: roleCodeNumIdAtAccountIdRow.num,
-						};
-					} else roleCode = null;
+					let caller_roleCodeNumIdAtAccountIdRow = roleCodeNumIdAtAccountIdRows.find(
+						(row) => row.at_ms === callerMs,
+					);
+					if (caller_roleCodeNumIdAtAccountIdRow) {
+						let { ms, num } = caller_roleCodeNumIdAtAccountIdRow;
+						roleCode = { ms, num };
+					} // else roleCode = undefined;
 				}
 			}
 			if (get.permissionCode) {
-				if (input.spaceMs === input.callerMs) {
+				if (spaceMs === callerMs) {
 					permissionCode = { num: permissionCodes.reactAndPost };
 				} else {
-					let permissionNumIdAtAccountIdRow = assertLt2Rows(permissionNumIdAtAccountIdRows);
-					if (permissionNumIdAtAccountIdRow) {
-						permissionCode = {
-							ms: permissionNumIdAtAccountIdRow.ms,
-							num: permissionNumIdAtAccountIdRow.num,
-						};
-					} else if (!roleCode) permissionCode = null;
+					let caller_permissionCodeNumIdAtAccountIdRow = permissionCodeNumIdAtAccountIdRows.find(
+						(row) => row.at_ms === callerMs,
+					);
+					if (caller_permissionCodeNumIdAtAccountIdRow) {
+						let { ms, num } = caller_permissionCodeNumIdAtAccountIdRow;
+						permissionCode = { ms, num };
+					} // else if (!roleCode) permissionCode = null;
 				}
 			}
 		}
-		if (ms - sessionKeyTxtMsAtAccountIdRowForCaller.ms > hour) {
-			sessionKey = { ms, txt: ranStr() };
-			setCookie(ctx, 'sessionKey', JSON.stringify(sessionKey));
-			await tdb
-				.update(pTable)
-				.set(sessionKey)
-				.where(
-					and(
-						pf.at_ms.gt0,
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						pf.id({ ms: sessionKeyTxtMsAtAccountIdRowForCaller.ms }),
-						pf.code.eq(pc.sessionKeyTxtMsAtAccountId),
-						pf.num.eq0,
-						pf.txt.eq(sessionKeyTxtMsAtAccountIdRowForCaller.txt!),
-					),
-				);
+		if (ms - caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.ms > hour) {
+			let newSessionObj: CookieObj = { ms, txt: ranStr() };
+			setCookie(ctx, 'sessionKeyObj', newSessionObj);
+			await tdb.insert(pTable).values({
+				...id0,
+				at_ms: callerMs,
+				code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
+				num: 0,
+				...newSessionObj,
+			});
+			if (!caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.num) {
+				let oldCookiePartialFilter = [
+					pf.at_by_ms.eq0,
+					pf.at_in_ms.eq0,
+					pf.ms.eq(caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.ms),
+					pf.in_ms.eq0,
+					pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+					pf.num.eq0,
+					pf.txt.eq(caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.txt!),
+				];
+				await tdb
+					.update(pTable)
+					.set({ num: ms + minute })
+					.where(
+						and(
+							pf.at_ms.eq(callerMs), //
+							...oldCookiePartialFilter,
+						),
+					);
+				await tdb
+					.update(pTable)
+					.set(newSessionObj)
+					.where(
+						and(
+							pf.at_ms.gt0, //
+							pf.at_ms.notEq(callerMs),
+							...oldCookiePartialFilter,
+						),
+					);
+			}
 		}
+	} else {
+		joinedSpaceUpdates = [];
+		signedInAccountUpdatesFrom.length && deleteCookie(ctx, 'sessionKeyObj');
 	}
 
 	if (get.isPublic) {
-		if (input.spaceMs === 1 && (get.isPublic === true || !get.isPublic.num)) isPublic = { num: 1 };
+		if (spaceMs === 1) isPublic = { num: 1 };
 		else {
-			let spaceIsPublicBinIdRow = assertLt2Rows(spaceIsPublicBinIdRows);
-			if (spaceIsPublicBinIdRow) {
-				isPublic =
-					spaceIsPublicBinIdRow.num || roleCode
-						? { ms: spaceIsPublicBinIdRow.ms, num: spaceIsPublicBinIdRow.num }
-						: null;
+			let caller_spaceIsPublicBinIdRow = spaceIsPublicBinIdRows.find(
+				(row) => row.in_ms === spaceMs,
+			);
+			if (caller_spaceIsPublicBinIdRow) {
+				let { ms, num } = caller_spaceIsPublicBinIdRow;
+				isPublic = roleCode || num ? { ms, num } : undefined;
 			}
 		}
-	}
-
-	if (get.pinnedQuery) {
-		let spacePinnedQueryTxtIdRow = assertLt2Rows(spacePinnedQueryTxtIdRows);
-		if (spacePinnedQueryTxtIdRow) {
-			pinnedQuery =
-				isPublic?.num || roleCode
-					? { ms: spacePinnedQueryTxtIdRow.ms, txt: spacePinnedQueryTxtIdRow.txt! }
-					: null;
-		}
-	}
-
-	if (signedIn) {
-		if (get.sidebarSpaceNames) {
-			//
-		}
-		if (get.yourTurnIndicatorsFromSpaceMsToLastCheckMsMap) {
-			//
-		}
-		if (get.latestAccountAttributesFromCallerAttributes) {
-			let updatedRows = [
-				...emailTxtMsAtAccountIdRows,
-				...nameTxtMsAtAccountIdRows,
-				...bioTxtMsAtAccountIdRows,
-				...savedTagsTxtMsAtAccountIdRows,
-				...spaceMssTxtMsAtAccountIdRows,
-			];
-			if (updatedRows.length) currentAccountUpdates = reducePartialAccountRows(updatedRows);
-		}
-	}
-
-	if (get.signedInAccountMssFrom)
-		signedInAccountMss = sessionKeyTxtMsAtAccountIdRows.map((r) => r.at_ms);
-
-	if (get.signedIn && !signedIn) deleteSessionKeyCookie(ctx);
-
-	if (get.roleCode && get.roleCode !== true) {
-		// If get.roleCode, roleCode must always be fetched fresh in case
-		// the caller is no longer a member of the space
-		if (roleCode?.num === get.roleCode.num) roleCode = undefined;
 	}
 
 	return {
 		signedIn,
-		isPublic,
-		pinnedQuery,
 		roleCode,
 		permissionCode,
+		isPublic,
 
-		currentAccountUpdates,
-		signedInAccountMss,
-		spaceMssAwaitingResponse,
+		joinedSpaceUpdates,
+		visitingPublicSpaceUpdate,
+		signedInAccountUpdates,
 	} satisfies CallerContext;
 };

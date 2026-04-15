@@ -1,17 +1,21 @@
+import { dev } from '$app/environment';
+import { goto } from '$app/navigation';
 import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
-import { gs } from '../global-state.svelte';
+import { getWhoObj, gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
 import { getDefaultAccount, MyAccountSchema } from './accounts';
-import { getWhoObj } from './parts';
 import { normalizeTags } from './posts';
+import { accentCodes, permissionCodes, roleCodes, SpaceSchema } from './spaces';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
 
 export let LocalCacheSchema = z
 	.object({
-		urlInMs: z.number(),
+		devMode: z.boolean(),
+		lastSeenInMs: z.number(),
 		accounts: z.array(MyAccountSchema),
+		msToSpaceMap: z.record(z.string(), SpaceSchema.optional()),
 	})
 	.strict();
 
@@ -19,8 +23,10 @@ export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
 let getDefaultLocalCache = () =>
 	structuredClone({
-		urlInMs: 0,
+		devMode: dev,
+		lastSeenInMs: 0,
 		accounts: [getDefaultAccount()],
+		msToSpaceMap: {},
 	} satisfies LocalCache);
 
 export let getLocalCache = () => {
@@ -46,7 +52,7 @@ export let getLocalCache = () => {
 	return localCache;
 };
 
-export let updateLocalCache = async (updater: (old: LocalCache) => LocalCache) => {
+export let updateLocalCache = (updater: (old: LocalCache) => LocalCache) => {
 	if (gs.accounts) {
 		let oldLocalCache = getLocalCache();
 		let newLocalCache = updater(oldLocalCache);
@@ -57,8 +63,10 @@ export let updateLocalCache = async (updater: (old: LocalCache) => LocalCache) =
 			});
 			throw new Error('Invalid local cache update');
 		}
-		gs.urlInMs = newLocalCache.urlInMs;
+		gs.devMode = newLocalCache.devMode;
+		gs.lastSeenInMs = newLocalCache.lastSeenInMs;
 		gs.accounts = newLocalCache.accounts;
+		gs.msToSpaceMap = newLocalCache.msToSpaceMap;
 		localStorage.setItem(localCacheLocalStorageKey, JSON.stringify(newLocalCache));
 	}
 };
@@ -95,17 +103,61 @@ export let unsaveAccount = (accountMs: number) => {
 	}));
 };
 
-export let signOut = async (callerMs: number, allCallerMsSessions = false) => {
+export let signOut = async (callerMs: number, everywhere = false) => {
 	try {
 		await trpc().signOut.mutate({
 			callerMs,
-			everywhere: allCallerMsSessions,
+			everywhere,
 		});
 	} catch (error) {}
-	unsaveAccount(callerMs);
-	gs.urlToFeedMap = {};
-	gs.accountMsToSpaceMsToCheckedMap = {
-		...gs.accountMsToSpaceMsToCheckedMap,
-		[callerMs]: {},
-	};
+	updateLocalCache((lc) => {
+		lc.accounts = lc.accounts
+			.map((a) => ({
+				...a,
+				signedIn: a.ms === callerMs ? false : a.signedIn,
+			}))
+			.sort((a, b) => {
+				let aPriority = !a.ms || a.signedIn ? 0 : 1;
+				let bPriority = !b.ms || b.signedIn ? 0 : 1;
+				return aPriority - bPriority;
+			});
+		return lc;
+	});
+	if (callerMs === gs.accounts?.[0].ms) {
+		gs.urlToFeedMap = {};
+		delete gs.accountMsToSpaceMsToCheckedMap[callerMs];
+		goto(`/__${gs.lastSeenInMs}`);
+	}
+};
+
+export let useCheckedInvite = async () => {
+	if (gs.accounts !== undefined && gs.checkedInvite) {
+		if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms) return alert(m.cannotUseYourOwnInvite());
+		let { redeemed } = await trpc().checkInvite.mutate({
+			...(await getWhoObj()),
+			inviteSlug: gs.checkedInvite.slug,
+			useIfValid: true,
+		});
+		if (!redeemed) return alert(m.invalidInvite());
+
+		let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
+		updateLocalCache((lc) => {
+			lc.accounts[0].joinedSpaceContexts.unshift({
+				ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
+				accentCode: { num: accentCodes.none },
+				permissionCode: { num: permissionCodes.reactAndPost },
+				roleCode: { num: roleCodes.member },
+			});
+			return lc;
+		});
+		gs.accountMsToSpaceMsToCheckedMap = {
+			...gs.accountMsToSpaceMsToCheckedMap,
+			[gs.accounts[0].ms]: {
+				...gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms],
+				[gs.checkedInvite.partialSpace.ms]: false,
+			},
+		};
+		gs.checkedInvite = undefined;
+		goto(`/__${joinedSpaceMs}`);
+	}
 };

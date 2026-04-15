@@ -1,8 +1,7 @@
 import type { LibSQLDatabase } from 'drizzle-orm/libsql';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
-import { gs } from './global-state.svelte';
-import { m } from './paraglide/messages';
+import { alertError } from './js';
 
 export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
@@ -31,18 +30,7 @@ export let initLocalDb = async () => {
 			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
 	`;
 	} catch (error) {
-		console.error(error);
+		// console.error(error);
+		alertError(error);
 	}
-};
-
-export let gsdb = async () => {
-	let attempts = 0;
-	while (!gs.db) {
-		if (++attempts > 888) {
-			alert(m.localDatabaseTimedOut());
-			throw new Error(m.localDatabaseTimedOut());
-		}
-		await new Promise((res) => setTimeout(res, 42));
-	}
-	return gs.db;
 };

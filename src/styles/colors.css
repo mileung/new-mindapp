@@ -12,8 +12,8 @@
 		--bg6: #e3e2de;
 		--bg7: #deddd8;
 		--bg8: #d9d7d2;
-		--hl1: var(--color-sky-500);
-		--hl2: var(--color-sky-600);
+		--hl1: var(--color-sky-400);
+		--hl2: var(--color-sky-500);
 		--hl-link: var(--color-teal-400);
 		--hl-edit: var(--color-red-400);
 		--hl-spot: var(--color-yellow-400);
@@ -34,8 +34,8 @@
 		--bg6: #323234;
 		--bg7: #38383a;
 		--bg8: #3e3e40;
-		--hl1: var(--color-cyan-400);
-		--hl2: var(--color-cyan-300);
+		--hl1: var(--color-cyan-500);
+		--hl2: var(--color-cyan-400);
 		--hl-link: var(--color-teal-300);
 		--hl-edit: var(--color-red-300);
 		--hl-spot: var(--color-yellow-300);

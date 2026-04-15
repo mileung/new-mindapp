@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { goto } from '$app/navigation';
 import { m } from './paraglide/messages';
 
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
@@ -7,15 +8,15 @@ export let getPostWriterHeight = () =>
 	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
 
 export let scrollToHighlight = (id: string) => {
-	let hlc =
+	let hlContainer =
 		document.querySelector('.hlc-' + id) || //
 		document.querySelector('.flat-at-hlc-' + id) ||
 		document.querySelector('.cited-hlc-' + id);
 	let hl =
 		document.querySelector('#hl-' + id) || //
 		document.querySelector('.hl-' + id);
-	if (hlc && hl) {
-		let { top: hlcTop } = hlc.getBoundingClientRect();
+	if (hlContainer && hl) {
+		let { top: hlcTop } = hlContainer.getBoundingClientRect();
 		let { height: hlHeight } = hl.getBoundingClientRect();
 		window.scrollTo({
 			top:
@@ -25,7 +26,7 @@ export let scrollToHighlight = (id: string) => {
 				getPostWriterHeight(),
 			behavior: 'smooth',
 		});
-	}
+	} else goto(`/${id}`);
 };
 
 export let scrape = (externalUrl: string, externalDomString: string) => {
@@ -161,6 +162,7 @@ export let getHoverColors = () => {
 
 export let promptSum = (cb: (a: number, b: number) => string) => {
 	let requireSumPrompt = !dev;
+	dev && (requireSumPrompt = true);
 	if (requireSumPrompt) {
 		let a = Math.floor(Math.random() * 90) + 10;
 		let b = Math.floor(Math.random() * 90) + 10;

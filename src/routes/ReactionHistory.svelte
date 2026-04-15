@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { scrollToHighlight } from '$lib/dom';
-	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
-
+	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { getIdStr, type IdObj } from '$lib/types/parts/partIds';
 	import type { Reaction } from '$lib/types/reactions';
 	import { getReactionHistory, reactionsPerLoad } from '$lib/types/reactions/getReactionHistory';
@@ -26,15 +24,19 @@
 	});
 
 	let loadMoreReactions = async (e: InfiniteEvent) => {
-		if (!gs.accounts || gs.urlInMs === undefined || !post) return;
-		let fromMs = reactions.slice(-1)[0]?.ms || Number.MAX_SAFE_INTEGER;
+		if (!gs.accounts || gs.lastSeenInMs === undefined || !post) return;
+		let lastRxn = reactions.slice(-1)[0];
 		let rxnIdObjsExclude: IdObj[] = [];
-		for (let i = reactions.length - 1; i >= 0; i--) {
+		for (let i = reactions.length - 2; i >= 0; i--) {
 			let rxn = reactions[i];
-			if (rxn.ms === fromMs) rxnIdObjsExclude.push(rxn);
+			if (rxn.ms === lastRxn.ms) rxnIdObjsExclude.push(rxn);
 			else break;
 		}
-		let res = await getReactionHistory(post, fromMs, rxnIdObjsExclude);
+		let res = await getReactionHistory({
+			postIdObj: post,
+			rxnIdObjsExclude,
+			msBefore: lastRxn ? lastRxn.ms + 1 : Number.MAX_SAFE_INTEGER,
+		});
 		reactions = [...reactions, ...res.reactions];
 		e.detail.loaded();
 
@@ -68,12 +70,12 @@
 				{rxn.emoji}
 				<a
 					href={`/_${post.by_ms}_`}
-					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.accountMsToNameTxtMap[rxn.by_ms] ? '' : 'italic'}`}
+					class={`fx px-1 group hover:text-fg1 hover:bg-bg6 ${gs.msToProfileMap[rxn.by_ms]?.name.txt ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx`}>
 						<AccountIcon isUser ms={post.by_ms} class="mr-0.5 shrink-0 w-4" />
 						<p class="pr-1">
-							{accountMsToNameTxt(rxn.by_ms)}
+							{msToAccountNameTxt(rxn.by_ms)}
 						</p>
 					</div>
 				</a>
@@ -86,7 +88,6 @@
 			on:infinite={loadMoreReactions}
 		>
 			<p slot="noMore" class="mb-2 text-lg text-fg2">{m.theEnd()}</p>
-			<!-- <p slot="error" class="mb-2 text-lg text-fg2">{m.placeholderError()}</p> -->
 		</InfiniteLoading>
 	</div>
 {/if}

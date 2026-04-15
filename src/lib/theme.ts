@@ -5,7 +5,7 @@ export let getSystemTheme = () =>
 
 export let setTheme = (theme: 'light' | 'dark' | 'system') => {
 	gs.theme = theme;
-	localStorage.setItem('theme', theme);
+	localStorage.setItem('mindappTheme', theme);
 	let dark = (theme === 'system' ? getSystemTheme() : theme) === 'dark';
 	document.documentElement.classList[dark ? 'add' : 'remove']('dark');
 };

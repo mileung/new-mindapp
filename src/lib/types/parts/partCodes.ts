@@ -42,34 +42,39 @@ export let pc = uniqueMapVals({
 	currentPostCoreIdWithVersionNumAtPostId: 22,
 	exPostCoreIdWithVersionNumAtPostId: 23,
 
+	// prob won't do this:
+	// tagId
+	// tagTxtAtId
+	// tagCountAtSpaceId
+
 	tagId8AndTxtWithNumAsCount: 30,
 	coreId8AndTxtWithNumAsCount: 31,
 	reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId: 32,
+	// TODO?: citeCount__inMsIdAtPostId: 33,
 
 	spaceIsPublicBinId: 40,
-	spaceNameTxtIdAndMemberCountNum: 41,
-	spaceDescriptionTxtId: 42,
+	spaceNameTxtId: 41,
+	spaceDescriptionTxtIdAndMemberCountNum: 42,
 	spacePinnedQueryTxtId: 43,
-	newMemberPermissionCodeId: 44,
-	permissionCodeNumIdAtAccountId: 45,
-	roleCodeNumIdAtAccountId: 46,
+	newMemberPermissionCodeNumId: 44,
+	roleCodeNumIdAtAccountId: 45,
+	permissionCodeNumIdAtAccountId: 46,
+	flairTxtIdAtAccountId: 47, // TODO: Indicate if the flair by_ms is a mod/owner
+	spacePriorityIdAccentCodeNumAtAccountId: 48,
 
 	accountEmailTxtMsByMs: 50,
 	accountPwHashTxtMsByMs: 51,
 	accountNameTxtMsByMs: 52,
 	accountBioTxtMsByMs: 53,
 	accountSavedTagsTxtMsByMs: 54,
-	accountSpaceMssTxtMsByMs: 55,
 
 	clientKeyTxtMsAtAccountId: 60,
-	sessionKeyTxtMsAtAccountId: 61,
-	createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 62,
-	signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 63,
-	resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount: 64,
+	sessionKeyTxtMs_ExpiryMs_AtAccountId: 61,
+	otpMs_Pin_StrikeCountIdAndEmailTxt: 62,
 
-	inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug: 70,
+	inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt: 70,
 	acceptMsByMsAtInviteId: 71,
-	revokeMsByMsAtInviteId: 72,
+	// TODO: acceptMs_ByMs_LastWriteMsIdAtInviteId: 71,
 
 	postIdAtBumpedRootId: 80,
 	lastSpaceViewId: 81,

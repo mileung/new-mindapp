@@ -1,77 +1,75 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { gs } from '$lib/global-state.svelte';
+	import { getUrlInMsContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
+	import { alertError, splitUntil } from '$lib/js';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
-	import {
-		accountMsToNameTxt,
-		type GetCallerContextGetArg,
-		type MyAccountUpdates,
-		type SpaceContext,
-	} from '$lib/types/accounts';
+	import { type GetCallerContextGetArg, type MyAccountUpdates } from '$lib/types/accounts';
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
-	import { getIdStrAsIdObj, isIdStr, isSpaceSlug } from '$lib/types/parts/partIds';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import {
-		permissionCodes,
-		roleCodes,
-		spaceMsToNameTxt,
-		usePendingInvite,
+		getDefaultSpace,
+		type MySpaceUpdate,
+		type MySpaceUpdateFrom,
+		type SpaceContext,
 	} from '$lib/types/spaces';
-	import { IconChevronRight, IconX } from '@tabler/icons-svelte';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
-	import type { LayoutData } from './$types';
-	import AccountIcon from './AccountIcon.svelte';
+	import type { LayoutData, LayoutServerData } from './$types';
 	import Sidebar from './Sidebar.svelte';
 	let p: { data: LayoutData; children: Snippet } = $props();
 
+	let isEmbed = $derived(page.url.pathname.startsWith('/embed'));
 	onMount(async () => {
-		let theme = localStorage.getItem('theme') as typeof gs.theme;
+		if (isEmbed) return;
+		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
 		gs.theme = (['light', 'dark', 'system'].includes(theme!) ? theme : 'system')!;
 		setTheme(gs.theme);
-
 		let localCache = getLocalCache();
 		gs.accounts = localCache.accounts;
-		gs.urlInMs = localCache.urlInMs;
+		gs.lastSeenInMs = localCache.lastSeenInMs;
+		gs.msToSpaceMap = localCache.msToSpaceMap;
 
-		if (!false) {
-			try {
-				await initLocalDb();
-				let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
-				gs.db = drizzle(driver, batchDriver);
-			} catch (error) {
-				console.error(error);
-				gs.localDbFailed = true;
-				goto('/settings');
-			}
+		try {
+			await initLocalDb();
+			let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
+			gs.db = drizzle(driver, batchDriver);
+		} catch (error) {
+			console.error(error);
+			gs.localDbFailed = true;
+			goto('/settings');
 		}
 
-		if ('serviceWorker' in navigator) {
+		'serviceWorker' in navigator &&
 			window.addEventListener('load', () => {
 				// unregister service workers at chrome://serviceworker-internals
 				navigator.serviceWorker.register('./service-worker.js');
 			});
-		}
 	});
 
 	$effect(() => {
-		if (gs.theme === 'system') {
-			window?.matchMedia('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => {
-				gs.theme = 'dark'; // retriggers moreOpaque in Highlight.svelte
-				setTheme('system');
-			});
-		}
+		if (gs.theme !== 'system') return;
+		let mql = window.matchMedia('(prefers-color-scheme: dark)');
+		let handler = () => {
+			gs.theme = 'dark'; // retriggers moreOpaque in Highlight.svelte
+			setTheme('system');
+		};
+		mql.addEventListener('change', handler);
+		return () => mql.removeEventListener('change', handler);
 	});
 
 	let lastHref = '';
 	$effect(() => {
-		if (gs.accounts?.[0].ms && page.url.pathname.includes('_8')) {
-			let newHref = page.url.pathname.replace('_8', `_${gs.accounts[0].ms}`) + page.url.search;
+		let [, firstSlug, ending] = splitUntil(page.url.pathname, '/', 2);
+		if (gs.accounts?.[0].ms && firstSlug.endsWith('_8')) {
+			let newHref =
+				`/${firstSlug.slice(0, -1)}${gs.accounts[0].ms}${ending ? `/${ending}` : ''}` +
+				page.url.search;
 			if (newHref !== lastHref) {
 				goto(newHref);
 				lastHref = newHref;
@@ -79,209 +77,280 @@
 		}
 	});
 
-	let urlInMs = $derived.by(() => {
-		let slug = page.url.pathname.split('/')[1];
-		if (isSpaceSlug(slug)) return +slug.slice(2);
-		if (isIdStr(slug)) return getIdStrAsIdObj(slug).in_ms;
-	});
+	let urlInMs = $derived(getUrlInMs());
 	$effect(() => {
-		if (urlInMs !== undefined && gs.urlInMs !== urlInMs)
-			updateLocalCache((lc) => ({ ...lc, urlInMs }));
+		urlInMs !== undefined &&
+			gs.lastSeenInMs !== urlInMs &&
+			updateLocalCache((lc) => ({ ...lc, lastSeenInMs: urlInMs }));
 	});
 
 	$effect(() => {
-		if (
-			gs.accounts !== undefined &&
-			gs.urlInMs !== undefined &&
-			gs.urlInMs !== 8 &&
-			gs.urlInMs === urlInMs &&
-			!gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms]?.[gs.urlInMs]
-		) {
+		try {
 			(async () => {
-				let spaceMs = gs.urlInMs;
-				if (gs.accounts === undefined || spaceMs === undefined) return;
-				let callerMs = gs.accounts?.[0].ms;
+				let checkedAnythingBefore = !!Object.keys(gs.accountMsToSpaceMsToCheckedMap).length;
+				if (
+					gs.accounts !== undefined &&
+					gs.lastSeenInMs !== undefined &&
+					(urlInMs === undefined
+						? !checkedAnythingBefore
+						: !gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms]?.[urlInMs])
+				) {
+					let spaceDne = urlInMs !== undefined && urlInMs > 1 && urlInMs < 1775000111222;
+					let caller = gs.accounts[0];
+					let callerMs = caller.ms;
 
-				let firstTimeChecking = !Object.keys(gs.accountMsToSpaceMsToCheckedMap).length;
-				let oldSignedInAccountMss = gs.accounts.filter((a) => a.signedIn).map((a) => a.ms);
+					if (urlInMs === 8 && callerMs) return;
 
-				let signedIn: undefined | boolean;
+					let checkedThisAccountBefore = !!gs.accountMsToSpaceMsToCheckedMap[callerMs];
+					let checkedSpaceWithThisAccountBefore =
+						urlInMs !== undefined &&
+						!!Object.keys(gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] || {}).length;
 
-				let signedInAccountMss: undefined | number[];
-				let currentAccountUpdates: undefined | MyAccountUpdates;
-				let spaceContext: undefined | SpaceContext;
-
-				if (!spaceMs || callerMs === spaceMs) {
-					spaceContext = {
-						isPublic: { num: 0 },
-						roleCode: { num: roleCodes.owner },
-						permissionCode: { num: permissionCodes.reactAndPost },
+					let currentSpaceUpdateFrom: undefined | MySpaceUpdateFrom =
+						urlInMs === undefined
+							? undefined
+							: {
+									ms: urlInMs,
+									isPublic: gs.msToSpaceMap[urlInMs]?.isPublic || { num: 0 },
+									pinnedQuery: gs.msToSpaceMap[urlInMs]?.pinnedQuery || { txt: '' },
+									name:
+										gs.msToSpaceMap[urlInMs]?.name || (urlInMs > 1 && urlInMs !== callerMs)
+											? { txt: '' }
+											: undefined,
+									...(() => {
+										let spaceContext = getUrlInMsContext();
+										return {
+											accentCode: spaceContext?.accentCode || { num: 0 },
+											roleCode: spaceContext?.roleCode || { num: 0 },
+											permissionCode: spaceContext?.permissionCode || { num: 0 },
+										};
+									})(),
+								};
+					let currentSpaceUpdateFromArr = currentSpaceUpdateFrom ? [currentSpaceUpdateFrom] : [];
+					let get: GetCallerContextGetArg = {
+						allJoinedSpaces: !checkedThisAccountBefore,
+						spaceUpdatesFrom: checkedSpaceWithThisAccountBefore
+							? undefined
+							: checkedThisAccountBefore
+								? currentSpaceUpdateFromArr
+								: [
+										...caller.joinedSpaceContexts
+											.map((spaceCtx) => {
+												let space = gs.msToSpaceMap[spaceCtx.ms];
+												return (
+													space?.ms && {
+														ms: spaceCtx.ms,
+														name: space.ms > 1 && space.ms !== callerMs ? space.name : undefined,
+														accentCode:
+															space.ms && space.ms !== callerMs ? spaceCtx.accentCode : undefined,
+														...(spaceCtx.ms === urlInMs
+															? {
+																	isPublic: space.isPublic,
+																	pinnedQuery: space.pinnedQuery,
+																	roleCode: spaceCtx.roleCode,
+																	permissionCode: spaceCtx.permissionCode,
+																}
+															: {}),
+													}
+												);
+											})
+											.filter((s) => !!s),
+										...(caller.joinedSpaceContexts.some((sc) => sc.ms === urlInMs)
+											? []
+											: currentSpaceUpdateFromArr),
+									],
+						signedInAccountUpdatesFrom: checkedThisAccountBefore
+							? undefined //
+							: checkedAnythingBefore
+								? [
+										{
+											ms: callerMs,
+											email: caller.email,
+											bio: caller.bio,
+											savedTags: caller.savedTags,
+										},
+									]
+								: gs.accounts
+										.filter((a) => a.ms)
+										.map((a) => ({
+											ms: a.ms,
+											name: a.name,
+											email: callerMs === a.ms ? a.email : undefined,
+											bio: callerMs === a.ms ? a.bio : undefined,
+											savedTags: callerMs === a.ms ? a.savedTags : undefined,
+										})),
 					};
-				} else if (spaceMs === 1 && !callerMs) {
-					spaceContext = { isPublic: { num: 1 } };
-				}
 
-				let oldSpaceContext = gs.accounts[0].spaceMsToContextMap[spaceMs];
+					// console.log('get', JSON.stringify(get, null, 2));
+					let callerContext = await trpc().getCallerContext.query({
+						callerMs,
+						spaceMs: urlInMs,
+						get,
+					});
+					// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 
-				console.log('spaceContext:', spaceContext);
-				let get: GetCallerContextGetArg = {
-					...(spaceContext
-						? {}
-						: {
-								isPublic: oldSpaceContext?.isPublic || true,
-								pinnedQuery: oldSpaceContext?.pinnedQuery || true,
-								roleCode: callerMs ? oldSpaceContext?.roleCode || true : false,
-								permissionCode: callerMs ? oldSpaceContext?.permissionCode || true : false,
-							}),
-					// spaceMssAwaitingResponse:
-					// yourTurnIndicatorsFromSpaceMsToLastCheckMsMap: gs.accounts[0].spaceMss,
-					...(!callerMs || gs.accountMsToSpaceMsToCheckedMap[callerMs]
-						? {}
-						: {
-								latestAccountAttributesFromCallerAttributes: {
-									email: gs.accounts[0].email,
-									name: gs.accounts[0].name,
-									bio: gs.accounts[0].bio,
-									savedTags: gs.accounts[0].savedTags,
-									spaceMss: gs.accounts[0].spaceMss,
-								},
-							}),
-					...(firstTimeChecking && oldSignedInAccountMss.length
-						? {
-								signedInAccountMssFrom: oldSignedInAccountMss, //
-							}
-						: {}),
-				};
-				if (Object.values(get).some((v) => !!v)) {
-					try {
-						get.signedIn = !!callerMs;
-						let res = await trpc().getCallerContext.query({
-							callerMs,
-							spaceMs,
-							get,
-						});
-						console.log('getCallerContext res:', res);
-						signedIn = res.signedIn;
-						signedInAccountMss = res.signedInAccountMss;
-						if (res.signedIn || !callerMs) {
-							currentAccountUpdates = res.currentAccountUpdates;
-							spaceContext = spaceContext || {
-								isPublic:
-									res.isPublic === null
-										? undefined //
-										: res.isPublic || oldSpaceContext?.isPublic,
-								pinnedQuery:
-									res.pinnedQuery === null
-										? undefined //
-										: res.pinnedQuery || oldSpaceContext?.pinnedQuery,
-								roleCode:
-									res.roleCode === null
-										? undefined //
-										: res.roleCode || oldSpaceContext?.roleCode,
-								permissionCode:
-									res.permissionCode === null
-										? undefined //
-										: res.permissionCode || oldSpaceContext?.permissionCode,
-							};
-							// spaceMssAwaitingResponse: res.spaceMssAwaitingResponse,
-						} else {
-							signedInAccountMss = (signedInAccountMss || oldSignedInAccountMss).filter(
-								(ms) => ms !== callerMs,
-							);
-						}
-					} catch (error) {
-						console.log('error:', error);
-					}
-				}
-
-				// if (!callerMs || signedIn)
-				gs.accountMsToSpaceMsToCheckedMap = {
-					...gs.accountMsToSpaceMsToCheckedMap,
-					[callerMs]: {
-						...gs.accountMsToSpaceMsToCheckedMap[callerMs],
-						[spaceMs]: true,
-					},
-				};
-
-				updateLocalCache((lc) => {
-					if (spaceContext) {
-						lc.accounts[0] = {
-							...lc.accounts[0],
-							spaceMsToContextMap: {
-								...lc.accounts[0].spaceMsToContextMap,
-								[spaceMs]: spaceContext,
+					gs.accountMsToSpaceMsToCheckedMap = {
+						...gs.accountMsToSpaceMsToCheckedMap,
+						[callerMs]: {
+							...gs.accountMsToSpaceMsToCheckedMap[callerMs],
+							...(urlInMs === undefined ? {} : { [urlInMs]: true }),
+						},
+					};
+					updateLocalCache((lc) => {
+						[...callerContext.joinedSpaceUpdates, callerContext.visitingPublicSpaceUpdate].forEach(
+							(spaceUpdate) => {
+								if (spaceUpdate) {
+									lc.msToSpaceMap[spaceUpdate.ms] ||= {
+										...getDefaultSpace(), //
+										ms: spaceUpdate.ms,
+									};
+									let space = lc.msToSpaceMap[spaceUpdate.ms]!;
+									space.isPublic = spaceUpdate.isPublic || space.isPublic;
+									space.name = spaceUpdate.name || space.name;
+									space.pinnedQuery = spaceUpdate.pinnedQuery || space.pinnedQuery;
+								}
 							},
-						};
-					}
-					if (currentAccountUpdates) {
-						lc.accounts[0] = {
-							...lc.accounts[0],
-							...currentAccountUpdates,
-						};
-					}
-					if (signedInAccountMss) {
-						lc.accounts = lc.accounts
-							.map((a) => ({
-								...a,
-								signedIn: signedInAccountMss.includes(a.ms),
-							}))
-							.sort((a, b) => {
-								let aPriority = !a.ms || a.signedIn ? 0 : 1;
-								let bPriority = !b.ms || b.signedIn ? 0 : 1;
-								return aPriority - bPriority;
-							});
-					}
-					return lc;
-				});
-				gs.accountMsToNameTxtMap = {
-					...gs.accountMsToNameTxtMap,
-					...gs.accounts.reduce(
-						(obj, account) => ({
-							...obj, //
-							[account.ms]: account.name.txt,
-						}),
-						{},
-					),
-				};
+						);
+
+						let msToSignedInAccountUpdateMap: Record<number, MyAccountUpdates> = {};
+						for (let i = 0; i < callerContext.signedInAccountUpdates.length; i++) {
+							let u = callerContext.signedInAccountUpdates[i];
+							msToSignedInAccountUpdateMap[u.ms] = u;
+						}
+						lc.accounts = lc.accounts.map((a) => {
+							let accountUpdate = msToSignedInAccountUpdateMap[a.ms];
+							if (!checkedAnythingBefore) a.signedIn = !!accountUpdate;
+							a.email = accountUpdate?.email || a.email;
+							a.name = accountUpdate?.name || a.name;
+							a.bio = accountUpdate?.bio || a.bio;
+							a.savedTags = accountUpdate?.savedTags || a.savedTags;
+							return a;
+						});
+
+						if (lc.accounts[0].signedIn) {
+							let msToJoinedSpaceUpdateMap: Record<number, MySpaceUpdate> = {};
+							for (let i = 0; i < callerContext.joinedSpaceUpdates.length; i++) {
+								let u = callerContext.joinedSpaceUpdates[i];
+								msToJoinedSpaceUpdateMap[u.ms] = u;
+							}
+							let newJoinedSpaceContexts: SpaceContext[] = callerContext.joinedSpaceUpdates
+								.filter(
+									(spaceUpdate) =>
+										spaceUpdate?.roleCode &&
+										!lc.accounts[0].joinedSpaceContexts.some((sc) => sc.ms === spaceUpdate?.ms),
+								)
+								.map(
+									(su) =>
+										({
+											ms: su!.ms,
+											accentCode: su!.accentCode || { num: 0 },
+											permissionCode: su!.permissionCode || { num: 0 },
+											roleCode: su!.roleCode || { num: 0 },
+										}) satisfies SpaceContext,
+								);
+							// console.log(
+							// 	'msToJoinedSpaceUpdateMap:',
+							// 	get.allJoinedSpaces,
+							// 	msToJoinedSpaceUpdateMap,
+							// );
+							lc.accounts[0] = {
+								...lc.accounts[0],
+								joinedSpaceContexts: [
+									...lc.accounts[0].joinedSpaceContexts,
+									...newJoinedSpaceContexts,
+								]
+									.filter(({ ms }) => !get.allJoinedSpaces || msToJoinedSpaceUpdateMap[ms])
+									.map((sc) => {
+										let spaceUpdate = msToJoinedSpaceUpdateMap[sc.ms];
+										return {
+											ms: sc.ms,
+											accentCode: spaceUpdate?.accentCode || sc.accentCode,
+											permissionCode: spaceUpdate?.permissionCode || sc.permissionCode,
+											roleCode: spaceUpdate?.roleCode || sc.roleCode,
+										};
+									})
+									.sort((a, b) => (b.accentCode.ms || 0) - (a.accentCode.ms || 0)),
+							};
+						}
+
+						Object.values(lc.msToSpaceMap).forEach((space) => {
+							if (
+								space &&
+								space.ms > 1 &&
+								!lc.accounts.some(
+									(a) => a.signedIn && a.joinedSpaceContexts.some((c) => c.ms === space.ms),
+								)
+							)
+								delete lc.msToSpaceMap[space.ms];
+						});
+
+						lc.accounts.sort((a, b) => {
+							let aPriority = !a.ms || a.signedIn ? 0 : 1;
+							let bPriority = !b.ms || b.signedIn ? 0 : 1;
+							return aPriority - bPriority;
+						});
+						return lc;
+					});
+
+					// gs.msToProfileMap = {
+					// 	...gs.msToProfileMap,
+					// 	...gs.accounts.reduce(
+					// 		(obj, account) => ({
+					// 			...obj, //
+					// 			[account.ms]: account satisfies PublicProfile,
+					// 		}),
+					// 		{},
+					// 	),
+					// };
+				}
 			})();
+		} catch (error) {
+			// console.log('error:', error);
+			alertError(error);
 		}
 	});
 
-	let joinSpaceButtonClass = $derived(
-		`fx h-9 pl-2 font-semibold ${page.url.pathname === '/sign-in' || page.url.pathname === '/create-account' ? 'text-fg2' : 'text-black bg-hl1 hover:bg-hl2'}`,
+	let pageData = $derived(page.data as LayoutServerData);
+	$effect(() => {
+		// console.log('test:', pageData);
+	});
+
+	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
+	let title = $derived.by(() => {
+		if (urlInMs !== undefined) {
+			return msToSpaceNameTxt(urlInMs);
+		}
+		return (
+			{
+				'/create-space': m.createSpace(),
+				'/user-guide': m.userGuide(),
+				'/settings': m.settings(),
+				'/sign-in': m.signIn(),
+				'/create-account': m.createAccount(),
+				'/reset-password': m.resetPassword(),
+			} as Record<string, string>
+		)[page.url.pathname];
+	});
+	let appendedTitle = $derived.by(() => {
+		return `${title ? `${title} | ` : ''}Mindapp`;
+	});
+	let siteDescription = $derived('General purpose organizer');
+	let thinTopOgText = $derived(
+		pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
 	);
+	let boldBottomOgText = $derived(pageData.boldBottomOgText || title);
 </script>
 
-<Sidebar />
-<div class={`xs:pl-[var(--w-sidebar)] pb-9 xs:pb-0`}>
-	{#if !!gs.pendingInvite}
-		<div class={`z-50 overflow-x-scroll text-nowrap sticky top-0 h-9 fx justify-between bg-bg3`}>
-			<div class="fx">
-				<AccountIcon isSystem ms={gs.pendingInvite!.by_ms} class="w-6 ml-0.5 mr-2" />
-				<p class="font-bold">
-					{accountMsToNameTxt(gs.pendingInvite!.by_ms, true)} invited you to {spaceMsToNameTxt(
-						gs.pendingInvite!.in_ms,
-					)}
-				</p>
-				<button
-					class="xy h-9 w-9 text-fg2 hover:bg-bg4 hover:text-fg1"
-					onclick={() => (gs.pendingInvite = undefined)}
-				>
-					<IconX stroke={2.5} class="h-5" />
-				</button>
-			</div>
-			{#if gs.accounts?.[0].ms}
-				<button onclick={usePendingInvite} class={joinSpaceButtonClass}>
-					{m.joinSpace()}
-					<IconChevronRight class="h-5" stroke={3} />
-				</button>
-			{:else}
-				<a href="/sign-in" class={joinSpaceButtonClass}>
-					{m.signInAndJoin()}
-					<IconChevronRight class="h-5" stroke={3} />
-				</a>
-			{/if}
-		</div>
-	{/if}
+<title>{appendedTitle}</title>
+<meta name="description" content={siteDescription} />
+<meta property="og:description" content={thinTopOgText} />
+<meta property="og:title" content={boldBottomOgText} />
+<!-- this og:url is needed to get ios to properly render the og text -->
+<meta property="og:url" content="https://x.com/_/status/0" />
+
+{#if !isEmbed}
+	<Sidebar />
+{/if}
+<div class={isEmbed ? '' : `xs:pl-[var(--w-sidebar)] pb-9 xs:pb-0`}>
 	{@render p.children()}
 </div>

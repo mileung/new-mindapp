@@ -1,22 +1,27 @@
 import { scrape } from '$lib/dom';
 import { m } from '$lib/paraglide/messages';
 import { _getCallerContext } from '$lib/server/_getCallerContext';
+import { _getPublicProfile } from '$lib/server/_getPublicProfile';
 import { tdb } from '$lib/server/db';
 import { throwIf } from '$lib/server/errors';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { GetCallerContextGetArgSchema, passwordRegexStr } from '$lib/types/accounts';
-import { _changeMyAccountNameOrBio } from '$lib/types/accounts/_changeMyAccountNameOrBio';
-import { _changeSpaceName } from '$lib/types/accounts/_changeSpaceName';
+import { _changeMyAccountAttributes } from '$lib/types/accounts/_changeMyAccountAttributes';
+import { _changeSpaceAttributes } from '$lib/types/accounts/_changeSpaceAttributes';
 import { _createAccount } from '$lib/types/accounts/_createAccount';
-import { _resetPassword } from '$lib/types/accounts/_resetPassword';
+import { _resetPasswordSignedIn } from '$lib/types/accounts/_resetPasswordSignedIn';
 import { _signIn } from '$lib/types/accounts/_signIn';
 import { _signOut } from '$lib/types/accounts/_signOut';
 import { _updateSavedTags } from '$lib/types/accounts/_updateSavedTags';
 import { _checkOtp } from '$lib/types/otp/_checkOtp';
 import { _sendOtp } from '$lib/types/otp/_sendOtp';
-import { WhoObjSchema, WhoWhereObjSchema } from '$lib/types/parts';
-import { pc } from '$lib/types/parts/partCodes';
+import {
+	GranularNumPropSchema,
+	GranularTxtPropSchema,
+	WhoObjSchema,
+	WhoWhereObjSchema,
+} from '$lib/types/parts';
 import { FullIdObjSchema, IdObjSchema } from '$lib/types/parts/partIds';
 import { PostSchema } from '$lib/types/posts';
 import { _addPost } from '$lib/types/posts/addPost';
@@ -32,6 +37,7 @@ import { permissionCodes, roleCodes } from '$lib/types/spaces';
 import { _checkInvite } from '$lib/types/spaces/_checkInvite';
 import { _createInviteLink } from '$lib/types/spaces/_createInviteLink';
 import { _getSpaceDots } from '$lib/types/spaces/_getSpaceDots';
+import { _revokeInviteLink } from '$lib/types/spaces/_revokeInviteLink';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
@@ -104,9 +110,11 @@ export let router = t.router({
 		.input(
 			z.object({
 				email: normalizingEmailSchema,
-				partCode: z
-					.literal(pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount)
-					.or(z.literal(pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount)),
+				will: z.object({
+					createAccount: z.boolean().optional(),
+					signIn: z.boolean().optional(),
+					resetPassword: z.boolean().optional(),
+				}),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -119,10 +127,6 @@ export let router = t.router({
 				otpMs: z.number(),
 				pin: pinSchema,
 				email: normalizingEmailSchema,
-				partCode: z
-					.literal(pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount)
-					.or(z.literal(pc.signInOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount))
-					.or(z.literal(pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount)),
 			}),
 		)
 		.mutation(({ input }) => _checkOtp(input)),
@@ -144,34 +148,47 @@ export let router = t.router({
 				pin: pinSchema.optional(),
 				email: normalizingEmailSchema,
 				password: passwordSchema,
+				resetPassword: z.boolean().optional(),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
 			await signInLimiter.ping(ctx);
 			return _signIn(ctx, input);
 		}),
+	getPublicProfile: whoProcedure
+		.input(
+			z.object({
+				profileMs: z.number(),
+				possibleMutualSpaceMss: z.array(z.number()).optional(),
+			}),
+		)
+		.query(async ({ ctx, input }) => {
+			if (input.callerMs && input.possibleMutualSpaceMss?.length) {
+				let c = await _getCallerContext(ctx, input, { signedIn: true });
+				throwIf(!c.signedIn);
+			}
+			return _getPublicProfile(input);
+		}),
 	getCallerContext: whoProcedure
 		.input(
 			z.object({
-				spaceMs: z.number().optional(), // this is the only api function that can be called when urlInMs = 0
+				spaceMs: z.number().optional(), // this is the only api function that can be called when lastSeenInMs = 0
 				get: GetCallerContextGetArgSchema,
 			}),
 		)
 		.query(async ({ ctx, input }) => _getCallerContext(ctx, input, input.get)),
-	resetPassword: whoProcedure
+	resetPasswordSignedIn: whoProcedure
 		.input(
 			z.object({
-				otpMs: z.number(),
-				pin: pinSchema,
-				email: normalizingEmailSchema,
-				password: passwordSchema,
+				oldPassword: passwordSchema,
+				newPassword: passwordSchema,
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error(m.placeholderError());
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
-			return _resetPassword(input);
+			return _resetPasswordSignedIn(input);
 		}),
 	signOut: whoProcedure
 		.input(z.object({ everywhere: z.boolean() }))
@@ -201,15 +218,17 @@ export let router = t.router({
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			let c = await _getCallerContext(ctx, input, {
-				signedIn: input.useIfValid,
-				roleCode: input.useIfValid,
-			});
-			if (c.roleCode) throw new Error(m.alreadyJoinedThisSpace());
-			throwIf(!c.signedIn && input.useIfValid);
+			if (input.useIfValid) {
+				let c = await _getCallerContext(ctx, input, {
+					signedIn: input.useIfValid,
+					roleCode: input.useIfValid,
+				});
+				if (c.roleCode) throw new Error(m.alreadyJoinedThisSpace());
+				throwIf(!c.signedIn && input.useIfValid);
+			}
 			return _checkInvite(input);
 		}),
-	changeMyAccountNameOrBio: whoProcedure
+	changeMyAccountAttributes: whoProcedure
 		.input(
 			z.object({
 				nameTxt: normalizingNameSchema.optional(),
@@ -220,17 +239,52 @@ export let router = t.router({
 			throwIf(input.nameTxt === undefined && input.bioTxt === undefined);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
-			return _changeMyAccountNameOrBio(input);
+			return _changeMyAccountAttributes(input);
 		}),
-	changeSpaceName: whoWhereProcedure
-		.input(z.object({ nameTxt: z.string() }))
+	createSpace: whoProcedure
+		.input(
+			z.object({
+				nameTxt: normalizingNameSchema.optional(),
+				descriptionTxt: normalizingBioOrDescriptionSchema.optional(),
+				pinnedQueryTxt: normalizingBioOrDescriptionSchema.optional(),
+				isPublicNum: z.number().gte(0).lte(1).optional(),
+				newMemberPermissionCodeNum: z
+					.number()
+					.gte(permissionCodes.viewOnly)
+					.lte(permissionCodes.reactAndPost)
+					.optional(),
+			}),
+		)
 		.mutation(async ({ ctx, input }) => {
-			let c = await _getCallerContext(ctx, input, {
-				signedIn: true,
-				roleCode: true,
-			});
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			throwIf(!c.signedIn);
+			return {};
+		}),
+	changeSpaceAttributes: whoWhereProcedure
+		.input(
+			z.object({
+				nameTxt: normalizingNameSchema.optional(),
+				descriptionTxt: normalizingBioOrDescriptionSchema.optional(),
+				pinnedQueryTxt: normalizingBioOrDescriptionSchema.optional(),
+				isPublicNum: z.number().gte(0).lte(1).optional(),
+				newMemberPermissionCodeNum: z
+					.number()
+					.gte(permissionCodes.viewOnly)
+					.lte(permissionCodes.reactAndPost)
+					.optional(),
+			}),
+		)
+		.mutation(async ({ ctx, input }) => {
+			throwIf(
+				input.nameTxt === undefined &&
+					input.descriptionTxt === undefined &&
+					input.pinnedQueryTxt === undefined &&
+					input.isPublicNum === undefined &&
+					input.newMemberPermissionCodeNum === undefined,
+			);
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
 			throwIf(!c.signedIn || c.roleCode?.num !== roleCodes.owner);
-			return _changeSpaceName(input);
+			return _changeSpaceAttributes(input);
 		}),
 	addPost: whoWhereProcedure
 		.input(z.object({ post: PostSchema })) //
@@ -320,16 +374,24 @@ export let router = t.router({
 			return _removeReaction(tdb, rxn);
 		}),
 	getSpaceDots: whoWhereProcedure
-		.input(z.object({ msAfter: z.number().optional() }))
+		.input(
+			z.object({
+				msBefore: z.number().optional(),
+				lastMemberListRoleCodeNum: z.number().optional(),
+				lastAcceptByMssWithSameRoleMs: z.array(z.number()).optional(),
+				memberCount: z.number().optional(),
+				description: GranularTxtPropSchema.optional(),
+				newMemberPermissionCode: GranularNumPropSchema.optional(),
+			}),
+		)
 		.query(async ({ input, ctx }) => {
-			// if (!input.callerMs) throw new Error('anon disallowed');
 			let c = await _getCallerContext(ctx, input, {
 				isPublic: true,
 				signedIn: true,
 				roleCode: true,
 			});
 			throwIf(!c.isPublic?.num && c.roleCode === undefined);
-			return _getSpaceDots(tdb, { ...c, ...input });
+			return _getSpaceDots(tdb, { ...input, roleCode: c.roleCode });
 		}),
 	createInviteLink: whoWhereProcedure
 		.input(
@@ -348,6 +410,22 @@ export let router = t.router({
 				!c.signedIn || (c.roleCode?.num !== roleCodes.mod && c.roleCode?.num !== roleCodes.owner),
 			);
 			return _createInviteLink(input);
+		}),
+	revokeInviteLink: whoWhereProcedure
+		.input(
+			z.object({
+				inviteMs: z.number(),
+				slugEnd: z.string(),
+			}),
+		)
+		.mutation(async ({ input, ctx }) => {
+			if (!input.callerMs) throw new Error('anon disallowed');
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: true,
+			});
+			throwIf(!c.signedIn || !c.roleCode);
+			return _revokeInviteLink(input);
 		}),
 	getPostHistory: whoWhereProcedure
 		.input(
@@ -371,7 +449,7 @@ export let router = t.router({
 		.input(
 			z.object({
 				postIdObj: IdObjSchema,
-				fromMs: z.number(),
+				msBefore: z.number(),
 				rxnIdObjsExclude: z.array(IdObjSchema),
 			}),
 		)
@@ -393,6 +471,7 @@ export let router = t.router({
 			let c = await _getCallerContext(ctx, input, {
 				roleCode: true,
 				signedIn: true,
+				// permissionCode: true,
 				isPublic: true,
 			});
 			throwIf(!c.isPublic && (!c.signedIn || c.roleCode === undefined));

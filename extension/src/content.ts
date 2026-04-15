@@ -56,7 +56,6 @@ window.addEventListener('keydown', (e) => {
 		// alt g
 		baseUrl = oldMindappDevUrl;
 	}
-
 	if (baseUrl && !['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName)) {
 		openPopup(baseUrl, e.key !== '©');
 	}
@@ -96,6 +95,12 @@ let openPopup = (baseUrl: string, sendBgMessage = false) => {
 		} as PopupMessage);
 	}
 
+	// TODO: allow postId (to reply to) as a param
+	// TODO: imagine turn based stateless apps like tic-tac-toe or chess
+	// where the "submit" button opens new tab with url params for
+	// tags, core, postId. Allow altMindappUrl for other mindapp instances
+	// TODO: Games where it's your turn show up under "Your turn" on post feed.
+	// The hierarchical nature of the posts would allow games to branch off into many threads
 	let json = JSON.stringify({
 		json: JSON.stringify({
 			// https://news.ycombinator.com/item?id=31871577

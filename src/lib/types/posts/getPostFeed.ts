@@ -1,16 +1,18 @@
+import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { type Post } from '.';
-import { gsdb, type Database } from '../../local-db';
+import { type Database } from '../../local-db';
 import {
 	atIdObjMatchesIdObj,
 	channelPartsByCode,
-	getWhoWhereObj,
 	hasParent,
 	makePartsUniqueByAtId,
 	makePartsUniqueById,
 	reduceTxtRowsToMap,
+	type GranularNumProp,
+	type GranularTxtProp,
 	type WhoWhereObj,
 } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -33,13 +35,11 @@ import { ParsedSearchSchema } from './parseSearchQuery';
 export let postsPerLoad = 15;
 export let bracketRegex = /\[([^\[\]]+)]/g;
 
-export let GetPostFeedArgSchema = ParsedSearchSchema.merge(
-	z.object({
-		view: z.enum(['nested', 'flat']),
-		sortedBy: z.enum(['bumped', 'new', 'old']),
-		postAtBumpedPostIdObjsExclude: z.array(FullIdObjSchema),
-	}),
-);
+export let GetPostFeedArgSchema = ParsedSearchSchema.extend({
+	view: z.enum(['nested', 'flat']),
+	sortedBy: z.enum(['bumped', 'new', 'old']),
+	postAtBumpedPostIdObjsExclude: z.array(FullIdObjSchema),
+});
 
 export type GetPostFeedArg = z.infer<typeof GetPostFeedArgSchema>;
 
@@ -101,8 +101,8 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 				and(
 					// pf.noParent,
 					// newFirst //
-					// 	? pf.ms.lte(q.fromMs || Number.MAX_SAFE_INTEGER)
-					// 	: pf.ms.gt(q.fromMs || 0),
+					// 	? pf.ms.lt(q.fromMs || Number.MAX_SAFE_INTEGER)
+					// 	: pf.ms.gt(q.fromMs || -Number.MAX_SAFE_INTEGER),
 					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 					// ...byMsInMsFilters,
 					// ...excludePostIdsFilters,
@@ -123,7 +123,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 			.where(
 				and(
 					pf.at_ms.gt0,
-					pf.ms.lte(q.msBefore || Number.MAX_SAFE_INTEGER),
+					pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER),
 					...byMsInMsFilters,
 					...q.postAtBumpedPostIdObjsExclude.flatMap((fullIdObj) => [
 						pf.notAtId(fullIdObj),
@@ -255,8 +255,8 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 					and(
 						pf.noAtId,
 						newFirst //
-							? pf.ms.lte(q.msBefore || Number.MAX_SAFE_INTEGER)
-							: pf.ms.gt(q.msAfter || 0),
+							? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
+							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
 						...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
@@ -291,9 +291,9 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 				.from(pTable)
 				.where(
 					and(
-						newFirst //
-							? pf.ms.lte(q.msBefore || Number.MAX_SAFE_INTEGER)
-							: pf.ms.gte(q.msAfter || 0),
+						newFirst
+							? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
+							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
 						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
@@ -397,8 +397,8 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		if (spaceMssToFetchSet.size) {
 			let citedInMss = [...spaceMssToFetchSet];
 			let {
-				[pc.spaceNameTxtIdAndMemberCountNum]: spaceNameTxtIdWithPublicBinRows = [],
-				[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
+				[pc.spaceNameTxtId]: spaceNameTxtIdWithPublicBinRows = [],
+				[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
 			} = channelPartsByCode(
 				await db
 					.select()
@@ -407,12 +407,12 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 						or(
 							and(
 								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
-								pf.code.eq(pc.spaceNameTxtIdAndMemberCountNum), //
+								pf.code.eq(pc.spaceNameTxtId), //
 							),
 							and(
 								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
 								pf.by_ms.eq(q.callerMs),
-								pf.code.eq(pc.acceptMsByMsAtInviteId),
+								pf.code.eq(pc.roleCodeNumIdAtAccountId),
 							),
 						),
 					),
@@ -423,25 +423,25 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	if (citedIdObjsToFetch.length) {
 		let {
 			// [pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
-			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows_ = [],
-			[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIdRows_ = [],
-			[pc.currentVersionNumMsAtPostId]: curVersionNumAndMsAtPostIdRows_ = [],
-			[pc.currentSoftDeletedVersionNumMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdRows_ = [],
-			[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows_ = [],
-			[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows_ = [],
-			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdRows_ = [],
-			// [pc.assignedRoleNumIdAtAccountId]: assignedRoleNumIdAtAccountIdRows_ = [],
-			// [pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows_ = [],
+			[pc.postIdWithNumAsLastVersionAtParentPostId]: _postIdWNumAsLastVersionAtPPostIdRows = [],
+			[pc.reactionIdWithEmojiTxtAtPostId]: _rxnIdWEmoTxtAtPostIdRows = [],
+			[pc.currentVersionNumMsAtPostId]: _curVersionNumAndMsAtPostIdRows = [],
+			[pc.currentSoftDeletedVersionNumMsAtPostId]: _curSoftDeletedVersionNumAndMsAtPostIdRows = [],
+			[pc.currentPostTagIdWithVersionNumAtPostId]: _curPostTagIdWNumAsVersionAtPostIdRows = [],
+			[pc.currentPostCoreIdWithVersionNumAtPostId]: _curPostCoreIdWNumAsVersionAtPostIdRows = [],
+			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: _rEmoTxtWUMsAndNAsCtAtPostIdRows = [],
+			// [pc.assignedRoleNumIdAtAccountId]: _assignedRoleNumIdAtAccountIdRows = [],
+			// [pc.nameTxtMsAtAccountId]: _nameTxtMsAtAccountIdRows = [],
 		} = channelPartsByCode(await getPostParts(citedIdObjsToFetch, true));
-		postIdWNumAsLastVersionAtPPostIdRows.push(...postIdWNumAsLastVersionAtPPostIdRows_);
-		rxnIdWEmoTxtAtPostIdRows.push(...rxnIdWEmoTxtAtPostIdRows_);
-		curVersionNumAndMsAtPostIdRows.push(...curVersionNumAndMsAtPostIdRows_);
-		curSoftDeletedVersionNumAndMsAtPostIdRows.push(...curSoftDeletedVersionNumAndMsAtPostIdRows_);
-		curPostTagIdWNumAsVersionAtPostIdRows.push(...curPostTagIdWNumAsVersionAtPostIdRows_);
-		curPostCoreIdWNumAsVersionAtPostIdRows.push(...curPostCoreIdWNumAsVersionAtPostIdRows_);
-		rEmoTxtWUMsAndNAsCtAtPostIdRows.push(...rEmoTxtWUMsAndNAsCtAtPostIdRows_);
-		// assignedRoleNumIdAtAccountIdRows.push(...assignedRoleNumIdAtAccountIdRows_);
-		// nameTxtMsAtAccountIdRows.push(...nameTxtMsAtAccountIdRows_);
+		postIdWNumAsLastVersionAtPPostIdRows.push(..._postIdWNumAsLastVersionAtPPostIdRows);
+		rxnIdWEmoTxtAtPostIdRows.push(..._rxnIdWEmoTxtAtPostIdRows);
+		curVersionNumAndMsAtPostIdRows.push(..._curVersionNumAndMsAtPostIdRows);
+		curSoftDeletedVersionNumAndMsAtPostIdRows.push(..._curSoftDeletedVersionNumAndMsAtPostIdRows);
+		curPostTagIdWNumAsVersionAtPostIdRows.push(..._curPostTagIdWNumAsVersionAtPostIdRows);
+		curPostCoreIdWNumAsVersionAtPostIdRows.push(..._curPostCoreIdWNumAsVersionAtPostIdRows);
+		rEmoTxtWUMsAndNAsCtAtPostIdRows.push(..._rEmoTxtWUMsAndNAsCtAtPostIdRows);
+		// assignedRoleNumIdAtAccountIdRows.push(..._assignedRoleNumIdAtAccountIdRows);
+		// nameTxtMsAtAccountIdRows.push(..._nameTxtMsAtAccountIdRows);
 	}
 
 	let {
@@ -561,11 +561,20 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	// 	// msToSpaceNameTxtMap[at_ms] = txt!;
 	// }
 
-	let spaceMsToAccountMsToRoleNumMap: Record<number, Record<number, number>> = {};
+	let spaceMsToAccountMsToRoleFlairMap: Record<
+		number,
+		Record<
+			number,
+			{
+				role?: GranularNumProp;
+				flair?: GranularTxtProp;
+			}
+		>
+	> = {};
 	// for (let i = 0; i < assignedRoleNumIdAtAccountIdRows.length; i++) {
 	// 	let { in_ms, at_ms } = assignedRoleNumIdAtAccountIdRows[i];
-	// 	if (!spaceMsToAccountMsToRoleNumMap[in_ms]) spaceMsToAccountMsToRoleNumMap[in_ms] = {};
-	// 	spaceMsToAccountMsToRoleNumMap[in_ms]![at_ms] = true;
+	// 	if (!spaceMsToAccountMsToRoleFlairMap[in_ms]) spaceMsToAccountMsToRoleFlairMap[in_ms] = {};
+	// 	spaceMsToAccountMsToRoleFlairMap[in_ms]![at_ms] = true;
 	// }
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
@@ -576,6 +585,6 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		postAtBumpedPostIdObjsExclude,
 		msToAccountNameTxtMap,
 		msToSpaceNameTxtMap,
-		spaceMsToAccountMsToRoleNumMap,
+		spaceMsToAccountMsToRoleFlairMap,
 	};
 };

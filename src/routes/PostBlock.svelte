@@ -1,7 +1,6 @@
 <script lang="ts">
-	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
+	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
-	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
@@ -14,8 +13,14 @@
 	import Self from './PostBlock.svelte';
 	import PostHeader from './PostHeader.svelte';
 
+	// TODO: speak posts? Doesn't work for all languages... オープンソースソフトウェア
+	// let utterance = new SpeechSynthesisUtterance('Hello world!');
+	// utterance.rate = 3;
+	// speechSynthesis.speak(utterance);
+
 	let p: {
 		post: Post;
+		isEmbed?: boolean;
 		nested?: boolean;
 		cited?: boolean;
 		depth: number;
@@ -79,7 +84,10 @@
 			: `hlc-${postIdStr} ${p.nested || !atPostIdStr ? '' : `flat-at-hlc-${atPostIdStr}`}`
 	} ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}
 >
-	{#if !p.cited}
+	{#if p.isEmbed}
+		<div class={`border-l-2 border-hl1 pl-2`}></div>
+	{/if}
+	{#if !p.cited && !p.isEmbed}
 		<button
 			class={`z-40 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 			onclick={() => {
@@ -89,8 +97,9 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class={`z-0 sticky bg-inherit h-5 w-5 xy ${!!gs.pendingInvite ? 'top-9' : 'top-0'}`}>
+			<div class="z-0 sticky bg-inherit h-5 w-5 xy top-0">
 				{#if open}
+					<!-- TODO: color -/+ with author's identicon color? -->
 					<IconMinus stroke={2.5} class="w-4" />
 				{:else}
 					<IconPlus stroke={2.5} class="w-4" />
@@ -98,11 +107,11 @@
 			</div>
 		</button>
 	{/if}
-	<div class={`bg-inherit flex-1 ${p.cited ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}>
+	<div
+		class={`bg-inherit flex-1 ${p.cited || p.isEmbed ? 'max-w-full' : 'max-w-[calc(100%-1.25rem)]'}`}
+	>
 		<div class={`relative bg-inherit`}>
-			<div
-				class={`z-10 bg-inherit ${p.cited ? '' : `sticky ${!!gs.pendingInvite ? 'top-9' : 'top-0'}`}`}
-			>
+			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
 						<a href={`/__${atPost.by_ms}_`} class="fx group hover:text-fg1">
@@ -110,8 +119,8 @@
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
 								<!-- TODO: text color matches UserIcon? -->
-								<p class={`font-bold ${gs.accountMsToNameTxtMap[atPost.by_ms] ? '' : 'italic'}`}>
-									{accountMsToNameTxt(atPost.by_ms)}
+								<p class={`font-bold ${gs.msToProfileMap[atPost.by_ms]?.name.txt ? '' : 'italic'}`}>
+									{msToAccountNameTxt(atPost.by_ms)}
 								</p>
 							</div>
 						</a>
@@ -159,12 +168,12 @@
 				class={p.nested || !p.cited ? '-left-5' : p.cited ? '-left-2.5 -bot tom-1' : ''}
 			/>
 			{#if open}
-				<div class={`pr-1 ${p.cited ? '' : 'pb-2'}`}>
+				<div class={`pr-1 ${p.cited || p.isEmbed ? '' : 'pb-2'}`}>
 					{#if tags?.length || rxnCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags || [] as tag (tag)}
 								<a
-									href={`/__${gs.urlInMs}?q=${`[${tag}]`}`}
+									href={`/__${gs.lastSeenInMs}?q=${`[${tag}]`}`}
 									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}
@@ -186,7 +195,7 @@
 											...getIdObjAsAtIdObj(p.post),
 											ms: 0,
 											by_ms: gs.accounts![0].ms,
-											in_ms: gs.urlInMs!,
+											in_ms: gs.lastSeenInMs!,
 											emoji,
 										});
 									}}
@@ -230,7 +239,7 @@
 								<CoreParser {core} miniCites={p.cited} depth={p.depth} />
 							</div>
 						{:else}
-							<p class="whitespace-pre-wrap break-all font-thin font-mono">{core}</p>
+							<p class="whitespace-pre-wrap break-all font-thin font-mono leading-4">{core}</p>
 						{/if}
 					{:else}
 						<p class={`text-fg2 font-bold italic`}>

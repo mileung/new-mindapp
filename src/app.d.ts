@@ -6,7 +6,7 @@ declare global {
 		// interface Locals {}
 		// interface PageData {}
 		interface PageState {
-			email?: string;
+			prefilledEmail?: string;
 		}
 		// interface Platform {}
 	}

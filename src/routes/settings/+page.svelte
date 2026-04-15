@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { promptSum } from '$lib/dom';
 	import { exportTextAsFile } from '$lib/files';
-	import { gs } from '$lib/global-state.svelte';
-	import { ranInt } from '$lib/js';
-	import { gsdb, initLocalDb, localDbFilename } from '$lib/local-db';
+	import { gs, gsdb } from '$lib/global-state.svelte';
+	import { alertError, ranInt } from '$lib/js';
+	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { day } from '$lib/time';
+	import { updateLocalCache } from '$lib/types/local-cache';
 	import { type PartInsert } from '$lib/types/parts';
 	import { pc } from '$lib/types/parts/partCodes';
 	import { pf } from '$lib/types/parts/partFilters';
@@ -26,6 +27,19 @@
 </script>
 
 <div class="p-2 max-w-lg">
+	<button
+		onclick={() => {
+			updateLocalCache((lc) => ({ ...lc, devMode: !lc.devMode }));
+		}}
+		class="absolute top-0 right-0 text-fg2 hover:text-fg1 hover:bg-bg4"
+	>
+		dev mode
+		{#if gs.devMode}
+			on
+		{:else}
+			off
+		{/if}
+	</button>
 	{#if gs.localDbFailed || gs.invalidLocalCache}
 		<p class="text-red-500 border-red-500 border-2 p-2">
 			{gs.localDbFailed
@@ -65,7 +79,7 @@
 
 	{#if gs.localDbFailed}
 		<button
-			class="xy px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-500"
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-amber-400 dark:border-amber-500 hover:bg-bg7 hover:text-fg3 hover:border-amber-500 dark:hover:border-amber-400"
 			onclick={async () => {
 				let { getDatabaseFile } = new SQLocal(localDbFilename);
 				let databaseFile = await getDatabaseFile();
@@ -80,7 +94,7 @@
 		>
 	{:else}
 		<button
-			class="xy px-2 py-1 bg-sky-400/20 hover:bg-sky-400/30 text-sky-500"
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-sky-400 dark:border-sky-500 hover:bg-bg7 hover:text-fg3 hover:border-sky-500 dark:hover:border-sky-400"
 			onclick={async () => {
 				exportTextAsFile(
 					`mindapp-${Date.now()}.json`,
@@ -112,7 +126,7 @@
 			}}><IconDownload class="w-5 mr-1" />{m.downloadJsonFile()}</button
 		>
 		<button
-			class="xy px-2 py-1 bg-teal-500/20 hover:bg-teal-500/30 text-teal-500"
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-teal-400 dark:border-teal-500 hover:bg-bg7 hover:text-fg3 hover:border-teal-500 dark:hover:border-teal-400"
 			onclick={async () => {
 				let input = document.createElement('input');
 				input.type = 'file';
@@ -176,7 +190,7 @@
 	<p class="text-xl font-bold">{m.dangerZone()}</p>
 	<!-- TODO: reset local cache button -->
 	<button
-		class="xy px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-500"
+		class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
 		onclick={async () => {
 			if (
 				promptSum((a, b) => m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }))
@@ -184,7 +198,6 @@
 				try {
 					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
 				} catch (e) {
-					alert('Error deleting db' + String(e));
 					console.error('error deleteDatabaseFile:', e);
 					// deleteDatabaseFile is slow and unreliable
 					await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
@@ -198,17 +211,16 @@
 			}
 		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
 	>
-	<!-- {#if dev} -->
-	{#if true}
+	{#if gs.devMode}
 		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 		<p class="text-xl font-bold">Dev Tools</p>
 		<button
-			class="xy px-2 py-1 bg-yellow-400/20 hover:bg-yellow-500/30 text-yellow-500"
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
 			onclick={async () => {
 				try {
 					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
 				} catch (e) {
-					console.error('error deleteDatabaseFile:', e);
+					alertError(e);
 				}
 				await initLocalDb();
 				let testTags: string[] = [];
@@ -244,13 +256,19 @@
 					try {
 						await addPost(post, true);
 					} catch (error) {
-						alert(String(error));
+						alertError(error);
 					}
 					console.log('added post');
 				}
 				gs.urlToFeedMap = {};
 				console.timeEnd('adding posts');
 			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
+		>
+		<button
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
+			onclick={async () => {
+				localStorage.clear();
+			}}><IconTrash class="w-5 mr-1" />Clear localStorage</button
 		>
 	{/if}
 </div>

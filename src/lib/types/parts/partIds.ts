@@ -1,4 +1,5 @@
 import { page } from '$app/state';
+import { splitUntil } from '$lib/js';
 import { z } from 'zod';
 
 export let IdObjSchema = z.object({
@@ -28,6 +29,12 @@ export let isProfileSlug = (str = '') => profileSlugRegex.test(str);
 export let isIdStr = (str = '') => idRegex.test(str);
 export let getIdStr = (io: IdObj) => `${io.ms}_${io.by_ms}_${io.in_ms}`;
 export let getAtIdStr = (aio: AtIdObj) => `${aio.at_ms}_${aio.at_by_ms}_${aio.at_in_ms}`;
+
+export let getUrlInMs = () => {
+	let slug = splitUntil(page.url.pathname, '/', 2)[1];
+	if (isSpaceSlug(slug)) return +slug.slice(2);
+	if (isIdStr(slug)) return getIdStrAsIdObj(slug).in_ms;
+};
 
 export let id0 = {
 	at_ms: 0,
@@ -72,7 +79,7 @@ export let getIdObjAsAtIdObj = (io: IdObj) => ({
 });
 
 export let getIdStrAsIdObj = (idStr: string) => {
-	let s = idStr.split('_', 3);
+	let s = splitUntil(idStr, '_', 2);
 	let ms = +s[0];
 	let by_ms = +s[1];
 	let in_ms = +s[2];
@@ -93,7 +100,7 @@ export let getIdStrAsIdObj = (idStr: string) => {
 };
 
 export let getIdStrAsAtIdObj = (idStr: string) => {
-	let s = idStr.split('_', 3);
+	let s = splitUntil(idStr, '_', 2);
 	let at_ms = +s[0];
 	let at_by_ms = +s[1];
 	let at_in_ms = +s[2];

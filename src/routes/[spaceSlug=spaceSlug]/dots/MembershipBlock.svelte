@@ -1,16 +1,9 @@
 <script lang="ts">
 	import { promptSum } from '$lib/dom';
-	import { gs } from '$lib/global-state.svelte';
+	import { getUrlInMsContext, gs, msToAccountNameTxt } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { accountMsToNameTxt } from '$lib/types/accounts';
-	import {
-		defaultSpaceProps,
-		permissionCodes,
-		roleCodes,
-		type Membership,
-		type Space,
-	} from '$lib/types/spaces';
+	import { permissionCodes, roleCodes, type Membership } from '$lib/types/spaces';
 	import {
 		IconCrown,
 		IconCrownFilled,
@@ -34,32 +27,21 @@
 	let p: { membership: Membership } = $props();
 
 	let moreOptionsShown = $state(false);
-	let spaceContext = $derived(gs.accounts?.[0].spaceMsToContextMap[gs.urlInMs || 0]);
+	let spaceContext = $derived(getUrlInMsContext());
 	let callerIsOwner = $derived(spaceContext?.roleCode?.num === roleCodes.owner);
 	let callerIsMod = $derived(spaceContext?.roleCode?.num === roleCodes.mod);
 
 	$effect(() => {
-		// gs.urlInMs; // TODO: is this how to reset members when switching spaces?
+		// gs.lastSeenInMs; // TODO: is this how to reset members when switching spaces?
 		// memberships = [];
 		// accountMsToModPromotionMsByMsMap = {};
 		// accountMsToOwnerPromotionMsByMsMap = {};
 	});
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
-	let membershipIsByCaller = $derived(p.membership.accept.by_ms === callerMs);
-	let space = $derived.by<Space>(() => {
-		let inPersonalSpace = gs.urlInMs === callerMs;
-		if (gs.urlInMs === 0 || gs.urlInMs === 1 || inPersonalSpace) {
-			return {
-				...defaultSpaceProps,
-				ms: gs.urlInMs!,
-			} satisfies Space;
-		}
-		return defaultSpaceProps;
-		// return gs.pendingInvite?.in_ms === gs.urlInMs //
-		// 	? gs.pendingInvite!.space
-		// 	: defaultSpaceProps;
-	});
+	let membershipInMs = $derived(p.membership.invite.in_ms);
+	let membershipAccountMs = $derived(p.membership.accept.by_ms);
+	let membershipIsByCaller = $derived(membershipAccountMs === callerMs);
 
 	let roleDict = $derived<Record<number, string>>({
 		[roleCodes.member]: m.assignedMemberBy(),
@@ -67,32 +49,43 @@
 		[roleCodes.owner]: m.assignedOwnerBy(),
 	});
 
-	let permissionDict = $derived<Record<number, string>>({
-		[permissionCodes.viewOnly]: m.viewOnlySetBy(),
-		[permissionCodes.reactOnly]: m.canReactSetBy(),
-		[permissionCodes.postOnly]: m.canPostSetBy(),
-		[permissionCodes.reactAndPost]: m.canReactPostSetBy(),
-	});
+	let permissionText = $derived(
+		{
+			[permissionCodes.viewOnly]: m.viewOnlySetBy(),
+			[permissionCodes.reactOnly]: m.canReactSetBy(),
+			[permissionCodes.postOnly]: m.canPostSetBy(),
+			[permissionCodes.reactAndPost]: m.canReactPostSetBy(),
+		}[p.membership.permission.num],
+	);
 
-	let accepteeName = $derived(accountMsToNameTxt(p.membership.accept.by_ms));
+	let accepteeName = $derived(msToAccountNameTxt(p.membership.accept.by_ms));
+	let membershipRole = $derived(
+		gs.spaceMsToAccountMsToRoleFlairMap[membershipInMs]?.[membershipAccountMs]?.role,
+	);
+	let membershipFlair = $derived(
+		gs.spaceMsToAccountMsToRoleFlairMap[membershipInMs]?.[membershipAccountMs]?.flair,
+	);
 </script>
 
 <div class="fx h-8">
-	<a class="fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.accept.by_ms}_`}>
-		{#if p.membership.role?.num === roleCodes.owner}
+	<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.accept.by_ms}_`}>
+		{#if membershipRole?.num === roleCodes.owner}
 			<IconCrownFilled />
-		{:else if p.membership.role?.num === roleCodes.mod}
+		{:else if membershipRole?.num === roleCodes.mod}
 			<IconShieldFilled />
 		{/if}
 		<AccountIcon ms={p.membership.accept.by_ms} class="mx-1 h-6 w-6" />
 		<p
-			class={`font-medium text-lg ${gs.accountMsToNameTxtMap[p.membership.accept.by_ms] ? '' : 'italic'}`}
+			class={`font-medium text-lg ${gs.msToProfileMap[p.membership.accept.by_ms]?.name.txt ? '' : 'italic'}`}
 		>
 			{accepteeName}
+			{#if membershipFlair}
+				<span class="text-fg2">
+					{membershipFlair.txt}
+				</span>
+			{/if}
 		</p>
 	</a>
-	<div class="flex-1"></div>
-
 	{#if moreOptionsShown}
 		{#if membershipIsByCaller || callerIsOwner}
 			<button
@@ -216,38 +209,48 @@
 	{/if}
 </div>
 <div class="text-sm text-fg2">
-	<div class="fx justify-between">
-		<div class="fx">
-			<p class="mr-1">{m.acceptedInviteBy()}</p>
-			<a class="fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.invite.by_ms}_`}>
-				<AccountIcon isSystem class="w-5 mr-0.5" ms={p.membership.invite.by_ms} />
-				{accountMsToNameTxt(p.membership.invite.by_ms, true)}
-			</a>
-		</div>
-		<p class="">{formatMs(p.membership.accept.ms, 'day')}</p>
-	</div>
-	{#if p.membership.role}
+	{#if membershipFlair}
 		<div class="fx justify-between">
-			<div class="fx">
-				<p class="mr-1">{roleDict[p.membership.role.num]}</p>
-				<a class="fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.role.by_ms}_`}>
-					<AccountIcon isSystem class="w-5 mr-0.5" ms={p.membership.role.by_ms} />
-					{accountMsToNameTxt(p.membership.role.by_ms, true)}
+			{#if membershipFlair.by_ms === membershipAccountMs}
+				<p class="mr-1">{m.flairSetBySelf()}</p>
+			{:else}
+				<p class="mr-1">{m.flairSetBy()}</p>
+				<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${membershipFlair.by_ms}_`}>
+					<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={membershipFlair.by_ms!} />
+					{msToAccountNameTxt(membershipFlair.by_ms!, true)}
 				</a>
-			</div>
+			{/if}
 			<p class="">
-				{formatMs(p.membership.role.ms, 'day')}
+				{formatMs(membershipFlair.ms!, 'day')}
 			</p>
 		</div>
 	{/if}
 	<div class="fx justify-between">
-		<div class="fx">
-			<p class="mr-1">{permissionDict[p.membership.permission.num]}</p>
-			<a class="fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.permission.by_ms}_`}>
-				<AccountIcon isSystem class="w-5 mr-0.5" ms={p.membership.permission.by_ms} />
-				{accountMsToNameTxt(p.membership.permission.by_ms, true)}
+		<p class="mr-1">{m.acceptedInviteBy()}</p>
+		<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.invite.by_ms}_`}>
+			<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={p.membership.invite.by_ms} />
+			{msToAccountNameTxt(p.membership.invite.by_ms, true)}
+		</a>
+		<p class="">{formatMs(p.membership.accept.ms, 'day')}</p>
+	</div>
+	{#if membershipRole}
+		<div class="fx justify-between">
+			<p class="mr-1">{roleDict[membershipRole.num]}</p>
+			<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${membershipRole.by_ms}_`}>
+				<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={membershipRole.by_ms!} />
+				{msToAccountNameTxt(membershipRole.by_ms!, true)}
 			</a>
+			<p class="">
+				{formatMs(membershipRole.ms!, 'day')}
+			</p>
 		</div>
+	{/if}
+	<div class="fx justify-between">
+		<p class="mr-1">{permissionText}</p>
+		<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.permission.by_ms}_`}>
+			<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={p.membership.permission.by_ms} />
+			{msToAccountNameTxt(p.membership.permission.by_ms, true)}
+		</a>
 		<p class="">{formatMs(p.membership.permission.ms, 'day')}</p>
 	</div>
 </div>

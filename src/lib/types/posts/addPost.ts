@@ -1,3 +1,4 @@
+import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import { ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
@@ -8,11 +9,10 @@ import {
 	PostSchema,
 	type Post,
 } from '.';
-import { gsdb, type Database } from '../../local-db';
+import { type Database } from '../../local-db';
 import {
 	assert1Row,
 	channelPartsByCode,
-	getWhoWhereObj,
 	hasParent,
 	type PartInsert,
 	type PartSelect,
@@ -31,7 +31,7 @@ import {
 import { pTable } from '../parts/partsTable';
 
 export let addPost = async (post: Post, forceUsingLocalDb?: boolean) => {
-	let baseInput = await getWhoWhereObj();
+	let baseInput = await getWhoWhereObj(forceUsingLocalDb);
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));

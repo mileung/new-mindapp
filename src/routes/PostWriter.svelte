@@ -172,7 +172,7 @@
 							...getIdObjAsAtIdObj(gs.writingTo!),
 							ms: 0,
 							by_ms: gs.accounts![0].ms,
-							in_ms: gs.urlInMs!,
+							in_ms: gs.lastSeenInMs!,
 							emoji,
 						});
 					}}

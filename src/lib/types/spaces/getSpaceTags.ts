@@ -1,8 +1,8 @@
+import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
 import { and, asc, desc } from 'drizzle-orm';
-import { gsdb } from '../../local-db';
-import { getWhoWhereObj, type WhoWhereObj } from '../parts';
+import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { getIdObj } from '../parts/partIds';

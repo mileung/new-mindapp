@@ -1,4 +1,19 @@
-import { and, asc, desc, eq, gt, gte, isNotNull, isNull, like, lte, not } from 'drizzle-orm';
+import {
+	and,
+	asc,
+	desc,
+	eq,
+	gt,
+	gte,
+	isNotNull,
+	isNull,
+	like,
+	lt,
+	lte,
+	not,
+	or,
+} from 'drizzle-orm';
+import type { GranularNumProp, GranularTxtProp } from '.';
 import type { AtIdObj, FullIdObj, IdObj } from './partIds';
 import { pTable } from './partsTable';
 
@@ -38,6 +53,16 @@ export let pf = {
 	notId: (io: IdObj) => not(filterIdObj(io)!),
 	notAtId: (aio: AtIdObj) => not(filterAtIdObj(aio)!),
 	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
+	notGranularTxt: (gn: GranularTxtProp) =>
+		or(
+			pf.ms.notEq(gn.ms || 0),
+			pf.txt.notEq(gn.txt), //
+		),
+	notGranularNum: (gn: GranularNumProp) =>
+		or(
+			pf.ms.notEq(gn.ms || 0),
+			pf.num.notEq(gn.num), //
+		),
 
 	noAtId: and(
 		eq(pTable.at_ms, 0), //
@@ -49,6 +74,8 @@ export let pf = {
 		eq0: eq(pTable.at_ms, 0),
 		notEq: (v: number) => not(eq(pTable.at_ms, v)),
 		gt0: gt(pTable.at_ms, 0),
+		gt: (v: number) => gt(pTable.at_ms, v),
+		lt: (v: number) => lt(pTable.at_ms, v),
 	},
 	at_by_ms: {
 		eq: (v: number) => eq(pTable.at_by_ms, v),
@@ -70,20 +97,21 @@ export let pf = {
 		notEq: (v: number) => not(eq(pTable.ms, v)),
 		gt: (v: number) => gt(pTable.ms, v),
 		gt0: gt(pTable.ms, 0),
-		gte: (v: number) => gte(pTable.ms, v),
-		lte: (v: number) => lte(pTable.ms, v),
+		lt: (v: number) => lt(pTable.ms, v),
 	},
 	by_ms: {
 		eq: (v: number) => eq(pTable.by_ms, v),
 		eq0: eq(pTable.by_ms, 0),
 		notEq: (v: number) => not(eq(pTable.by_ms, v)),
 		gt0: gt(pTable.by_ms, 0),
+		lt: (v: number) => lt(pTable.by_ms, v),
 	},
 	in_ms: {
 		eq: (v: number) => eq(pTable.in_ms, v),
 		eq0: eq(pTable.in_ms, 0),
 		notEq: (v: number) => not(eq(pTable.in_ms, v)),
 		gt0: gt(pTable.in_ms, 0),
+		lt: (v: number) => lt(pTable.in_ms, v),
 	},
 	code: {
 		eq: (v: number) => eq(pTable.code, v),
@@ -95,6 +123,7 @@ export let pf = {
 		notEq: (v: number) => not(eq(pTable.num, v)),
 		gt0: gt(pTable.num, 0),
 		gte0: gte(pTable.num, 0),
+		lt: (v: number) => lt(pTable.num, v),
 		lte: (v: number) => lte(pTable.num, v),
 	},
 	txt: {

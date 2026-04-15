@@ -1,4 +1,5 @@
 import { ranStr } from '$lib/js';
+import { m } from '$lib/paraglide/messages';
 import { _getEmailRow } from '$lib/server/_getEmailRow';
 import { tdb } from '$lib/server/db';
 import { getValidAuthCookie, setCookie } from '$lib/server/sessions';
@@ -24,17 +25,15 @@ export let _createAccount = async (
 		email: string;
 		password: string;
 	},
-): Promise<{ fail?: true; strike?: number; expiredOtp?: true; account?: MyAccount }> => {
+): Promise<{ strike?: number; expiredOtp?: true; account?: MyAccount }> => {
 	let res = await _checkOtp({
 		...input,
 		deleteIfCorrect: true,
-		partCode: pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
 	});
 	if (res.strike || res.expiredOtp) return res;
+	if (await _getEmailRow(input.email)) throw new Error(m.emailAlreadyInUse());
 
-	if (await _getEmailRow(input.email)) return { fail: true };
-
-	let top888MostUsedGlobalTags = normalizeTags(
+	let top88MostUsedGlobalTags = normalizeTags(
 		(
 			await tdb
 				.select()
@@ -50,7 +49,7 @@ export let _createAccount = async (
 					),
 				)
 				.orderBy(pf.num.desc, pf.ms.desc)
-				.limit(888)
+				.limit(88)
 		).map((r) => r.txt!),
 	);
 
@@ -86,29 +85,21 @@ export let _createAccount = async (
 			by_ms: ms,
 			code: pc.accountSavedTagsTxtMsByMs,
 			num: 0,
-			txt: JSON.stringify(top888MostUsedGlobalTags),
-		},
-		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.accountSpaceMssTxtMsByMs,
-			num: 0,
-			txt: JSON.stringify([]),
+			txt: JSON.stringify(top88MostUsedGlobalTags),
 		},
 	];
 	let account = reduceMyAccountRows(myAccountRows);
 	if (!MyAccountSchema.safeParse(account).success) throw new Error('Invalid account');
 
-	let clientKey = getValidAuthCookie(ctx, 'clientKey');
-	if (!clientKey) {
-		clientKey = { ms, txt: ranStr() };
-		setCookie(ctx, 'clientKey', JSON.stringify(clientKey));
+	let clientIdObj = getValidAuthCookie(ctx, 'clientKeyObj');
+	if (!clientIdObj) {
+		clientIdObj = { ms, txt: ranStr() };
+		setCookie(ctx, 'clientKeyObj', clientIdObj);
 	}
-	let sessionKey = getValidAuthCookie(ctx, 'sessionKey');
-	if (!sessionKey) {
-		sessionKey = { ms, txt: ranStr() };
-		setCookie(ctx, 'sessionKey', JSON.stringify(sessionKey));
+	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	if (!sessionIdObj) {
+		sessionIdObj = { ms, txt: ranStr() };
+		setCookie(ctx, 'sessionKeyObj', sessionIdObj);
 	}
 
 	let partsToInsert: PartInsert[] = [
@@ -124,16 +115,8 @@ export let _createAccount = async (
 			...id0,
 			ms,
 			in_ms: ms,
-			code: pc.spaceNameTxtIdAndMemberCountNum,
+			code: pc.spaceDescriptionTxtIdAndMemberCountNum,
 			num: 1,
-			txt: '',
-		},
-		{
-			...id0,
-			ms,
-			in_ms: ms,
-			code: pc.spaceDescriptionTxtId,
-			num: 0,
 			txt: '',
 		},
 		{
@@ -148,7 +131,7 @@ export let _createAccount = async (
 			...id0,
 			ms,
 			in_ms: ms,
-			code: pc.newMemberPermissionCodeId,
+			code: pc.newMemberPermissionCodeNumId,
 			num: permissionCodes.viewOnly,
 		},
 		{
@@ -178,37 +161,37 @@ export let _createAccount = async (
 		{
 			...id0,
 			at_ms: ms,
-			ms: clientKey.ms,
+			ms: clientIdObj.ms,
 			code: pc.clientKeyTxtMsAtAccountId,
 			num: 0,
-			txt: clientKey.txt,
+			txt: clientIdObj.txt,
 		},
 		{
 			...id0,
 			at_ms: ms,
-			ms: sessionKey.ms,
-			code: pc.sessionKeyTxtMsAtAccountId,
+			ms: sessionIdObj.ms,
+			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
 			num: 0,
-			txt: sessionKey.txt,
+			txt: sessionIdObj.txt,
 		},
-		{
-			...id0,
-			at_by_ms: ms,
-			at_in_ms: 1,
-			ms,
-			in_ms: ms,
-			code: pc.inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug,
-			num: 1,
-		},
-		{
-			...id0,
-			at_ms: ms,
-			at_in_ms: ms,
-			ms,
-			by_ms: ms,
-			code: pc.acceptMsByMsAtInviteId,
-			num: 0,
-		},
+		// {
+		// 	...id0,
+		// 	at_by_ms: 1,
+		// 	at_in_ms: 1,
+		// 	ms,
+		// 	in_ms: ms,
+		// 	code: pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt,
+		// 	num: 0,
+		// },
+		// {
+		// 	...id0,
+		// 	at_ms: ms,
+		// 	at_in_ms: ms,
+		// 	ms,
+		// 	by_ms: ms,
+		// 	code: pc.acceptMsByMsAtInviteId,
+		// 	num: 0,
+		// },
 	];
 	await tdb.insert(pTable).values(partsToInsert);
 	return { account };

@@ -2,7 +2,12 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
-	import { getBottomOverlayShown, gs, resetBottomOverlay } from '$lib/global-state.svelte';
+	import {
+		getBottomOverlayShown,
+		gs,
+		msToSpaceNameTxt,
+		resetBottomOverlay,
+	} from '$lib/global-state.svelte';
 	import { identikana, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import {
@@ -12,7 +17,7 @@
 		updateSavedTags,
 	} from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
-	import { defaultSpaceProps, spaceMsToNameTxt, type Space } from '$lib/types/spaces';
+	import { getDefaultSpace, type Space } from '$lib/types/spaces';
 	import {
 		IconBook2,
 		IconDotsVertical,
@@ -67,22 +72,25 @@
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
-			if (!textInputFocused() && gs.urlInMs !== undefined) {
+			if (!textInputFocused() && gs.lastSeenInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
 				e.key === '/' && setTimeout(() => searchIpt.focus(), 0);
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
-				e.key === 'h' && goto(`/__${gs.urlInMs}`);
+				e.key === 'h' && goto(`/__${gs.lastSeenInMs}`);
 				e.key === 's' && goto(`/settings`);
 				(e.key === 'u' || e.key === '?') && goto(`/user-guide`);
+
+				// TODO: e.key === 'r' to refresh/empty cache for current page
+
 				if (e.key === 'Escape') {
 					if (getBottomOverlayShown()) resetBottomOverlay();
 					else if (showAccountMenu || showSpaceMenu) showAccountMenu = showSpaceMenu = false;
 					else window.scrollTo({ top: 0 });
 				}
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					let urlInMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.urlInMs);
-					let newSpaceMsIndex = urlInMsIndex + (e.shiftKey ? -1 : 1);
+					let lastSeenInMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.lastSeenInMs);
+					let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 					if (newSpaceMsIndex >= sidebarSpaces.length) newSpaceMsIndex = sidebarSpaces.length - 1;
 					goto(`/__${sidebarSpaces[newSpaceMsIndex].ms}`);
@@ -97,6 +105,10 @@
 		!savedTagsSet.size && (tagXFocused = false);
 	});
 
+	let highlightLastSeenInMs = $derived(
+		(page.params.feedSlug || page.params.spaceSlug)?.endsWith(`_${gs.lastSeenInMs}`),
+	);
+
 	let addTagToSearchInput = (tag: string) => {
 		searchVal = `${searchVal
 			.replace(/\s\s+/g, ' ')
@@ -108,22 +120,11 @@
 
 	let sidebarSpaces = $derived<Space[]>([
 		// local space ms - everything private in OPFS
-		defaultSpaceProps,
+		getDefaultSpace(),
 		// personal space ms placeholder - everything private in cloud
-		{ ...defaultSpaceProps, ms: gs.accounts?.[0].ms || 8 },
+		{ ...getDefaultSpace(), ms: gs.accounts?.[0].ms || 8 },
 		// global space ms - everything public in cloud
-		{ ...defaultSpaceProps, ms: 1 },
-
-		// ...(gs.pendingInvite && gs.pendingInvite.in_ms !== 1
-		// 	? [
-		// 			{
-		// 				...defaultSpaceProps,
-		// 				ms: gs.pendingInvite.in_ms,
-		// 				name: { ms: 0, by_ms: 0, txt: gs.pendingInvite.space.name.txt },
-		// 			},
-		// 		]
-		// 	: []),
-		// ...(gs.accounts?.[0].spaceMss || []),
+		{ ...getDefaultSpace(), ms: 1 },
 	]);
 </script>
 
@@ -167,7 +168,7 @@
 				{#if showSpaceMenu}
 					<IconX class="h-6 w-6" />
 				{:else if gs.accounts}
-					<SpaceIcon ms={gs.urlInMs!} class="h-6 w-6" />
+					<SpaceIcon ms={gs.lastSeenInMs!} class="h-6 w-6" />
 				{/if}
 			</button>
 			<input
@@ -192,7 +193,7 @@
 						else {
 							let q = searchVal.trim();
 							if (q) {
-								let href = `/__${gs.urlInMs}?q=${q}`;
+								let href = `/__${gs.lastSeenInMs}?q=${q}`;
 								e.metaKey ? open(href, '_blank') : goto(href);
 							}
 						}
@@ -233,7 +234,7 @@
 			/>
 			<a
 				class={`xy -ml-9 w-9 group ${searchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
-				href={`/__${gs.urlInMs}?q=${searchVal}`}
+				href={`/__${gs.lastSeenInMs}?q=${searchVal}`}
 			>
 				<div class={`xy ${searchIptFocused ? 'h-8 w-8' : 'h-9 w-9'} group-hover:bg-bg5`}>
 					<IconSearch class="h-6 w-6" />
@@ -262,7 +263,7 @@
 					>
 						<button
 							bind:this={tagSuggestionsRefs[i]}
-							class={`relative h-8 truncate text-nowrap flex-1 text-left px-2 text-lg`}
+							class={`relative h-8 overflow-scroll flex-1 text-left px-2 text-lg`}
 							onclick={() => addTagToSearchInput(tag)}
 						>
 							{#if tagIndex === i && !tagXFocused}
@@ -295,12 +296,12 @@
 						<button
 							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 font-medium flex-1 ${a.name ? '' : 'italic'}`}
 							onclick={() => {
-								a.signedIn || !a.ms
-									? updateLocalCache((lc) => ({
-											...lc,
-											accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
-										}))
-									: goto('/sign-in', { state: { email: a.email.txt } });
+								if (a.signedIn || !a.ms)
+									updateLocalCache((lc) => ({
+										...lc,
+										accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
+									}));
+								else goto('/sign-in', { state: { prefilledEmail: a.email.txt } });
 							}}
 						>
 							{#if !i}
@@ -343,10 +344,10 @@
 					<a
 						target="_blank"
 						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-						class="truncate flex-1 h-12 fx pl-2 gap-2 font-medium leading-4.5"
+						class="flex-1 overflow-hidden h-12 fx pl-2 gap-2 font-medium leading-4.5"
 					>
 						<IconPuzzle class="shrink-0 w-6" />
-						<p class="truncate">{m.extension()}</p>
+						<p class="overflow-scroll">{m.extension()}</p>
 					</a>
 					<button
 						class="xy w-8"
@@ -359,39 +360,63 @@
 					</button>
 				</div>
 				<a
-					href="/add-space"
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/add-space' ? 'bg-bg5' : ''}`}
+					href="/create-space"
+					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'bg-bg5' : ''}`}
 				>
 					<IconSquarePlus2 class="shrink-0 w-6" />
-					<p class="truncate">{m.createSpace()}</p>
+					<p class="overflow-scroll">{m.createSpace()}</p>
 				</a>
+				<!-- <div class="flex h-10 text-fg2">
+					<a
+						href="/create-space"
+						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'text-fg1 bg-bg5' : ''}`}
+					>
+						<IconSquarePlus2 class="shrink-0 w-6" />
+					</a>
+					<a
+						href={`/_${gs.accounts?.[0].ms || 0}_`}
+						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'text-fg1 bg-bg5' : ''}`}
+					>
+						<IconUserSquare class="shrink-0 w-6" />
+					</a>
+					<a
+						href="/settings"
+						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'text-fg1 bg-bg5' : ''}`}
+					>
+						<IconSettings class="shrink-0 w-6" />
+					</a>
+				</div> -->
 				{#each sidebarSpaces as space (space.ms)}
-					<div class={`flex group/space ${space.ms === gs.urlInMs ? 'bg-bg5' : ''} hover:bg-bg5`}>
+					<div
+						class={`flex group/space ${highlightLastSeenInMs && space.ms === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
+					>
 						<a
 							href={`/__${space.ms}`}
-							class={`relative flex-1 fx h-10 pl-2 gap-2 truncate font-medium`}
+							class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden font-medium`}
 						>
-							{#if space.ms === gs.urlInMs}
+							{#if space.ms === gs.lastSeenInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.feedSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
 							{/if}
-							{#if space.ms === gs.urlInMs}
+							<!-- {#if space.ms === gs.lastSeenInMs}
 								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
-							{/if}
+							{/if} -->
 							<SpaceIcon ms={space.ms} class="shrink-0 w-6" />
-							<p class="truncate">{spaceMsToNameTxt(space.ms)}</p>
+							<p class="overflow-scroll">
+								{msToSpaceNameTxt(space.ms)}
+							</p>
 						</a>
 						<!-- TODO: IconCalendar -->
 						<a
 							href={`/__${space.ms}/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
 							href={`/__${space.ms}/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.urlInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>
@@ -405,21 +430,21 @@
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
 				>
 					<IconUserSquare class="shrink-0 w-6" />
-					<p class="truncate">{m.profile()}</p>
+					<p class="overflow-scroll">{m.profile()}</p>
 				</a>
 				<a
 					href="/user-guide"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
 					<IconBook2 class="shrink-0 w-6" />
-					<p class="truncate">{m.userGuide()}</p>
+					<p class="overflow-scroll">{m.userGuide()}</p>
 				</a>
 				<a
 					href="/settings"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
 				>
 					<IconSettings class="shrink-0 w-6" />
-					<p class="truncate">{m.settings()}</p>
+					<p class="overflow-scroll">{m.settings()}</p>
 				</a>
 			</div>
 		</div>

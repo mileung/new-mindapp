@@ -1,23 +1,34 @@
 import { dev } from '$app/environment';
+import { m } from '$lib/paraglide/messages';
 import { _getEmailRow } from '$lib/server/_getEmailRow';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
-import type { OtpPartCode } from '.';
 import { pc } from '../parts/partCodes';
 import { id0 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let _sendOtp = async (input: { email: string; partCode: OtpPartCode }) => {
-	let accountRow = await _getEmailRow(input.email);
-	throwIf(
-		accountRow
-			? input.partCode === pc.createAccountOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount
-			: input.partCode === pc.resetPasswordOtpMsWithTxtAsEmailSpacePinAndNumAsStrikeCount,
-	);
+export let _sendOtp = async (input: {
+	email: string;
+	will: {
+		createAccount?: boolean;
+		signIn?: boolean;
+		resetPassword?: boolean;
+	};
+}): Promise<{
+	otpMs?: number;
+	fail?: true;
+}> => {
+	let { email, will } = input;
+	if (!will.signIn) {
+		// _signIn already checks for email row
+		let emailRow = await _getEmailRow(email);
+		if (will.createAccount) {
+			if (emailRow) throw new Error(m.emailAlreadyInUse());
+		} else if (!emailRow) throw new Error(m.anErrorOccurred());
+	}
 
-	let pin = ('' + Math.random()).slice(-8);
+	let pin = +('' + Math.random()).slice(-8);
 	if (dev) {
-		pin = '00000000';
+		pin = 0;
 	} else {
 		// await sendEmail({
 		// 	from: 'noreply@yourdomain.com',
@@ -30,9 +41,10 @@ export let _sendOtp = async (input: { email: string; partCode: OtpPartCode }) =>
 	await tdb.insert(pTable).values({
 		...id0,
 		ms,
-		code: input.partCode,
+		by_ms: pin,
+		code: pc.otpMs_Pin_StrikeCountIdAndEmailTxt,
 		num: 0,
-		txt: `${input.email} ${pin}`,
+		txt: email,
 	});
 	return { otpMs: ms };
 };

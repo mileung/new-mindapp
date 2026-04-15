@@ -1,11 +1,13 @@
 import { ranStr } from '$lib/js';
+import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
+import { makeMyValidInvitesFilter } from '.';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { id0 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let inviteLinksPerLoad = 88;
+let validInviteLimit = 88;
 
 export let _createInviteLink = async (
 	input: WhoWhereObj & {
@@ -14,26 +16,35 @@ export let _createInviteLink = async (
 	},
 ) => {
 	let ms = Date.now();
-	let slug = ranStr(42);
-	let expiryMs = ms + input.validFor;
+	let slugEnd = ranStr(8);
+	let expiryMs = input.validFor ? ms + input.validFor : 0;
+
+	if (input.spaceMs === input.callerMs) throw new Error(`Cannot invite people to personal space`);
+
+	let myInviteRows = await tdb
+		.select()
+		.from(pTable)
+		.where(makeMyValidInvitesFilter(input.callerMs, input.spaceMs, ms))
+		.limit(validInviteLimit);
+	if (myInviteRows.length >= validInviteLimit) throw new Error(m.limitReached());
 
 	await tdb.insert(pTable).values([
 		{
 			...id0,
-			at_by_ms: expiryMs,
+			at_ms: expiryMs,
 			at_in_ms: input.maxUses,
 			ms,
 			by_ms: input.callerMs,
 			in_ms: input.spaceMs,
-			code: pc.inviteIdWithAtByMsAsExpiryAtInMsAsMaxUsesNumAsUseCountAndTxtAsSlug,
+			code: pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt,
 			num: 0,
-			txt: slug,
+			txt: slugEnd,
 		},
 	]);
 
 	return {
 		ms,
-		slug,
+		slugEnd,
 		expiryMs,
 	};
 };

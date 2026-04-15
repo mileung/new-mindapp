@@ -1,11 +1,15 @@
 <script lang="ts">
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
-	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
+	import {
+		gs,
+		msToAccountNameTxt,
+		msToSpaceNameTxt,
+		resetBottomOverlay,
+	} from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
-	import { accountMsToNameTxt } from '$lib/types/accounts';
 	import { hasParent } from '$lib/types/parts';
 	import {
 		getAtIdStr,
@@ -14,11 +18,11 @@
 		getIdStr,
 		isIdStr,
 	} from '$lib/types/parts/partIds';
-	import type { Post } from '$lib/types/posts';
+	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import { reactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { roleCodes, spaceMsToNameTxt } from '$lib/types/spaces';
+	import { roleCodes } from '$lib/types/spaces';
 	import {
 		IconBrowserMinus,
 		IconBrowserShare,
@@ -44,6 +48,7 @@
 
 	let p: {
 		post: Post;
+		isEmbed?: boolean;
 		cited?: boolean;
 		parsed: boolean;
 		bumpDownReactionHoverMenu: boolean;
@@ -75,6 +80,9 @@
 		setTimeout(() => (copyClicked = false), 1000);
 	};
 	let deletable = $derived(p.lastVersion !== 0 || !p.post.subIds?.length);
+	let authorRole = $derived(
+		gs.spaceMsToAccountMsToRoleFlairMap[p.post.in_ms]?.[p.post.by_ms]?.role,
+	);
 	let savedLocally = $derived(true);
 	let toggleSavedLocally = () => {
 		// TODO:
@@ -82,12 +90,15 @@
 
 	let xMoreOptionsBtn = $state<HTMLButtonElement>();
 	let a = { onkeydown: (e: KeyboardEvent) => e.key === 'Escape' && (moreOptionsOpen = false) };
+
+	let target = $derived(p.isEmbed ? '_blank' : undefined);
 </script>
 
 <div class="group/div h-5 fx w-full overflow-x-scroll overflow-y-hidden">
 	<div class="fx flex-1 text-nowrap">
 		<div class={`${p.open ? 'h-7' : 'h-5'} flex-1 flex text-sm font-bold text-fg2`}>
 			<a
+				{target}
 				href={`/${postIdStr}`}
 				class="fx group hover:text-fg1"
 				title={isoMsLabel}
@@ -106,35 +117,37 @@
 				</div>
 			</a>
 			<a
+				{target}
 				href={`/_${p.post.by_ms}_`}
-				class={`fx group text-fg1 hover:text-fg3 ${gs.accountMsToNameTxtMap[p.post.by_ms] ? '' : 'italic'}`}
+				class={`fx group text-fg1 hover:text-fg3 ${gs.msToProfileMap[p.post.by_ms]?.name.txt ? '' : 'italic'}`}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-					{#if gs.spaceMsToAccountMsToRoleNumMap[p.post.in_ms]?.[p.post.by_ms] === roleCodes.owner}
+					{#if authorRole?.num === roleCodes.owner}
 						<IconCrownFilled class="w-4" />
-					{:else if gs.spaceMsToAccountMsToRoleNumMap[p.post.in_ms]?.[p.post.by_ms] === roleCodes.mod}
+					{:else if authorRole?.num === roleCodes.mod}
 						<IconShieldFilled class="w-4" />
 					{/if}
 					<AccountIcon ms={p.post.by_ms} class="mx-0.5 shrink-0 w-4" />
 					<p class="pr-1">
-						{accountMsToNameTxt(p.post.by_ms)}
+						{msToAccountNameTxt(p.post.by_ms)}
 					</p>
 				</div>
 			</a>
-			{#if p.post.in_ms !== gs.urlInMs}
+			{#if p.post.in_ms !== gs.lastSeenInMs}
 				<a
+					{target}
 					href={`/__${p.post.in_ms}`}
-					class={`fx group hover:text-fg1 ${gs.msToSpaceNameTxtMap[p.post.in_ms] ? '' : 'italic'}`}
+					class={`fx group hover:text-fg1 ${gs.msToSpaceMap[p.post.in_ms]?.name.txt ? '' : 'italic'}`}
 				>
 					<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
 						<p class="pr-0.5">
-							{spaceMsToNameTxt(p.post.in_ms)}
+							{msToSpaceNameTxt(p.post.in_ms)}
 						</p>
 					</div>
 				</a>
 			{/if}
-			{#if !p.cited}
+			{#if !p.cited && !p.isEmbed}
 				<button
 					class="fx group hover:text-fg1"
 					onmousedown={(e) => e.preventDefault()}
@@ -142,6 +155,9 @@
 						// TODO: second click within 1s of first click: copy post url?
 						// TODO: third click within 1s of second click: copy whole post?
 						gs.writingNew = true;
+						let lastVersion = getLastVersion(p.post);
+						let tags = p.post.history?.[lastVersion]?.tags || [];
+						gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
 						gs.writerCore = `${gs.writerCore}\n${postIdStr}`;
 					}}
 				>
@@ -150,49 +166,53 @@
 					</div>
 				</button>
 			{/if}
-			<div class="flex-1 shrink-0 w-4 fx group hover:text-fg1">
-				{#if !p.cited}
-					<button
-						class="fx h-full flex-1"
-						onclick={() => {
-							resetBottomOverlay('wt');
-							gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === postIdStr ? null : p.post;
-						}}
-					>
-						<div class={`h-5 fx w-full ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-							<IconMessage2Plus class="w-4.5" />
-						</div>
-					</button>
-				{/if}
-				<div
-					class={`absolute z-10 right-0 h-7 hidden group-hover/div:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover/div:bg-bg4' : 'bg-bg2 group-hover/div:bg-bg5'}`}
-				>
-					{#each reactionList.slice(0, 4) as emoji}
+			{#if !p.isEmbed}
+				<div class="flex-1 shrink-0 w-4 fx group hover:text-fg1">
+					{#if !p.cited}
 						<button
-							class="text-sm w-7 xy hover:bg-bg7 hover:text-fg3 grayscale-75 hover:grayscale-0"
-							onclick={async () => {
-								await toggleReaction({
-									...getIdObjAsAtIdObj(p.post),
-									ms: 0,
-									by_ms: gs.accounts![0].ms,
-									in_ms: gs.urlInMs!,
-									emoji,
-								});
+							class="fx h-full flex-1"
+							onclick={() => {
+								resetBottomOverlay('wt');
+								gs.writingTo = gs.writingTo && getIdStr(gs.writingTo) === postIdStr ? null : p.post;
 							}}
 						>
-							{emoji}
+							<div
+								class={`h-5 fx w-full ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+							>
+								<IconMessage2Plus class="w-4.5" />
+							</div>
 						</button>
-					{/each}
-					<button
-						class="hidden text-lg w-7 xy hover:bg-bg7 hover:text-fg3"
-						onclick={() => {
-							// console.log(emoji);
-						}}
+					{/if}
+					<div
+						class={`absolute z-10 right-0 h-7 hidden group-hover/div:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover/div:bg-bg4' : 'bg-bg2 group-hover/div:bg-bg5'}`}
 					>
-						<IconMoodPlus class="w-4" />
-					</button>
+						{#each reactionList.slice(0, 4) as emoji}
+							<button
+								class="text-sm w-7 xy hover:bg-bg7 hover:text-fg3 grayscale-75 hover:grayscale-0"
+								onclick={async () => {
+									await toggleReaction({
+										...getIdObjAsAtIdObj(p.post),
+										ms: 0,
+										by_ms: gs.accounts![0].ms,
+										in_ms: gs.lastSeenInMs!,
+										emoji,
+									});
+								}}
+							>
+								{emoji}
+							</button>
+						{/each}
+						<button
+							class="hidden text-lg w-7 xy hover:bg-bg7 hover:text-fg3"
+							onclick={() => {
+								// console.log(emoji);
+							}}
+						>
+							<IconMoodPlus class="w-4" />
+						</button>
+					</div>
 				</div>
-			</div>
+			{/if}
 		</div>
 		{#if p.lastVersion > 1 && p.version}
 			<div class="flex">
@@ -339,7 +359,7 @@
 					</div>
 				</button>
 			{/if}
-		{:else}
+		{:else if !p.isEmbed}
 			<button
 				class="fx group hover:text-fg1"
 				onclick={() => {
@@ -353,5 +373,7 @@
 			</button>
 		{/if}
 	</div>
-	{#if dev}{postIdStr}{/if}
+	{#if gs.devMode}
+		<p class="text-fg2">{postIdStr}</p>
+	{/if}
 </div>

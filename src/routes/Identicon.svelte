@@ -24,8 +24,8 @@
 	let overlap = 0.8;
 	let halfWidth = $derived(Math.ceil(gridSize / 2));
 	let hash = $derived(
-		data.split('').reduce((acc, char, idx) => {
-			return ((acc << 5) - acc + char.charCodeAt(0) * (idx + 1)) | 0;
+		data.split('').reduce((num, char, idx) => {
+			return ((num << 5) - num + char.charCodeAt(0) * (idx + 1)) | 0;
 		}, 0),
 	);
 

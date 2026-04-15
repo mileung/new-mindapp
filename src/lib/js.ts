@@ -149,3 +149,29 @@ type UniqueValues<T extends Record<string, number>> = {
 };
 export let uniqueMapVals = <const T extends Record<string, number>>(dict: UniqueValues<T>): T =>
 	dict;
+
+export let makeErrorReadable = (error: unknown) => {
+	// @ts-ignore
+	return error?.message || JSON.stringify(error);
+};
+
+export let alertError = (error: unknown) => {
+	console.error(error);
+	alert(makeErrorReadable(error));
+};
+
+export let splitUntil = (str: string, delimiter: string, limit: number): string[] => {
+	let result: string[] = [];
+	let start = 0;
+	let splits = 0;
+	while (splits < limit) {
+		let end = str.indexOf(delimiter, start);
+		if (end === -1) break;
+		result.push(str.substring(start, end));
+		start = end + delimiter.length;
+		splits++;
+	}
+	result.push(str.substring(start));
+	return result;
+};
+// console.log(splitUntil('0_1_2_3', '_', 2));

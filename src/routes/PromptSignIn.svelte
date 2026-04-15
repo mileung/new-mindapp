@@ -1,10 +1,9 @@
 <script lang="ts">
-	import { gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 </script>
 
-<div class={`xy fy gap-2 p-2 ${!gs.pendingInvite ? 'min-h-screen' : 'min-h-[calc(100vh-36px)]'}`}>
+<div class="xy fy gap-2 p-2 min-h-screen">
 	<p class="text-2xl font-black">{m.signInToViewThisPage()}</p>
 	<a
 		href="/sign-in"

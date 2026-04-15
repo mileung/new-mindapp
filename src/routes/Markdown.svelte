@@ -5,6 +5,9 @@
 		text: string;
 	} = $props();
 
+	// TODO: parse phone numbers as href="tel:+1234567890" links
+	// TODO: parse emails as href="mailto:example@example.com" links
+
 	// const assetRegex = /!\[([^\]]*)\]\(([^\)]*)\)/g;
 	// const linkRegex = /\[([^\]]*)\]\(([^\)]*)\)/g;
 	const uriRegex = /([a-zA-Z][a-zA-Z0-9+.-]*):\/\/(\S+)/g;

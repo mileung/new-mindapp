@@ -1,12 +1,14 @@
+import { splitUntil } from '$lib/js';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 
-type CookieName = 'clientKey' | 'sessionKey';
+type CookieName = 'clientKeyObj' | 'sessionKeyObj';
+export type CookieObj = { ms: number; txt: string };
 
 export let getCookie = (ctx: Context, name: CookieName) => ctx.event.cookies.get(name);
 
-export let setCookie = (ctx: Context, name: CookieName, val: string) =>
-	ctx.event.cookies.set(name, val, {
+export let setCookie = (ctx: Context, name: CookieName, co: CookieObj) =>
+	ctx.event.cookies.set(name, `${co.ms}_${co.txt}`, {
 		httpOnly: true,
 		secure: true,
 		path: '/',
@@ -18,19 +20,14 @@ export let deleteCookie = (ctx: Context, name: CookieName) => {
 	ctx.event.cookies.delete(name, { path: '/' });
 };
 
-export let deleteSessionKeyCookie = (ctx: Context) => {
-	console.log('deleteSessionCookies');
-	deleteCookie(ctx, 'sessionKey');
-};
-
 export let getValidAuthCookie = (ctx: Context, cookieName: CookieName) => {
 	let cookieStr = getCookie(ctx, cookieName);
 	if (cookieStr) {
 		try {
-			let cookieObj = JSON.parse(cookieStr) as { ms: number; txt: string };
-			let { ms, txt } = cookieObj;
+			let [msStr, txt] = splitUntil(cookieStr, '_', 1);
+			let ms = +msStr;
 			let now = Date.now();
-			if (txt.length !== 88 || !ms || ms > now || now - ms > week) {
+			if (Number.isNaN(ms) || txt.length !== 88 || !ms || ms > now || now - ms > week) {
 				deleteCookie(ctx, cookieName);
 				return undefined;
 			}

@@ -1,7 +1,4 @@
-import { gs } from '$lib/global-state.svelte';
 import { z } from 'zod';
-import { gsdb } from '../../local-db';
-import { pf } from './partFilters';
 import { getAtIdStr, getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
 import { pTable } from './partsTable';
 
@@ -20,6 +17,8 @@ export let getGranularNumProp = (part: PartInsert) =>
 		by_ms: part.by_ms,
 		num: part.num,
 	}) satisfies GranularNumProp;
+export let sameGranularNum = (a?: GranularNumProp, b?: GranularNumProp) =>
+	a?.ms === b?.ms && a?.by_ms === b?.by_ms && a?.num === b?.num;
 
 export let GranularTxtPropSchema = z.object({
 	ms: z.number().optional(),
@@ -40,6 +39,7 @@ export let GranularNumTxtPropSchema = z.object({
 	num: z.number(),
 	txt: z.string(),
 });
+
 export type GranularNumTxtProp = z.infer<typeof GranularNumTxtPropSchema>;
 export let getGranularNumTxtProp = (part: PartInsert) =>
 	({
@@ -54,44 +54,15 @@ export let WhoObjSchema = z.object({
 });
 export type WhoObj = z.infer<typeof WhoObjSchema>;
 
-export let WhoWhereObjSchema = WhoObjSchema.merge(
-	z.object({
-		spaceMs: z.number().gte(0),
-	}),
-);
+export let WhoWhereObjSchema = WhoObjSchema.extend({
+	spaceMs: z.number().gte(0),
+});
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
-
-export let getWhoObj = async () => {
-	let attempts = 0;
-	while (gs.accounts === undefined) {
-		if (++attempts > 888) throw new Error(`getWhoObj timed out`);
-		await new Promise((res) => setTimeout(res, 42));
-	}
-	return {
-		callerMs: gs.accounts[0].ms,
-	} satisfies WhoObj;
-};
-
-export let getWhoWhereObj = async () => {
-	let attempts = 0;
-	while (gs.accounts === undefined || gs.urlInMs === undefined) {
-		if (++attempts > 888) throw new Error(`getWhoWhereObj timed out`);
-		await new Promise((res) => setTimeout(res, 42));
-	}
-	return {
-		callerMs: gs.accounts[0].ms,
-		spaceMs: gs.urlInMs,
-	} satisfies WhoWhereObj;
-};
 
 export let hasParent = (part: FullIdObj) =>
 	part.at_ms !== 0 || //
 	part.at_by_ms !== 0 ||
 	part.at_in_ms !== 0;
-
-export let overwriteLocalPost = async (t: PartInsert) => {
-	await (await gsdb()).update(pTable).set(t).where(pf.id(t));
-};
 
 export let assertLt2Rows = (parts: PartSelect[]) => {
 	if (parts.length > 1) throw new Error(`Multiple parts found`);

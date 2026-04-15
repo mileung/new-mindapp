@@ -6,7 +6,7 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createTRPCHandle } from 'trpc-sveltekit';
 
-const handleParaglide: Handle = ({ event, resolve }) =>
+let handleParaglide: Handle = ({ event, resolve }) =>
 	paraglideMiddleware(event.request, ({ request, locale }) => {
 		event.request = request;
 		return resolve(event, {
@@ -14,11 +14,18 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		});
 	});
 
-export const handle: Handle = sequence(
+export let handle: Handle = sequence(
 	async ({ event, resolve }) => {
-		const response = await resolve(event);
-		response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
-		response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		// console.log('event:', !!event);
+		let response = await resolve(event);
+		// if (!event.url.pathname.startsWith('/embed')) {
+		// 	response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+		// 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		// }
+		if (event.url.pathname.startsWith('/embed')) {
+			response.headers.delete('Cross-Origin-Embedder-Policy');
+			response.headers.delete('Cross-Origin-Opener-Policy');
+		}
 		return response;
 	},
 	handleParaglide,

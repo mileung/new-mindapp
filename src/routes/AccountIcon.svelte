@@ -12,7 +12,7 @@
 </script>
 
 {#if p.ms === 0}
-	{#if p.isSystem || (gs.urlInMs && !p.isUser)}
+	{#if p.isSystem || (gs.lastSeenInMs && !p.isUser)}
 		<IconCpu class={`text-fg1 ${p.class}`} />
 	{:else}
 		<IconUserFilled class={`text-fg1 ${p.class}`} />

@@ -25,6 +25,7 @@
 {#snippet thumbnail()}
 	<!-- TODO: make an iframe widget that renders img urls cuz img tags don't have a credentialless option -->
 	<img
+		crossorigin="anonymous"
 		class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
 		src={`https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`}
 		alt={m.youTubeThumbnail()}
