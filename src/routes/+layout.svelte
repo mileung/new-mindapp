@@ -194,6 +194,7 @@
 							get,
 						});
 					} catch (error) {
+						console.log('error:', error);
 						callerContext = {
 							joinedSpaceUpdates: [], //
 							signedInAccountUpdates: [],
