@@ -4,10 +4,10 @@ import { getIdStrAsIdObj, isIdStr, isSpaceSlug } from '$lib/types/parts/partIds'
 import type { LayoutServerLoad } from './$types';
 
 export const load: LayoutServerLoad = async (event) => {
-	// event.setHeaders({
-	// 	'Cross-Origin-Embedder-Policy': 'require-corp',
-	// 	'Cross-Origin-Opener-Policy': 'same-origin',
-	// });
+	event.setHeaders({
+		'Cross-Origin-Embedder-Policy': 'require-corp',
+		'Cross-Origin-Opener-Policy': 'same-origin',
+	});
 
 	let title: undefined | string;
 	let thinTopOgText: undefined | string;

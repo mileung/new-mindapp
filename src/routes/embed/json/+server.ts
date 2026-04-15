@@ -18,6 +18,8 @@ export let GET: RequestHandler = (event) => {
 	});
 };
 
+// await (await fetch('https://new.mindapp.cc/embed/json')).json()
+
 // await fetch('https://swapi.dev/api/people/1')
 // await fetch('http://localhost:8888/embed')
 // curl -I http://localhost:8888/embed/json
