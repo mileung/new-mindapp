@@ -162,7 +162,7 @@ export let getHoverColors = () => {
 
 export let promptSum = (cb: (a: number, b: number) => string) => {
 	let requireSumPrompt = !dev;
-	dev && (requireSumPrompt = true);
+	// requireSumPrompt = true;
 	if (requireSumPrompt) {
 		let a = Math.floor(Math.random() * 90) + 10;
 		let b = Math.floor(Math.random() * 90) + 10;
