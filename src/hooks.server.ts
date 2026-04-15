@@ -22,10 +22,12 @@ export let handle: Handle = sequence(
 		// 	response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
 		// 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
 		// }
-		if (event.url.pathname.startsWith('/embed')) {
-			response.headers.delete('Cross-Origin-Embedder-Policy');
-			response.headers.delete('Cross-Origin-Opener-Policy');
-		}
+		response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+		response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		// if (event.url.pathname.startsWith('/embed')) {
+		// 	response.headers.delete('Cross-Origin-Embedder-Policy');
+		// 	response.headers.delete('Cross-Origin-Opener-Policy');
+		// }
 		return response;
 	},
 	handleParaglide,
