@@ -45,7 +45,7 @@ export let _getCallerContext = async (
 		spaceMs?: number;
 	},
 	get: GetCallerContextGetArg,
-) => {
+): Promise<CallerContext> => {
 	// console.log('get', JSON.stringify(get, null, 2));
 	if (!get.signedIn && (get.roleCode || get.permissionCode))
 		throw new Error('must get signed in to get callerRole or permissionCode');
@@ -542,5 +542,5 @@ export let _getCallerContext = async (
 		joinedSpaceUpdates,
 		visitingPublicSpaceUpdate,
 		signedInAccountUpdates,
-	} satisfies CallerContext;
+	};
 };

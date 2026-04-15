@@ -7,7 +7,11 @@
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
-	import { type GetCallerContextGetArg, type MyAccountUpdates } from '$lib/types/accounts';
+	import {
+		type CallerContext,
+		type GetCallerContextGetArg,
+		type MyAccountUpdates,
+	} from '$lib/types/accounts';
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import {
@@ -182,11 +186,19 @@
 					};
 
 					// console.log('get', JSON.stringify(get, null, 2));
-					let callerContext = await trpc().getCallerContext.query({
-						callerMs,
-						spaceMs: urlInMs,
-						get,
-					});
+					let callerContext: CallerContext;
+					try {
+						callerContext = await trpc().getCallerContext.query({
+							callerMs,
+							spaceMs: urlInMs,
+							get,
+						});
+					} catch (error) {
+						callerContext = {
+							joinedSpaceUpdates: [], //
+							signedInAccountUpdates: [],
+						};
+					}
 					// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 
 					gs.accountMsToSpaceMsToCheckedMap = {

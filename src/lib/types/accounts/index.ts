@@ -95,8 +95,8 @@ export let CallerContextSchema = z.object({
 	permissionCode: GranularNumPropSchema.optional(),
 
 	joinedSpaceUpdates: z.array(MySpaceUpdateSchema),
-	visitingPublicSpaceUpdate: MyAccountUpdatesSchema.optional(),
-	signedInAccountUpdates: z.array(MyAccountUpdatesSchema),
+	visitingPublicSpaceUpdate: MySpaceUpdateSchema.optional(),
+	signedInAccountUpdates: z.array(MySpaceUpdateSchema),
 	// msToViewableSpaceUpdateMap: z.record(z.number(), MySpaceUpdatesSchema.optional()),
 	// msToSignedInAccountUpdateMap: z.record(z.number(), MyAccountUpdatesSchema.optional()),
 });
