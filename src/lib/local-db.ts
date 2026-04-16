@@ -11,7 +11,6 @@ export let localDbFilename = 'mindapp.db';
 export let initLocalDb = async () => {
 	let { sql } = new SQLocalDrizzle(localDbFilename);
 	try {
-		console.log('initLocalDb');
 		let res = await sql`
 			PRAGMA journal_mode=WAL;
 
@@ -30,7 +29,6 @@ export let initLocalDb = async () => {
 
 			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
 	`;
-		console.log('res:', res);
 	} catch (error) {
 		// console.error(error);
 		alertError(error);

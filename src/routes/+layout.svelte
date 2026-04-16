@@ -6,6 +6,7 @@
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
+	import { trpc } from '$lib/trpc/client';
 	import {
 		type CallerContext,
 		type GetCallerContextGetArg,
@@ -186,23 +187,19 @@
 
 					// console.log('get', JSON.stringify(get, null, 2));
 					let callerContext: CallerContext;
-					// try {
-					// 	callerContext = await trpc().getCallerContext.query({
-					// 		callerMs,
-					// 		spaceMs: urlInMs,
-					// 		get,
-					// 	});
-					// } catch (error) {
-					// 	console.log('error:', error);
-					// 	callerContext = {
-					// 		joinedSpaceUpdates: [], //
-					// 		signedInAccountUpdates: [],
-					// 	};
-					// }
-					callerContext = {
-						joinedSpaceUpdates: [], //
-						signedInAccountUpdates: [],
-					};
+					try {
+						callerContext = await trpc().getCallerContext.query({
+							callerMs,
+							spaceMs: urlInMs,
+							get,
+						});
+					} catch (error) {
+						console.log('error:', error);
+						callerContext = {
+							joinedSpaceUpdates: [], //
+							signedInAccountUpdates: [],
+						};
+					}
 					// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 
 					gs.accountMsToSpaceMsToCheckedMap = {
