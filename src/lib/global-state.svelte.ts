@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { page } from '$app/state';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { identikana } from './js';
 import { m } from './paraglide/messages';
@@ -125,7 +126,8 @@ export let gsdb = async () => {
 	return gs.db;
 };
 
-export let getPromptSigningIn = () => !gs.accounts?.[0].ms && getUrlInMs() === 8;
+export let getPromptSigningIn = () =>
+	!gs.accounts?.[0].ms && (getUrlInMs() === 8 || page.url.pathname === '/create-space');
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;

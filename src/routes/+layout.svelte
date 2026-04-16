@@ -8,7 +8,7 @@
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
 	import {
-		type CallerContext,
+		getDefaultCallerContext,
 		type GetCallerContextGetArg,
 		type MyAccountUpdates,
 	} from '$lib/types/accounts';
@@ -186,19 +186,17 @@
 					};
 
 					// console.log('get', JSON.stringify(get, null, 2));
-					let callerContext: CallerContext;
+					let callerContext = getDefaultCallerContext();
 					try {
-						callerContext = await trpc().getCallerContext.query({
-							callerMs,
-							spaceMs: urlInMs,
-							get,
-						});
+						if ((urlInMs && urlInMs !== 8) || gs.accounts.some((a) => a.ms && a.signedIn)) {
+							callerContext = await trpc().getCallerContext.query({
+								callerMs,
+								spaceMs: urlInMs,
+								get,
+							});
+						}
 					} catch (error) {
 						console.log('error:', error);
-						callerContext = {
-							joinedSpaceUpdates: [], //
-							signedInAccountUpdates: [],
-						};
 					}
 					// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 

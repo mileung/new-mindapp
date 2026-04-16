@@ -102,6 +102,11 @@ export let CallerContextSchema = z.object({
 });
 export type CallerContext = z.infer<typeof CallerContextSchema>;
 
+export let getDefaultCallerContext = (): CallerContext => ({
+	joinedSpaceUpdates: [], //
+	signedInAccountUpdates: [],
+});
+
 export let passwordRegexStr = '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,64}';
 
 export let filterAccountPwHashRow = (accountMs: number) =>
