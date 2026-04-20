@@ -14,7 +14,7 @@ import { _checkOtp } from '../otp/_checkOtp';
 import type { PartInsert } from '../parts';
 import { pf } from '../parts/partFilters';
 import { normalizeTags } from '../posts';
-import { permissionCodes, roleCodes } from '../spaces';
+import { makeNewSpaceRows } from '../spaces/_createSpace';
 
 export let _createAccount = async (
 	ctx: Context,
@@ -104,52 +104,10 @@ export let _createAccount = async (
 
 	let partsToInsert: PartInsert[] = [
 		...myAccountRows,
-		{
-			...id0,
-			ms,
-			in_ms: ms, // This is an account's personal space
-			code: pc.spaceIsPublicBinId,
-			num: 0,
-		},
-		{
-			...id0,
-			ms,
-			in_ms: ms,
-			code: pc.spaceDescriptionTxtIdAndMemberCountNum,
-			num: 1,
-			txt: '',
-		},
-		{
-			...id0,
-			ms,
-			in_ms: ms,
-			code: pc.spacePinnedQueryTxtId,
-			num: 0,
-			txt: '',
-		},
-		{
-			...id0,
-			ms,
-			in_ms: ms,
-			code: pc.newMemberPermissionCodeNumId,
-			num: permissionCodes.viewOnly,
-		},
-		{
-			...id0,
-			at_ms: ms,
-			ms,
-			in_ms: ms,
-			code: pc.permissionCodeNumIdAtAccountId,
-			num: permissionCodes.reactAndPost,
-		},
-		{
-			...id0,
-			at_ms: ms,
-			ms,
-			in_ms: ms,
-			code: pc.roleCodeNumIdAtAccountId,
-			num: roleCodes.owner,
-		},
+		...makeNewSpaceRows({
+			spaceMs: ms,
+			callerMs: ms,
+		}),
 		{
 			...id0,
 			ms,
@@ -174,24 +132,6 @@ export let _createAccount = async (
 			num: 0,
 			txt: sessionIdObj.txt,
 		},
-		// {
-		// 	...id0,
-		// 	at_by_ms: 1,
-		// 	at_in_ms: 1,
-		// 	ms,
-		// 	in_ms: ms,
-		// 	code: pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt,
-		// 	num: 0,
-		// },
-		// {
-		// 	...id0,
-		// 	at_ms: ms,
-		// 	at_in_ms: ms,
-		// 	ms,
-		// 	by_ms: ms,
-		// 	code: pc.acceptMsByMsAtInviteId,
-		// 	num: 0,
-		// },
 	];
 	await tdb.insert(pTable).values(partsToInsert);
 	return { account };

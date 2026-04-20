@@ -175,3 +175,6 @@ export let splitUntil = (str: string, delimiter: string, limit: number): string[
 	return result;
 };
 // console.log(splitUntil('0_1_2_3', '_', 2));
+
+export let hasDefinedKeysBesidesMs = (obj: Object) =>
+	Object.entries(obj).some(([k, v]) => k !== 'ms' && v !== undefined);

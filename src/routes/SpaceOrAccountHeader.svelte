@@ -119,19 +119,14 @@
 						}
 						if (draftSettings.pinnedQueryTxt !== currentSettings.pinnedQueryTxt)
 							changes.pinnedQueryTxt = draftSettings.pinnedQueryTxt.trim();
-						if (
-							currentSettings.isPublicNum &&
-							draftSettings.isPublicNum !== currentSettings.isPublicNum
-						)
+						if (draftSettings.isPublicNum !== currentSettings.isPublicNum)
 							changes.isPublicNum = draftSettings.isPublicNum;
 						if (
 							draftSettings.newMemberPermissionCodeNum !==
 							currentSettings.newMemberPermissionCodeNum
 						)
 							changes.newMemberPermissionCodeNum = draftSettings.newMemberPermissionCodeNum;
-
 						if (Object.keys(changes).length) {
-							console.log('changes:', changes);
 							let { ms } = await (
 								p.space ? trpc().changeSpaceAttributes : trpc().changeMyAccountAttributes
 							).mutate({

@@ -1,19 +1,23 @@
 <script lang="ts">
-	import { getPromptSigningIn, getWhoObj } from '$lib/global-state.svelte';
+	import { goto } from '$app/navigation';
+	import { getPromptSigningIn, getWhoObj, gs } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
-	import { permissionCodes } from '$lib/types/spaces';
+	import { updateLocalCache } from '$lib/types/local-cache';
+	import { accentCodes, permissionCodes, roleCodes } from '$lib/types/spaces';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 	import PromptSignIn from '../PromptSignIn.svelte';
 
-	let nameTxt = $state('');
-	let descriptionTxt = $state('');
-	let pinnedQueryTxt = $state('');
-	let isPublicNum = $state(0);
-	let newMemberPermissionCodeNum = $state(permissionCodes.viewOnly);
+	let spaceNameTxt = $state('');
+	let spaceDescriptionTxt = $state('');
+	let spacePinnedQueryTxt = $state('');
+	let spaceIsPublicBin = $state(0);
+	let newMemberPermissionCodeNum = $state(permissionCodes.reactAndPost);
 </script>
 
-{#if getPromptSigningIn()}
+{#if !gs.accounts}
+	<!--  -->
+{:else if getPromptSigningIn()}
 	<PromptSignIn />
 {:else}
 	<div class="p-2 max-w-lg">
@@ -25,16 +29,69 @@
 			onsubmit={async (e) => {
 				e.preventDefault();
 				try {
-					let res = await trpc().createSpace.mutate({
-						...(await getWhoObj()),
-						nameTxt,
-						descriptionTxt,
-						pinnedQueryTxt,
-						isPublicNum,
+					let whoObj = await getWhoObj();
+					let { ms } = await trpc().createSpace.mutate({
+						...whoObj,
+						spaceNameTxt,
+						spaceDescriptionTxt,
+						spacePinnedQueryTxt,
+						spaceIsPublicBin,
 						newMemberPermissionCodeNum,
 					});
-					console.log('res:', res);
-					// goto(`/__${gs.lastSeenInMs}`, {});
+					// let { callerMs } = whoObj;
+					// gs.spaceMsToAccountMsToRoleFlairMap[res.ms];
+					// gs.msToSpaceMap={
+					// 	...gs.msToSpaceMap,
+					// 	[res.ms]: {
+
+					// 	}
+					// }
+					// gs.accountMsToSpaceMsToDots = {
+					// 	...gs.accountMsToSpaceMsToDots,
+					// 	[callerMs]: {
+					// 		...gs.accountMsToSpaceMsToDots[callerMs],
+					// 		[res.ms]: {
+					// 			invites: [],
+					// 			endReached: true,
+					// 			memberships: [
+					// 				{
+					// 					accept: {
+					// 						ms: res.ms,
+					// 						by_ms: callerMs,
+					// 					},
+					// 					invite: {
+					// 						by_ms: 0,
+					// 						in_ms: res.ms,
+					// 					},
+					// 					permission: {
+					// 						ms: res.ms,
+					// 						by_ms: 0,
+					// 						num: permissionCodes.reactAndPost,
+					// 					},
+					// 				},
+					// 			],
+					// 		},
+					// 	},
+					// };
+					// gs.accountMsToSpaceMsToCheckedMap = {
+					// 	...gs.accountMsToSpaceMsToCheckedMap,
+					// 	[callerMs]: {
+					// 		...gs.accountMsToSpaceMsToCheckedMap[callerMs],
+					// 		[res.ms]: true,
+					// 	},
+					// };
+
+					updateLocalCache((lc) => {
+						lc.accounts[0].joinedSpaceContexts.unshift({
+							ms,
+							roleCode: { ms, by_ms: 0, num: roleCodes.owner },
+							permissionCode: { ms, by_ms: 0, num: permissionCodes.reactAndPost },
+							accentCode: { ms, by_ms: 0, num: accentCodes.none },
+						});
+						return lc;
+					});
+
+					goto(`/__${ms}`);
 				} catch (error) {
 					console.error(error);
 					alert(error);
@@ -43,17 +100,17 @@
 		>
 			<p class="font-bold">{m.name()}</p>
 			<input
-				bind:value={nameTxt}
+				bind:value={spaceNameTxt}
 				class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
 			/>
 			<p class="mt-1 font-bold">{m.description()}</p>
 			<textarea
-				bind:value={descriptionTxt}
+				bind:value={spaceDescriptionTxt}
 				class="resize-y w-full px-2 py-0.5 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4 block"
 			></textarea>
 			<p class="font-bold">{m.pinnedQuery()}</p>
 			<input
-				bind:value={pinnedQueryTxt}
+				bind:value={spacePinnedQueryTxt}
 				class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
 			/>
 			<div class="mt-2 flex">
@@ -62,7 +119,7 @@
 					<select
 						name={m.visibility()}
 						class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
-						bind:value={isPublicNum}
+						bind:value={spaceIsPublicBin}
 					>
 						<option value={0}>{m.private()}</option>
 						<option value={1}>{m.public()}</option>

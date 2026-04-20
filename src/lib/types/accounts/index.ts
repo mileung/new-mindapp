@@ -94,16 +94,18 @@ export let CallerContextSchema = z.object({
 	roleCode: GranularNumPropSchema.optional(),
 	permissionCode: GranularNumPropSchema.optional(),
 
-	joinedSpaceUpdates: z.array(MySpaceUpdateSchema),
 	visitingPublicSpaceUpdate: MySpaceUpdateSchema.optional(),
-	signedInAccountUpdates: z.array(MySpaceUpdateSchema),
+	removedSpaceMss: z.array(z.number()).optional(),
+	signedOutAccountMss: z.array(z.number()).optional(),
+	spaceUpdates: z.array(MySpaceUpdateSchema).optional(),
+	signedInAccountUpdates: z.array(MySpaceUpdateSchema).optional(),
 	// msToViewableSpaceUpdateMap: z.record(z.number(), MySpaceUpdatesSchema.optional()),
 	// msToSignedInAccountUpdateMap: z.record(z.number(), MyAccountUpdatesSchema.optional()),
 });
 export type CallerContext = z.infer<typeof CallerContextSchema>;
 
 export let getDefaultCallerContext = (): CallerContext => ({
-	joinedSpaceUpdates: [], //
+	spaceUpdates: [], //
 	signedInAccountUpdates: [],
 });
 

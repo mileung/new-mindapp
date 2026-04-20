@@ -16,7 +16,7 @@
 	let urlInMs = $derived(getUrlInMs());
 	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
 	let spaceContext = $derived(getUrlInMsContext());
-	let viewable = $derived(space?.isPublic || spaceContext?.roleCode);
+	let viewable = $derived(space?.isPublic || spaceContext?.permissionCode);
 	let tagsData = $derived(gs.spaceMsToTagsMap[urlInMs || -1]);
 	let tags = $derived(tagsData?.tags || []);
 

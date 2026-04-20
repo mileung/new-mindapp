@@ -2,56 +2,49 @@
 	let p: {
 		ms?: number;
 		class?: string;
+		mirrored?: boolean;
 	} = $props();
 
 	let largePrimeNumber = 2654435761;
 	let size = 100;
 	let padding = 10;
-	let colors = [
-		'fill-red-500',
-		'fill-orange-500',
-		'fill-yellow-500',
-		'fill-green-500',
-		'fill-blue-500',
-		'fill-purple-500',
-		'fill-pink-500',
-	];
-
 	let gridSize = 5;
-	let data = $derived('' + p.ms);
-	// data = '' + Math.random();
-
+	let cellSize = $derived((size - padding * 2) / gridSize);
 	let overlap = 0.8;
 	let halfWidth = $derived(Math.ceil(gridSize / 2));
-	let hash = $derived(
-		data.split('').reduce((num, char, idx) => {
-			return ((num << 5) - num + char.charCodeAt(0) * (idx + 1)) | 0;
-		}, 0),
-	);
 
-	let bits = $derived(
-		Array.from({ length: gridSize * halfWidth }, (_, i) => {
-			let seed = (hash ^ (i * largePrimeNumber)) >>> 0;
-			let charCode1 = data.charCodeAt(i % Math.max(data.length, 1)) || 0;
-			let charCode2 = data.charCodeAt((i * 7) % Math.max(data.length, 1)) || 0;
-			let charCode3 = data.charCodeAt((i * 13) % Math.max(data.length, 1)) || 0;
-			let combined = (seed ^ charCode1 ^ charCode2 ^ charCode3) >>> 0;
-			return ((combined >> i % 8) & 1) === 1;
-		}),
-	);
+	let cyrb53 = (str: string, seed: number = 0): number => {
+		let h1 = 0xdeadbeef ^ seed;
+		let h2 = 0x41c6ce57 ^ seed;
+		for (let i = 0, ch: number; i < str.length; i++) {
+			ch = str.charCodeAt(i);
+			h1 = Math.imul(h1 ^ ch, 2654435761);
+			h2 = Math.imul(h2 ^ ch, 1597334677);
+		}
+		h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507);
+		h1 ^= Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+		h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
+		h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+		return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+	};
 
-	let grid = $derived(
-		Array.from({ length: gridSize }, (_, row) =>
+	let msHash = $derived(cyrb53('' + p.ms));
+	let fillColor = $derived.by(() => `hsl(${msHash % 360}, 58%, 58%)`);
+	let grid = $derived.by(() => {
+		let n = gridSize * (p.mirrored ? halfWidth : gridSize);
+		let bits = Array.from({ length: n }, (_, i) => {
+			let h = ((msHash ^ (i * largePrimeNumber)) >>> 0) * 2654435761;
+			h ^= h >>> 16;
+			return Math.imul(h, 2246822507) & 1;
+		});
+		if (!bits.some(Boolean)) bits = bits.map(() => 1);
+		return Array.from({ length: gridSize }, (_, row) =>
 			Array.from({ length: gridSize }, (_, col) => {
 				let mirrorCol = col < halfWidth ? col : gridSize - 1 - col;
-				return bits[row * halfWidth + mirrorCol];
+				return bits[row * (p.mirrored ? halfWidth : gridSize) + (p.mirrored ? mirrorCol : col)];
 			}),
-		),
-	);
-
-	let colorIndex = $derived((hash >>> 0) % colors.length);
-	let fillColor = $derived(colors[colorIndex]);
-	let cellSize = $derived((size - padding * 2) / gridSize);
+		);
+	});
 </script>
 
 <svg
@@ -59,7 +52,8 @@
 	width="100"
 	height="100"
 	viewBox="0 0 100 100"
-	class={`${fillColor} ${p.class}`}
+	class={p.class}
+	fill={fillColor}
 >
 	{#each grid as row, rowIndex}
 		{#each row as filled, colIndex}

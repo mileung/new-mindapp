@@ -1,3 +1,4 @@
+import { hasDefinedKeysBesidesMs } from '$lib/js';
 import type { Database } from '$lib/local-db';
 import { and, or, sql } from 'drizzle-orm';
 import {
@@ -181,6 +182,8 @@ export let _getSpaceDots = async (
 			spaceUpdate.newMemberPermissionCode = getGranularNumProp(newMemberPermissionCodeNumIdRow);
 		}
 
+		if (!hasDefinedKeysBesidesMs(spaceUpdate)) spaceUpdate = undefined;
+
 		invites = inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxtRows.map(
 			(row) => ({
 				ms: row.ms,
@@ -296,7 +299,7 @@ export let _getSpaceDots = async (
 
 	return {
 		spaceUpdate,
-		invites,
+		invites: invites?.length ? invites : undefined,
 		memberships,
 		msToAccountNameTxtMap,
 		accountMsToRoleFlairMap,

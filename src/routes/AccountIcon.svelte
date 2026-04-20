@@ -18,5 +18,5 @@
 		<IconUserFilled class={`text-fg1 ${p.class}`} />
 	{/if}
 {:else}
-	<Identicon {...p} />
+	<Identicon {...p} mirrored />
 {/if}

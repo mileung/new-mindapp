@@ -32,7 +32,14 @@ class GlobalState {
 	devMode = $state(dev);
 	lastSeenInMs = $state<number>();
 	accounts = $state<undefined | MyAccount[]>();
-	msToSpaceMap = $state<Record<number | string, undefined | Space>>({});
+	visitedSpaceMsSet = $state(new Set<number>());
+	msToSpaceMap = $state<Record<number | string, undefined | Space>>({
+		1: {
+			...getDefaultSpace(),
+			ms: 1,
+			isPublic: { ms: 0, num: 1 },
+		},
+	});
 	//
 
 	accountMsToSpaceMsToCheckedMap = $state<
@@ -127,7 +134,9 @@ export let gsdb = async () => {
 };
 
 export let getPromptSigningIn = () =>
-	!gs.accounts?.[0].ms && (getUrlInMs() === 8 || page.url.pathname === '/create-space');
+	gs.accounts &&
+	!gs.accounts[0].ms &&
+	(getUrlInMs() === 8 || page.url.pathname === '/create-space');
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;

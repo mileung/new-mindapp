@@ -6,7 +6,7 @@ import { week } from '$lib/time';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and, lt, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { accentCodes, permissionCodes, roleCodes, SpaceSchema } from '.';
+import { permissionCodes, roleCodes, SpaceSchema } from '.';
 import { MyAccountSchema } from '../accounts';
 import {
 	assert1Row,
@@ -18,6 +18,7 @@ import {
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { id0 } from '../parts/partIds';
+import { makeNewSpaceRows, makeRowsForJoiningSpace } from './_createSpace';
 
 let CheckedInviteSchema = z.object({
 	slug: z.string(),
@@ -34,56 +35,6 @@ let CheckedInviteSchema = z.object({
 });
 
 export type CheckedInvite = z.infer<typeof CheckedInviteSchema>;
-
-export let makeEssentialJoinSpaceRows = (a: {
-	ms: number;
-	spaceMs: number;
-	callerMs: number;
-	permissionCodeNum: number;
-	roleCodeNum: number;
-}) => [
-	{
-		...id0,
-		at_in_ms: a.spaceMs,
-		ms: a.ms,
-		by_ms: a.callerMs,
-		code: pc.acceptMsByMsAtInviteId,
-		num: 0,
-	},
-	{
-		...id0,
-		at_ms: a.callerMs,
-		ms: a.ms,
-		in_ms: a.spaceMs,
-		code: pc.roleCodeNumIdAtAccountId,
-		num: a.roleCodeNum,
-	},
-	{
-		...id0,
-		at_ms: a.callerMs,
-		ms: a.ms,
-		in_ms: a.spaceMs,
-		code: pc.permissionCodeNumIdAtAccountId,
-		num: a.permissionCodeNum,
-	},
-	{
-		...id0,
-		at_ms: a.callerMs,
-		ms: a.ms,
-		in_ms: a.spaceMs,
-		code: pc.flairTxtIdAtAccountId,
-		num: 0,
-		txt: '',
-	},
-	{
-		...id0,
-		at_ms: a.callerMs,
-		ms: a.ms,
-		in_ms: a.spaceMs,
-		code: pc.spacePriorityIdAccentCodeNumAtAccountId,
-		num: accentCodes.none,
-	},
-];
 
 export let _checkInvite = async (
 	input: WhoObj & {
@@ -140,11 +91,11 @@ export let _checkInvite = async (
 			if (dev && addTestMembers) {
 				for (let i = 0; i < 88; i++) {
 					testMembers.push(
-						...makeEssentialJoinSpaceRows({
+						...makeRowsForJoiningSpace({
 							// ms: 888,
 							ms: 888 + i * week,
-							spaceMs: 1,
 							callerMs: 1 + i,
+							inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 							permissionCodeNum: 0,
 							roleCodeNum: roleCodes.member,
 						}),
@@ -153,44 +104,18 @@ export let _checkInvite = async (
 			}
 
 			await tdb.insert(pTable).values([
-				...testMembers,
-				...makeEssentialJoinSpaceRows({
-					ms,
+				...makeNewSpaceRows({
 					spaceMs: 1,
 					callerMs: input.callerMs,
+				}),
+				...testMembers,
+				...makeRowsForJoiningSpace({
+					ms,
+					callerMs: input.callerMs,
+					inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 					permissionCodeNum: permissionCodes.reactAndPost,
 					roleCodeNum: roleCodes.owner,
 				}),
-				{
-					...id0,
-					ms,
-					in_ms: 1,
-					code: pc.spaceIsPublicBinId,
-					num: 1,
-				},
-				{
-					...id0,
-					ms,
-					in_ms: 1,
-					code: pc.spaceDescriptionTxtIdAndMemberCountNum,
-					num: 1,
-					txt: '',
-				},
-				{
-					...id0,
-					ms,
-					in_ms: 1,
-					code: pc.spacePinnedQueryTxtId,
-					num: 0,
-					txt: '',
-				},
-				{
-					...id0,
-					ms,
-					in_ms: 1,
-					code: pc.newMemberPermissionCodeNumId,
-					num: permissionCodes.reactAndPost,
-				},
 				{
 					...id0,
 					at_by_ms: 1,
@@ -206,6 +131,8 @@ export let _checkInvite = async (
 		}
 		return { checkedInvite };
 	} else {
+		// TODO: check for stuff in space that may count as awaiting response?
+
 		let [inviteMsStr, slugEnd] = splitUntil(input.inviteSlug, '_', 1);
 		let inviteMs = +inviteMsStr;
 		if (Number.isNaN(inviteMs)) return {};
@@ -240,9 +167,9 @@ export let _checkInvite = async (
 						),
 				);
 				await tdb.insert(pTable).values(
-					makeEssentialJoinSpaceRows({
+					makeRowsForJoiningSpace({
 						ms,
-						spaceMs: 1,
+						inviteIdObj: inviteRow,
 						callerMs: input.callerMs,
 						permissionCodeNum: newMemberPermissionCodeNumIdRow.num,
 						roleCodeNum: roleCodes.member,

@@ -83,7 +83,7 @@
 	let urlInMs = $derived(getUrlInMs());
 	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
 	let spaceContext = $derived(getUrlInMsContext());
-	let viewable = $derived(space?.isPublic || spaceContext?.roleCode);
+	let viewable = $derived(space?.isPublic || spaceContext?.permissionCode);
 	let showViewOnly = $derived(viewable && !spaceContext?.permissionCode);
 	let showYourTurn = $derived(
 		urlInMs && urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,

@@ -85,6 +85,7 @@ export let MySpaceUpdateSchema = z.object({
 export type MySpaceUpdate = z.infer<typeof MySpaceUpdateSchema>;
 
 export let MySpaceUpdateFromSchema = MySpaceUpdateSchema.extend({
+	visiting: z.boolean().optional(),
 	permissionCode: GranularNumPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
 	accentCode: GranularNumPropSchema.optional(),

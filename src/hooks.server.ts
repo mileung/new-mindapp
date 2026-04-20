@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { getTextDirection } from '$lib/paraglide/runtime';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { createContext } from '$lib/trpc/context';
 import { router } from '$lib/trpc/router';
@@ -6,11 +7,13 @@ import type { Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 import { createTRPCHandle } from 'trpc-sveltekit';
 
-let handleParaglide: Handle = ({ event, resolve }) =>
-	paraglideMiddleware(event.request, ({ request, locale }) => {
-		event.request = request;
+let paraglideHandle: Handle = ({ event, resolve }) =>
+	paraglideMiddleware(event.request, ({ request: localizedRequest, locale }) => {
+		event.request = localizedRequest;
 		return resolve(event, {
-			transformPageChunk: ({ html }) => html.replace('%paraglide.lang%', locale),
+			transformPageChunk: ({ html }) => {
+				return html.replace('%lang%', locale).replace('%dir%', getTextDirection(locale));
+			},
 		});
 	});
 
@@ -30,7 +33,7 @@ export let handle: Handle = sequence(
 		// }
 		return response;
 	},
-	handleParaglide,
+	paraglideHandle,
 	createTRPCHandle({
 		router,
 		createContext,

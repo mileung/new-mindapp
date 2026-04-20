@@ -102,31 +102,29 @@
 					let spaceDne = urlInMs !== undefined && urlInMs > 1 && urlInMs < 1775000111222;
 					let caller = gs.accounts[0];
 					let callerMs = caller.ms;
-
 					if (urlInMs === 8 && callerMs) return;
 
 					let checkedThisAccountBefore = !!gs.accountMsToSpaceMsToCheckedMap[callerMs];
 					let checkedSpaceWithThisAccountBefore =
 						urlInMs !== undefined &&
 						!!Object.keys(gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] || {}).length;
-
+					let space = urlInMs === undefined ? undefined : gs.msToSpaceMap[urlInMs];
 					let currentSpaceUpdateFrom: undefined | MySpaceUpdateFrom =
 						urlInMs === undefined
 							? undefined
 							: {
 									ms: urlInMs,
-									isPublic: gs.msToSpaceMap[urlInMs]?.isPublic || { num: 0 },
-									pinnedQuery: gs.msToSpaceMap[urlInMs]?.pinnedQuery || { txt: '' },
+									isPublic: space?.isPublic || { num: -1 },
+									pinnedQuery: space?.pinnedQuery || { txt: '' },
 									name:
-										gs.msToSpaceMap[urlInMs]?.name || (urlInMs > 1 && urlInMs !== callerMs)
-											? { txt: '' }
-											: undefined,
+										space?.name || (urlInMs > 1 && urlInMs !== callerMs ? { txt: '' } : undefined),
 									...(() => {
 										let spaceContext = getUrlInMsContext();
 										return {
-											accentCode: spaceContext?.accentCode || { num: 0 },
-											roleCode: spaceContext?.roleCode || { num: 0 },
-											permissionCode: spaceContext?.permissionCode || { num: 0 },
+											visiting: !spaceContext,
+											accentCode: spaceContext?.accentCode || { num: -1 },
+											roleCode: spaceContext?.roleCode || { num: -1 },
+											permissionCode: spaceContext?.permissionCode || { num: -1 },
 										};
 									})(),
 								};
@@ -186,6 +184,15 @@
 					};
 
 					// console.log('get', JSON.stringify(get, null, 2));
+					// console.log(
+					// 	'get.spaceUpdatesFrom test',
+					// 	JSON.stringify(
+					// 		get.spaceUpdatesFrom?.map((s) => s),
+					// 		// get.spaceUpdatesFrom?.map((s) => s.ms),
+					// 		null,
+					// 		2,
+					// 	),
+					// );
 					let callerContext = getDefaultCallerContext();
 					try {
 						if ((urlInMs && urlInMs !== 8) || gs.accounts.some((a) => a.ms && a.signedIn)) {
@@ -198,7 +205,14 @@
 					} catch (error) {
 						console.log('error:', error);
 					}
-					// console.log('callerContext', JSON.stringify(callerContext, null, 2));
+					let {
+						removedSpaceMss = [],
+						signedOutAccountMss = [],
+						spaceUpdates = [],
+						signedInAccountUpdates = [],
+						visitingPublicSpaceUpdate,
+					} = callerContext;
+					console.log('callerContext', JSON.stringify(callerContext, null, 2));
 
 					gs.accountMsToSpaceMsToCheckedMap = {
 						...gs.accountMsToSpaceMsToCheckedMap,
@@ -207,30 +221,30 @@
 							...(urlInMs === undefined ? {} : { [urlInMs]: true }),
 						},
 					};
+					if (visitingPublicSpaceUpdate) gs.visitedSpaceMsSet.add(visitingPublicSpaceUpdate.ms);
 					updateLocalCache((lc) => {
-						[...callerContext.joinedSpaceUpdates, callerContext.visitingPublicSpaceUpdate].forEach(
-							(spaceUpdate) => {
-								if (spaceUpdate) {
-									lc.msToSpaceMap[spaceUpdate.ms] ||= {
-										...getDefaultSpace(), //
-										ms: spaceUpdate.ms,
-									};
-									let space = lc.msToSpaceMap[spaceUpdate.ms]!;
-									space.isPublic = spaceUpdate.isPublic || space.isPublic;
-									space.name = spaceUpdate.name || space.name;
-									space.pinnedQuery = spaceUpdate.pinnedQuery || space.pinnedQuery;
-								}
-							},
-						);
+						[...spaceUpdates, visitingPublicSpaceUpdate].forEach((spaceUpdate) => {
+							if (spaceUpdate) {
+								lc.msToSpaceMap[spaceUpdate.ms] ||= {
+									...getDefaultSpace(),
+									ms: spaceUpdate.ms,
+								};
+								let space = lc.msToSpaceMap[spaceUpdate.ms]!;
+								space.isPublic = spaceUpdate.isPublic || space.isPublic;
+								space.name = spaceUpdate.name || space.name;
+								space.pinnedQuery = spaceUpdate.pinnedQuery || space.pinnedQuery;
+							}
+						});
 
 						let msToSignedInAccountUpdateMap: Record<number, MyAccountUpdates> = {};
-						for (let i = 0; i < callerContext.signedInAccountUpdates.length; i++) {
-							let u = callerContext.signedInAccountUpdates[i];
+						for (let i = 0; i < signedInAccountUpdates.length; i++) {
+							let u = signedInAccountUpdates[i];
 							msToSignedInAccountUpdateMap[u.ms] = u;
 						}
 						lc.accounts = lc.accounts.map((a) => {
 							let accountUpdate = msToSignedInAccountUpdateMap[a.ms];
-							if (!checkedAnythingBefore) a.signedIn = !!accountUpdate;
+							if (!checkedAnythingBefore)
+								a.signedIn = !signedOutAccountMss.some((ms) => ms === a.ms);
 							a.email = accountUpdate?.email || a.email;
 							a.name = accountUpdate?.name || a.name;
 							a.bio = accountUpdate?.bio || a.bio;
@@ -240,37 +254,33 @@
 
 						if (lc.accounts[0].signedIn) {
 							let msToJoinedSpaceUpdateMap: Record<number, MySpaceUpdate> = {};
-							for (let i = 0; i < callerContext.joinedSpaceUpdates.length; i++) {
-								let u = callerContext.joinedSpaceUpdates[i];
+							for (let i = 0; i < spaceUpdates.length; i++) {
+								let u = spaceUpdates[i];
 								msToJoinedSpaceUpdateMap[u.ms] = u;
 							}
-							let newJoinedSpaceContexts: SpaceContext[] = callerContext.joinedSpaceUpdates
+							let newJoinedSpaceContexts: SpaceContext[] = spaceUpdates
 								.filter(
 									(spaceUpdate) =>
-										spaceUpdate?.roleCode &&
+										spaceUpdate.ms !== callerMs &&
 										!lc.accounts[0].joinedSpaceContexts.some((sc) => sc.ms === spaceUpdate?.ms),
 								)
 								.map(
 									(su) =>
 										({
-											ms: su!.ms,
-											accentCode: su!.accentCode || { num: 0 },
-											permissionCode: su!.permissionCode || { num: 0 },
-											roleCode: su!.roleCode || { num: 0 },
+											ms: su.ms,
+											accentCode: su.accentCode || { num: -1 },
+											permissionCode: su.permissionCode || { num: -1 },
+											roleCode: su.roleCode || { num: -1 },
 										}) satisfies SpaceContext,
 								);
-							// console.log(
-							// 	'msToJoinedSpaceUpdateMap:',
-							// 	get.allJoinedSpaces,
-							// 	msToJoinedSpaceUpdateMap,
-							// );
+							console.log('newJoinedSpaceContexts:', newJoinedSpaceContexts);
 							lc.accounts[0] = {
 								...lc.accounts[0],
 								joinedSpaceContexts: [
 									...lc.accounts[0].joinedSpaceContexts,
 									...newJoinedSpaceContexts,
 								]
-									.filter(({ ms }) => !get.allJoinedSpaces || msToJoinedSpaceUpdateMap[ms])
+									.filter(({ ms }) => !removedSpaceMss.includes(ms))
 									.map((sc) => {
 										let spaceUpdate = msToJoinedSpaceUpdateMap[sc.ms];
 										return {
@@ -288,8 +298,11 @@
 							if (
 								space &&
 								space.ms > 1 &&
+								!gs.visitedSpaceMsSet.has(space.ms) &&
 								!lc.accounts.some(
-									(a) => a.signedIn && a.joinedSpaceContexts.some((c) => c.ms === space.ms),
+									(a) =>
+										a.signedIn &&
+										(a.ms === space.ms || a.joinedSpaceContexts.some((c) => c.ms === space.ms)),
 								)
 							)
 								delete lc.msToSpaceMap[space.ms];

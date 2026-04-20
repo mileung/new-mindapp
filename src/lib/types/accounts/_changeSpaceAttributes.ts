@@ -15,7 +15,7 @@ export let _changeSpaceAttributes = async (
 	},
 ) => {
 	let ms = Date.now();
-	console.log('input:', input);
+	// console.log('input:', input);
 	if (input.nameTxt !== undefined) {
 		await tdb
 			.update(pTable)
@@ -80,6 +80,7 @@ export let _changeSpaceAttributes = async (
 			// Therefore it should also be impossible for a personal input.spaceMs to be different from input.callerMs.
 			if (input.spaceMs === input.callerMs) throw new Error(`Personal space cannot be made public`);
 		} else if (input.spaceMs === 1) throw new Error(`Global space cannot be made private`);
+		console.log('input.isPublicNum:', input.isPublicNum);
 		await tdb
 			.update(pTable)
 			.set({

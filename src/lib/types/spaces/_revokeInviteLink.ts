@@ -13,7 +13,6 @@ export let _revokeInviteLink = async (
 	},
 ) => {
 	let ms = Date.now();
-
 	let updatedInviteRows = await tdb
 		.update(pTable)
 		.set({ num: ms })
@@ -25,8 +24,8 @@ export let _revokeInviteLink = async (
 				),
 				pf.at_by_ms.gt0,
 				pf.ms.eq(input.inviteMs),
-				pf.by_ms.gt0,
-				pf.in_ms.gt0,
+				pf.by_ms.eq(input.callerMs),
+				pf.in_ms.eq(input.spaceMs),
 				pf.code.eq(pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt),
 				pf.num.eq0,
 				pf.txt.eq(input.slugEnd),
@@ -56,7 +55,7 @@ export let _revokeInviteLink = async (
 							pf.ms.lt(ms - week),
 							and(
 								pf.by_ms.gt0, //
-								pf.by_ms.lt(ms + 1),
+								pf.by_ms.lt(ms),
 							),
 						),
 						pf.in_ms.eq0,

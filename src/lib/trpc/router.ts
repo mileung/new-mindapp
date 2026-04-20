@@ -36,6 +36,7 @@ import { _removeReaction } from '$lib/types/reactions/removeReaction';
 import { permissionCodes, roleCodes } from '$lib/types/spaces';
 import { _checkInvite } from '$lib/types/spaces/_checkInvite';
 import { _createInviteLink } from '$lib/types/spaces/_createInviteLink';
+import { _createSpace } from '$lib/types/spaces/_createSpace';
 import { _getSpaceDots } from '$lib/types/spaces/_getSpaceDots';
 import { _revokeInviteLink } from '$lib/types/spaces/_revokeInviteLink';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
@@ -221,9 +222,9 @@ export let router = t.router({
 			if (input.useIfValid) {
 				let c = await _getCallerContext(ctx, input, {
 					signedIn: input.useIfValid,
-					roleCode: input.useIfValid,
+					permissionCode: input.useIfValid,
 				});
-				if (c.roleCode) throw new Error(m.alreadyJoinedThisSpace());
+				if (c.permissionCode) throw new Error(m.alreadyJoinedThisSpace());
 				throwIf(!c.signedIn && input.useIfValid);
 			}
 			return _checkInvite(input);
@@ -244,21 +245,20 @@ export let router = t.router({
 	createSpace: whoProcedure
 		.input(
 			z.object({
-				nameTxt: normalizingNameSchema.optional(),
-				descriptionTxt: normalizingBioOrDescriptionSchema.optional(),
-				pinnedQueryTxt: normalizingBioOrDescriptionSchema.optional(),
-				isPublicNum: z.number().gte(0).lte(1).optional(),
+				spaceNameTxt: normalizingNameSchema,
+				spaceDescriptionTxt: normalizingBioOrDescriptionSchema,
+				spacePinnedQueryTxt: normalizingBioOrDescriptionSchema,
+				spaceIsPublicBin: z.number().gte(0).lte(1),
 				newMemberPermissionCodeNum: z
 					.number()
 					.gte(permissionCodes.viewOnly)
-					.lte(permissionCodes.reactAndPost)
-					.optional(),
+					.lte(permissionCodes.reactAndPost),
 			}),
 		)
 		.mutation(async ({ ctx, input }) => {
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
-			return {};
+			return _createSpace(input);
 		}),
 	changeSpaceAttributes: whoWhereProcedure
 		.input(
@@ -438,11 +438,11 @@ export let router = t.router({
 			if (!input.callerMs) throw new Error('anon disallowed');
 			if (input.postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
 			let c = await _getCallerContext(ctx, input, {
-				roleCode: true,
+				permissionCode: true,
 				signedIn: true,
 				isPublic: true,
 			});
-			throwIf(!c.signedIn || (!c.isPublic && c.roleCode === undefined));
+			throwIf(!c.signedIn || (!c.isPublic && c.permissionCode === undefined));
 			return _getPostHistory(tdb, input.postIdObj, input.version);
 		}),
 	getReactionHistory: whoWhereProcedure
@@ -457,11 +457,11 @@ export let router = t.router({
 			if (!input.callerMs) throw new Error('anon disallowed');
 			if (input.postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
 			let c = await _getCallerContext(ctx, input, {
-				roleCode: true,
+				permissionCode: true,
 				signedIn: true,
 				isPublic: true,
 			});
-			throwIf(!c.signedIn || (!c.isPublic && c.roleCode === undefined));
+			throwIf(!c.signedIn || (!c.isPublic && c.permissionCode === undefined));
 			return _getReactionHistory(tdb, input);
 		}),
 	getPostFeed: whoWhereProcedure //
@@ -469,12 +469,12 @@ export let router = t.router({
 		.query(async ({ input, ctx }) => {
 			await feedLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, {
-				roleCode: true,
+				permissionCode: true,
 				signedIn: true,
 				// permissionCode: true,
 				isPublic: true,
 			});
-			throwIf(!c.isPublic && (!c.signedIn || c.roleCode === undefined));
+			throwIf(!c.isPublic && (!c.signedIn || c.permissionCode === undefined));
 			return _getPostFeed(tdb, input);
 		}),
 	getSpaceTags: whoWhereProcedure
@@ -486,11 +486,11 @@ export let router = t.router({
 		)
 		.query(async ({ input, ctx }) => {
 			let c = await _getCallerContext(ctx, input, {
-				roleCode: true,
+				permissionCode: true,
 				signedIn: true,
 				isPublic: true,
 			});
-			throwIf(!c.isPublic && (!c.signedIn || c.roleCode === undefined));
+			throwIf(!c.isPublic && (!c.signedIn || c.permissionCode === undefined));
 			return _getSpaceTags(tdb, input);
 		}),
 });

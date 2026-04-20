@@ -17,7 +17,6 @@
 		updateSavedTags,
 	} from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
-	import { getDefaultSpace, type Space } from '$lib/types/spaces';
 	import {
 		IconBook2,
 		IconDotsVertical,
@@ -89,11 +88,12 @@
 					else window.scrollTo({ top: 0 });
 				}
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					let lastSeenInMsIndex = sidebarSpaces.findIndex((s) => s.ms === gs.lastSeenInMs);
+					let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
 					let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
-					if (newSpaceMsIndex >= sidebarSpaces.length) newSpaceMsIndex = sidebarSpaces.length - 1;
-					goto(`/__${sidebarSpaces[newSpaceMsIndex].ms}`);
+					if (newSpaceMsIndex >= sidebarSpaceMss.length)
+						newSpaceMsIndex = sidebarSpaceMss.length - 1;
+					goto(`/__${sidebarSpaceMss[newSpaceMsIndex]}`);
 				}
 			}
 		};
@@ -118,13 +118,14 @@
 		setTimeout(() => searchIpt!.scrollTo({ left: Number.MAX_SAFE_INTEGER }), 0);
 	};
 
-	let sidebarSpaces = $derived<Space[]>([
+	let sidebarSpaceMss = $derived<number[]>([
 		// local space ms - everything private in OPFS
-		getDefaultSpace(),
+		0,
 		// personal space ms placeholder - everything private in cloud
-		{ ...getDefaultSpace(), ms: gs.accounts?.[0].ms || 8 },
+		gs.accounts?.[0].ms || 8,
 		// global space ms - everything public in cloud
-		{ ...getDefaultSpace(), ms: 1 },
+		1,
+		...(gs.accounts?.[0].joinedSpaceContexts || []).map((s) => s.ms).filter((ms) => ms !== 1),
 	]);
 </script>
 
@@ -386,15 +387,15 @@
 						<IconSettings class="shrink-0 w-6" />
 					</a>
 				</div> -->
-				{#each sidebarSpaces as space (space.ms)}
+				{#each sidebarSpaceMss as spaceMs (spaceMs)}
 					<div
-						class={`flex group/space ${highlightLastSeenInMs && space.ms === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
+						class={`flex group/space ${highlightLastSeenInMs && spaceMs === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
 					>
 						<a
-							href={`/__${space.ms}`}
+							href={`/__${spaceMs}`}
 							class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden font-medium`}
 						>
-							{#if space.ms === gs.lastSeenInMs}
+							{#if spaceMs === gs.lastSeenInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.feedSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
@@ -402,21 +403,21 @@
 							<!-- {#if space.ms === gs.lastSeenInMs}
 								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
 							{/if} -->
-							<SpaceIcon ms={space.ms} class="shrink-0 w-6" />
+							<SpaceIcon ms={spaceMs} class="shrink-0 w-6" />
 							<p class="overflow-scroll">
-								{msToSpaceNameTxt(space.ms)}
+								{msToSpaceNameTxt(spaceMs)}
 							</p>
 						</a>
 						<!-- TODO: IconCalendar -->
 						<a
-							href={`/__${space.ms}/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							href={`/__${spaceMs}/tags`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${spaceMs}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
-							href={`/__${space.ms}/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${space.ms !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${space.ms}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							href={`/__${spaceMs}/dots`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${spaceMs}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>

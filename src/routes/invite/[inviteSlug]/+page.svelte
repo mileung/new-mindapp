@@ -63,7 +63,11 @@
 					{m.nameInvitedYou({ n: msToAccountNameTxt(gs.checkedInvite.inviter.ms, true) })}
 				</p>
 			</div>
-			<p class="">{m.nMembers({ n: gs.checkedInvite.partialSpace.memberCount })}</p>
+			<p class="">
+				{gs.checkedInvite.partialSpace.memberCount === 1
+					? m.oneMember()
+					: m.nMembers({ n: gs.checkedInvite.partialSpace.memberCount })}
+			</p>
 		</div>
 		<p class="">{gs.checkedInvite.partialSpace.description.txt}</p>
 		{#if gs.accounts?.[0].ms}

@@ -1,4 +1,4 @@
-import { ranStr } from '$lib/js';
+import { hasDefinedKeysBesidesMs, ranStr } from '$lib/js';
 import { tdb } from '$lib/server/db';
 import { deleteCookie, getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
 import { hour, minute } from '$lib/time';
@@ -75,11 +75,15 @@ export let _getCallerContext = async (
 		);
 
 	if (spaceMs && (get.isPublic || get.roleCode || get.permissionCode)) {
-		if (get.isPublic && spaceMs === 1) isPublic = { num: 1 };
+		if (get.isPublic && spaceMs === 1) isPublic = { num: -1 };
 		else if (spaceMs === callerMs) {
-			if (get.isPublic) isPublic = { num: 0 };
-			if (get.roleCode) roleCode = { num: roleCodes.owner };
-			if (get.permissionCode) permissionCode = { num: permissionCodes.reactAndPost };
+			if (get.isPublic) isPublic = { num: -1 };
+			if (get.roleCode) roleCode = { num: -1 };
+			if (get.permissionCode) permissionCode = { num: -1 };
+		} else {
+			if (get.isPublic) isPublic = { num: -1 };
+			if (get.roleCode) roleCode = { num: -1 };
+			if (get.permissionCode) permissionCode = { num: -1 };
 		}
 		spaceUpdatesFrom.push({
 			ms: spaceMs,
@@ -143,7 +147,8 @@ export let _getCallerContext = async (
 			: []),
 		...spaceUpdatesFrom.flatMap((su) => {
 			if (!su.ms || su.ms === callerMs) {
-				su.isPublic?.num &&
+				su.isPublic &&
+					su.isPublic.num !== 0 &&
 					forcedSpaceUpdateRows.push({
 						...id0,
 						in_ms: su.ms,
@@ -152,27 +157,26 @@ export let _getCallerContext = async (
 						txt: null,
 					});
 				if (su.ms === spaceMs) {
-					su.permissionCode &&
-						su.permissionCode?.num !== permissionCodes.reactAndPost &&
-						forcedSpaceUpdateRows.push({
-							...id0,
-							at_ms: callerMs,
-							ms: callerMs,
-							in_ms: callerMs,
-							code: pc.permissionCodeNumIdAtAccountId,
-							num: permissionCodes.reactAndPost,
-							txt: null,
-						});
-					// su.roleCode?.num !== roleCodes.owner &&
 					forcedSpaceUpdateRows.push({
 						...id0,
 						at_ms: callerMs,
 						ms: callerMs,
 						in_ms: callerMs,
-						code: pc.roleCodeNumIdAtAccountId,
-						num: roleCodes.owner,
+						code: pc.permissionCodeNumIdAtAccountId,
+						num: permissionCodes.reactAndPost,
 						txt: null,
 					});
+					su.roleCode &&
+						su.roleCode.num !== roleCodes.owner &&
+						forcedSpaceUpdateRows.push({
+							...id0,
+							at_ms: callerMs,
+							ms: callerMs,
+							in_ms: callerMs,
+							code: pc.roleCodeNumIdAtAccountId,
+							num: roleCodes.owner,
+							txt: null,
+						});
 				}
 				// su.accentCode?.num &&
 				// 	forcedSpaceUpdateRows.push({
@@ -182,8 +186,8 @@ export let _getCallerContext = async (
 				// 		txt: null,
 				// 	});
 			}
-			if (su.ms === 1)
-				// if (su.ms === 1 && !su.isPublic?.num)
+
+			if (su.ms === 1 && su.isPublic && su.isPublic.num !== 1)
 				forcedSpaceUpdateRows.push({
 					...id0,
 					in_ms: 1,
@@ -192,19 +196,17 @@ export let _getCallerContext = async (
 					txt: null,
 				});
 			return [
-				...(su.ms && su.ms !== callerMs
-					? [
-							su.accentCode &&
-								and(
-									pf.atId({ at_ms: callerMs }),
-									pf.notGranularNum(su.accentCode),
-									pf.in_ms.eq(su.ms),
-									pf.code.eq(pc.spacePriorityIdAccentCodeNumAtAccountId),
-									pf.num.gte0,
-									pf.txt.isNull,
-								),
-						]
-					: []),
+				su.ms && su.ms !== callerMs
+					? su.accentCode &&
+						and(
+							pf.atId({ at_ms: callerMs }),
+							pf.notGranularNum(su.accentCode),
+							pf.in_ms.eq(su.ms),
+							pf.code.eq(pc.spacePriorityIdAccentCodeNumAtAccountId),
+							pf.num.gte0,
+							pf.txt.isNull,
+						)
+					: undefined,
 				su.ms === spaceMs && su.pinnedQuery
 					? and(
 							pf.noAtId,
@@ -217,6 +219,14 @@ export let _getCallerContext = async (
 					: undefined,
 				...(su.ms && su.ms !== callerMs
 					? [
+							and(
+								pf.atId({ at_ms: callerMs }),
+								pf.ms.gt0,
+								pf.in_ms.eq(su.ms),
+								pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+								pf.num.gte0,
+								pf.txt.isNull,
+							),
 							su.ms > 1 && su.name
 								? and(
 										pf.noAtId,
@@ -229,36 +239,26 @@ export let _getCallerContext = async (
 								: undefined,
 							...(su.ms === spaceMs
 								? [
-										su.ms > 1
-											? // su.ms > 1 && su.isPublic
-												and(
+										su.ms > 1 && su.isPublic
+											? and(
 													pf.noAtId,
-													// pf.notGranularNum(su.isPublic),
+													pf.notGranularNum(su.isPublic),
 													pf.in_ms.eq(su.ms),
 													pf.code.eq(pc.spaceIsPublicBinId),
 													pf.num.gte0,
-													pf.num.lte(1),
 													pf.txt.isNull,
 												)
 											: undefined,
-										su.permissionCode
+										su.roleCode
 											? and(
 													pf.atId({ at_ms: callerMs }),
-													pf.notGranularNum(su.permissionCode),
+													pf.notGranularNum(su.roleCode),
 													pf.in_ms.eq(su.ms),
-													pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+													pf.code.eq(pc.roleCodeNumIdAtAccountId),
 													pf.num.gte0,
 													pf.txt.isNull,
 												)
 											: undefined,
-										and(
-											pf.atId({ at_ms: callerMs }),
-											pf.ms.gt0,
-											pf.in_ms.eq(su.ms),
-											pf.code.eq(pc.roleCodeNumIdAtAccountId),
-											pf.num.gte0,
-											pf.txt.isNull,
-										),
 									]
 								: []),
 						]
@@ -346,8 +346,8 @@ export let _getCallerContext = async (
 	}
 	if (get.allJoinedSpaces && caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow) {
 		let unfetchedSpaceMss: number[] = [];
-		for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
-			let row = roleCodeNumIdAtAccountIdRows[i];
+		for (let i = 0; i < permissionCodeNumIdAtAccountIdRows.length; i++) {
+			let row = permissionCodeNumIdAtAccountIdRows[i];
 			if (!msToSpaceUpdatesFrom[row.in_ms]) unfetchedSpaceMss.push(row.in_ms);
 		}
 		if (unfetchedSpaceMss.length) {
@@ -402,17 +402,24 @@ export let _getCallerContext = async (
 		spaceMsToRowsMap[row.in_ms] ??= [];
 		spaceMsToRowsMap[row.in_ms].push(row);
 	}
-	let joinedSpaceMss = caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow
-		? roleCodeNumIdAtAccountIdRows.map((r) => r.in_ms)
+	let SpaceMssWithPermission = caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow
+		? permissionCodeNumIdAtAccountIdRows.map((r) => r.in_ms)
 		: [];
 	let callerJoinedSpaceMs = false;
-	let joinedSpaceUpdates: MySpaceUpdate[] = joinedSpaceMss.map((ms) => {
+	let spaceUpdates: MySpaceUpdate[] = SpaceMssWithPermission.map((ms) => {
 		if (ms === spaceMs) callerJoinedSpaceMs = true;
 		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms] || [{ in_ms: ms }]);
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[ms];
-		// Need these if statements since isPublic and roleCode don't use notGranularNum
-		if (sameGranularNum(su.isPublic, spaceUpdateFrom?.isPublic)) su.isPublic = undefined;
-		if (sameGranularNum(su.roleCode, spaceUpdateFrom?.roleCode)) su.roleCode = undefined;
+		// console.log('spaceUpdateFrom:', spaceUpdateFrom);
+		// console.log('su:', su);
+
+		// Need this if statement since permissionCode doesn't use notGranularNum
+		if (
+			!spaceUpdateFrom?.permissionCode ||
+			su.ms === callerMs ||
+			sameGranularNum(su.permissionCode, spaceUpdateFrom?.permissionCode)
+		)
+			su.permissionCode = undefined;
 		return su;
 	});
 	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =
@@ -421,12 +428,17 @@ export let _getCallerContext = async (
 		spaceIsPublicBinIdRows.some((r) => r.in_ms === spaceMs)
 			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs] || [{ in_ms: spaceMs }])
 			: undefined;
+
 	if (visitingPublicSpaceUpdate) {
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[visitingPublicSpaceUpdate.ms];
-		if (sameGranularNum(visitingPublicSpaceUpdate.isPublic, spaceUpdateFrom?.isPublic))
-			visitingPublicSpaceUpdate.isPublic = undefined;
-		if (sameGranularNum(visitingPublicSpaceUpdate.roleCode, spaceUpdateFrom?.roleCode))
-			visitingPublicSpaceUpdate.roleCode = undefined;
+		if (!visitingPublicSpaceUpdate.isPublic?.num) {
+			visitingPublicSpaceUpdate = undefined;
+		} else {
+			if (sameGranularNum(visitingPublicSpaceUpdate.isPublic, spaceUpdateFrom?.isPublic))
+				visitingPublicSpaceUpdate.isPublic = undefined;
+			if (!hasDefinedKeysBesidesMs(visitingPublicSpaceUpdate))
+				visitingPublicSpaceUpdate = undefined;
+		}
 	}
 
 	let accountUpdatedRows = [
@@ -516,7 +528,7 @@ export let _getCallerContext = async (
 			}
 		}
 	} else {
-		joinedSpaceUpdates = [];
+		spaceUpdates = [];
 		signedInAccountUpdatesFrom.length && deleteCookie(ctx, 'sessionKeyObj');
 	}
 
@@ -528,10 +540,23 @@ export let _getCallerContext = async (
 			);
 			if (caller_spaceIsPublicBinIdRow) {
 				let { ms, num } = caller_spaceIsPublicBinIdRow;
-				isPublic = roleCode || num ? { ms, num } : undefined;
+				isPublic = permissionCode || num ? { ms, num } : undefined;
 			}
 		}
 	}
+
+	let removedSpaceMss: number[] = spaceUpdatesFrom
+		.filter((su) => !su.visiting && !SpaceMssWithPermission.includes(su.ms))
+		.map((su) => su.ms);
+	let removedAccountMss: number[] = signedInAccountUpdatesFrom
+		.filter(
+			(accountFrom) =>
+				!signedInAccountUpdates.some((accountUpdate) => accountUpdate.ms === accountFrom.ms),
+		)
+		.map((su) => su.ms);
+	// console.log('spaceUpdates:', spaceUpdates);
+	spaceUpdates = spaceUpdates.filter((s) => hasDefinedKeysBesidesMs(s));
+	signedInAccountUpdates = signedInAccountUpdates.filter((s) => hasDefinedKeysBesidesMs(s));
 
 	return {
 		signedIn,
@@ -539,8 +564,10 @@ export let _getCallerContext = async (
 		permissionCode,
 		isPublic,
 
-		joinedSpaceUpdates,
 		visitingPublicSpaceUpdate,
-		signedInAccountUpdates,
+		removedSpaceMss: removedSpaceMss.length ? removedSpaceMss : undefined,
+		signedOutAccountMss: removedAccountMss.length ? removedAccountMss : undefined,
+		spaceUpdates: spaceUpdates.length ? spaceUpdates : undefined,
+		signedInAccountUpdates: signedInAccountUpdates.length ? signedInAccountUpdates : undefined,
 	};
 };
