@@ -1,5 +1,4 @@
 import { dev } from '$app/environment';
-import { splitUntil } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
 import { week } from '$lib/time';
@@ -21,7 +20,8 @@ import { id0 } from '../parts/partIds';
 import { makeNewSpaceRows, makeRowsForJoiningSpace } from './_createSpace';
 
 let CheckedInviteSchema = z.object({
-	slug: z.string(),
+	ms: z.number(),
+	slugEnd: z.string(),
 	inviter: MyAccountSchema.pick({
 		ms: true,
 		name: true,
@@ -38,7 +38,8 @@ export type CheckedInvite = z.infer<typeof CheckedInviteSchema>;
 
 export let _checkInvite = async (
 	input: WhoObj & {
-		inviteSlug: string; //
+		inviteMs: number;
+		slugEnd: string;
 		useIfValid: boolean;
 	},
 ): Promise<{ redeemed?: true; checkedInvite?: CheckedInvite }> => {
@@ -55,7 +56,7 @@ export let _checkInvite = async (
 		},
 	};
 
-	if (input.inviteSlug === 'init') {
+	if (!input.inviteMs && input.slugEnd === 'init') {
 		let initInviteRows = await tdb
 			.select()
 			.from(pTable)
@@ -87,7 +88,7 @@ export let _checkInvite = async (
 		if (input.useIfValid) {
 			let testMembers: PartInsert[] = [];
 			let addTestMembers = false;
-			// addTestMembers = true;
+			addTestMembers = true;
 			if (dev && addTestMembers) {
 				for (let i = 0; i < 88; i++) {
 					testMembers.push(
@@ -97,7 +98,7 @@ export let _checkInvite = async (
 							callerMs: 1 + i,
 							inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 							permissionCodeNum: 0,
-							roleCodeNum: roleCodes.member,
+							roleCodeNum: i % 8 === 1 ? roleCodes.mod : roleCodes.member,
 						}),
 					);
 				}
@@ -124,30 +125,26 @@ export let _checkInvite = async (
 					in_ms: 1,
 					code: pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt,
 					num: 0,
-					txt: input.inviteSlug,
+					txt: input.slugEnd,
 				},
 			]);
 			return { redeemed: true };
 		}
 		return { checkedInvite };
-	} else {
+	} else if (input.inviteMs && input.slugEnd.length === 8) {
 		// TODO: check for stuff in space that may count as awaiting response?
 
-		let [inviteMsStr, slugEnd] = splitUntil(input.inviteSlug, '_', 1);
-		let inviteMs = +inviteMsStr;
-		if (Number.isNaN(inviteMs)) return {};
 		let inviteFilter = and(
 			or(pf.at_ms.eq0, pf.at_ms.gt(ms)),
 			or(pf.at_in_ms.eq0, lt(pTable.at_by_ms, pTable.at_in_ms)),
-			pf.ms.eq(inviteMs),
+			pf.ms.eq(input.inviteMs),
 			pf.by_ms.gt0,
 			pf.in_ms.gt0,
 			pf.code.eq(pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt),
 			pf.num.eq0,
-			pf.txt.eq(slugEnd),
+			pf.txt.eq(input.slugEnd),
 		);
 		let inviteRows = await tdb.select().from(pTable).where(inviteFilter);
-
 		let inviteRow = assertLt2Rows(inviteRows);
 		if (inviteRow) {
 			if (input.useIfValid) {
@@ -193,9 +190,9 @@ export let _checkInvite = async (
 				return { redeemed: true };
 			} else {
 				let {
+					// prettier-ignore
+					[pc.spaceDescriptionTxtIdAndMemberCountNum]: spaceDescriptionTxtIdAndMemberCountNumRows = [],
 					[pc.spaceNameTxtId]: spaceNameTxtIdRows = [],
-					[pc.spaceDescriptionTxtIdAndMemberCountNum]:
-						spaceDescriptionTxtIdAndMemberCountNumRows = [],
 					[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
 				} = channelPartsByCode(
 					await tdb
@@ -208,7 +205,7 @@ export let _checkInvite = async (
 									pf.ms.gt0,
 									pf.in_ms.eq(inviteRow.in_ms),
 									or(
-										pf.code.eq(pc.spaceNameTxtId),
+										inviteRow.in_ms > 1 ? pf.code.eq(pc.spaceNameTxtId) : undefined,
 										pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
 									),
 									pf.txt.isNotNull,
@@ -223,12 +220,13 @@ export let _checkInvite = async (
 							),
 						),
 				);
-				let spaceNameTxtIdRow = assert1Row(spaceNameTxtIdRows);
+
+				let spaceNameTxtIdRow = assertLt2Rows(spaceNameTxtIdRows);
 				let spaceDescriptionTxtIdAndMemberCountNumRow = assert1Row(
 					spaceDescriptionTxtIdAndMemberCountNumRows,
 				);
-				checkedInvite.partialSpace.ms = spaceNameTxtIdRow.in_ms;
-				checkedInvite.partialSpace.name.txt = spaceNameTxtIdRow.txt!;
+				checkedInvite.partialSpace.ms = inviteRow.in_ms;
+				checkedInvite.partialSpace.name.txt = spaceNameTxtIdRow?.txt || '';
 				checkedInvite.partialSpace.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num;
 				checkedInvite.partialSpace.description.txt = spaceDescriptionTxtIdAndMemberCountNumRow.txt!;
 				let accountNameTxtMsByMsRow = assert1Row(accountNameTxtMsByMsRows);

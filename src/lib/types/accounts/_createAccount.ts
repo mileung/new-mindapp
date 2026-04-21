@@ -91,15 +91,15 @@ export let _createAccount = async (
 	let account = reduceMyAccountRows(myAccountRows);
 	if (!MyAccountSchema.safeParse(account).success) throw new Error('Invalid account');
 
-	let clientIdObj = getValidAuthCookie(ctx, 'clientKeyObj');
+	let clientIdObj = getValidAuthCookie(ctx, 'ms_clientKey');
 	if (!clientIdObj) {
 		clientIdObj = { ms, txt: ranStr() };
-		setCookie(ctx, 'clientKeyObj', clientIdObj);
+		setCookie(ctx, 'ms_clientKey', clientIdObj);
 	}
-	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	if (!sessionIdObj) {
 		sessionIdObj = { ms, txt: ranStr() };
-		setCookie(ctx, 'sessionKeyObj', sessionIdObj);
+		setCookie(ctx, 'ms_sessionKey', sessionIdObj);
 	}
 
 	let partsToInsert: PartInsert[] = [

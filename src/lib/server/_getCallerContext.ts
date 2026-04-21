@@ -1,6 +1,6 @@
 import { hasDefinedKeysBesidesMs, ranStr } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { deleteCookie, getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
+import { getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
 import { hour, minute } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import {
@@ -54,7 +54,7 @@ export let _getCallerContext = async (
 	// 	throw new Error('must get roleCode to get permissionCode');
 
 	let ms = Date.now();
-	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 
 	let signedIn: undefined | boolean;
 	let isPublic: undefined | GranularNumProp;
@@ -75,16 +75,9 @@ export let _getCallerContext = async (
 		);
 
 	if (spaceMs && (get.isPublic || get.roleCode || get.permissionCode)) {
-		if (get.isPublic && spaceMs === 1) isPublic = { num: -1 };
-		else if (spaceMs === callerMs) {
-			if (get.isPublic) isPublic = { num: -1 };
-			if (get.roleCode) roleCode = { num: -1 };
-			if (get.permissionCode) permissionCode = { num: -1 };
-		} else {
-			if (get.isPublic) isPublic = { num: -1 };
-			if (get.roleCode) roleCode = { num: -1 };
-			if (get.permissionCode) permissionCode = { num: -1 };
-		}
+		if (get.isPublic) isPublic = { num: -1 };
+		if (get.roleCode) roleCode = { num: -1 };
+		if (get.permissionCode) permissionCode = { num: -1 };
 		spaceUpdatesFrom.push({
 			ms: spaceMs,
 			isPublic,
@@ -93,12 +86,7 @@ export let _getCallerContext = async (
 		});
 	}
 
-	if (!sessionIdObj) signedInAccountUpdatesFrom = [];
-	else if (
-		// get.signedIn &&
-		callerMs && //
-		!signedInAccountUpdatesFrom.some((a) => a.ms === callerMs)
-	)
+	if (sessionIdObj && callerMs && !signedInAccountUpdatesFrom.some((a) => a.ms === callerMs))
 		signedInAccountUpdatesFrom.push({ ms: callerMs });
 	signedInAccountUpdatesFrom = signedInAccountUpdatesFrom.filter((a) => a.ms);
 
@@ -339,7 +327,6 @@ export let _getCallerContext = async (
 		sessionKeyTxtMs_ExpiryMs_AtAccountIdRows.find((row) => row.at_ms === callerMs);
 
 	let msToSpaceUpdatesFrom: Record<number, undefined | MySpaceUpdate> = {};
-	// console.log('spaceUpdatesFrom:', spaceUpdatesFrom);
 	for (let i = 0; i < spaceUpdatesFrom.length; i++) {
 		let u = spaceUpdatesFrom[i];
 		msToSpaceUpdatesFrom[u.ms] = u;
@@ -410,9 +397,6 @@ export let _getCallerContext = async (
 		if (ms === spaceMs) callerJoinedSpaceMs = true;
 		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms] || [{ in_ms: ms }]);
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[ms];
-		// console.log('spaceUpdateFrom:', spaceUpdateFrom);
-		// console.log('su:', su);
-
 		// Need this if statement since permissionCode doesn't use notGranularNum
 		if (
 			!spaceUpdateFrom?.permissionCode ||
@@ -469,7 +453,7 @@ export let _getCallerContext = async (
 					if (caller_roleCodeNumIdAtAccountIdRow) {
 						let { ms, num } = caller_roleCodeNumIdAtAccountIdRow;
 						roleCode = { ms, num };
-					} // else roleCode = undefined;
+					} else roleCode = undefined;
 				}
 			}
 			if (get.permissionCode) {
@@ -482,13 +466,13 @@ export let _getCallerContext = async (
 					if (caller_permissionCodeNumIdAtAccountIdRow) {
 						let { ms, num } = caller_permissionCodeNumIdAtAccountIdRow;
 						permissionCode = { ms, num };
-					} // else if (!roleCode) permissionCode = null;
+					} else permissionCode = undefined;
 				}
 			}
 		}
 		if (ms - caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.ms > hour) {
 			let newSessionObj: CookieObj = { ms, txt: ranStr() };
-			setCookie(ctx, 'sessionKeyObj', newSessionObj);
+			setCookie(ctx, 'ms_sessionKey', newSessionObj);
 			await tdb.insert(pTable).values({
 				...id0,
 				at_ms: callerMs,
@@ -527,9 +511,8 @@ export let _getCallerContext = async (
 					);
 			}
 		}
-	} else {
+	} else if (callerMs) {
 		spaceUpdates = [];
-		signedInAccountUpdatesFrom.length && deleteCookie(ctx, 'sessionKeyObj');
 	}
 
 	if (get.isPublic) {
@@ -541,20 +524,20 @@ export let _getCallerContext = async (
 			if (caller_spaceIsPublicBinIdRow) {
 				let { ms, num } = caller_spaceIsPublicBinIdRow;
 				isPublic = permissionCode || num ? { ms, num } : undefined;
-			}
+			} else isPublic = undefined;
 		}
 	}
 
 	let removedSpaceMss: number[] = spaceUpdatesFrom
 		.filter((su) => !su.visiting && !SpaceMssWithPermission.includes(su.ms))
 		.map((su) => su.ms);
-	let removedAccountMss: number[] = signedInAccountUpdatesFrom
+	let signedOutAccountMss: number[] = signedInAccountUpdatesFrom
 		.filter(
 			(accountFrom) =>
+				!sessionIdObj ||
 				!signedInAccountUpdates.some((accountUpdate) => accountUpdate.ms === accountFrom.ms),
 		)
 		.map((su) => su.ms);
-	// console.log('spaceUpdates:', spaceUpdates);
 	spaceUpdates = spaceUpdates.filter((s) => hasDefinedKeysBesidesMs(s));
 	signedInAccountUpdates = signedInAccountUpdates.filter((s) => hasDefinedKeysBesidesMs(s));
 
@@ -566,7 +549,7 @@ export let _getCallerContext = async (
 
 		visitingPublicSpaceUpdate,
 		removedSpaceMss: removedSpaceMss.length ? removedSpaceMss : undefined,
-		signedOutAccountMss: removedAccountMss.length ? removedAccountMss : undefined,
+		signedOutAccountMss: signedOutAccountMss.length ? signedOutAccountMss : undefined,
 		spaceUpdates: spaceUpdates.length ? spaceUpdates : undefined,
 		signedInAccountUpdates: signedInAccountUpdates.length ? signedInAccountUpdates : undefined,
 	};

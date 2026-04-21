@@ -9,7 +9,7 @@ import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean }) => {
-	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	if (sessionIdObj) {
 		await tdb
 			.delete(pTable)

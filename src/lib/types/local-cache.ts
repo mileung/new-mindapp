@@ -135,7 +135,8 @@ export let useCheckedInvite = async () => {
 		if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms) return alert(m.cannotUseYourOwnInvite());
 		let { redeemed } = await trpc().checkInvite.mutate({
 			...(await getWhoObj()),
-			inviteSlug: gs.checkedInvite.slug,
+			inviteMs: gs.checkedInvite.ms,
+			slugEnd: gs.checkedInvite.slugEnd,
 			useIfValid: true,
 		});
 		if (!redeemed) return alert(m.invalidInvite());

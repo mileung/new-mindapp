@@ -214,7 +214,8 @@ export let router = t.router({
 	checkInvite: whoProcedure
 		.input(
 			z.object({
-				inviteSlug: z.string(),
+				inviteMs: z.number(),
+				slugEnd: z.string(),
 				useIfValid: z.boolean(),
 			}),
 		)
@@ -386,9 +387,10 @@ export let router = t.router({
 		)
 		.query(async ({ input, ctx }) => {
 			let c = await _getCallerContext(ctx, input, {
-				isPublic: true,
 				signedIn: true,
+				isPublic: true,
 				roleCode: true,
+				permissionCode: true,
 			});
 			throwIf(!c.isPublic?.num && c.roleCode === undefined);
 			return _getSpaceDots(tdb, { ...input, roleCode: c.roleCode });

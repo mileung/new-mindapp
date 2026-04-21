@@ -41,7 +41,7 @@
 	let urlInMs = $derived(getUrlInMs());
 	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
 	let spaceContext = $derived(getUrlInMsContext());
-	let viewable = $derived(space?.isPublic || spaceContext?.permissionCode);
+	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
 	let myDots = $derived(gs.accountMsToSpaceMsToDots[gs.accounts?.[0].ms || 0]?.[urlInMs || 0]);
 	let myInvites = $derived(myDots?.invites || []);
 	let memberships = $derived(myDots?.memberships || []);
@@ -308,9 +308,6 @@
 					{space.memberCount === 1 ? m.oneMember() : m.nMembers({ n: space.memberCount })}
 				</p>
 				{#each memberships as membership, i (membership.accept.by_ms)}
-					{i}
-					<!-- {membership.accept.by_ms} -->
-					{gs.spaceMsToAccountMsToRoleFlairMap[urlInMs]?.[membership.accept.by_ms]?.role?.ms}
 					<MembershipBlock {membership} />
 				{/each}
 			{/if}

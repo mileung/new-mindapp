@@ -2,7 +2,7 @@ import { splitUntil } from '$lib/js';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 
-type CookieName = 'clientKeyObj' | 'sessionKeyObj';
+type CookieName = 'ms_clientKey' | 'ms_sessionKey';
 export type CookieObj = { ms: number; txt: string };
 
 export let getCookie = (ctx: Context, name: CookieName) => ctx.event.cookies.get(name);

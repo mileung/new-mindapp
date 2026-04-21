@@ -74,7 +74,7 @@ export let _getSpaceDots = async (
 					),
 				)
 				.orderBy(
-					...(firstLoad ? [sql`CASE WHEN ${pTable.by_ms} = ${callerMs} THEN 0 ELSE 1 END`] : []),
+					...(firstLoad ? [sql`CASE WHEN ${pTable.at_ms} = ${callerMs} THEN 0 ELSE 1 END`] : []),
 					pf.num.desc,
 					pf.ms.desc,
 				)

@@ -7,6 +7,7 @@
 		msToAccountNameTxt,
 		msToSpaceNameTxt,
 	} from '$lib/global-state.svelte';
+	import { splitUntil } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
 	import { useCheckedInvite } from '$lib/types/local-cache';
@@ -19,9 +20,13 @@
 
 	onMount(async () => {
 		if (!page.params.inviteSlug) return;
+		let [inviteMsStr, slugEnd] = splitUntil(page.params.inviteSlug, '_', 1);
+		let inviteMs = +inviteMsStr;
+		if (Number.isNaN(inviteMs) || slugEnd.length > 8) return (validInvite = false);
 		let { checkedInvite } = await trpc().checkInvite.mutate({
 			...(await getWhoObj()),
-			inviteSlug: page.params.inviteSlug,
+			inviteMs,
+			slugEnd,
 			useIfValid: false,
 		});
 		if (checkedInvite) {
@@ -32,7 +37,7 @@
 			mergeMsToSpaceNameTxtMap({
 				[checkedInvite.partialSpace.ms]: checkedInvite.partialSpace.name.txt,
 			});
-			gs.checkedInvite = { ...checkedInvite, slug: page.params.inviteSlug };
+			gs.checkedInvite = { ...checkedInvite, ms: inviteMs, slugEnd };
 		} else validInvite = false;
 	});
 

@@ -74,7 +74,7 @@ export let _signIn = async (
 			throw new Error(m.anErrorOccurred());
 	}
 
-	let clientIdObj = getValidAuthCookie(ctx, 'clientKeyObj');
+	let clientIdObj = getValidAuthCookie(ctx, 'ms_clientKey');
 
 	let clientIdObjTxtMsAtAccountIdRows = clientIdObj
 		? await tdb
@@ -90,13 +90,13 @@ export let _signIn = async (
 					),
 				)
 		: [];
-	console.log('clientIdObjTxtMsAtAccountIdRows:', clientIdObjTxtMsAtAccountIdRows);
+
 	let clientIdObjTxtMsAtAccountIdRow = assertLt2Rows(clientIdObjTxtMsAtAccountIdRows);
 	let partsToInsert: PartInsert[] = [];
 	if (!clientIdObjTxtMsAtAccountIdRow) {
 		if (otpVerified) {
 			clientIdObj = { ms, txt: ranStr() };
-			setCookie(ctx, 'clientKeyObj', clientIdObj);
+			setCookie(ctx, 'ms_clientKey', clientIdObj);
 			partsToInsert.push({
 				...id0,
 				at_ms: accountMs,
@@ -113,7 +113,7 @@ export let _signIn = async (
 		}
 	}
 
-	let sessionIdObj = getValidAuthCookie(ctx, 'sessionKeyObj');
+	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	let {
 		[pc.sessionKeyTxtMs_ExpiryMs_AtAccountId]: sessionIdObjTxtMsAtAccountIdRows = [],
 		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
@@ -157,7 +157,7 @@ export let _signIn = async (
 	if (!sessionIdObjTxtMsAtAccountIdRows.length) {
 		if (!sessionIdObj) {
 			sessionIdObj = { ms, txt: ranStr() };
-			setCookie(ctx, 'sessionKeyObj', sessionIdObj);
+			setCookie(ctx, 'ms_sessionKey', sessionIdObj);
 		}
 		partsToInsert.push({
 			...id0,

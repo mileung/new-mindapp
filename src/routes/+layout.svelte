@@ -307,7 +307,6 @@
 							)
 								delete lc.msToSpaceMap[space.ms];
 						});
-
 						lc.accounts.sort((a, b) => {
 							let aPriority = !a.ms || a.signedIn ? 0 : 1;
 							let bPriority = !b.ms || b.signedIn ? 0 : 1;
