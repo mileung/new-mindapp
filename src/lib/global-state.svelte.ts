@@ -5,7 +5,7 @@ import { identikana } from './js';
 import { m } from './paraglide/messages';
 import { getDefaultAccount, type MyAccount, type PublicProfile } from './types/accounts';
 import { updateLocalCache } from './types/local-cache';
-import type { GranularNumProp, GranularTxtProp, WhoObj, WhoWhereObj } from './types/parts';
+import type { WhoObj, WhoWhereObj } from './types/parts';
 import { getUrlInMs, type FullIdObj } from './types/parts/partIds';
 import type { Post } from './types/posts';
 import {
@@ -64,34 +64,6 @@ class GlobalState {
 			  }
 		>
 	>({});
-	// spaceMsToAccountMsToRoleNumMap = $state<Record<number, undefined | Record<number, number>>>({});
-	spaceMsToAccountMsToRoleFlairMap = $state<
-		Record<
-			number,
-			| undefined
-			| Record<
-					number,
-					| undefined
-					| {
-							role?: GranularNumProp;
-							flair?: GranularTxtProp;
-					  }
-			  >
-		>
-	>({});
-
-	urlToFeedMap = $state<
-		Record<
-			string,
-			| undefined
-			| {
-					topLvlPostIdStrs?: string[];
-					endReached?: boolean;
-					postAtBumpedPostIdObjsExclude?: FullIdObj[];
-					error?: string;
-			  }
-		>
-	>({});
 
 	accountMsToSpaceMsToDots = $state<
 		Record<
@@ -102,11 +74,44 @@ class GlobalState {
 					| undefined
 					| {
 							invites: Invite[];
-							memberships: Membership[];
-							endReached?: boolean;
 							error?: string;
 					  }
 			  >
+		>
+	>({});
+	spaceMsToDotsFeed = $state<
+		Record<
+			number,
+			| undefined
+			| {
+					callerMemberMss: number[];
+					endReached: boolean;
+			  }
+		>
+	>({});
+	spaceMsToAccountMsToMembershipMap = $state<
+		Record<
+			number,
+			| undefined
+			| Record<
+					number,
+					| undefined
+					| null //
+					| Partial<Membership>
+			  >
+		>
+	>({});
+
+	urlToPostFeedMap = $state<
+		Record<
+			string,
+			| undefined
+			| {
+					topLvlPostIdStrs?: string[];
+					endReached?: boolean;
+					postAtBumpedPostIdObjsExclude?: FullIdObj[];
+					error?: string;
+			  }
 		>
 	>({});
 
@@ -227,41 +232,35 @@ export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, strin
 	});
 };
 
-export let mergeSpaceMsToAccountMsToRoleFlairMap = (
-	spaceMsToAccountMsToRoleFlairMap: Record<
-		number,
-		Record<
-			number,
-			{
-				role?: GranularNumProp;
-				flair?: GranularTxtProp;
-			}
-		>
-	>,
+export let mergeSpaceMsToAccountMsToMembershipMap = (
+	spaceMsToAccountMsToMembershipMap: Record<number, Record<number, Partial<Membership>>>,
 ) => {
 	// TODO: exclude fetching already fetched role and flair in post feed
 	// Only going to dots should override entries, right?
-	Object.entries(spaceMsToAccountMsToRoleFlairMap).forEach(
-		([spaceMsStr, accountMsToRoleFlairMap]) => {
+	Object.entries(spaceMsToAccountMsToMembershipMap).forEach(
+		([spaceMsStr, accountMsToMembershipMap]) => {
 			let spaceMs = +spaceMsStr;
-			Object.entries(accountMsToRoleFlairMap).forEach(([accountMsStr, roleFlairMap]) => {
+			Object.entries(accountMsToMembershipMap).forEach(([accountMsStr, membership]) => {
 				let accountMs = +accountMsStr;
-				gs.spaceMsToAccountMsToRoleFlairMap[spaceMs] ||= {};
-				gs.spaceMsToAccountMsToRoleFlairMap[spaceMs][accountMs] ||= {};
-				let gsPointer = gs.spaceMsToAccountMsToRoleFlairMap[spaceMs][accountMs];
+				gs.spaceMsToAccountMsToMembershipMap[spaceMs] ||= {};
+				gs.spaceMsToAccountMsToMembershipMap[spaceMs][accountMs] ||= {};
+				let gsPointer = gs.spaceMsToAccountMsToMembershipMap[spaceMs][accountMs];
+				if (membership.invite) gsPointer.invite = { ...membership.invite, in_ms: spaceMs };
+				if (membership.accept) gsPointer.accept = { ...membership.accept, by_ms: accountMs };
+				if (membership.permissionCode) gsPointer.permissionCode = membership.permissionCode;
 				if (
-					roleFlairMap.role &&
-					(!gsPointer.role || //
-						(!gsPointer.role.ms && !gsPointer.role.by_ms))
+					membership.roleCode &&
+					(!gsPointer.roleCode || //
+						(!gsPointer.roleCode.ms && !gsPointer.roleCode.by_ms))
 				) {
-					gsPointer.role = roleFlairMap.role;
+					gsPointer.roleCode = membership.roleCode;
 				}
 				if (
-					roleFlairMap.flair &&
+					membership.flair &&
 					(!gsPointer.flair || //
 						(!gsPointer.flair.ms && !gsPointer.flair.by_ms))
 				) {
-					gsPointer.flair = roleFlairMap.flair;
+					gsPointer.flair = membership.flair;
 				}
 			});
 		},

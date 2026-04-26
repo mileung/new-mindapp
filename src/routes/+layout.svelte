@@ -109,25 +109,24 @@
 						urlInMs !== undefined &&
 						!!Object.keys(gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] || {}).length;
 					let space = urlInMs === undefined ? undefined : gs.msToSpaceMap[urlInMs];
-					let currentSpaceUpdateFrom: undefined | MySpaceUpdateFrom =
-						urlInMs === undefined
-							? undefined
-							: {
-									ms: urlInMs,
-									isPublic: space?.isPublic || { num: -1 },
-									pinnedQuery: space?.pinnedQuery || { txt: '' },
-									name:
-										space?.name || (urlInMs > 1 && urlInMs !== callerMs ? { txt: '' } : undefined),
-									...(() => {
-										let spaceContext = getUrlInMsContext();
-										return {
-											visiting: !spaceContext,
-											accentCode: spaceContext?.accentCode || { num: -1 },
-											roleCode: spaceContext?.roleCode || { num: -1 },
-											permissionCode: spaceContext?.permissionCode || { num: -1 },
-										};
-									})(),
-								};
+					let currentSpaceUpdateFrom: undefined | MySpaceUpdateFrom = !urlInMs
+						? undefined
+						: {
+								ms: urlInMs,
+								isPublic: space?.isPublic || { num: -1 },
+								pinnedQuery: space?.pinnedQuery || { txt: '' },
+								name:
+									space?.name || (urlInMs > 1 && urlInMs !== callerMs ? { txt: '' } : undefined),
+								...(() => {
+									let spaceContext = getUrlInMsContext();
+									return {
+										visiting: !spaceContext,
+										accentCode: spaceContext?.accentCode || { num: -1 },
+										roleCode: spaceContext?.roleCode || { num: -1 },
+										permissionCode: spaceContext?.permissionCode || { num: -1 },
+									};
+								})(),
+							};
 					let currentSpaceUpdateFromArr = currentSpaceUpdateFrom ? [currentSpaceUpdateFrom] : [];
 					let get: GetCallerContextGetArg = {
 						allJoinedSpaces: !checkedThisAccountBefore,
@@ -136,6 +135,7 @@
 							: checkedThisAccountBefore
 								? currentSpaceUpdateFromArr
 								: [
+										// personal space stuff
 										...caller.joinedSpaceContexts
 											.map((spaceCtx) => {
 												let space = gs.msToSpaceMap[spaceCtx.ms];
@@ -173,7 +173,7 @@
 										},
 									]
 								: gs.accounts
-										.filter((a) => a.ms)
+										.filter((a) => a.ms && a.signedIn)
 										.map((a) => ({
 											ms: a.ms,
 											name: a.name,

@@ -5,19 +5,17 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { MySpaceUpdateFromSchema, MySpaceUpdateSchema, SpaceContextSchema } from '../spaces';
 
-export let MyAccountSchema = z
-	.object({
-		ms: z.number(),
-		name: GranularTxtPropSchema,
-		bio: GranularTxtPropSchema,
-		email: GranularTxtPropSchema,
-		savedTags: GranularTxtPropSchema,
-		// No good reason to include pwHash, clientIdObj, or clientIdObjMs
-		signedIn: z.boolean().optional(),
-		joinedSpaceContexts: z.array(SpaceContextSchema),
-		// TODO: pastSearches: z.array(z.string()),
-	})
-	.strict();
+export let MyAccountSchema = z.strictObject({
+	ms: z.number(),
+	name: GranularTxtPropSchema,
+	bio: GranularTxtPropSchema,
+	email: GranularTxtPropSchema,
+	savedTags: GranularTxtPropSchema,
+	// No good reason to include pwHash, clientIdObj, or clientIdObjMs
+	signedIn: z.boolean().optional(),
+	joinedSpaceContexts: z.array(SpaceContextSchema),
+	// TODO: pastSearches: z.array(z.string()),
+});
 
 export type MyAccount = z.infer<typeof MyAccountSchema>;
 
@@ -64,17 +62,15 @@ export let reduceMyAccountRows = (rows: PartInsert[]) =>
 		...reduceMyAccountUpdateRows(rows),
 	}) satisfies MyAccount;
 
-export let PublicProfileSchema = z
-	.object({
-		ms: z.number(),
-		name: GranularTxtPropSchema,
-		bio: GranularTxtPropSchema.optional(),
-		mutualSpaceMss: z.array(z.number()).optional(),
-	})
-	.strict();
+export let PublicProfileSchema = z.strictObject({
+	ms: z.number(),
+	name: GranularTxtPropSchema,
+	bio: GranularTxtPropSchema.optional(),
+	mutualSpaceMss: z.array(z.number()).optional(),
+});
 export type PublicProfile = z.infer<typeof PublicProfileSchema>;
 
-export let GetCallerContextGetArgSchema = z.object({
+export let GetCallerContextGetArgSchema = z.strictObject({
 	signedIn: z.boolean().optional(),
 	//
 	isPublic: z.boolean().optional(),
@@ -87,7 +83,7 @@ export let GetCallerContextGetArgSchema = z.object({
 });
 export type GetCallerContextGetArg = z.infer<typeof GetCallerContextGetArgSchema>;
 
-export let CallerContextSchema = z.object({
+export let CallerContextSchema = z.strictObject({
 	signedIn: z.boolean().optional(),
 	isPublic: GranularNumPropSchema.optional(),
 	pinnedQuery: GranularTxtPropSchema.optional(),

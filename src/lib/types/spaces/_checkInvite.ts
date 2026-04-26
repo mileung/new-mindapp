@@ -18,8 +18,9 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { id0 } from '../parts/partIds';
 import { makeNewSpaceRows, makeRowsForJoiningSpace } from './_createSpace';
+import { moveSpaceMemberCountBy1 } from './db-spaces';
 
-let CheckedInviteSchema = z.object({
+let CheckedInviteSchema = z.strictObject({
 	ms: z.number(),
 	slugEnd: z.string(),
 	inviter: MyAccountSchema.pick({
@@ -46,7 +47,8 @@ export let _checkInvite = async (
 	let ms = Date.now();
 
 	let checkedInvite: CheckedInvite = {
-		slug: '',
+		ms: 0,
+		slugEnd: '',
 		inviter: { ms: 0, name: { txt: '' } },
 		partialSpace: {
 			ms: 1,
@@ -64,20 +66,19 @@ export let _checkInvite = async (
 				and(
 					// This check is so critical and consequential that I'm intentionally making it as
 					// broad as possible to eliminate any chance of a false negative. This check should
-					// only pass once and that's when an account joins the global space for the first time.
-					pf.in_ms.eq(1),
+					// only pass once and that's when the global space has no members
 					or(
 						pf.code.eq(pc.roleCodeNumIdAtAccountId),
 						pf.code.eq(pc.permissionCodeNumIdAtAccountId),
 						pf.code.eq(pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt),
 					),
-
 					// Pretty much all other queries in this codebase are verbose and include stuff like:
 					// pf.at_ms.eq0,
 					// pf.at_by_ms.eq(1),
 					// pf.at_in_ms.eq(1),
 					// pf.ms.gt0,
 					// pf.by_ms.eq0,
+					// pf.in_ms.eq(1),
 					// pf.num.eq0,
 					// pf.txt.eq('init'),
 				),
@@ -149,20 +150,33 @@ export let _checkInvite = async (
 		if (inviteRow) {
 			if (input.useIfValid) {
 				if (input.callerMs === inviteRow.by_ms) throw new Error(m.cannotUseYourOwnInvite());
-				let newMemberPermissionCodeNumIdRow = assert1Row(
+				let {
+					[pc.roleCodeNumIdAtAccountId]: caller_roleCodeNumIdAtAccountIdRows = [],
+					[pc.newMemberPermissionCodeNumId]: newMemberPermissionCodeNumIdRows = [],
+				} = channelPartsByCode(
 					await tdb
 						.select()
 						.from(pTable)
 						.where(
-							and(
-								pf.noAtId,
-								pf.in_ms.eq(inviteRow.in_ms),
-								pf.code.eq(pc.newMemberPermissionCodeNumId),
-								pf.num.gte0,
-								pf.txt.isNull,
+							or(
+								and(
+									pf.at_ms.eq(input.callerMs),
+									pf.in_ms.eq(inviteRow.in_ms),
+									pf.code.eq(pc.roleCodeNumIdAtAccountId),
+								),
+								and(
+									pf.noAtId,
+									pf.in_ms.eq(inviteRow.in_ms),
+									pf.code.eq(pc.newMemberPermissionCodeNumId),
+									pf.num.gte0,
+									pf.txt.isNull,
+								),
 							),
 						),
 				);
+				let caller_roleCodeNumIdAtAccountIdRow = assertLt2Rows(caller_roleCodeNumIdAtAccountIdRows);
+				if (caller_roleCodeNumIdAtAccountIdRow) throw new Error(m.alreadyJoinedThisSpace());
+				let newMemberPermissionCodeNumIdRow = assert1Row(newMemberPermissionCodeNumIdRows);
 				await tdb.insert(pTable).values(
 					makeRowsForJoiningSpace({
 						ms,
@@ -172,21 +186,11 @@ export let _checkInvite = async (
 						roleCodeNum: roleCodes.member,
 					}),
 				);
+				await moveSpaceMemberCountBy1(inviteRow.in_ms, true);
 				await tdb
 					.update(pTable)
 					.set({ at_by_ms: sql`${pTable.at_by_ms} + 1` })
 					.where(inviteFilter);
-				await tdb
-					.update(pTable)
-					.set({ num: sql`${pTable.num} + 1` })
-					.where(
-						and(
-							pf.noAtId, //
-							pf.in_ms.eq(inviteRow.in_ms),
-							pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
-						),
-					);
-				// permissionCodes.reactAndPost
 				return { redeemed: true };
 			} else {
 				let {

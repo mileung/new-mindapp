@@ -50,9 +50,9 @@ export let pf = {
 	idAsAtId: filterIdObjAsAtIdObj,
 	atIdAsId: filterAtIdObjAsIdObj,
 	atId: filterAtIdObj,
-	notId: (io: IdObj) => not(filterIdObj(io)!),
-	notAtId: (aio: AtIdObj) => not(filterAtIdObj(aio)!),
-	notIdAsAtId: (io: IdObj) => not(filterIdObjAsAtIdObj(io)!),
+	notId: (io: Partial<IdObj>) => not(filterIdObj(io)!),
+	notAtId: (aio: Partial<AtIdObj>) => not(filterAtIdObj(aio)!),
+	notIdAsAtId: (io: Partial<IdObj>) => not(filterIdObjAsAtIdObj(io)!),
 	notGranularTxt: (gn: GranularTxtProp) =>
 		or(
 			pf.ms.notEq(gn.ms || 0),

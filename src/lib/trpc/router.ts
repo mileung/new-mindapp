@@ -10,7 +10,11 @@ import { GetCallerContextGetArgSchema, passwordRegexStr } from '$lib/types/accou
 import { _changeMyAccountAttributes } from '$lib/types/accounts/_changeMyAccountAttributes';
 import { _changeSpaceAttributes } from '$lib/types/accounts/_changeSpaceAttributes';
 import { _createAccount } from '$lib/types/accounts/_createAccount';
+import { _removeSpaceMember } from '$lib/types/accounts/_removeSpaceMember';
 import { _resetPasswordSignedIn } from '$lib/types/accounts/_resetPasswordSignedIn';
+import { _setSpaceMemberFlair } from '$lib/types/accounts/_setSpaceMemberFlair';
+import { _setSpaceMemberPermission } from '$lib/types/accounts/_setSpaceMemberPermission';
+import { _setSpaceMemberRole } from '$lib/types/accounts/_setSpaceMemberRole';
 import { _signIn } from '$lib/types/accounts/_signIn';
 import { _signOut } from '$lib/types/accounts/_signOut';
 import { _updateSavedTags } from '$lib/types/accounts/_updateSavedTags';
@@ -77,15 +81,6 @@ let generalProcedure = t.procedure.use(async ({ ctx, next }) => {
 	return next();
 });
 
-let whoProcedure = generalProcedure.input(WhoObjSchema);
-
-let whoWhereProcedure = generalProcedure.input(
-	WhoWhereObjSchema.refine(
-		(b) => b.spaceMs > 0, //
-		{ message: 'spaceMs must be gt0' },
-	),
-);
-
 let test = 0;
 let testLimiter = makeLimiter(3, 1 / 6);
 export let router = t.router({
@@ -94,8 +89,8 @@ export let router = t.router({
 		test++;
 		return { test };
 	}),
-	scrape: generalProcedure //
-		.input(z.object({ url: z.string().url() }))
+	scrape: generalProcedure
+		.input(z.strictObject({ url: z.string().url() }).strict())
 		.query(async ({ input }) => {
 			// TODO: paste a url in mindapp url as a search or maybe under /parse/[text].
 			// fetch the page and scrape it as if using the extension shortcut.
@@ -109,9 +104,9 @@ export let router = t.router({
 		}),
 	sendOtp: generalProcedure
 		.input(
-			z.object({
+			z.strictObject({
 				email: normalizingEmailSchema,
-				will: z.object({
+				will: z.strictObject({
 					createAccount: z.boolean().optional(),
 					signIn: z.boolean().optional(),
 					resetPassword: z.boolean().optional(),
@@ -124,7 +119,7 @@ export let router = t.router({
 		}),
 	checkOtp: generalProcedure
 		.input(
-			z.object({
+			z.strictObject({
 				otpMs: z.number(),
 				pin: pinSchema,
 				email: normalizingEmailSchema,
@@ -133,7 +128,7 @@ export let router = t.router({
 		.mutation(({ input }) => _checkOtp(input)),
 	createAccount: generalProcedure
 		.input(
-			z.object({
+			z.strictObject({
 				name: normalizingNameSchema,
 				otpMs: z.number(),
 				pin: pinSchema,
@@ -144,7 +139,7 @@ export let router = t.router({
 		.mutation(({ ctx, input }) => _createAccount(ctx, input)),
 	signIn: generalProcedure
 		.input(
-			z.object({
+			z.strictObject({
 				otpMs: z.number().optional(),
 				pin: pinSchema.optional(),
 				email: normalizingEmailSchema,
@@ -156,12 +151,12 @@ export let router = t.router({
 			await signInLimiter.ping(ctx);
 			return _signIn(ctx, input);
 		}),
-	getPublicProfile: whoProcedure
+	getPublicProfile: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				profileMs: z.number(),
 				possibleMutualSpaceMss: z.array(z.number()).optional(),
-			}),
+			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {
 			if (input.callerMs && input.possibleMutualSpaceMss?.length) {
@@ -170,20 +165,20 @@ export let router = t.router({
 			}
 			return _getPublicProfile(input);
 		}),
-	getCallerContext: whoProcedure
+	getCallerContext: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				spaceMs: z.number().optional(), // this is the only api function that can be called when lastSeenInMs = 0
 				get: GetCallerContextGetArgSchema,
-			}),
+			}).strict(),
 		)
 		.query(async ({ ctx, input }) => _getCallerContext(ctx, input, input.get)),
-	resetPasswordSignedIn: whoProcedure
+	resetPasswordSignedIn: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				oldPassword: passwordSchema,
 				newPassword: passwordSchema,
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error(m.placeholderError());
@@ -191,19 +186,19 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _resetPasswordSignedIn(input);
 		}),
-	signOut: whoProcedure
-		.input(z.object({ everywhere: z.boolean() }))
+	signOut: generalProcedure
+		.input(WhoObjSchema.extend({ everywhere: z.boolean() }).strict())
 		.mutation(async ({ ctx, input }) => {
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _signOut(ctx, input);
 		}),
-	updateSavedTags: whoProcedure
+	updateSavedTags: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				tags: z.array(z.string()),
 				remove: z.boolean(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
@@ -211,31 +206,27 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _updateSavedTags(input);
 		}),
-	checkInvite: whoProcedure
+	checkInvite: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				inviteMs: z.number(),
 				slugEnd: z.string(),
 				useIfValid: z.boolean(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			if (input.useIfValid) {
-				let c = await _getCallerContext(ctx, input, {
-					signedIn: input.useIfValid,
-					permissionCode: input.useIfValid,
-				});
-				if (c.permissionCode) throw new Error(m.alreadyJoinedThisSpace());
-				throwIf(!c.signedIn && input.useIfValid);
+				let c = await _getCallerContext(ctx, input, { signedIn: input.useIfValid });
+				throwIf(!c.signedIn);
 			}
 			return _checkInvite(input);
 		}),
-	changeMyAccountAttributes: whoProcedure
+	changeMyAccountAttributes: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				nameTxt: normalizingNameSchema.optional(),
 				bioTxt: normalizingBioOrDescriptionSchema.optional(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			throwIf(input.nameTxt === undefined && input.bioTxt === undefined);
@@ -243,9 +234,9 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _changeMyAccountAttributes(input);
 		}),
-	createSpace: whoProcedure
+	createSpace: generalProcedure
 		.input(
-			z.object({
+			WhoObjSchema.extend({
 				spaceNameTxt: normalizingNameSchema,
 				spaceDescriptionTxt: normalizingBioOrDescriptionSchema,
 				spacePinnedQueryTxt: normalizingBioOrDescriptionSchema,
@@ -254,16 +245,71 @@ export let router = t.router({
 					.number()
 					.gte(permissionCodes.viewOnly)
 					.lte(permissionCodes.reactAndPost),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _createSpace(input);
 		}),
-	changeSpaceAttributes: whoWhereProcedure
+	removeSpaceMember: generalProcedure
+		.input(WhoWhereObjSchema.extend({ accountMs: z.number() }).strict())
+		.mutation(async ({ ctx, input }) => {
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			throwIf(
+				!c.signedIn ||
+					!c.roleCode ||
+					(input.accountMs !== input.callerMs && //
+						c.roleCode.num !== roleCodes.owner),
+			);
+			return _removeSpaceMember({ ...input, callerRoleCodeNum: c.roleCode!.num });
+		}),
+	setSpaceMemberFlair: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
+				accountMs: z.number(),
+				flairTxt: z.string().max(88),
+			}).strict(),
+		)
+		.mutation(async ({ ctx, input }) => {
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			throwIf(!c.signedIn || !c.roleCode);
+			return _setSpaceMemberFlair({ ...input, callerRoleCodeNum: c.roleCode!.num });
+		}),
+	setSpaceMemberPermission: generalProcedure
+		.input(
+			WhoWhereObjSchema.extend({
+				accountMs: z.number(),
+				newPermissionCodeNum: z
+					.literal(permissionCodes.viewOnly)
+					.or(z.literal(permissionCodes.reactOnly))
+					.or(z.literal(permissionCodes.postOnly))
+					.or(z.literal(permissionCodes.reactAndPost)),
+			}).strict(),
+		)
+		.mutation(async ({ ctx, input }) => {
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			throwIf(!c.signedIn || !c.roleCode);
+			return _setSpaceMemberPermission({ ...input, callerRoleCodeNum: c.roleCode!.num });
+		}),
+	setSpaceMemberRole: generalProcedure
+		.input(
+			WhoWhereObjSchema.extend({
+				accountMs: z.number(),
+				newRoleCodeNum: z
+					.literal(roleCodes.member)
+					.or(z.literal(roleCodes.mod))
+					.or(z.literal(roleCodes.owner)),
+			}).strict(),
+		)
+		.mutation(async ({ ctx, input }) => {
+			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
+			throwIf(!c.signedIn || !c.roleCode);
+			return _setSpaceMemberRole({ ...input, callerRoleCodeNum: c.roleCode!.num });
+		}),
+	changeSpaceAttributes: generalProcedure
+		.input(
+			WhoWhereObjSchema.extend({
 				nameTxt: normalizingNameSchema.optional(),
 				descriptionTxt: normalizingBioOrDescriptionSchema.optional(),
 				pinnedQueryTxt: normalizingBioOrDescriptionSchema.optional(),
@@ -273,7 +319,7 @@ export let router = t.router({
 					.gte(permissionCodes.viewOnly)
 					.lte(permissionCodes.reactAndPost)
 					.optional(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
 			throwIf(
@@ -287,8 +333,8 @@ export let router = t.router({
 			throwIf(!c.signedIn || c.roleCode?.num !== roleCodes.owner);
 			return _changeSpaceAttributes(input);
 		}),
-	addPost: whoWhereProcedure
-		.input(z.object({ post: PostSchema })) //
+	addPost: generalProcedure
+		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
 		.mutation(async ({ input, ctx }) => {
 			await postLimiter.ping(ctx);
 			let { post } = input;
@@ -310,8 +356,8 @@ export let router = t.router({
 			);
 			return _addPost(tdb, post);
 		}),
-	editPost: whoWhereProcedure //
-		.input(z.object({ post: PostSchema }))
+	editPost: generalProcedure
+		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
 		.mutation(async ({ input, ctx }) => {
 			await postLimiter.ping(ctx);
 			let { post } = input;
@@ -328,12 +374,12 @@ export let router = t.router({
 			);
 			return _editPost(tdb, post);
 		}),
-	deletePost: whoWhereProcedure
+	deletePost: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				fullPostIdObj: FullIdObjSchema,
 				version: z.number().gte(0).nullable(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ input, ctx }) => {
 			await postLimiter.ping(ctx);
@@ -344,8 +390,8 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _deletePost(tdb, fullPostIdObj, input.version);
 		}),
-	addReaction: whoWhereProcedure //
-		.input(z.object({ rxn: ReactionSchema }))
+	addReaction: generalProcedure
+		.input(WhoWhereObjSchema.extend({ rxn: ReactionSchema }).strict())
 		.mutation(async ({ input, ctx }) => {
 			await reactionLimiter.ping(ctx);
 			let { rxn } = input;
@@ -363,8 +409,8 @@ export let router = t.router({
 			);
 			return _addReaction(tdb, rxn);
 		}),
-	removeReaction: whoWhereProcedure //
-		.input(z.object({ rxn: ReactionSchema }))
+	removeReaction: generalProcedure
+		.input(WhoWhereObjSchema.extend({ rxn: ReactionSchema }).strict())
 		.mutation(async ({ input, ctx }) => {
 			await reactionLimiter.ping(ctx);
 			let { rxn } = input;
@@ -374,16 +420,17 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _removeReaction(tdb, rxn);
 		}),
-	getSpaceDots: whoWhereProcedure
+	getSpaceDots: generalProcedure
 		.input(
-			z.object({
-				msBefore: z.number().optional(),
-				lastMemberListRoleCodeNum: z.number().optional(),
-				lastAcceptByMssWithSameRoleMs: z.array(z.number()).optional(),
+			WhoWhereObjSchema.extend({
 				memberCount: z.number().optional(),
 				description: GranularTxtPropSchema.optional(),
 				newMemberPermissionCode: GranularNumPropSchema.optional(),
-			}),
+				getCallerMembership: z.boolean().optional(),
+				msBefore: z.number().optional(),
+				excludeMemberMss: z.array(z.number()).optional(),
+				lastMemberListRoleCodeNum: z.number().optional(),
+			}).strict(),
 		)
 		.query(async ({ input, ctx }) => {
 			let c = await _getCallerContext(ctx, input, {
@@ -393,14 +440,14 @@ export let router = t.router({
 				permissionCode: true,
 			});
 			throwIf(!c.isPublic?.num && c.roleCode === undefined);
-			return _getSpaceDots(tdb, { ...input, roleCode: c.roleCode });
+			return _getSpaceDots(tdb, { ...input, callerRoleCodeNum: c.roleCode?.num });
 		}),
-	createInviteLink: whoWhereProcedure
+	createInviteLink: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				validFor: z.number().min(0).max(week),
 				maxUses: z.number().min(0).max(99999999),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ input, ctx }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
@@ -413,12 +460,12 @@ export let router = t.router({
 			);
 			return _createInviteLink(input);
 		}),
-	revokeInviteLink: whoWhereProcedure
+	revokeInviteLink: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				inviteMs: z.number(),
 				slugEnd: z.string(),
-			}),
+			}).strict(),
 		)
 		.mutation(async ({ input, ctx }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
@@ -429,12 +476,12 @@ export let router = t.router({
 			throwIf(!c.signedIn || !c.roleCode);
 			return _revokeInviteLink(input);
 		}),
-	getPostHistory: whoWhereProcedure
+	getPostHistory: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				postIdObj: IdObjSchema,
 				version: z.number().gt(0),
-			}),
+			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
@@ -447,13 +494,13 @@ export let router = t.router({
 			throwIf(!c.signedIn || (!c.isPublic && c.permissionCode === undefined));
 			return _getPostHistory(tdb, input.postIdObj, input.version);
 		}),
-	getReactionHistory: whoWhereProcedure
+	getReactionHistory: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				postIdObj: IdObjSchema,
 				msBefore: z.number(),
 				rxnIdObjsExclude: z.array(IdObjSchema),
-			}),
+			}).strict(),
 		)
 		.query(async ({ input, ctx }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
@@ -466,8 +513,8 @@ export let router = t.router({
 			throwIf(!c.signedIn || (!c.isPublic && c.permissionCode === undefined));
 			return _getReactionHistory(tdb, input);
 		}),
-	getPostFeed: whoWhereProcedure //
-		.input(GetPostFeedArgSchema)
+	getPostFeed: generalProcedure
+		.input(WhoWhereObjSchema.merge(GetPostFeedArgSchema).strict())
 		.query(async ({ input, ctx }) => {
 			await feedLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, {
@@ -479,12 +526,12 @@ export let router = t.router({
 			throwIf(!c.isPublic && (!c.signedIn || c.permissionCode === undefined));
 			return _getPostFeed(tdb, input);
 		}),
-	getSpaceTags: whoWhereProcedure
+	getSpaceTags: generalProcedure
 		.input(
-			z.object({
+			WhoWhereObjSchema.extend({
 				fromCount: z.number(),
 				excludeTags: z.array(z.string()),
-			}),
+			}).strict(),
 		)
 		.query(async ({ input, ctx }) => {
 			let c = await _getCallerContext(ctx, input, {

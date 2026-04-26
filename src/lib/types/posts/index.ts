@@ -14,7 +14,7 @@ export let normalizeTags = (tags: string[]) =>
 		...new Set(tags.map((tag) => tag.trim()).filter((t) => !!t)), //
 	].sort((a, b) => a.localeCompare(b));
 
-let HistoryLayerSchema = z.object({
+let HistoryLayerSchema = z.strictObject({
 	ms: z.number().gte(0),
 	tags: z
 		.array(z.string().max(888))
@@ -29,57 +29,55 @@ let HistoryLayerSchema = z.object({
 });
 export type HistoryLayer = z.infer<typeof HistoryLayerSchema>;
 
-export let PostSchema = z
-	.object({
-		at_ms: z.number().gte(0),
-		at_by_ms: z.number().gte(0),
-		at_in_ms: z.number().gte(0),
+export let PostSchema = z.strictObject({
+	at_ms: z.number().gte(0),
+	at_by_ms: z.number().gte(0),
+	at_in_ms: z.number().gte(0),
 
-		ms: z.number().gte(0),
-		by_ms: z.number().gte(0),
-		in_ms: z.number().gte(0),
+	ms: z.number().gte(0),
+	by_ms: z.number().gte(0),
+	in_ms: z.number().gte(0),
 
-		myRxns: z.array(z.enum(reactionList)).optional(),
-		rxnCount: z.record(z.number()).optional(),
-		subIds: z.array(z.string()).optional(),
+	myRxns: z.array(z.enum(reactionList)).optional(),
+	rxnCount: z.record(z.number()).optional(),
+	subIds: z.array(z.string()).optional(),
 
-		history: z
-			.record(
-				z
-					.number()
-					.gt(0)
-					.or(z.string().regex(/^[1-9]\d*$/)),
-				HistoryLayerSchema.optional(), // undefined history layer means hasn't been loaded
-			)
-			.nullable() // null history means soft deleted post
-			.transform((history) => {
-				if (history === null) return null;
-				let keys = Object.keys(history)
-					.map((k) => {
-						let version = +k;
-						if (Number.isNaN(version) || version < 1) throw new Error('version num must be gt0');
-						return version;
-					})
-					.sort((a, b) => a - b);
-				for (let i = 1; i < keys.length; i++) {
-					if (keys[i] - keys[i - 1] !== 1)
-						throw new Error(
-							`History keys must be consecutive numbers; found gap between ${keys[i - 1]} and ${keys[i]}`,
-						);
-				}
-				let sortedHistory: Record<string, undefined | HistoryLayer> = {};
-				for (let i = 0; i < keys.length; i++) {
-					let keyStr = keys[i].toString();
-					if (!history[keyStr]) throw new Error(`Version ${keyStr} has not been loaded`);
-					sortedHistory[keyStr] = history[keyStr];
-				}
-				return sortedHistory;
-			})
-			.refine((history) => history === null || Object.keys(history).length > 0, {
-				message: 'History must either be null or have at least one key',
-			}),
-	})
-	.strict();
+	history: z
+		.record(
+			z
+				.number()
+				.gt(0)
+				.or(z.string().regex(/^[1-9]\d*$/)),
+			HistoryLayerSchema.optional(), // undefined history layer means hasn't been loaded
+		)
+		.nullable() // null history means soft deleted post
+		.transform((history) => {
+			if (history === null) return null;
+			let keys = Object.keys(history)
+				.map((k) => {
+					let version = +k;
+					if (Number.isNaN(version) || version < 1) throw new Error('version num must be gt0');
+					return version;
+				})
+				.sort((a, b) => a - b);
+			for (let i = 1; i < keys.length; i++) {
+				if (keys[i] - keys[i - 1] !== 1)
+					throw new Error(
+						`History keys must be consecutive numbers; found gap between ${keys[i - 1]} and ${keys[i]}`,
+					);
+			}
+			let sortedHistory: Record<string, undefined | HistoryLayer> = {};
+			for (let i = 0; i < keys.length; i++) {
+				let keyStr = keys[i].toString();
+				if (!history[keyStr]) throw new Error(`Version ${keyStr} has not been loaded`);
+				sortedHistory[keyStr] = history[keyStr];
+			}
+			return sortedHistory;
+		})
+		.refine((history) => history === null || Object.keys(history).length > 0, {
+			message: 'History must either be null or have at least one key',
+		}),
+});
 
 export type Post = z.infer<typeof PostSchema>;
 

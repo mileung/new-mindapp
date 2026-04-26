@@ -243,7 +243,7 @@
 			</a>
 		</div>
 		<div
-			class={`${showSuggestedTags || showAccountMenu || showSpaceMenu ? '' : 'hidden'} ${showSuggestedTags ? 'max-h-18' : 'max-h-38'} xs:max-h-none relative flex-1 xs:flex flex-col overflow-scroll`}
+			class={`${showSuggestedTags || showAccountMenu || showSpaceMenu ? '' : 'hidden'} ${showSuggestedTags ? 'max-h-18' : 'max-h-38'} xs:max-h-none relative flex-1 xs:flex flex-col text-nowrap overflow-scroll`}
 			onclick={(e) => {
 				setTimeout(() => {
 					if (!e.metaKey) {
@@ -264,7 +264,7 @@
 					>
 						<button
 							bind:this={tagSuggestionsRefs[i]}
-							class={`relative h-8 overflow-scroll flex-1 text-left px-2 text-lg`}
+							class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
 							onclick={() => addTagToSearchInput(tag)}
 						>
 							{#if tagIndex === i && !tagXFocused}
@@ -311,7 +311,7 @@
 							<div class="self-center xy h-6 w-6">
 								<AccountIcon isUser ms={a.ms} class="h-6 w-6" />
 							</div>
-							<div class="flex-1 overflow-scroll text-nowrap fx justify-start">
+							<div class="flex-1 text-nowrap overflow-scroll fx justify-start">
 								{a.ms === 0 ? m.anon() : a.name.txt || identikana(a.ms)}
 							</div>
 							{#if a.ms && !a.signedIn}
@@ -348,7 +348,7 @@
 						class="flex-1 overflow-hidden h-12 fx pl-2 gap-2 font-medium leading-4.5"
 					>
 						<IconPuzzle class="shrink-0 w-6" />
-						<p class="overflow-scroll">{m.extension()}</p>
+						<p class="text-nowrap overflow-scroll">{m.extension()}</p>
 					</a>
 					<button
 						class="xy w-8"
@@ -365,7 +365,7 @@
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'bg-bg5' : ''}`}
 				>
 					<IconSquarePlus2 class="shrink-0 w-6" />
-					<p class="overflow-scroll">{m.createSpace()}</p>
+					<p class="text-nowrap overflow-scroll">{m.createSpace()}</p>
 				</a>
 				<!-- <div class="flex h-10 text-fg2">
 					<a
@@ -404,7 +404,7 @@
 								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
 							{/if} -->
 							<SpaceIcon ms={spaceMs} class="shrink-0 w-6" />
-							<p class="overflow-scroll">
+							<p class="text-nowrap overflow-scroll">
 								{msToSpaceNameTxt(spaceMs)}
 							</p>
 						</a>
@@ -431,21 +431,21 @@
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
 				>
 					<IconUserSquare class="shrink-0 w-6" />
-					<p class="overflow-scroll">{m.profile()}</p>
+					<p class="text-nowrap overflow-scroll">{m.profile()}</p>
 				</a>
 				<a
 					href="/user-guide"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
 					<IconBook2 class="shrink-0 w-6" />
-					<p class="overflow-scroll">{m.userGuide()}</p>
+					<p class="text-nowrap overflow-scroll">{m.userGuide()}</p>
 				</a>
 				<a
 					href="/settings"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
 				>
 					<IconSettings class="shrink-0 w-6" />
-					<p class="overflow-scroll">{m.settings()}</p>
+					<p class="text-nowrap overflow-scroll">{m.settings()}</p>
 				</a>
 			</div>
 		</div>

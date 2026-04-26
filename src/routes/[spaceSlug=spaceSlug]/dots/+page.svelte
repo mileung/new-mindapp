@@ -6,9 +6,9 @@
 		getWhoWhereObj,
 		gs,
 		mergeMsToAccountNameTxtMap,
-		mergeSpaceMsToAccountMsToRoleFlairMap,
+		mergeSpaceMsToAccountMsToMembershipMap,
 	} from '$lib/global-state.svelte';
-	import { alertError, isStrInt } from '$lib/js';
+	import { alertError, isStrInt, makeErrorReadable } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { day, formatMs, hour, minute, week } from '$lib/time';
 	import { trpc } from '$lib/trpc/client';
@@ -31,7 +31,6 @@
 	// TODO: use a less rounded icon set with the same dx as @tabler/icons-svelte
 	// Lucide, Lucide, Phosphor, Remix Icon, idk
 
-	let identifier = $derived(page.url.href);
 	let copiedInviteSlugTimeout: NodeJS.Timeout;
 	let validFor = $state(0);
 	let maxUsesStr = $state('1');
@@ -39,62 +38,95 @@
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let urlInMs = $derived(getUrlInMs());
+	let identifier = $derived(callerMs + '_' + urlInMs);
 	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
 	let spaceContext = $derived(getUrlInMsContext());
 	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
-	let myDots = $derived(gs.accountMsToSpaceMsToDots[gs.accounts?.[0].ms || 0]?.[urlInMs || 0]);
-	let myInvites = $derived(myDots?.invites || []);
-	let memberships = $derived(myDots?.memberships || []);
+	let dots = $derived(gs.accountMsToSpaceMsToDots[callerMs || -1]?.[urlInMs || -1]);
+	let myInvites = $derived(dots?.invites || []);
+	let error = $derived(dots?.error);
+	let dotsFeed = $derived(gs.spaceMsToDotsFeed[urlInMs || -1]);
+	let accountMsToMembershipMap = $derived(gs.spaceMsToAccountMsToMembershipMap[urlInMs || -1]);
+	let memberMss = $derived(
+		Object.entries(accountMsToMembershipMap || {})
+			.filter(([_, m]) => m)
+			.sort((a, b) => {
+				if (+a[0] === callerMs) return -1;
+				if (+b[0] === callerMs) return 1;
+				let aRoleCode = a[1]!.roleCode!;
+				let bRoleCode = b[1]!.roleCode!;
+				return bRoleCode.num === aRoleCode.num
+					? bRoleCode.ms! - aRoleCode.ms!
+					: bRoleCode.num - aRoleCode.num;
+			})
+			.map(([k]) => +k),
+	);
+	let memberships = $derived(
+		spaceContext && !dots?.invites
+			? [] // this [] is needed to retrigger on:infinite...
+			: (memberMss.map((ms) => accountMsToMembershipMap![ms]) as Membership[]),
+	);
 
 	let loadMoreDots = async (e: InfiniteEvent) => {
-		if (!viewable || !gs.accounts || urlInMs === undefined || callerMs === undefined) return;
-		if (myDots?.endReached) {
+		if (
+			!viewable || //
+			!gs.accounts ||
+			urlInMs === undefined ||
+			callerMs === undefined ||
+			urlInMs < 1
+		)
+			return;
+		if (dotsFeed?.endReached) {
 			e.detail.loaded();
 			return e.detail.complete();
 		}
 
 		let lastMembership = memberships.slice(-1)[0] as undefined | Membership;
-		let lastMembershipRole =
-			gs.spaceMsToAccountMsToRoleFlairMap[urlInMs]?.[lastMembership?.accept.by_ms || -1]?.role;
-		let lastAcceptByMssWithSameRoleMs: undefined | number[];
+		let lastAcceptByMssWithSameRoleMs: number[] = [];
+		let lastMembershipRole = lastMembership?.roleCode;
 		if (lastMembership) {
-			lastAcceptByMssWithSameRoleMs = [lastMembership.accept.by_ms];
+			lastAcceptByMssWithSameRoleMs = [lastMembership.accept.by_ms!];
 			for (let i = memberships.length - 2; i >= 0; i--) {
 				let membership = memberships[i];
-				let membershipRole =
-					gs.spaceMsToAccountMsToRoleFlairMap[urlInMs]?.[membership.accept.by_ms]?.role!;
-				console.log(
-					'hi',
-					membershipRole.ms === lastMembershipRole?.ms,
-					!lastAcceptByMssWithSameRoleMs.includes(membership.accept.by_ms),
-				);
+				let membershipRole = accountMsToMembershipMap?.[membership.accept.by_ms!]?.roleCode!;
 				if (
 					membershipRole.ms === lastMembershipRole?.ms &&
-					!lastAcceptByMssWithSameRoleMs.includes(membership.accept.by_ms)
+					!lastAcceptByMssWithSameRoleMs.includes(membership.accept.by_ms!)
 				) {
-					lastAcceptByMssWithSameRoleMs.push(membership.accept.by_ms);
+					lastAcceptByMssWithSameRoleMs.push(membership.accept.by_ms!);
 				} else break;
 			}
 		}
-		if (urlInMs !== 0) {
+		let excludeMemberMss = [
+			...(dotsFeed?.callerMemberMss || []),
+			...lastAcceptByMssWithSameRoleMs, //
+		];
+		try {
 			let res = await trpc().getSpaceDots.query({
 				...(await getWhoWhereObj()),
-				lastMemberListRoleCodeNum: lastMembershipRole?.num,
-				lastAcceptByMssWithSameRoleMs,
+				memberCount: space?.memberCount,
+				description: space?.description,
+				newMemberPermissionCode: space?.newMemberPermissionCode,
+				getCallerMembership:
+					urlInMs > 0 && //
+					urlInMs !== callerMs &&
+					!gs.accountMsToSpaceMsToDots?.[callerMs]?.[urlInMs],
 				msBefore: lastMembershipRole ? lastMembershipRole.ms! + 1 : undefined,
-				memberCount: lastMembership ? undefined : space?.memberCount,
-				description: lastMembership ? undefined : space?.description,
-				newMemberPermissionCode: lastMembership ? undefined : space?.newMemberPermissionCode,
+				excludeMemberMss: excludeMemberMss.length ? excludeMemberMss : undefined,
+				lastMemberListRoleCodeNum: lastMembershipRole?.num,
 			});
-			console.log('getSpaceDots res:', res);
-			if (res.spaceUpdate) {
+			let { spaceUpdate, invites = [] } = res;
+			// console.log('res', JSON.stringify(res, null, 2));
+			// console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
+
+			if (spaceUpdate) {
 				updateLocalCache((lc) => {
 					lc.msToSpaceMap = {
 						...lc.msToSpaceMap,
-						[res.spaceUpdate!.ms]: {
+						[spaceUpdate!.ms]: {
 							...getDefaultSpace(),
-							...lc.msToSpaceMap[res.spaceUpdate!.ms]!,
-							...res.spaceUpdate,
+							...lc.msToSpaceMap[spaceUpdate!.ms]!,
+							...spaceUpdate,
 							// TODO: why do I need this satisfies for correct type checking?
 						} satisfies Space,
 					};
@@ -102,22 +134,37 @@
 				});
 			}
 			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
-			mergeSpaceMsToAccountMsToRoleFlairMap({ [urlInMs]: res.accountMsToRoleFlairMap });
+			mergeSpaceMsToAccountMsToMembershipMap({ [urlInMs]: res.accountMsToMembershipMap });
 
 			e.detail.loaded();
-			let endReached = res.memberships.length < membersPerLoad;
+			let endReached = Object.keys(res.accountMsToMembershipMap).length < membersPerLoad;
+
+			gs.accountMsToSpaceMsToDots = {
+				...gs.accountMsToSpaceMsToDots,
+				[callerMs]: {
+					...gs.accountMsToSpaceMsToDots[callerMs],
+					[urlInMs]: { invites },
+				},
+			};
+			gs.spaceMsToDotsFeed = {
+				...gs.spaceMsToDotsFeed,
+				[urlInMs]: {
+					callerMemberMss: [...new Set([callerMs, ...(dotsFeed?.callerMemberMss || [])])],
+					endReached,
+				},
+			};
+			endReached && e.detail.complete();
+		} catch (error) {
 			gs.accountMsToSpaceMsToDots = {
 				...gs.accountMsToSpaceMsToDots,
 				[callerMs]: {
 					...gs.accountMsToSpaceMsToDots[callerMs],
 					[urlInMs]: {
-						endReached,
-						invites: res.invites || [],
-						memberships: [...memberships, ...res.memberships],
+						invites: myInvites,
+						error: makeErrorReadable(error),
 					},
 				},
 			};
-			endReached && e.detail.complete();
 		}
 	};
 
@@ -287,13 +334,26 @@
 									validFor,
 									maxUses,
 								});
-								myInvites.push({
-									by_ms: gs.accounts![0].ms,
-									in_ms: urlInMs!,
-									...inviteProps,
-									useCount: 0,
-									maxUses,
-								});
+
+								gs.accountMsToSpaceMsToDots = {
+									...gs.accountMsToSpaceMsToDots,
+									[callerMs]: {
+										...gs.accountMsToSpaceMsToDots[callerMs],
+										[urlInMs]: {
+											...gs.accountMsToSpaceMsToDots[callerMs]![urlInMs],
+											invites: [
+												...myInvites,
+												{
+													by_ms: callerMs,
+													in_ms: urlInMs,
+													...inviteProps,
+													useCount: 0,
+													maxUses,
+												},
+											],
+										},
+									},
+								};
 							} catch (error) {
 								alertError(error);
 							}
@@ -307,13 +367,14 @@
 				<p class="text-xl font-black">
 					{space.memberCount === 1 ? m.oneMember() : m.nMembers({ n: space.memberCount })}
 				</p>
-				{#each memberships as membership, i (membership.accept.by_ms)}
+				{#each memberships as membership (membership.accept.by_ms)}
 					<MembershipBlock {membership} />
 				{/each}
 			{/if}
 		{/if}
-		{#if viewable && urlInMs !== callerMs}
+		{#if viewable && urlInMs && urlInMs !== callerMs}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>
+				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
 				<p slot="noMore" class="mb-2 text-lg text-fg2">{urlInMs === callerMs ? '' : m.theEnd()}</p>
 			</InfiniteLoading>
 		{/if}

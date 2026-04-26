@@ -47,7 +47,7 @@
 					...lc.accounts.filter((a) => a.ms !== account.ms),
 				],
 			}));
-			gs.urlToFeedMap = {};
+			gs.urlToPostFeedMap = {};
 			delete gs.accountMsToSpaceMsToCheckedMap[account.ms];
 			gs.checkedInvite //
 				? useCheckedInvite()

@@ -23,7 +23,7 @@ let parseDateParts = (
 	return isNaN(date.getTime()) ? 0 : date.getTime();
 };
 
-export let ParsedSearchSchema = z.object({
+export let ParsedSearchSchema = z.strictObject({
 	tagsInclude: z.array(z.string()),
 	tagsExclude: z.array(z.string()),
 	coreIncludes: z.array(z.string()),

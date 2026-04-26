@@ -561,7 +561,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	// 	// msToSpaceNameTxtMap[at_ms] = txt!;
 	// }
 
-	let spaceMsToAccountMsToRoleFlairMap: Record<
+	let spaceMsToAccountMsToMembershipMap: Record<
 		number,
 		Record<
 			number,
@@ -573,8 +573,8 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	> = {};
 	// for (let i = 0; i < assignedRoleNumIdAtAccountIdRows.length; i++) {
 	// 	let { in_ms, at_ms } = assignedRoleNumIdAtAccountIdRows[i];
-	// 	if (!spaceMsToAccountMsToRoleFlairMap[in_ms]) spaceMsToAccountMsToRoleFlairMap[in_ms] = {};
-	// 	spaceMsToAccountMsToRoleFlairMap[in_ms]![at_ms] = true;
+	// 	if (!spaceMsToAccountMsToMembershipMap[in_ms]) spaceMsToAccountMsToMembershipMap[in_ms] = {};
+	// 	spaceMsToAccountMsToMembershipMap[in_ms]![at_ms] = true;
 	// }
 
 	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
@@ -585,6 +585,6 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		postAtBumpedPostIdObjsExclude,
 		msToAccountNameTxtMap,
 		msToSpaceNameTxtMap,
-		spaceMsToAccountMsToRoleFlairMap,
+		spaceMsToAccountMsToMembershipMap,
 	};
 };

@@ -39,7 +39,7 @@
 						newMemberPermissionCodeNum,
 					});
 					// let { callerMs } = whoObj;
-					// gs.spaceMsToAccountMsToRoleFlairMap[res.ms];
+					// gs.spaceMsToAccountMsToMembershipMap[res.ms];
 					// gs.msToSpaceMap={
 					// 	...gs.msToSpaceMap,
 					// 	[res.ms]: {

@@ -46,10 +46,15 @@ export let _getCallerContext = async (
 	},
 	get: GetCallerContextGetArg,
 ): Promise<CallerContext> => {
+	// console.log('get:', get);
 	// console.log('get', JSON.stringify(get, null, 2));
 	if (!get.signedIn && (get.roleCode || get.permissionCode))
 		throw new Error('must get signed in to get callerRole or permissionCode');
-	if (get.isPublic && !spaceMs) throw new Error('spaceMs must be gt0');
+	if (
+		(get.isPublic || get.roleCode || get.permissionCode) &&
+		(spaceMs === undefined || spaceMs < 1)
+	)
+		throw new Error('spaceMs must be gt0');
 	// if (!get.roleCode && get.permissionCode)
 	// 	throw new Error('must get roleCode to get permissionCode');
 
@@ -73,7 +78,6 @@ export let _getCallerContext = async (
 		throw new Error(
 			`Cannot use get[signedIn/isPublic/roleCode/permissionCode] and spaceUpdatesFrom/signedInAccountUpdatesFrom at the same time`,
 		);
-
 	if (spaceMs && (get.isPublic || get.roleCode || get.permissionCode)) {
 		if (get.isPublic) isPublic = { num: -1 };
 		if (get.roleCode) roleCode = { num: -1 };
@@ -305,8 +309,8 @@ export let _getCallerContext = async (
 		[pc.spaceIsPublicBinId]: spaceIsPublicBinIdRows = [],
 		[pc.spaceNameTxtId]: spaceNameTxtIdRows = [],
 		[pc.spacePinnedQueryTxtId]: spacePinnedQueryTxtIdRows = [],
-		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
 		[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
+		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
 		[pc.spacePriorityIdAccentCodeNumAtAccountId]: spacePriorityIdAccentCodeNumAtAccountIdRows = [],
 
 		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
@@ -322,6 +326,26 @@ export let _getCallerContext = async (
 			: []),
 		...forcedSpaceUpdateRows,
 	]);
+
+	if (
+		roleCodeNumIdAtAccountIdRows.some(
+			({ num }) =>
+				num !== roleCodes.member &&
+				num !== roleCodes.mod && //
+				num !== roleCodes.owner,
+		)
+	)
+		throw new Error(`invalid roleCode num`);
+	if (
+		permissionCodeNumIdAtAccountIdRows.some(
+			({ num }) =>
+				num !== permissionCodes.viewOnly &&
+				num !== permissionCodes.reactOnly &&
+				num !== permissionCodes.postOnly &&
+				num !== permissionCodes.reactAndPost,
+		)
+	)
+		throw new Error(`invalid permissionCode num`);
 
 	let caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow =
 		sessionKeyTxtMs_ExpiryMs_AtAccountIdRows.find((row) => row.at_ms === callerMs);
@@ -529,7 +553,7 @@ export let _getCallerContext = async (
 	}
 
 	let removedSpaceMss: number[] = spaceUpdatesFrom
-		.filter((su) => !su.visiting && !SpaceMssWithPermission.includes(su.ms))
+		.filter((su) => su.ms && !su.visiting && !SpaceMssWithPermission.includes(su.ms))
 		.map((su) => su.ms);
 	let signedOutAccountMss: number[] = signedInAccountUpdatesFrom
 		.filter(

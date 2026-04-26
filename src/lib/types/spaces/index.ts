@@ -1,23 +1,27 @@
 import { uniqueMapVals } from '$lib/js';
 import { and, lt, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { GranularNumPropSchema, GranularTxtPropSchema, type PartInsert } from '../parts';
+import {
+	GranularNumPropSchema,
+	GranularTxtPropSchema,
+	type GranularNumProp,
+	type GranularTxtProp,
+	type PartInsert,
+} from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 // These are space props shared across its members (and the public if applicable)
-export let SpaceSchema = z
-	.object({
-		ms: z.number(),
-		memberCount: z.number(),
-		isPublic: GranularNumPropSchema,
-		name: GranularTxtPropSchema,
-		description: GranularTxtPropSchema,
-		pinnedQuery: GranularTxtPropSchema,
-		newMemberPermissionCode: GranularNumPropSchema,
-	})
-	.strict();
+export let SpaceSchema = z.strictObject({
+	ms: z.number(),
+	memberCount: z.number(),
+	isPublic: GranularNumPropSchema,
+	name: GranularTxtPropSchema,
+	description: GranularTxtPropSchema,
+	pinnedQuery: GranularTxtPropSchema,
+	newMemberPermissionCode: GranularNumPropSchema,
+});
 export type Space = z.infer<typeof SpaceSchema>;
 
 export let getDefaultSpace = () =>
@@ -36,6 +40,8 @@ export let roleCodes = uniqueMapVals({
 	mod: 1,
 	owner: 2,
 });
+export type RoleCode = (typeof roleCodes)[keyof typeof roleCodes];
+
 export let permissionCodes = uniqueMapVals({
 	// TODO: use bitmasking if this gets more complex?
 	viewOnly: 0,
@@ -43,6 +49,8 @@ export let permissionCodes = uniqueMapVals({
 	postOnly: 2,
 	reactAndPost: 3,
 });
+export type PermissionCode = (typeof permissionCodes)[keyof typeof permissionCodes];
+
 export let accentCodes = uniqueMapVals({
 	// TODO: use bitmasking if this gets more complex?
 	disabled: 0,
@@ -53,14 +61,12 @@ export let accentCodes = uniqueMapVals({
 });
 
 // These are space props specific to the caller and only exist for members
-export let SpaceContextSchema = z
-	.object({
-		ms: z.number(),
-		roleCode: GranularNumPropSchema,
-		permissionCode: GranularNumPropSchema,
-		accentCode: GranularNumPropSchema,
-	})
-	.strict();
+export let SpaceContextSchema = z.strictObject({
+	ms: z.number(),
+	roleCode: GranularNumPropSchema,
+	permissionCode: GranularNumPropSchema,
+	accentCode: GranularNumPropSchema,
+});
 export type SpaceContext = z.infer<typeof SpaceContextSchema>;
 
 export let SpaceDotsUpdateSchema = SpaceSchema.pick({
@@ -72,7 +78,7 @@ export let SpaceDotsUpdateSchema = SpaceSchema.pick({
 	.extend({ ms: z.number() });
 export type SpaceDotsUpdate = z.infer<typeof SpaceDotsUpdateSchema>;
 
-export let MySpaceUpdateSchema = z.object({
+export let MySpaceUpdateSchema = z.strictObject({
 	ms: z.number(),
 	isPublic: GranularNumPropSchema.optional(),
 	name: GranularTxtPropSchema.optional(),
@@ -114,39 +120,32 @@ export let reduceMySpaceUpdateRows = (rows: PartInsert[]) => {
 	return spaceUpdates;
 };
 
-export let InviteSchema = z
-	.object({
-		ms: z.number(),
-		by_ms: z.number(),
-		in_ms: z.number(),
-		slugEnd: z.string(),
-		expiryMs: z.number(),
-		useCount: z.number(),
-		maxUses: z.number().optional(),
-		revoked: z.boolean().optional(),
-	})
-	.strict();
+export let InviteSchema = z.strictObject({
+	ms: z.number(),
+	by_ms: z.number(),
+	in_ms: z.number(),
+	slugEnd: z.string(),
+	expiryMs: z.number(),
+	useCount: z.number(),
+	maxUses: z.number().optional(),
+	revoked: z.boolean().optional(),
+});
 export type Invite = z.infer<typeof InviteSchema>;
 
 export type Membership = {
+	// gs.spaceMsToAccountMsToMembershipMap makes
+	// invite.in_ms and accept.by_ms unnecessary
 	invite: {
 		by_ms: number;
-		in_ms: number;
+		in_ms?: number;
 	};
 	accept: {
 		ms: number;
-		by_ms: number;
+		by_ms?: number;
 	};
-	permission: {
-		num: number;
-		ms: number;
-		by_ms: number;
-	};
-	// role: {
-	// 	num: number;
-	// 	ms: number;
-	// 	by_ms: number;
-	// };
+	roleCode: GranularNumProp;
+	permissionCode: GranularNumProp;
+	flair: GranularTxtProp;
 };
 
 export let makeMyValidInvitesFilter = (callerMs: number, spaceMs: number, now = Date.now()) =>

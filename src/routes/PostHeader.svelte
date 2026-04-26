@@ -81,7 +81,7 @@
 	};
 	let deletable = $derived(p.lastVersion !== 0 || !p.post.subIds?.length);
 	let authorRole = $derived(
-		gs.spaceMsToAccountMsToRoleFlairMap[p.post.in_ms]?.[p.post.by_ms]?.role,
+		gs.spaceMsToAccountMsToMembershipMap[p.post.in_ms]?.[p.post.by_ms]?.roleCode,
 	);
 	let savedLocally = $derived(true);
 	let toggleSavedLocally = () => {

@@ -1,5 +1,6 @@
 import { dev } from '$app/environment';
 import { goto } from '$app/navigation';
+import { alertError } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
 import { getWhoObj, gs } from '../global-state.svelte';
@@ -10,14 +11,12 @@ import { accentCodes, permissionCodes, roleCodes, SpaceSchema } from './spaces';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
 
-export let LocalCacheSchema = z
-	.object({
-		devMode: z.boolean(),
-		lastSeenInMs: z.number(),
-		accounts: z.array(MyAccountSchema),
-		msToSpaceMap: z.record(z.string(), SpaceSchema.optional()),
-	})
-	.strict();
+export let LocalCacheSchema = z.strictObject({
+	devMode: z.boolean(),
+	lastSeenInMs: z.number(),
+	accounts: z.array(MyAccountSchema),
+	msToSpaceMap: z.record(z.string(), SpaceSchema.optional()),
+});
 
 export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
@@ -124,41 +123,45 @@ export let signOut = async (callerMs: number, everywhere = false) => {
 		return lc;
 	});
 	if (callerMs === gs.accounts?.[0].ms) {
-		gs.urlToFeedMap = {};
+		gs.urlToPostFeedMap = {};
 		delete gs.accountMsToSpaceMsToCheckedMap[callerMs];
 		goto(`/__${gs.lastSeenInMs}`);
 	}
 };
 
 export let useCheckedInvite = async () => {
-	if (gs.accounts !== undefined && gs.checkedInvite) {
-		if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms) return alert(m.cannotUseYourOwnInvite());
-		let { redeemed } = await trpc().checkInvite.mutate({
-			...(await getWhoObj()),
-			inviteMs: gs.checkedInvite.ms,
-			slugEnd: gs.checkedInvite.slugEnd,
-			useIfValid: true,
-		});
-		if (!redeemed) return alert(m.invalidInvite());
-
-		let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
-		updateLocalCache((lc) => {
-			lc.accounts[0].joinedSpaceContexts.unshift({
-				ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
-				accentCode: { num: accentCodes.none },
-				permissionCode: { num: permissionCodes.reactAndPost },
-				roleCode: { num: roleCodes.member },
+	try {
+		if (gs.accounts !== undefined && gs.checkedInvite) {
+			if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms)
+				return alert(m.cannotUseYourOwnInvite());
+			let { redeemed } = await trpc().checkInvite.mutate({
+				...(await getWhoObj()),
+				inviteMs: gs.checkedInvite.ms,
+				slugEnd: gs.checkedInvite.slugEnd,
+				useIfValid: true,
 			});
-			return lc;
-		});
-		gs.accountMsToSpaceMsToCheckedMap = {
-			...gs.accountMsToSpaceMsToCheckedMap,
-			[gs.accounts[0].ms]: {
-				...gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms],
-				[gs.checkedInvite.partialSpace.ms]: false,
-			},
-		};
-		gs.checkedInvite = undefined;
-		goto(`/__${joinedSpaceMs}`);
+			if (!redeemed) return alert(m.invalidInvite());
+			let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
+			updateLocalCache((lc) => {
+				lc.accounts[0].joinedSpaceContexts.unshift({
+					ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
+					accentCode: { num: accentCodes.none },
+					permissionCode: { num: permissionCodes.reactAndPost },
+					roleCode: { num: roleCodes.member },
+				});
+				return lc;
+			});
+			gs.accountMsToSpaceMsToCheckedMap = {
+				...gs.accountMsToSpaceMsToCheckedMap,
+				[gs.accounts[0].ms]: {
+					...gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms],
+					[gs.checkedInvite.partialSpace.ms]: false,
+				},
+			};
+			gs.checkedInvite = undefined;
+			goto(`/__${joinedSpaceMs}`);
+		}
+	} catch (error) {
+		alertError(error);
 	}
 };

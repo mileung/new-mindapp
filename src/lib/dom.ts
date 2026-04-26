@@ -167,8 +167,8 @@ export let promptSum = (cb: (a: number, b: number) => string) => {
 		let a = Math.floor(Math.random() * 90) + 10;
 		let b = Math.floor(Math.random() * 90) + 10;
 		let sum = prompt(cb(a, b));
-		if (!sum) return;
-		if (a + b !== +sum) return alert(m.incorrect());
+		if (!sum) return false;
+		if (a + b !== +sum) return alert(m.incorrect()), false;
 	}
 	return true;
 };

@@ -8,7 +8,7 @@
 		gs,
 		mergeMsToAccountNameTxtMap,
 		mergeMsToSpaceNameTxtMap,
-		mergeSpaceMsToAccountMsToRoleFlairMap,
+		mergeSpaceMsToAccountMsToMembershipMap,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 	import { alertError, makeErrorReadable } from '$lib/js';
@@ -103,7 +103,7 @@
 			href: page.url.href,
 		}),
 	);
-	let feed = $derived(gs.urlToFeedMap[identifier]);
+	let feed = $derived(gs.urlToPostFeedMap[identifier]);
 	let topLvlPostIdStrs = $derived(feed?.topLvlPostIdStrs || []);
 	let endReached = $derived(feed?.endReached);
 	let postAtBumpedPostIdObjsExclude = $derived(feed?.postAtBumpedPostIdObjsExclude || []);
@@ -184,7 +184,7 @@
 
 			mergeMsToAccountNameTxtMap(postFeed.msToAccountNameTxtMap);
 			mergeMsToSpaceNameTxtMap(postFeed.msToSpaceNameTxtMap);
-			mergeSpaceMsToAccountMsToRoleFlairMap(postFeed.spaceMsToAccountMsToRoleFlairMap);
+			mergeSpaceMsToAccountMsToMembershipMap(postFeed.spaceMsToAccountMsToMembershipMap);
 
 			Object.entries(newIdToPostMap).forEach(([id, post]) => {
 				let lastVersion = getLastVersion(newIdToPostMap[id]);
@@ -207,8 +207,8 @@
 			newTopLvlPostIdStrs.length && e.detail.loaded();
 			let endReached = newTopLvlPostIdStrs.length < postsPerLoad;
 			endReached && e.detail.complete();
-			gs.urlToFeedMap = {
-				...gs.urlToFeedMap,
+			gs.urlToPostFeedMap = {
+				...gs.urlToPostFeedMap,
 				[identifier]: {
 					endReached,
 					topLvlPostIdStrs: [...new Set([...topLvlPostIdStrs, ...newTopLvlPostIdStrs])],
@@ -216,8 +216,8 @@
 				},
 			};
 		} catch (error) {
-			gs.urlToFeedMap = {
-				...gs.urlToFeedMap,
+			gs.urlToPostFeedMap = {
+				...gs.urlToPostFeedMap,
 				[identifier]: {
 					error: makeErrorReadable(error),
 				},
@@ -458,6 +458,7 @@
 		{/each}
 		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
+				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
 				<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
 					<p class="m-2 text-lg text-fg2">
 						<!-- noResults slot shows even after adding the first post -->
@@ -467,9 +468,6 @@
 				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
 					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 				</div>
-				<p slot="error" class="m-2 text-lg text-fg2">
-					{error}
-				</p>
 			</InfiniteLoading>
 		{/if}
 		{#if postIdStr}

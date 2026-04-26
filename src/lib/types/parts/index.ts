@@ -5,7 +5,7 @@ import { pTable } from './partsTable';
 export type PartInsert = typeof pTable.$inferInsert;
 export type PartSelect = typeof pTable.$inferSelect;
 
-export let GranularNumPropSchema = z.object({
+export let GranularNumPropSchema = z.strictObject({
 	ms: z.number().optional(),
 	by_ms: z.number().optional(),
 	num: z.number(),
@@ -20,7 +20,7 @@ export let getGranularNumProp = (part: PartInsert) =>
 export let sameGranularNum = (a?: GranularNumProp, b?: GranularNumProp) =>
 	a?.ms === b?.ms && a?.by_ms === b?.by_ms && a?.num === b?.num;
 
-export let GranularTxtPropSchema = z.object({
+export let GranularTxtPropSchema = z.strictObject({
 	ms: z.number().optional(),
 	by_ms: z.number().optional(),
 	txt: z.string(),
@@ -33,7 +33,7 @@ export let getGranularTxtProp = (part: PartInsert) =>
 		txt: part.txt!,
 	}) satisfies GranularTxtProp;
 
-export let GranularNumTxtPropSchema = z.object({
+export let GranularNumTxtPropSchema = z.strictObject({
 	ms: z.number().optional(),
 	by_ms: z.number().optional(),
 	num: z.number(),
@@ -49,7 +49,7 @@ export let getGranularNumTxtProp = (part: PartInsert) =>
 		txt: part.txt!,
 	}) satisfies GranularNumTxtProp;
 
-export let WhoObjSchema = z.object({
+export let WhoObjSchema = z.strictObject({
 	callerMs: z.number().gte(0),
 });
 export type WhoObj = z.infer<typeof WhoObjSchema>;
@@ -59,10 +59,13 @@ export let WhoWhereObjSchema = WhoObjSchema.extend({
 });
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
 
-export let hasParent = (part: FullIdObj) =>
-	part.at_ms !== 0 || //
-	part.at_by_ms !== 0 ||
-	part.at_in_ms !== 0;
+export let hasParent = (part: FullIdObj) => {
+	// Some partCodes repurpose part attributes but oh well
+	if (part.at_ms < 0) throw new Error(`invalid at_ms`);
+	if (part.at_by_ms < 0) throw new Error(`invalid at_by_ms`);
+	if (part.at_in_ms < 0) throw new Error(`invalid at_in_ms`);
+	return !!(part.at_ms || part.at_by_ms || part.at_in_ms);
+};
 
 export let assertLt2Rows = (parts: PartSelect[]) => {
 	if (parts.length > 1) throw new Error(`Multiple parts found`);

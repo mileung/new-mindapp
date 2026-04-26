@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { reactionList } from './reactionList';
 
 export let ReactionSchema = z
-	.object({
+	.strictObject({
 		at_ms: z.number().gte(0),
 		at_by_ms: z.number().gte(0),
 		at_in_ms: z.number().gte(0),
@@ -11,7 +11,6 @@ export let ReactionSchema = z
 		in_ms: z.number().gte(0),
 		emoji: z.enum(reactionList),
 	})
-	.strict()
 	.superRefine((data, ctx) => {
 		if (data.at_in_ms !== data.in_ms) {
 			ctx.addIssue({

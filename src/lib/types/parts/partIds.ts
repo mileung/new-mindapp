@@ -2,14 +2,14 @@ import { page } from '$app/state';
 import { splitUntil } from '$lib/js';
 import { z } from 'zod';
 
-export let IdObjSchema = z.object({
+export let IdObjSchema = z.strictObject({
 	ms: z.number(),
 	by_ms: z.number(),
 	in_ms: z.number(),
 });
 export type IdObj = z.infer<typeof IdObjSchema>;
 
-export let AtIdObjSchema = z.object({
+export let AtIdObjSchema = z.strictObject({
 	at_ms: z.number(),
 	at_by_ms: z.number(),
 	at_in_ms: z.number(),
