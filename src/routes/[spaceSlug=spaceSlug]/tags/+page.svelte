@@ -9,15 +9,20 @@
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { getSpaceTags, tagsPerLoad } from '$lib/types/spaces/getSpaceTags';
-	import { IconSquare, IconSquareCheckFilled } from '@tabler/icons-svelte';
+	import {
+		IconDeselect,
+		IconSelectAll,
+		IconSquare,
+		IconSquareCheckFilled,
+	} from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 
-	let urlInMs = $derived(getUrlInMs());
-	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
+	let urlInMs = $derived(getUrlInMs()!);
+	let space = $derived(gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getUrlInMsContext());
 	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
-	let tagsData = $derived(gs.spaceMsToTagsMap[urlInMs || -1]);
+	let tagsData = $derived(gs.spaceMsToTagsMap[urlInMs]);
 	let tags = $derived(tagsData?.tags || []);
 
 	let loadMoreTags = async (e: InfiniteEvent) => {
@@ -35,9 +40,11 @@
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
 		console.log('getSpaceTags res', res);
-		if (tags.length) e.detail.loaded();
+		res.tags.length && e.detail.loaded();
+
 		let endReached = res.tags.length < tagsPerLoad;
-		if (endReached) e.detail.complete();
+		endReached && e.detail.complete();
+
 		gs.spaceMsToTagsMap = {
 			...gs.spaceMsToTagsMap,
 			[urlInMs]: {
@@ -54,20 +61,39 @@
 				: [],
 		),
 	);
+	let pageSelected = $derived(tags.every((t) => savedTagsSet.has(t.txt)));
 </script>
 
-{#if urlInMs === undefined}
+{#if urlInMs === undefined || !gs.accounts}
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
+{:else if !viewable}
+	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
-	<div class="p-2 w-full max-w-lg">
-		<p class="text-xl font-bold">
-			<!-- {numTags === 1
-				? m.oneSpaceNameTag({ spaceName: spaceMsToName(lastSeenInMs) })
-				: m.nSpaceNameTags({ n: numTags, spaceName: spaceMsToName(lastSeenInMs) })} -->
-			{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
-		</p>
+	<div class="p-2 pt-0 w-full max-w-lg">
+		<div class="sticky top-0 bg-bg1 fx justify-between">
+			<p class="text-xl font-bold">
+				{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
+			</p>
+			<button
+				class="h-8 xy pl-0.5 pr-1 hover:bg-bg4 text-fg2 hover:text-fg1"
+				onclick={() => {
+					if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
+					updateSavedTags(
+						tags.map((t) => t.txt),
+						pageSelected,
+					);
+				}}
+			>
+				{#if pageSelected}
+					<IconDeselect class="w-5 mr-1" />
+				{:else}
+					<IconSelectAll class="w-5 mr-1" />
+				{/if}
+				{pageSelected ? m.unsaveLoadedTags() : m.saveLoadedTags()}
+			</button>
+		</div>
 		{#each tags || [] as tag, i (tag.txt)}
 			<div class="flex text-lg">
 				{tag.num} -
@@ -88,16 +114,14 @@
 				</button>
 			</div>
 		{/each}
-		{#if viewable}
-			<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
-				<p slot="noResults" class="m-2 text-lg text-fg2">
-					{m.noTagsFound()}
-				</p>
-				<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
-				<p slot="error" class="m-2 text-lg text-fg2">
-					{m.placeholderError()}
-				</p>
-			</InfiniteLoading>
-		{/if}
+		<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
+			<p slot="noResults" class="m-2 text-lg text-fg2">
+				{m.noTagsFound()}
+			</p>
+			<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+			<p slot="error" class="m-2 text-lg text-fg2">
+				{m.placeholderError()}
+			</p>
+		</InfiniteLoading>
 	</div>
 {/if}

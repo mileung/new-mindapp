@@ -17,7 +17,7 @@ export let normalizeTags = (tags: string[]) =>
 let HistoryLayerSchema = z.strictObject({
 	ms: z.number().gte(0),
 	tags: z
-		.array(z.string().max(888))
+		.array(z.string().max(88))
 		.max(888) //
 		.transform(normalizeTags)
 		.nullable(), // null tags means soft deleted version

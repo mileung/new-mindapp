@@ -196,8 +196,7 @@ export let router = t.router({
 	updateSavedTags: generalProcedure
 		.input(
 			WhoObjSchema.extend({
-				tags: z.array(z.string()),
-				remove: z.boolean(),
+				savedTags: z.array(z.string().max(88)).max(8888),
 			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {

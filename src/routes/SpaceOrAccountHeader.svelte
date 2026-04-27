@@ -6,7 +6,7 @@
 		msToAccountNameTxt,
 		msToSpaceNameTxt,
 	} from '$lib/global-state.svelte';
-	import { deepClone, identikana } from '$lib/js';
+	import { alertError, deepClone, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
 	import { type PublicProfile } from '$lib/types/accounts';
@@ -53,10 +53,8 @@
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let spaceContext = $derived(getUrlInMsContext());
 	let userCanEdit = $derived.by(() => {
-		if (accountOrSpaceMs && gs.accounts) {
-			if (p.space) return spaceContext?.roleCode?.num === roleCodes.owner;
-			if (p.account) return p.account.ms === callerMs;
-		}
+		if (p.space) return spaceContext?.roleCode?.num === roleCodes.owner;
+		if (p.account) return p.account.ms === callerMs;
 		return false;
 	});
 
@@ -127,37 +125,52 @@
 						)
 							changes.newMemberPermissionCodeNum = draftSettings.newMemberPermissionCodeNum;
 						if (Object.keys(changes).length) {
-							let { ms } = await (
-								p.space ? trpc().changeSpaceAttributes : trpc().changeMyAccountAttributes
-							).mutate({
-								...(await getWhoWhereObj()),
-								...changes,
-							});
-							updateLocalCache((lc) => {
-								if (p.account) {
-									if (changes.nameTxt !== undefined)
-										lc.accounts[0].name = { ms, txt: changes.nameTxt };
-									if (changes.bioTxt !== undefined)
-										lc.accounts[0].bio = { ms, txt: changes.bioTxt };
-								}
-								if (p.space) {
-									if (changes.nameTxt !== undefined)
-										lc.msToSpaceMap[p.space.ms]!.name = { ms, txt: changes.nameTxt };
-									if (changes.descriptionTxt !== undefined)
-										lc.msToSpaceMap[p.space.ms]!.description = { ms, txt: changes.descriptionTxt };
-									if (changes.pinnedQueryTxt !== undefined)
-										lc.msToSpaceMap[p.space.ms]!.pinnedQuery = { ms, txt: changes.pinnedQueryTxt };
-									if (changes.isPublicNum !== undefined)
-										lc.msToSpaceMap[p.space.ms]!.isPublic = { ms, num: changes.isPublicNum };
-									if (changes.newMemberPermissionCodeNum !== undefined) {
-										lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode = {
-											ms,
-											num: changes.newMemberPermissionCodeNum,
-										};
+							try {
+								let ms =
+									p.space?.ms || p.account?.ms
+										? (
+												await (
+													p.space ? trpc().changeSpaceAttributes : trpc().changeMyAccountAttributes
+												).mutate({
+													...(await getWhoWhereObj()),
+													...changes,
+												})
+											).ms
+										: Date.now();
+								updateLocalCache((lc) => {
+									if (p.account) {
+										if (changes.nameTxt !== undefined)
+											lc.accounts[0].name = { ms, txt: changes.nameTxt };
+										if (changes.bioTxt !== undefined)
+											lc.accounts[0].bio = { ms, txt: changes.bioTxt };
 									}
-								}
-								return lc;
-							});
+									if (p.space) {
+										if (changes.nameTxt !== undefined)
+											lc.msToSpaceMap[p.space.ms]!.name = { ms, txt: changes.nameTxt };
+										if (changes.descriptionTxt !== undefined)
+											lc.msToSpaceMap[p.space.ms]!.description = {
+												ms,
+												txt: changes.descriptionTxt,
+											};
+										if (changes.pinnedQueryTxt !== undefined)
+											lc.msToSpaceMap[p.space.ms]!.pinnedQuery = {
+												ms,
+												txt: changes.pinnedQueryTxt,
+											};
+										if (changes.isPublicNum !== undefined)
+											lc.msToSpaceMap[p.space.ms]!.isPublic = { ms, num: changes.isPublicNum };
+										if (changes.newMemberPermissionCodeNum !== undefined) {
+											lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode = {
+												ms,
+												num: changes.newMemberPermissionCodeNum,
+											};
+										}
+									}
+									return lc;
+								});
+							} catch (error) {
+								alertError(error);
+							}
 						}
 					}}
 				>
@@ -197,7 +210,7 @@
 			bind:value={draftSettings.pinnedQueryTxt}
 			class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
 		/>
-		{#if p.space && p.space.ms !== callerMs}
+		{#if p.space && p.space.ms && p.space.ms !== callerMs}
 			<div class="mt-2 flex">
 				<div class="flex-1">
 					<p class="text-sm font-bold">{m.visibility()}</p>

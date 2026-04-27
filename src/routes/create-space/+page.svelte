@@ -38,6 +38,8 @@
 						spaceIsPublicBin,
 						newMemberPermissionCodeNum,
 					});
+
+					// TODO: cache space stuff locally after creation so it isn't fetched
 					// let { callerMs } = whoObj;
 					// gs.spaceMsToAccountMsToMembershipMap[res.ms];
 					// gs.msToSpaceMap={

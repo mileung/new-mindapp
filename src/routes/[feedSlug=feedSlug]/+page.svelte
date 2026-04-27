@@ -80,8 +80,8 @@
 		let { feedSlug } = page.params;
 		return isIdStr(feedSlug) ? feedSlug : undefined;
 	});
-	let urlInMs = $derived(getUrlInMs());
-	let space = $derived(gs.msToSpaceMap[urlInMs || -1]);
+	let urlInMs = $derived(getUrlInMs()!);
+	let space = $derived(gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getUrlInMsContext());
 	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
 	let showViewOnly = $derived(viewable && !spaceContext?.permissionCode);
@@ -405,48 +405,46 @@
 				<p class="font-bold text-xl leading-4">{m.nextUp()}</p>
 			</div>
 		{/if}
-		{#if viewable}
-			<div
-				class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
+		<div
+			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
+		>
+			<a
+				href={makeParams('nested', sortedBy)}
+				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
 			>
-				<a
-					href={makeParams('nested', sortedBy)}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
-				>
-					<IconListTree stroke={2.5} class="h-4" />{m.nested()}
-				</a>
-				<a
-					href={makeParams('flat', sortedBy)}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
-				>
-					<IconList stroke={2.5} class="h-4" />{m.flat()}
-				</a>
-				<div class="xy mr-0.5">
-					<IconSquareFilled class="h-1.5 w-1.5" />
-				</div>
-				{#if !qSearchParam}
-					<a
-						href={makeParams(view, 'bumped')}
-						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
-					>
-						<IconMessage2Up stroke={2.5} class="h-4" />
-						{m.bumped()}
-					</a>
-				{/if}
-				<a
-					href={makeParams(view, 'new')}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
-				>
-					<IconClockUp stroke={2.5} class="h-4" />{m.new()}
-				</a>
-				<a
-					href={makeParams(view, 'old')}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
-				>
-					<IconArchive stroke={2.5} class="h-4" />{m.old()}
-				</a>
+				<IconListTree stroke={2.5} class="h-4" />{m.nested()}
+			</a>
+			<a
+				href={makeParams('flat', sortedBy)}
+				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
+			>
+				<IconList stroke={2.5} class="h-4" />{m.flat()}
+			</a>
+			<div class="xy mr-0.5">
+				<IconSquareFilled class="h-1.5 w-1.5" />
 			</div>
-		{/if}
+			{#if !qSearchParam}
+				<a
+					href={makeParams(view, 'bumped')}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
+				>
+					<IconMessage2Up stroke={2.5} class="h-4" />
+					{m.bumped()}
+				</a>
+			{/if}
+			<a
+				href={makeParams(view, 'new')}
+				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
+			>
+				<IconClockUp stroke={2.5} class="h-4" />{m.new()}
+			</a>
+			<a
+				href={makeParams(view, 'old')}
+				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
+			>
+				<IconArchive stroke={2.5} class="h-4" />{m.old()}
+			</a>
+		</div>
 		{#each postObjFeed as post, i (getIdStr(post))}
 			{#if postIdStr && i === 1}
 				<div class="h-9 fx">

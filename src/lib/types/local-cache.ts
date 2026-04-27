@@ -7,16 +7,42 @@ import { getWhoObj, gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
 import { getDefaultAccount, MyAccountSchema } from './accounts';
 import { normalizeTags } from './posts';
-import { accentCodes, permissionCodes, roleCodes, SpaceSchema } from './spaces';
+import { accentCodes, getDefaultSpace, permissionCodes, roleCodes, SpaceSchema } from './spaces';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
 
-export let LocalCacheSchema = z.strictObject({
-	devMode: z.boolean(),
-	lastSeenInMs: z.number(),
-	accounts: z.array(MyAccountSchema),
-	msToSpaceMap: z.record(z.string(), SpaceSchema.optional()),
-});
+export let LocalCacheSchema = z
+	.strictObject({
+		devMode: z.boolean(),
+		lastSeenInMs: z.number(),
+		accounts: z.array(MyAccountSchema),
+		msToSpaceMap: z.record(z.string(), SpaceSchema.optional()),
+	})
+	.refine((lc) => {
+		let hasLocalSpace = '0' in lc.msToSpaceMap;
+		let uniqueJoinedSpaceContextMss = true;
+		let hasAnonAccount = false;
+		let uniqueAccountMss =
+			lc.accounts.length ===
+			[
+				...new Set(
+					lc.accounts.map((a) => {
+						if (!a.ms) hasAnonAccount = true;
+						uniqueJoinedSpaceContextMss =
+							a.joinedSpaceContexts.length ===
+							[...new Set(a.joinedSpaceContexts.map((c) => c.ms))].length;
+						return a.ms;
+					}),
+				),
+			].length;
+
+		return (
+			hasLocalSpace && //
+			uniqueJoinedSpaceContextMss &&
+			hasAnonAccount &&
+			uniqueAccountMss
+		);
+	});
 
 export type LocalCache = z.infer<typeof LocalCacheSchema>;
 
@@ -25,7 +51,7 @@ let getDefaultLocalCache = () =>
 		devMode: dev,
 		lastSeenInMs: 0,
 		accounts: [getDefaultAccount()],
-		msToSpaceMap: {},
+		msToSpaceMap: { 0: getDefaultSpace() },
 	} satisfies LocalCache);
 
 export let getLocalCache = () => {
@@ -70,28 +96,28 @@ export let updateLocalCache = (updater: (old: LocalCache) => LocalCache) => {
 	}
 };
 
-export let updateSavedTags = async (tags: string[], remove = false) => {
+export let updateSavedTags = async (usedTags: string[], remove = false) => {
 	// TODO: debounce
-	await updateLocalCache((lc) => {
-		let savedTags = JSON.parse(lc.accounts[0].savedTags.txt) as string[];
-		lc.accounts[0].savedTags.txt = JSON.stringify(
-			remove
-				? savedTags.filter((st) => !tags.includes(st))
-				: normalizeTags([...savedTags, ...tags]),
-		);
-		return lc;
-	});
-
-	if (gs.accounts?.[0].ms) {
-		let res = await trpc().updateSavedTags.mutate({
-			...(await getWhoObj()),
-			tags,
-			remove,
-		});
-		await updateLocalCache((lc) => {
-			lc.accounts[0].savedTags.ms = res.ms;
+	let savedTags = JSON.parse(gs.accounts![0].savedTags.txt) as string[];
+	savedTags = remove
+		? savedTags.filter((t) => !usedTags.includes(t))
+		: normalizeTags([...savedTags, ...usedTags]);
+	try {
+		let ms = gs.accounts?.[0].ms
+			? (
+					await trpc().updateSavedTags.mutate({
+						...(await getWhoObj()),
+						savedTags,
+					})
+				).ms
+			: 0;
+		updateLocalCache((lc) => {
+			lc.accounts[0].savedTags.txt = JSON.stringify(savedTags);
+			if (ms) lc.accounts[0].savedTags.ms = ms;
 			return lc;
 		});
+	} catch (error) {
+		alertError(error);
 	}
 };
 
