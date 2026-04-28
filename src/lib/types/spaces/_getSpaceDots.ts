@@ -43,7 +43,7 @@ export let _getSpaceDots = async (
 		getCallerMembership,
 		msBefore,
 		excludeMemberMss = [],
-		lastMemberListRoleCodeNum = roleCodes.owner,
+		lastMemberListRoleCodeNum = roleCodes.admin,
 	} = input;
 	let spaceUpdate: undefined | SpaceDotsUpdate;
 	let invites: undefined | Invite[];
@@ -84,7 +84,7 @@ export let _getSpaceDots = async (
 				)
 				.limit(membersPerLoad);
 
-	// TODO: sort all owners and mods to the top
+	// TODO: sort all admins and mods to the top
 
 	let {
 		[pc.spaceDescriptionTxtIdAndMemberCountNum]: spaceDescriptionTxtIdAndMemberCountNumRows = [],
@@ -103,7 +103,7 @@ export let _getSpaceDots = async (
 				or(
 					getCallerMembership &&
 						!isLocalOrPersonal &&
-						(callerRoleCodeNum === roleCodes.mod || callerRoleCodeNum === roleCodes.owner)
+						(callerRoleCodeNum === roleCodes.mod || callerRoleCodeNum === roleCodes.admin)
 						? makeMyValidInvitesFilter(callerMs, spaceMs)
 						: undefined,
 					firstLoad

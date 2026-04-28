@@ -38,7 +38,7 @@ export let getDefaultSpace = () =>
 export let roleCodes = uniqueMapVals({
 	member: 0,
 	mod: 1,
-	owner: 2,
+	admin: 2,
 });
 export type RoleCode = (typeof roleCodes)[keyof typeof roleCodes];
 

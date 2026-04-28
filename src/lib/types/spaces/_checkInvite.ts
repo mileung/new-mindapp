@@ -116,7 +116,7 @@ export let _checkInvite = async (
 					callerMs: input.callerMs,
 					inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 					permissionCodeNum: permissionCodes.reactAndPost,
-					roleCodeNum: roleCodes.owner,
+					roleCodeNum: roleCodes.admin,
 				}),
 				{
 					...id0,

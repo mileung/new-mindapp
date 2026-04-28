@@ -33,7 +33,7 @@ export let getAnother_roleCodeNumIdAtAccountIdRow = async (
 					pf.notAtId({ at_ms: callerMs }),
 					pf.in_ms.eq(spaceMs),
 					pf.code.eq(pc.roleCodeNumIdAtAccountId),
-					pf.num.eq(roleCodes.owner),
+					pf.num.eq(roleCodes.admin),
 				),
 			)
 			.limit(1)

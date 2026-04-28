@@ -86,7 +86,7 @@
 					updateLocalCache((lc) => {
 						lc.accounts[0].joinedSpaceContexts.unshift({
 							ms,
-							roleCode: { ms, by_ms: 0, num: roleCodes.owner },
+							roleCode: { ms, by_ms: 0, num: roleCodes.admin },
 							permissionCode: { ms, by_ms: 0, num: permissionCodes.reactAndPost },
 							accentCode: { ms, by_ms: 0, num: accentCodes.none },
 						});

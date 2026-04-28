@@ -148,7 +148,7 @@ export let _createSpace = async (
 				ms,
 				callerMs: input.callerMs,
 				inviteIdObj: { ms, by_ms: 0, in_ms: ms },
-				roleCodeNum: roleCodes.owner,
+				roleCodeNum: roleCodes.admin,
 				permissionCodeNum: permissionCodes.reactAndPost,
 			}),
 			{

@@ -159,14 +159,14 @@ export let _getCallerContext = async (
 						txt: null,
 					});
 					su.roleCode &&
-						su.roleCode.num !== roleCodes.owner &&
+						su.roleCode.num !== roleCodes.admin &&
 						forcedSpaceUpdateRows.push({
 							...id0,
 							at_ms: callerMs,
 							ms: callerMs,
 							in_ms: callerMs,
 							code: pc.roleCodeNumIdAtAccountId,
-							num: roleCodes.owner,
+							num: roleCodes.admin,
 							txt: null,
 						});
 				}
@@ -332,7 +332,7 @@ export let _getCallerContext = async (
 			({ num }) =>
 				num !== roleCodes.member &&
 				num !== roleCodes.mod && //
-				num !== roleCodes.owner,
+				num !== roleCodes.admin,
 		)
 	)
 		throw new Error(`invalid roleCode num`);
@@ -469,7 +469,7 @@ export let _getCallerContext = async (
 		if (get.signedIn) {
 			signedIn = true;
 			if (get.roleCode) {
-				if (spaceMs === callerMs) roleCode = { num: roleCodes.owner };
+				if (spaceMs === callerMs) roleCode = { num: roleCodes.admin };
 				else {
 					let caller_roleCodeNumIdAtAccountIdRow = roleCodeNumIdAtAccountIdRows.find(
 						(row) => row.at_ms === callerMs,

@@ -22,7 +22,7 @@ export let _setSpaceMemberFlair = async ({
 	if (callerMs !== accountMs) {
 		throwIf(
 			callerRoleCodeNum !== roleCodes.mod && //
-				callerRoleCodeNum !== roleCodes.owner,
+				callerRoleCodeNum !== roleCodes.admin,
 		);
 		let updatee_roleCodeNumIdAtAccountId = await get_roleCodeNumIdAtAccountId(spaceMs, accountMs);
 		throwIf(

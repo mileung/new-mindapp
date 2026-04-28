@@ -274,7 +274,7 @@ export let getUrlInMsContext = (): undefined | SpaceContext => {
 	return urlInMs === 0 || urlInMs === caller.ms
 		? {
 				ms: urlInMs,
-				roleCode: { num: roleCodes.owner },
+				roleCode: { num: roleCodes.admin },
 				permissionCode: { num: permissionCodes.reactAndPost },
 				accentCode: { num: accentCodes.none },
 			}

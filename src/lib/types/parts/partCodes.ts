@@ -59,7 +59,7 @@ export let pc = uniqueMapVals({
 	newMemberPermissionCodeNumId: 44,
 	roleCodeNumIdAtAccountId: 45,
 	permissionCodeNumIdAtAccountId: 46,
-	flairTxtIdAtAccountId: 47, // TODO: Indicate if the flair by_ms is a mod/owner
+	flairTxtIdAtAccountId: 47, // TODO: Indicate if the flair by_ms is a mod/admin
 	spacePriorityIdAccentCodeNumAtAccountId: 48,
 
 	accountEmailTxtMsByMs: 50,

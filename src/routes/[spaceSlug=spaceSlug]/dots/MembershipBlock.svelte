@@ -44,7 +44,7 @@
 
 	let moreOptionsShown = $state(false);
 	let spaceContext = $derived(getUrlInMsContext());
-	let callerIsOwner = $derived(spaceContext?.roleCode?.num === roleCodes.owner);
+	let callerIsAdmin = $derived(spaceContext?.roleCode?.num === roleCodes.admin);
 	let callerIsMod = $derived(spaceContext?.roleCode?.num === roleCodes.mod);
 	let spaceMs = $derived(p.membership.invite.in_ms!);
 	let space = $derived(gs.msToSpaceMap[spaceMs]!);
@@ -55,9 +55,9 @@
 
 	let accepteeName = $derived(msToAccountNameTxt(accepteeMs));
 	let membershipRoleCode = $derived(p.membership.roleCode);
-	let memberIsOwner = $derived(membershipRoleCode?.num === roleCodes.owner);
+	let memberIsAdmin = $derived(membershipRoleCode?.num === roleCodes.admin);
 	let memberIsMod = $derived(membershipRoleCode?.num === roleCodes.mod);
-	let memberIsModOrOwner = $derived(memberIsMod || memberIsOwner);
+	let memberIsModOrAdmin = $derived(memberIsMod || memberIsAdmin);
 	let authorityOverMember = $derived(membershipRoleCode.num < (spaceContext?.roleCode?.num || 0));
 
 	let membershipFlair = $derived(p.membership.flair);
@@ -65,7 +65,7 @@
 		{
 			[roleCodes.member]: m.assignedMemberBy(),
 			[roleCodes.mod]: m.assignedModBy(),
-			[roleCodes.owner]: m.assignedOwnerBy(),
+			[roleCodes.admin]: m.assignedAdminBy(),
 		}[membershipRoleCode.num],
 	);
 
@@ -149,19 +149,19 @@
 							m && //
 							m.roleCode &&
 							m.accept &&
-							m.roleCode.num === roleCodes.owner &&
+							m.roleCode.num === roleCodes.admin &&
 							m.accept.by_ms !== callerMs,
 					)
 				)
-					return alert(m.assignAnotherOwnerToAssignYourselfToMod());
-				fn = m.enterTheSumOfAAndBToAssignYourselfFromOwnerToMod;
+					return alert(m.assignAnotherAdminToAssignYourselfToMod());
+				fn = m.enterTheSumOfAAndBToAssignYourselfFromAdminToMod;
 			}
 			ok = promptSum((a, b) => fn({ a, b }));
 		} else {
 			let fn = m.enterTheSumOfAAndBToAssignCToMember;
 			if (toMember) 0;
 			else if (toMod) fn = m.enterTheSumOfAAndBToAssignCToMod;
-			else if (newRoleCodeNum === roleCodes.owner) fn = m.enterTheSumOfAAndBToAssignCToCoOwner;
+			else if (newRoleCodeNum === roleCodes.admin) fn = m.enterTheSumOfAAndBToAssignCToCoAdmin;
 			ok = promptSum((a, b) => fn({ a, b, c: accepteeName }));
 		}
 		if (ok) {
@@ -187,7 +187,7 @@
 
 <div class="fx h-8">
 	<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${accepteeMs}_`}>
-		{#if memberIsOwner}
+		{#if memberIsAdmin}
 			<IconCrownFilled />
 		{:else if memberIsMod}
 			<IconShieldFilled />
@@ -203,7 +203,7 @@
 		</p>
 	</a>
 	{#if moreOptionsShown}
-		{#if membershipIsByCaller || callerIsOwner}
+		{#if membershipIsByCaller || callerIsAdmin}
 			<button
 				class="h-8 w-8 xy hover:bg-bg4"
 				onclick={async () => {
@@ -251,7 +251,7 @@
 				<IconUserMinus class="h-5" />
 			</button>
 		{/if}
-		{#if (callerIsOwner && accepteeMs !== callerMs) || (membershipIsByCaller && callerIsMod)}
+		{#if (callerIsAdmin && accepteeMs !== callerMs) || (membershipIsByCaller && callerIsMod)}
 			<button
 				class="h-full shrink-0 w-8 xy hover:bg-bg4"
 				onclick={() => setRole(memberIsMod ? roleCodes.member : roleCodes.mod)}
@@ -263,12 +263,12 @@
 				{/if}
 			</button>
 		{/if}
-		{#if callerIsOwner && memberIsModOrOwner}
+		{#if callerIsAdmin && memberIsModOrAdmin}
 			<button
 				class="h-full shrink-0 w-8 xy hover:bg-bg4"
-				onclick={() => setRole(memberIsOwner ? roleCodes.mod : roleCodes.owner)}
+				onclick={() => setRole(memberIsAdmin ? roleCodes.mod : roleCodes.admin)}
 			>
-				{#if memberIsOwner}
+				{#if memberIsAdmin}
 					<IconCrownOff class="h-5" />
 				{:else}
 					<IconCrown class="h-5" />
@@ -297,7 +297,7 @@
 				{/if}
 			</button>
 		{/if}
-		{#if membershipIsByCaller || (callerIsOwner && !memberIsOwner) || (callerIsMod && !memberIsModOrOwner)}
+		{#if membershipIsByCaller || (callerIsAdmin && !memberIsAdmin) || (callerIsMod && !memberIsModOrAdmin)}
 			<button
 				class="h-full shrink-0 w-8 xy hover:bg-bg4"
 				onclick={async () => {

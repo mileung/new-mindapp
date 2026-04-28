@@ -18,9 +18,9 @@ export let _removeSpaceMember = async (
 	},
 ) => {
 	let { callerRoleCodeNum, callerMs, spaceMs, accountMs } = input;
-	if (callerRoleCodeNum === roleCodes.owner) {
+	if (callerRoleCodeNum === roleCodes.admin) {
 		if (!(await getAnother_roleCodeNumIdAtAccountIdRow(spaceMs, callerMs)))
-			throw new Error(m.assignAnotherOwnerToLeaveThisSpace());
+			throw new Error(m.assignAnotherAdminToLeaveThisSpace());
 	}
 	await moveSpaceMemberCountBy1(spaceMs, false);
 	await tdb.delete(pTable).where(

@@ -37,14 +37,14 @@ export let _setSpaceMemberRole = async ({
 			)?.num;
 
 	let callerIsMod = callerRoleCodeNum === roleCodes.mod;
-	let callerIsOwner = callerRoleCodeNum === roleCodes.owner;
+	let callerIsAdmin = callerRoleCodeNum === roleCodes.admin;
 
 	let updateeIsMod = updateeRoleCodeNum === roleCodes.mod;
 	let updateeIsMember = updateeRoleCodeNum === roleCodes.member;
 
 	let toMember = newRoleCodeNum === roleCodes.member;
 	let toMod = newRoleCodeNum === roleCodes.mod;
-	let toOwner = newRoleCodeNum === roleCodes.owner;
+	let toAdmin = newRoleCodeNum === roleCodes.admin;
 
 	throwIf(
 		updateeRoleCodeNum === undefined ||
@@ -55,7 +55,7 @@ export let _setSpaceMemberRole = async ({
 
 	if (updatingSelf) {
 		if (callerIsMod && toMember) ok = true;
-		if (callerIsOwner && toMod) {
+		if (callerIsAdmin && toMod) {
 			let another_roleCodeNumIdAtAccountIdRow = await getAnother_roleCodeNumIdAtAccountIdRow(
 				spaceMs,
 				callerMs,
@@ -63,8 +63,8 @@ export let _setSpaceMemberRole = async ({
 			ok = !!another_roleCodeNumIdAtAccountIdRow;
 		}
 	} else {
-		if (callerIsOwner) {
-			if (updateeIsMod && (toMember || toOwner)) ok = true;
+		if (callerIsAdmin) {
+			if (updateeIsMod && (toMember || toAdmin)) ok = true;
 			if (updateeIsMember && toMod) ok = true;
 		}
 	}

@@ -55,7 +55,7 @@
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let spaceContext = $derived(getUrlInMsContext());
 	let userCanEdit = $derived.by(() => {
-		if (p.space) return spaceContext?.roleCode?.num === roleCodes.owner;
+		if (p.space) return spaceContext?.roleCode?.num === roleCodes.admin;
 		if (p.account) return p.account.ms === callerMs;
 		return false;
 	});

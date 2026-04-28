@@ -122,7 +122,7 @@
 				class={`fx group text-fg1 hover:text-fg3 ${gs.msToProfileMap[p.post.by_ms]?.name.txt ? '' : 'italic'}`}
 			>
 				<div class={`h-5 fx ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-					{#if authorRole?.num === roleCodes.owner}
+					{#if authorRole?.num === roleCodes.admin}
 						<IconCrownFilled class="w-4" />
 					{:else if authorRole?.num === roleCodes.mod}
 						<IconShieldFilled class="w-4" />

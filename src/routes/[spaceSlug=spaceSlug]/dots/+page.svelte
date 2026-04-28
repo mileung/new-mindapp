@@ -32,7 +32,7 @@
 	// Lucide, Lucide, Phosphor, Remix Icon, idk
 
 	let copiedInviteSlugTimeout: NodeJS.Timeout;
-	let validFor = $state(0);
+	let validFor = $state(week);
 	let maxUsesStr = $state('1');
 	let copiedInviteMs = $state(0);
 
@@ -191,7 +191,7 @@
 			</a>
 		{/if}
 		{#if urlInMs && gs.accounts && urlInMs !== gs.accounts[0].ms}
-			{#if spaceContext?.roleCode?.num === roleCodes.mod || spaceContext?.roleCode?.num === roleCodes.owner}
+			{#if spaceContext?.roleCode?.num === roleCodes.mod || spaceContext?.roleCode?.num === roleCodes.admin}
 				<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 				<p class="text-xl font-black">{m.yourInviteLinks()}</p>
 				<div class="flex">

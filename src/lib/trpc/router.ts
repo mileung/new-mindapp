@@ -259,7 +259,7 @@ export let router = t.router({
 				!c.signedIn ||
 					!c.roleCode ||
 					(input.accountMs !== input.callerMs && //
-						c.roleCode.num !== roleCodes.owner),
+						c.roleCode.num !== roleCodes.admin),
 			);
 			return _removeSpaceMember({ ...input, callerRoleCodeNum: c.roleCode!.num });
 		}),
@@ -298,7 +298,7 @@ export let router = t.router({
 				newRoleCodeNum: z
 					.literal(roleCodes.member)
 					.or(z.literal(roleCodes.mod))
-					.or(z.literal(roleCodes.owner)),
+					.or(z.literal(roleCodes.admin)),
 			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
@@ -329,7 +329,7 @@ export let router = t.router({
 					input.newMemberPermissionCodeNum === undefined,
 			);
 			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: true });
-			throwIf(!c.signedIn || c.roleCode?.num !== roleCodes.owner);
+			throwIf(!c.signedIn || c.roleCode?.num !== roleCodes.admin);
 			return _changeSpaceAttributes(input);
 		}),
 	addPost: generalProcedure
@@ -337,7 +337,7 @@ export let router = t.router({
 		.mutation(async ({ input, ctx }) => {
 			await postLimiter.ping(ctx);
 			let { post } = input;
-			// TODO: allow non zero ms if the caller is an owner of the space (useful for importing old posts)
+			// TODO: allow non zero ms if the caller is an admin of the space (useful for importing old posts)
 			if (post.ms) throw new Error('post ms must be 0');
 			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid by_ms');
 			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid in_ms');
@@ -455,7 +455,7 @@ export let router = t.router({
 				roleCode: true,
 			});
 			throwIf(
-				!c.signedIn || (c.roleCode?.num !== roleCodes.mod && c.roleCode?.num !== roleCodes.owner),
+				!c.signedIn || (c.roleCode?.num !== roleCodes.mod && c.roleCode?.num !== roleCodes.admin),
 			);
 			return _createInviteLink(input);
 		}),
