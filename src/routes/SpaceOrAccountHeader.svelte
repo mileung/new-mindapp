@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		getUrlInMsContext,
+		getWhoObj,
 		getWhoWhereObj,
 		gs,
 		msToAccountNameTxt,
@@ -8,11 +9,12 @@
 	} from '$lib/global-state.svelte';
 	import { alertError, deepClone, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
+	import { formatMs } from '$lib/time';
 	import { trpc } from '$lib/trpc/client';
 	import { type PublicProfile } from '$lib/types/accounts';
 	import { updateLocalCache } from '$lib/types/local-cache';
 	import { permissionCodes, roleCodes, type Space } from '$lib/types/spaces';
-	import { IconDeviceFloppy, IconEdit, IconX } from '@tabler/icons-svelte';
+	import { IconDeviceFloppy, IconEdit, IconPin, IconX } from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
@@ -128,15 +130,17 @@
 							try {
 								let ms =
 									p.space?.ms || p.account?.ms
-										? (
-												await (
-													p.space ? trpc().changeSpaceAttributes : trpc().changeMyAccountAttributes
-												).mutate({
-													...(await getWhoWhereObj()),
-													...changes,
-												})
+										? (p.space
+												? await trpc().changeSpaceAttributes.mutate({
+														...(await getWhoWhereObj()),
+														...changes,
+													})
+												: await trpc().changeMyAccountAttributes.mutate({
+														...(await getWhoObj()),
+														...changes,
+													})
 											).ms
-										: Date.now();
+										: 0;
 								updateLocalCache((lc) => {
 									if (p.account) {
 										if (changes.nameTxt !== undefined)
@@ -205,11 +209,13 @@
 			bind:value={draftSettings.bioOrDescriptionTxt}
 			class="resize-y w-full px-2 py-0.5 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4 block"
 		></textarea>
-		<p class="font-bold">{m.pinnedQuery()}</p>
-		<input
-			bind:value={draftSettings.pinnedQueryTxt}
-			class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
-		/>
+		{#if p.space}
+			<p class="font-bold">{m.pinnedQuery()}</p>
+			<input
+				bind:value={draftSettings.pinnedQueryTxt}
+				class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
+			/>
+		{/if}
 		{#if p.space && p.space.ms && p.space.ms !== callerMs}
 			<div class="mt-2 flex">
 				<div class="flex-1">
@@ -255,15 +261,22 @@
 			{/if}
 		</div>
 		<p class="whitespace-pre-wrap">{draftSettings.bioOrDescriptionTxt}</p>
-		{#if draftSettings.pinnedQueryTxt}
-			<a
-				class="text-fg1 hover:text-fg3 underline decoration-fg1 hover:decoration-fg3"
-				href={`/__${accountOrSpaceMs}?q=${draftSettings.pinnedQueryTxt}`}
-				>{m.pinnedQuery()}: {draftSettings.pinnedQueryTxt}</a
-			>
-		{:else if p.space}
-			<p class="text-fg2">{m.nothingPinned()}</p>
-		{/if}
+		<div class="fx text-nowrap">
+			{#if draftSettings.pinnedQueryTxt}
+				<a
+					class="truncate fx text-fg1 hover:text-fg3 underline decoration-fg1 hover:decoration-fg3"
+					href={`/__${accountOrSpaceMs}?q=${draftSettings.pinnedQueryTxt}`}
+				>
+					<IconPin class="shrink-0 w-4 mr-1" />
+					<span class="truncate">
+						{draftSettings.pinnedQueryTxt}
+					</span>
+				</a>
+			{:else if p.space}
+				<p class="text-fg2">{m.nothingPinned()}</p>
+			{/if}
+			<p class="ml-auto text-fg2">{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}</p>
+		</div>
 		{#if visibilityAndNewMembersCan}
 			<p class="text-fg2">{visibilityAndNewMembersCan}</p>
 		{/if}

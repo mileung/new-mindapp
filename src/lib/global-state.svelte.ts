@@ -49,7 +49,7 @@ class GlobalState {
 		>
 	>({});
 
-	msToProfileMap = $state<Record<number, undefined | PublicProfile>>({});
+	msToProfileMap = $state<Record<number, undefined | null | PublicProfile>>({});
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
 	spaceMsToTagsMap = $state<
 		Record<

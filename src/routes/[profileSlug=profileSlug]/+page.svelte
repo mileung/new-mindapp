@@ -3,37 +3,66 @@
 	import { page } from '$app/state';
 	import { getWhoObj, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
+	import { formatMs } from '$lib/time';
 	import { trpc } from '$lib/trpc/client';
-	import { type MyAccount, type PublicProfile } from '$lib/types/accounts';
 	import { signOut } from '$lib/types/local-cache';
 	import { IconChevronRight, IconLogout2, IconMail } from '@tabler/icons-svelte';
-	import { onMount } from 'svelte';
+	import { untrack } from 'svelte';
 	import SpaceIcon from '../SpaceIcon.svelte';
 	import SpaceOrAccountHeader from '../SpaceOrAccountHeader.svelte';
-	let p: { profileMs: number } = $props();
 
-	let publicProfile = $state<null | (PublicProfile & Partial<MyAccount>)>();
+	let caller = $derived(gs.accounts?.[0]);
+	let callerMs = $derived(caller?.ms);
 	let profileMs = $derived(+page.params.profileSlug!.slice(1, -1));
-	onMount(async () => {
-		let whoObj = await getWhoObj();
-
-		publicProfile =
-			profileMs === gs.accounts?.[0].ms
-				? { ...gs.accounts[0], mutualSpaceMss: [] }
-				: (await trpc().getPublicProfile.query({
+	let publicProfile = $derived(gs.msToProfileMap[profileMs]);
+	let mutualSpaceMsToJoinMsMap = $derived(
+		publicProfile?.callerMsToMutualSpaceMsToJoinMsMap?.[callerMs!],
+	);
+	let mutualSpaceMsAndJoinMsArr = $derived(
+		callerMs === undefined || callerMs === profileMs
+			? []
+			: Object.entries(mutualSpaceMsToJoinMsMap || {}).map(
+					([a, b]) => [+a, b], //
+				),
+	);
+	$effect(() => {
+		if (mutualSpaceMsToJoinMsMap || publicProfile === null) return;
+		untrack(async () => {
+			let whoObj = await getWhoObj();
+			try {
+				if (profileMs === callerMs) {
+					publicProfile = {
+						...caller!,
+						callerMsToMutualSpaceMsToJoinMsMap: {
+							...publicProfile?.callerMsToMutualSpaceMsToJoinMsMap,
+							[callerMs]: {},
+						},
+					};
+				} else {
+					let res = await trpc().getPublicProfile.query({
 						...whoObj,
 						profileMs,
-						...(whoObj.callerMs //
-							? { possibleMutualSpaceMss: gs.accounts?.[0].joinedSpaceContexts.map((j) => j.ms) }
-							: {}),
-					})) || null;
-
-		if (publicProfile) {
+						possibleMutualSpaceMss: gs.accounts?.[0].joinedSpaceContexts.map((j) => j.ms),
+					});
+					// console.log('res:', res);
+					publicProfile = {
+						ms: profileMs,
+						name: res.name,
+						bio: res.bio,
+						callerMsToMutualSpaceMsToJoinMsMap: {
+							...publicProfile?.callerMsToMutualSpaceMsToJoinMsMap,
+							[callerMs!]: res.mutualSpaceMsToJoinMsMap || {},
+						},
+					};
+				}
+			} catch (error) {
+				publicProfile = null;
+			}
 			gs.msToProfileMap = {
 				...gs.msToProfileMap,
-				[publicProfile.ms]: publicProfile,
+				[profileMs]: publicProfile,
 			};
-		}
+		});
 	});
 </script>
 
@@ -43,12 +72,12 @@
 	<div class="p-2 max-w-lg">
 		<SpaceOrAccountHeader account={publicProfile} />
 		{#if publicProfile.ms}
-			{#if publicProfile.ms === gs.accounts?.[0].ms}
+			{#if publicProfile.ms === callerMs}
 				<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 				<p class="text-sm text-fg2">{m.private()}</p>
 				<button
 					class="px-2 h-9 xy bg-bg4 border-b-2 border-emerald-400 dark:border-emerald-500 hover:bg-bg7 hover:text-fg3 hover:border-emerald-500 dark:hover:border-emerald-400"
-					onclick={() => alert(publicProfile?.email?.txt)}
+					onclick={() => alert(caller?.email?.txt)}
 				>
 					<IconMail class="w-5 mr-1" />
 					{m.showEmail()}
@@ -65,7 +94,7 @@
 					onclick={(e) => {
 						if (!e.metaKey && !e.metaKey && !e.metaKey) {
 							e.preventDefault();
-							goto('/reset-password', { state: { prefilledEmail: publicProfile!.email!.txt } });
+							goto('/reset-password', { state: { prefilledEmail: caller!.email!.txt } });
 						}
 					}}
 					class="inline-flex pl-2 h-9 xy bg-bg4 border-b-2 border-slate-400 dark:border-slate-500 hover:bg-bg7 hover:text-fg3 hover:border-slate-500 dark:hover:border-slate-400"
@@ -73,20 +102,21 @@
 					<IconChevronRight class="w-5 ml-1" />
 				</a>
 			{/if}
-			{#if publicProfile?.mutualSpaceMss?.length}
+			{#if mutualSpaceMsAndJoinMsArr?.length}
 				<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 				<p class="text-xl font-bold">{m.mutualSpaces()}</p>
-				{#each publicProfile.mutualSpaceMss as mutualSpaceMs}
+				{#each mutualSpaceMsAndJoinMsArr as [spaceMs, joinMs]}
 					<a
-						href={`/__${mutualSpaceMs}?q=by:${page.params.profileSlug}`}
+						href={`/__${spaceMs}?q=by:${page.params.profileSlug}`}
 						class="h-9 fx hover:bg-bg3 w-full"
 					>
-						<SpaceIcon ms={mutualSpaceMs} />
-						<p class="ml-2 text-lg font-bold">{msToSpaceNameTxt(mutualSpaceMs)}</p>
+						<SpaceIcon ms={spaceMs} class="h-8 w-8" />
+						<p class="ml-2 text-lg font-bold">{msToSpaceNameTxt(spaceMs)}</p>
+						<p class="ml-auto">{m.joinedD({ d: formatMs(joinMs, 'day') })}</p>
 					</a>
 				{/each}
-			{:else}
-				<p class="text-fg2">No mutual spaces</p>
+			{:else if profileMs !== callerMs}
+				<p class="text-fg2">{@html callerMs ? m.noMutualSpaces() : m.signInToSeeMutualSpaces()}</p>
 			{/if}
 		{/if}
 	</div>

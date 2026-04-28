@@ -66,7 +66,9 @@ export let PublicProfileSchema = z.strictObject({
 	ms: z.number(),
 	name: GranularTxtPropSchema,
 	bio: GranularTxtPropSchema.optional(),
-	mutualSpaceMss: z.array(z.number()).optional(),
+	callerMsToMutualSpaceMsToJoinMsMap: z
+		.record(z.number(), z.record(z.number(), z.number()).optional())
+		.optional(),
 });
 export type PublicProfile = z.infer<typeof PublicProfileSchema>;
 

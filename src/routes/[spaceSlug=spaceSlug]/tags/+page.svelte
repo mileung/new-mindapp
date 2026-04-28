@@ -39,7 +39,6 @@
 			else break;
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
-		console.log('getSpaceTags res', res);
 		res.tags.length && e.detail.loaded();
 
 		let endReached = res.tags.length < tagsPerLoad;
@@ -61,7 +60,7 @@
 				: [],
 		),
 	);
-	let pageSelected = $derived(tags.every((t) => savedTagsSet.has(t.txt)));
+	let pageSelected = $derived(!!tags.length && tags.every((t) => savedTagsSet.has(t.txt)));
 </script>
 
 {#if urlInMs === undefined || !gs.accounts}
@@ -71,57 +70,63 @@
 {:else if !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
-	<div class="p-2 pt-0 w-full max-w-lg">
-		<div class="sticky top-0 bg-bg1 fx justify-between">
-			<p class="text-xl font-bold">
-				{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
-			</p>
-			<button
-				class="h-8 xy pl-0.5 pr-1 hover:bg-bg4 text-fg2 hover:text-fg1"
-				onclick={() => {
-					if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
-					updateSavedTags(
-						tags.map((t) => t.txt),
-						pageSelected,
-					);
-				}}
-			>
-				{#if pageSelected}
-					<IconDeselect class="w-5 mr-1" />
-				{:else}
-					<IconSelectAll class="w-5 mr-1" />
+	<div class="px-2 w-full max-w-lg">
+		<div class="">
+			<div class="sticky top-0 bg-bg1 fx justify-between">
+				<p class="text-xl font-bold">
+					{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
+				</p>
+				{#if tags.length}
+					<button
+						class="h-8 xy pl-0.5 pr-1 hover:bg-bg4 text-fg2 hover:text-fg1"
+						onclick={() => {
+							if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
+							updateSavedTags(
+								tags.map((t) => t.txt),
+								pageSelected,
+							);
+						}}
+					>
+						{#if pageSelected}
+							<IconDeselect class="w-5 mr-1" />
+						{:else}
+							<IconSelectAll class="w-5 mr-1" />
+						{/if}
+						{pageSelected ? m.unsaveLoadedTags() : m.saveLoadedTags()}
+					</button>
 				{/if}
-				{pageSelected ? m.unsaveLoadedTags() : m.saveLoadedTags()}
-			</button>
-		</div>
-		{#each tags || [] as tag, i (tag.txt)}
-			<div class="flex text-lg">
-				{tag.num} -
-				<a
-					href={`/__${urlInMs}?q=${`[${tag.txt}]`}`}
-					class="px-1 font-bold hover:underline hover:bg-bg3"
-				>
-					{tag.txt}
-				</a>
-				<button
-					class="group flex-1 hover:bg-bg3 pr-1"
-					onclick={() => updateSavedTags([tag.txt], savedTagsSet.has(tag.txt))}
-				>
-					<IconSquare class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'hidden' : 'block'}`} />
-					<IconSquareCheckFilled
-						class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'block' : 'hidden'}`}
-					/>
-				</button>
 			</div>
-		{/each}
+			{#each tags || [] as tag, i (tag.txt)}
+				<div class="flex text-lg">
+					{tag.num} -
+					<a
+						href={`/__${urlInMs}?q=${`[${tag.txt}]`}`}
+						class="px-1 font-bold hover:underline hover:bg-bg3"
+					>
+						{tag.txt}
+					</a>
+					<button
+						class="group flex-1 hover:bg-bg3 pr-1"
+						onclick={() => updateSavedTags([tag.txt], savedTagsSet.has(tag.txt))}
+					>
+						<IconSquare class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'hidden' : 'block'}`} />
+						<IconSquareCheckFilled
+							class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'block' : 'hidden'}`}
+						/>
+					</button>
+				</div>
+			{/each}
+		</div>
 		<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
-			<p slot="noResults" class="m-2 text-lg text-fg2">
-				{m.noTagsFound()}
-			</p>
-			<p slot="noMore" class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 			<p slot="error" class="m-2 text-lg text-fg2">
 				{m.placeholderError()}
 			</p>
+			<p slot="noResults" class="m-2 text-lg text-fg2">
+				{m.noTagsFound()}
+			</p>
+			<div slot="noMore" class={'h-[calc(100vh-36px)] xs:h-screen'}>
+				<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+			</div>
 		</InfiniteLoading>
 	</div>
 {/if}

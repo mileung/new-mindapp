@@ -72,11 +72,10 @@
 			!viewable || //
 			!gs.accounts ||
 			urlInMs === undefined ||
-			callerMs === undefined ||
-			urlInMs < 1
+			callerMs === undefined
 		)
 			return;
-		if (dotsFeed?.endReached) {
+		if (urlInMs < 1 || dotsFeed?.endReached) {
 			e.detail.loaded();
 			return e.detail.complete();
 		}
@@ -178,12 +177,18 @@
 {:else if !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
-	<div class="p-2 w-full max-w-lg">
+	<div class="p-2 pb-0 w-full max-w-lg">
 		<SpaceOrAccountHeader {space} />
 		{#if gs.devMode && space.ms && spaceContext}
 			<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 			<p class="text-xl font-black">{m.yourApiKeys()}</p>
-			TODO
+			<a
+				target="_blank"
+				class="text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
+				href="https://github.com/search?q=repo%3Amileung%2Fnew-mindapp%20TODO&type=code"
+			>
+				TODO
+			</a>
 		{/if}
 		{#if urlInMs && gs.accounts && urlInMs !== gs.accounts[0].ms}
 			{#if spaceContext?.roleCode?.num === roleCodes.mod || spaceContext?.roleCode?.num === roleCodes.owner}
@@ -366,10 +371,12 @@
 				<MembershipBlock {membership} />
 			{/each}
 		{/if}
-		{#if viewable && urlInMs && urlInMs !== callerMs}
+		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>
 				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
-				<p slot="noMore" class="mb-2 text-lg text-fg2">{urlInMs === callerMs ? '' : m.theEnd()}</p>
+				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
+					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+				</div>
 			</InfiniteLoading>
 		{/if}
 	</div>

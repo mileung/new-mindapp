@@ -357,7 +357,7 @@
 				</div>
 			{/if}
 			{@render continueAndChangeEmailBtn()}
-			<p class="mt-2 text-base">
+			<p class={gs.accounts?.[0].ms && p.resettingPassword ? 'hidden' : 'mt-2 text-base'}>
 				{p.signingIn ? m.newToMindapp() : m.haveAnAccount()}
 				<a href={p.signingIn ? '/create-account' : '/sign-in'} class="text-hl1 hover:text-hl2">
 					{p.signingIn ? m.createAccount() : m.signIn()}
