@@ -5,7 +5,6 @@ import { and, asc, desc } from 'drizzle-orm';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let tagsPerLoad = 88;
@@ -34,7 +33,7 @@ export let _getSpaceTags = async (
 			and(
 				pf.noAtId,
 				pf.ms.gt0,
-				pf.in_ms.eq(input.spaceMs),
+				!input.spaceMs ? undefined : pf.in_ms.eq(input.spaceMs),
 				pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
 				pf.num.lte(input.fromCount),
 				pf.num.gt0,
@@ -46,9 +45,9 @@ export let _getSpaceTags = async (
 
 	return {
 		tags: tagIdAndTxtWithNumAsCountRows.map((r) => ({
-			...getIdObj(r),
-			txt: r.txt!, //
+			txt: r.txt!,
 			num: r.num,
+			...(r.in_ms ? { in_ms: r.in_ms } : {}),
 		})),
 	};
 };

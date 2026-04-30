@@ -173,6 +173,8 @@
 	"canReactPostSetBy": "Can react/post set by",
 	"permissionsUpdatedBy": "Permissions updated by",
 	"noPostsAwaitingYourResponse": "No posts awaiting your response",
+	"ownerView": "Owner view",
+	"mergedView": "Merged view",
 	"profile": "Profile",
 	"userGuide": "User guide",
 	"setPassword": "Set password",

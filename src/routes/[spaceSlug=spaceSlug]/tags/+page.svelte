@@ -17,6 +17,7 @@
 	} from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import PromptSignIn from '../../PromptSignIn.svelte';
+	import SpaceIcon from '../../SpaceIcon.svelte';
 
 	let urlInMs = $derived(getUrlInMs()!);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
@@ -39,6 +40,7 @@
 			else break;
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
+		console.log('res:', res);
 		res.tags.length && e.detail.loaded();
 
 		let endReached = res.tags.length < tagsPerLoad;
@@ -98,12 +100,18 @@
 			</div>
 			{#each tags || [] as tag, i (tag.txt)}
 				<div class="flex text-lg">
-					{tag.num} -
 					<a
-						href={`/__${urlInMs}?q=${`[${tag.txt}]`}`}
-						class="px-1 font-bold hover:underline hover:bg-bg3"
+						class="fx px-1 group hover:bg-bg3 text-nowrap overflow-scroll"
+						href={`/__${urlInMs}?q=${`[${tag.txt}]${!urlInMs && tag.in_ms ? ` in_ms:${tag.in_ms}` : ''}`}`}
 					>
-						{tag.txt}
+						{tag.num} -
+						<span class="ml-1.5 font-bold group-hover:underline">
+							{tag.txt}
+						</span>
+						{#if !urlInMs && tag.in_ms}
+							<SpaceIcon ms={tag.in_ms} class="shrink-0 h-5 w-5 ml-2 mr-1" />
+							{msToSpaceNameTxt(tag.in_ms)}
+						{/if}
 					</a>
 					<button
 						class="group flex-1 hover:bg-bg3 pr-1"
@@ -121,10 +129,10 @@
 			<p slot="error" class="m-2 text-lg text-fg2">
 				{m.placeholderError()}
 			</p>
-			<p slot="noResults" class="m-2 text-lg text-fg2">
-				{m.noTagsFound()}
-			</p>
-			<div slot="noMore" class={'h-[calc(100vh-36px)] xs:h-screen'}>
+			<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
+				<p class="m-2 text-lg text-fg2">{m.noTagsFound()}</p>
+			</div>
+			<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
 				<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 			</div>
 		</InfiniteLoading>

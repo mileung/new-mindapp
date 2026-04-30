@@ -1,5 +1,6 @@
 import { dev } from '$app/environment';
 import { page } from '$app/state';
+import { PUBLIC_OWNER_MSS } from '$env/static/public';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { identikana } from './js';
 import { m } from './paraglide/messages';
@@ -60,6 +61,7 @@ class GlobalState {
 					tags: {
 						txt: string;
 						num: number;
+						in_ms?: number;
 					}[];
 			  }
 		>
@@ -141,7 +143,9 @@ export let gsdb = async () => {
 export let getPromptSigningIn = () =>
 	gs.accounts &&
 	!gs.accounts[0].ms &&
-	(getUrlInMs() === 8 || page.url.pathname === '/create-space');
+	(getUrlInMs() === 8 ||
+		page.url.pathname === '/create-space' ||
+		page.url.pathname === '/merged-view');
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;
@@ -279,4 +283,12 @@ export let getUrlInMsContext = (): undefined | SpaceContext => {
 				accentCode: { num: accentCodes.none },
 			}
 		: caller.joinedSpaceContexts.find((c) => c.ms === urlInMs);
+};
+
+export let getCallerIsOwner = () => {
+	let publicOwnerMss = JSON.parse(PUBLIC_OWNER_MSS) as number[];
+	let callerMs = gs.accounts?.[0].ms;
+	return Array.isArray(publicOwnerMss) && callerMs !== undefined
+		? publicOwnerMss.includes(callerMs)
+		: false;
 };

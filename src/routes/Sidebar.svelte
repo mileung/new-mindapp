@@ -4,6 +4,7 @@
 	import { textInputFocused } from '$lib/dom';
 	import {
 		getBottomOverlayShown,
+		getCallerIsOwner,
 		gs,
 		msToSpaceNameTxt,
 		resetBottomOverlay,
@@ -18,6 +19,7 @@
 	} from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import {
+		IconArrowMergeBoth,
 		IconBook2,
 		IconDotsVertical,
 		IconLogout,
@@ -28,6 +30,7 @@
 		IconTags,
 		IconUserPlus,
 		IconUserSquare,
+		IconView360,
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
@@ -49,6 +52,7 @@
 	let showSpaceMenu = $state(false);
 	let tagIndex = $state(-1);
 
+	let callerIsOwner = $derived(getCallerIsOwner());
 	let tagFilter = $derived(
 		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
@@ -88,6 +92,7 @@
 					else window.scrollTo({ top: 0 });
 				}
 				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
+					// TODO: this should work with all the sidebar tabs
 					let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
 					let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
@@ -262,16 +267,14 @@
 						class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}
 						onmousedown={(e) => e.preventDefault()}
 					>
+						{#if tagIndex === i && !tagXFocused}
+							<div class="absolute z-10 h-8 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
+						{/if}
 						<button
 							bind:this={tagSuggestionsRefs[i]}
 							class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
 							onclick={() => addTagToSearchInput(tag)}
 						>
-							{#if tagIndex === i && !tagXFocused}
-								<div
-									class="absolute left-0 top-0 bottom-0 w-0.5 bg-hl1 group-hover/tag:bg-hl2"
-								></div>
-							{/if}
 							{tag}
 						</button>
 						{#if savedTagsSet.has(tag)}
@@ -367,26 +370,6 @@
 					<IconSquarePlus2 class="shrink-0 w-6" />
 					<p class="text-nowrap overflow-scroll">{m.createSpace()}</p>
 				</a>
-				<!-- <div class="flex h-10 text-fg2">
-					<a
-						href="/create-space"
-						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'text-fg1 bg-bg5' : ''}`}
-					>
-						<IconSquarePlus2 class="shrink-0 w-6" />
-					</a>
-					<a
-						href={`/_${gs.accounts?.[0].ms || 0}_`}
-						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'text-fg1 bg-bg5' : ''}`}
-					>
-						<IconUserSquare class="shrink-0 w-6" />
-					</a>
-					<a
-						href="/settings"
-						class={`xy flex-1 hover:text-fg1 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'text-fg1 bg-bg5' : ''}`}
-					>
-						<IconSettings class="shrink-0 w-6" />
-					</a>
-				</div> -->
 				{#each sidebarSpaceMss as spaceMs (spaceMs)}
 					<div
 						class={`flex group/space ${highlightLastSeenInMs && spaceMs === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
@@ -423,16 +406,36 @@
 						</a>
 					</div>
 				{/each}
+				{#if gs.accounts}
+					<a
+						href="/merged-view"
+						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/merged-view' ? 'bg-bg5' : ''}`}
+					>
+						<IconArrowMergeBoth class="shrink-0 w-6" />
+						<p class="text-nowrap overflow-scroll">{m.mergedView()}</p>
+					</a>
+				{/if}
+				{#if callerIsOwner}
+					<a
+						href="/owner-view"
+						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/owner-view' ? 'bg-bg5' : ''}`}
+					>
+						<IconView360 class="shrink-0 w-6" />
+						<p class="text-nowrap overflow-scroll">{m.ownerView()}</p>
+					</a>
+				{/if}
 			{/if}
 			<div class="flex-1" onclick={(e) => e.stopPropagation()}></div>
 			<div class={`${showAccountMenu ? '' : 'hidden xs:block'}`}>
-				<a
-					href={`/_${gs.accounts?.[0].ms || 0}_`}
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
-				>
-					<IconUserSquare class="shrink-0 w-6" />
-					<p class="text-nowrap overflow-scroll">{m.profile()}</p>
-				</a>
+				{#if gs.accounts}
+					<a
+						href={`/_${gs.accounts[0].ms}_`}
+						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
+					>
+						<IconUserSquare class="shrink-0 w-6" />
+						<p class="text-nowrap overflow-scroll">{m.profile()}</p>
+					</a>
+				{/if}
 				<a
 					href="/user-guide"
 					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}

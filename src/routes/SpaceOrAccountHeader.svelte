@@ -261,21 +261,23 @@
 			{/if}
 		</div>
 		<p class="whitespace-pre-wrap">{draftSettings.bioOrDescriptionTxt}</p>
-		<div class="fx text-nowrap">
+		<div class="flex text-nowrap">
 			{#if draftSettings.pinnedQueryTxt}
 				<a
-					class="truncate fx text-fg1 hover:text-fg3 underline decoration-fg1 hover:decoration-fg3"
+					class="flex-1 fx overflow-hidden text-fg1 hover:text-fg3 underline decoration-fg1 hover:bg-bg4 hover:decoration-fg3"
 					href={`/__${accountOrSpaceMs}?q=${draftSettings.pinnedQueryTxt}`}
 				>
 					<IconPin class="shrink-0 w-4 mr-1" />
-					<span class="truncate">
+					<div class="flex-1 overflow-scroll">
 						{draftSettings.pinnedQueryTxt}
-					</span>
+					</div>
 				</a>
 			{:else if p.space}
 				<p class="text-fg2">{m.nothingPinned()}</p>
 			{/if}
-			<p class="ml-auto text-fg2">{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}</p>
+			<p class="text-fg2">
+				{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}
+			</p>
 		</div>
 		{#if visibilityAndNewMembersCan}
 			<p class="text-fg2">{visibilityAndNewMembersCan}</p>

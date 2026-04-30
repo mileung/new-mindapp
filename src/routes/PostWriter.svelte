@@ -145,7 +145,7 @@
 	<div class="flex group bg-bg4 relative w-full">
 		<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
 		<button
-			class="flex-1 h-8 pl-2 fx gap-1 truncate text-left"
+			class="flex-1 h-8 pl-2 fx gap-1 text-left text-nowrap overflow-scroll"
 			onclick={() => {
 				let post = gs.writingEdit || gs.writingTo;
 				post && scrollToHighlight(getIdStr(post));
@@ -158,7 +158,7 @@
 			{:else}
 				<IconPencil class="w-5" />
 			{/if}
-			<p class="flex-1 truncate">
+			<p class="flex-1">
 				{gs.writingNew ? m.newPost() : highlightedPostLastCore}
 			</p>
 		</button>
@@ -319,14 +319,14 @@
 		>
 			{#each suggestedTags as tag, i}
 				<div class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}>
+					{#if tagIndex === i && !xFocused}
+						<div class="absolute z-10 h-8 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
+					{/if}
 					<button
 						bind:this={tagSuggestionsRefs[i]}
-						class={`relative h-8 truncate flex-1 text-left px-2 text-nowrap text-lg`}
+						class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
 						onclick={() => addTag(tag)}
 					>
-						{#if tagIndex === i && !xFocused}
-							<div class="absolute left-0 top-0 bottom-0 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
-						{/if}
 						{tag}
 					</button>
 					{#if savedTagsSet.has(tag)}
