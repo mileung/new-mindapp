@@ -1,5 +1,5 @@
 import { tdb } from '$lib/server/db';
-import { minute, week } from '$lib/time';
+import { getExpiredRowsFilters } from '$lib/server/sessions';
 import { and, or } from 'drizzle-orm';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -40,29 +40,7 @@ export let _revokeInviteLink = async (
 			.delete(pTable)
 			.where(
 				or(
-					and(
-						pf.noAtId,
-						pf.ms.lt(ms - 5 * minute),
-						pf.code.eq(pc.otpMs_Pin_StrikeCountIdAndEmailTxt),
-						pf.num.eq0,
-					),
-					and(
-						pf.at_ms.gt0,
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						pf.ms.gt0,
-						or(
-							pf.ms.lt(ms - week),
-							and(
-								pf.by_ms.gt0, //
-								pf.by_ms.lt(ms),
-							),
-						),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-						pf.num.eq0,
-						pf.txt.isNotNull,
-					),
+					...getExpiredRowsFilters(ms),
 					and(
 						or(
 							and(

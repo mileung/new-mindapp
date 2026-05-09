@@ -69,6 +69,14 @@ export let PublicProfileSchema = z.strictObject({
 	callerMsToMutualSpaceMsToJoinMsMap: z
 		.record(z.number(), z.record(z.number(), z.number()).optional())
 		.optional(),
+	banned: z
+		.object({
+			ms: z.number(), //
+			by_ms: z.number().optional(),
+			bannerNameTxt: z.string().optional(),
+		})
+		.optional(),
+	email: GranularTxtPropSchema.optional(), // email should only be visible to owners
 });
 export type PublicProfile = z.infer<typeof PublicProfileSchema>;
 

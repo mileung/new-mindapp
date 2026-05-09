@@ -1,5 +1,5 @@
 import { tdb } from '$lib/server/db';
-import { getValidAuthCookie } from '$lib/server/sessions';
+import { getExpiredRowsFilters, getValidAuthCookie } from '$lib/server/sessions';
 import { week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { type WhoObj } from '$lib/types/parts';
@@ -11,44 +11,48 @@ import { pTable } from '../parts/partsTable';
 export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean }) => {
 	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	if (sessionIdObj) {
+		let ms = Date.now();
 		await tdb
 			.delete(pTable)
 			.where(
-				input.everywhere
-					? or(
-							and(
+				or(
+					...getExpiredRowsFilters(ms),
+					input.everywhere
+						? or(
+								and(
+									pf.atId({ at_ms: input.callerMs }),
+									pf.ms.gt0,
+									pf.in_ms.eq0,
+									or(
+										pf.code.eq(pc.clientKeyTxtMsAtAccountId),
+										pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+									),
+									pf.num.eq0,
+									pf.txt.isNotNull,
+								),
+								and(
+									pf.at_ms.gt0,
+									pf.at_by_ms.eq0,
+									pf.at_in_ms.eq0,
+									pf.ms.lt(ms - week),
+									pf.in_ms.eq0,
+									or(
+										pf.code.eq(pc.clientKeyTxtMsAtAccountId),
+										pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+									),
+									pf.num.eq0,
+									pf.txt.isNotNull,
+								),
+							)
+						: and(
 								pf.atId({ at_ms: input.callerMs }),
-								pf.ms.gt0,
+								pf.ms.eq(sessionIdObj.ms),
 								pf.in_ms.eq0,
-								or(
-									pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-									pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-								),
+								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 								pf.num.eq0,
-								pf.txt.isNotNull,
+								pf.txt.eq(sessionIdObj.txt),
 							),
-							and(
-								pf.at_ms.gt0,
-								pf.at_by_ms.eq0,
-								pf.at_in_ms.eq0,
-								pf.ms.lt(Date.now() - week),
-								pf.in_ms.eq0,
-								or(
-									pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-									pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-								),
-								pf.num.eq0,
-								pf.txt.isNotNull,
-							),
-						)
-					: and(
-							pf.atId({ at_ms: input.callerMs }),
-							pf.ms.eq(sessionIdObj.ms),
-							pf.in_ms.eq0,
-							pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-							pf.num.eq0,
-							pf.txt.eq(sessionIdObj.txt),
-						),
+				),
 			);
 	}
 };

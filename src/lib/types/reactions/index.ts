@@ -1,6 +1,11 @@
+import { is1Emoji } from '$lib/js';
 import { z } from 'zod';
-import { reactionList } from './reactionList';
+import { shortReactionList } from './reactionList';
 
+export let EmojiStringSchema = z.string().refine(
+	(s) => is1Emoji(s), //
+	'emoji must pass is1Emoji',
+);
 export let ReactionSchema = z
 	.strictObject({
 		at_ms: z.number().gte(0),
@@ -9,7 +14,7 @@ export let ReactionSchema = z
 		ms: z.number().gte(0),
 		by_ms: z.number().gte(0),
 		in_ms: z.number().gte(0),
-		emoji: z.enum(reactionList),
+		emoji: EmojiStringSchema,
 	})
 	.superRefine((data, ctx) => {
 		if (data.at_in_ms !== data.in_ms) {
@@ -22,4 +27,4 @@ export let ReactionSchema = z
 	});
 
 export type Reaction = z.infer<typeof ReactionSchema>;
-export type RxnEmoji = (typeof reactionList)[number];
+export type RxnEmoji = (typeof shortReactionList)[number];

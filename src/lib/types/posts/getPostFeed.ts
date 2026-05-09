@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ import {
 	reduceTxtRowsToMap,
 	type GranularNumProp,
 	type GranularTxtProp,
-	type WhoWhereObj,
+	type WhoObj,
 } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
@@ -43,21 +43,25 @@ export let GetPostFeedArgSchema = ParsedSearchSchema.extend({
 
 export type GetPostFeedArg = z.infer<typeof GetPostFeedArgSchema>;
 
-export let getPostFeed = async (q: GetPostFeedArg, forceUsingLocalDb?: boolean) => {
-	let baseInput = await getWhoWhereObj();
-	let input = { ...q, ...baseInput };
+export let getPostFeed = async (q: GetPostFeedArg, useLocalDb: boolean) => {
+	let input = { ...q, ...(await getWhoObj()) };
 	// TODO: use local db as a fallback when cloud db can't find a post
-	return baseInput.spaceMs && !forceUsingLocalDb
-		? trpc().getPostFeed.query(input)
-		: _getPostFeed(await gsdb(), input);
+	return useLocalDb //
+		? _getPostFeed(await gsdb(), input, false)
+		: trpc().getPostFeed.query(input);
 };
 
 // TODO: fetch cited posts right after submitting post
 
-export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) => {
+export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLocalDb: boolean) => {
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 	// console.log('_getPostFeed q:', q);
+
+	if (!useLocalDb) {
+		// let c = await _getCallerContext(ctx, input, {signedIn: true,});
+		// throwIf(input.callerMs && (!c.signedIn ));
+	}
 
 	let bumpedFirst = q.sortedBy === 'bumped';
 	let newFirst = q.sortedBy === 'new';
@@ -106,7 +110,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 					// ...byMsInMsFilters,
 					// ...excludePostIdsFilters,
-					pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+					pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 					// pf.num.gte0,
 					// pf.txt.isNull,
 				),
@@ -155,7 +159,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		// to only show posts that cite the included posts from the same space.
 
 		let {
-			[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtParentPostIdRows = [],
+			[pc.postIdLastVersionNumAtParentPostId]: postIdLastVersionNumAtParentPostIdRows = [],
 			[pc.childPostIdWithNumAsDepthAtRootId]: childPostIdWithNumAsDepthAtRootIdRows = [],
 			[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
 		} = channelPartsByCode(
@@ -170,7 +174,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 							or(
 								and(
 									pf.noAtId, //
-									pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+									pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 								),
 								pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
 							),
@@ -193,7 +197,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		);
 
 		let rootIdObjs = [
-			...postIdWNumAsLastVersionAtParentPostIdRows,
+			...postIdLastVersionNumAtParentPostIdRows,
 			...childPostIdWithNumAsDepthAtRootIdRows,
 		].map((idObj) => ({
 			...id0,
@@ -202,7 +206,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 				: getIdObj(idObj)),
 		}));
 		let {
-			[pc.postIdWithNumAsLastVersionAtParentPostId]: citingPostIdWNumAsLastVersionAtPPostId = [],
+			[pc.postIdLastVersionNumAtParentPostId]: citingPostIdWNumAsLastVersionAtPPostId = [],
 			[pc.childPostIdWithNumAsDepthAtRootId]: descendentPostIdRows = [],
 		} = channelPartsByCode(
 			rootIdObjs.length
@@ -214,7 +218,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 								and(
 									or(...postIdAtCitedPostIdRows.map((pio) => pf.id(pio))),
 									...byMsInMsFilters,
-									pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+									pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 									pf.num.gte0,
 									pf.txt.isNull,
 								),
@@ -257,10 +261,10 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 						newFirst //
 							? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
 							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
-						...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
+						// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
-						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -296,7 +300,7 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
-						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -323,10 +327,20 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 					and(
 						or(...postIdObs.map((idObj) => pf.id(idObj))),
 						or(
-							pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+							pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 							omitPostIdAtCitedPostId ? undefined : pf.code.eq(pc.postIdAtCitedPostId),
 						),
 						pf.txt.isNull,
+					),
+					and(
+						or(...postIdObs.map((io) => pf.id(io))),
+						and(
+							pf.ms.gt0,
+							// pt.in_ms.eq(),
+							pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+							pf.num.gt0,
+							pf.txt.isNotNull,
+						),
 					),
 					and(
 						or(...postIdObs.map((io) => pf.idAsAtId(io))),
@@ -346,16 +360,9 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 							and(
 								pf.ms.gt0,
 								// pt.in_ms.eq(),
-								pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-								pf.num.gte0,
-								pf.txt.isNotNull,
-							),
-							and(
-								pf.ms.gt0,
-								// pt.in_ms.eq(),
-								// pt.by_ms.eq(q.), // TODO: Caller ms
+								pf.by_ms.eq(q.callerMs),
 								pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-								pf.num.eq0,
+								pf.num.isNull,
 								pf.txt.isNotNull,
 							),
 						),
@@ -365,14 +372,14 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	};
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.postIdLastVersionNumAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
-		[pc.reactionIdWithEmojiTxtAtPostId]: rxnIdWEmoTxtAtPostIdRows = [],
+		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
 		[pc.currentVersionNumMsAtPostId]: curVersionNumAndMsAtPostIdRows = [],
 		[pc.currentSoftDeletedVersionNumMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
 		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows = [],
 		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
-		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmoTxtWUMsAndNAsCtAtPostIdRows = [],
+		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
 		// [pc.assignedRoleNumIdAtAccountId]: assignedRoleNumIdAtAccountIdRows = [],
 		// [pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
 	} = channelPartsByCode(
@@ -423,23 +430,23 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 	if (citedIdObjsToFetch.length) {
 		let {
 			// [pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
-			[pc.postIdWithNumAsLastVersionAtParentPostId]: _postIdWNumAsLastVersionAtPPostIdRows = [],
-			[pc.reactionIdWithEmojiTxtAtPostId]: _rxnIdWEmoTxtAtPostIdRows = [],
+			[pc.postIdLastVersionNumAtParentPostId]: _postIdWNumAsLastVersionAtPPostIdRows = [],
+			[pc.reactionIdWithEmojiTxtAtPostId]: _reactionIdWithEmojiTxtAtPostIdRows = [],
 			[pc.currentVersionNumMsAtPostId]: _curVersionNumAndMsAtPostIdRows = [],
 			[pc.currentSoftDeletedVersionNumMsAtPostId]: _curSoftDeletedVersionNumAndMsAtPostIdRows = [],
 			[pc.currentPostTagIdWithVersionNumAtPostId]: _curPostTagIdWNumAsVersionAtPostIdRows = [],
 			[pc.currentPostCoreIdWithVersionNumAtPostId]: _curPostCoreIdWNumAsVersionAtPostIdRows = [],
-			[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: _rEmoTxtWUMsAndNAsCtAtPostIdRows = [],
+			[pc.postIdRxnEmojiTxtAndCountNum]: _postIdRxnEmojiTxtAndCountNumRows = [],
 			// [pc.assignedRoleNumIdAtAccountId]: _assignedRoleNumIdAtAccountIdRows = [],
 			// [pc.nameTxtMsAtAccountId]: _nameTxtMsAtAccountIdRows = [],
 		} = channelPartsByCode(await getPostParts(citedIdObjsToFetch, true));
 		postIdWNumAsLastVersionAtPPostIdRows.push(..._postIdWNumAsLastVersionAtPPostIdRows);
-		rxnIdWEmoTxtAtPostIdRows.push(..._rxnIdWEmoTxtAtPostIdRows);
+		reactionIdWithEmojiTxtAtPostIdRows.push(..._reactionIdWithEmojiTxtAtPostIdRows);
 		curVersionNumAndMsAtPostIdRows.push(..._curVersionNumAndMsAtPostIdRows);
 		curSoftDeletedVersionNumAndMsAtPostIdRows.push(..._curSoftDeletedVersionNumAndMsAtPostIdRows);
 		curPostTagIdWNumAsVersionAtPostIdRows.push(..._curPostTagIdWNumAsVersionAtPostIdRows);
 		curPostCoreIdWNumAsVersionAtPostIdRows.push(..._curPostCoreIdWNumAsVersionAtPostIdRows);
-		rEmoTxtWUMsAndNAsCtAtPostIdRows.push(..._rEmoTxtWUMsAndNAsCtAtPostIdRows);
+		postIdRxnEmojiTxtAndCountNumRows.push(..._postIdRxnEmojiTxtAndCountNumRows);
 		// assignedRoleNumIdAtAccountIdRows.push(..._assignedRoleNumIdAtAccountIdRows);
 		// nameTxtMsAtAccountIdRows.push(..._nameTxtMsAtAccountIdRows);
 	}
@@ -499,36 +506,36 @@ export let _getPostFeed = async (db: Database, q: WhoWhereObj & GetPostFeedArg) 
 		...curPostCoreIdWNumAsVersionAtPostIdRows,
 		...curVersionNumAndMsAtPostIdRows,
 		...curSoftDeletedVersionNumAndMsAtPostIdRows,
-		...rEmoTxtWUMsAndNAsCtAtPostIdRows,
-		...rxnIdWEmoTxtAtPostIdRows,
+		...postIdRxnEmojiTxtAndCountNumRows,
+		...reactionIdWithEmojiTxtAtPostIdRows,
 	];
 	for (let i = 0; i < subParts.length; i++) {
 		let part = subParts[i];
 		let partIdStr = getIdStr(part);
 		let partAtIdStr = getAtIdStr(part);
 		if (part.code === pc.currentPostTagIdWithVersionNumAtPostId) {
-			idToPostMap[partAtIdStr].history![part.num]!.tags!.push(tagIdToTxtMap[partIdStr]);
+			idToPostMap[partAtIdStr].history![part.num!]!.tags!.push(tagIdToTxtMap[partIdStr]);
 		} else if (part.code === pc.currentPostCoreIdWithVersionNumAtPostId) {
-			idToPostMap[partAtIdStr].history![part.num]!.core = coreIdToTxtMap[partIdStr];
+			idToPostMap[partAtIdStr].history![part.num!]!.core = coreIdToTxtMap[partIdStr];
 		} else if (part.code === pc.currentVersionNumMsAtPostId) {
-			idToPostMap[partAtIdStr].history![part.num]!.ms = part.ms;
+			idToPostMap[partAtIdStr].history![part.num!]!.ms = part.ms;
 		} else if (part.code === pc.currentSoftDeletedVersionNumMsAtPostId) {
-			idToPostMap[partAtIdStr].history![part.num]!.tags = null;
-		} else if (part.code === pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId) {
-			idToPostMap[partAtIdStr].rxnCount = {
-				...idToPostMap[partAtIdStr].rxnCount,
-				[part.txt!]: part.num,
+			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
+		} else if (part.code === pc.postIdRxnEmojiTxtAndCountNum) {
+			idToPostMap[partIdStr].rxnEmojiCount = {
+				...idToPostMap[partIdStr].rxnEmojiCount,
+				[part.txt!]: part.num!,
 			};
 		} else if (part.code === pc.reactionIdWithEmojiTxtAtPostId) {
-			idToPostMap[partAtIdStr].myRxns = [
+			idToPostMap[partAtIdStr].myRxnEmojis = [
 				part.txt as RxnEmoji,
-				...(idToPostMap[partAtIdStr].myRxns || []),
+				...(idToPostMap[partAtIdStr].myRxnEmojis || []),
 			];
 		}
 	}
 
-	rEmoTxtWUMsAndNAsCtAtPostIdRows;
-	rxnIdWEmoTxtAtPostIdRows;
+	postIdRxnEmojiTxtAndCountNumRows;
+	reactionIdWithEmojiTxtAtPostIdRows;
 
 	// let test = or(
 	// 	and(

@@ -2,6 +2,7 @@
 	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import {
+		getSpaceContext,
 		gs,
 		msToAccountNameTxt,
 		msToSpaceNameTxt,
@@ -14,15 +15,16 @@
 	import {
 		getAtIdStr,
 		getFullIdObj,
-		getIdObjAsAtIdObj,
+		getIdObj,
 		getIdStr,
+		getUrlInMs,
 		isIdStr,
 	} from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
-	import { reactionList } from '$lib/types/reactions/reactionList';
+	import { shortReactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { roleCodes } from '$lib/types/spaces';
+	import { permissionCodes, roleCodes } from '$lib/types/spaces';
 	import {
 		IconBrowserMinus,
 		IconBrowserShare,
@@ -36,7 +38,6 @@
 		IconDots,
 		IconLibraryPlus,
 		IconMessage2Plus,
-		IconMoodPlus,
 		IconPencil,
 		IconShare2,
 		IconShieldFilled,
@@ -72,6 +73,12 @@
 		return `${str}${edited ? '*' : ''}`;
 	});
 	let isoMsLabel = $derived.by(() => formatMs(versionMs || p.post.ms, 'ms'));
+	let urlInMs = $derived(getUrlInMs());
+
+	let inMsSpaceContext = $derived(getSpaceContext(p.post.in_ms));
+	let isViewOnly = $derived(
+		!inMsSpaceContext || inMsSpaceContext?.permissionCode.num === permissionCodes.viewOnly,
+	);
 
 	let copyClicked = $state(false);
 	let handleCopyClick = () => {
@@ -133,7 +140,7 @@
 					</p>
 				</div>
 			</a>
-			{#if p.post.in_ms !== gs.lastSeenInMs}
+			{#if p.post.in_ms !== urlInMs}
 				<a
 					{target}
 					href={`/__${p.post.in_ms}`}
@@ -162,13 +169,14 @@
 					}}
 				>
 					<div class={`h-5 px-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
-						<IconLibraryPlus stroke={2.5} class="w-4" />
+						<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
+						{m.cite()}
 					</div>
 				</button>
 			{/if}
 			{#if !p.isEmbed}
-				<div class="flex-1 shrink-0 w-4 fx group hover:text-fg1">
-					{#if !p.cited}
+				<div class="flex-1 shrink-0 fx group hover:text-fg1">
+					{#if !p.cited && !isViewOnly}
 						<button
 							class="fx h-full flex-1"
 							onclick={() => {
@@ -179,22 +187,20 @@
 							<div
 								class={`h-5 fx w-full ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>
-								<IconMessage2Plus class="w-4.5" />
+								<IconMessage2Plus class="w-4.5 mr-1" />
+								{m.reply()}
 							</div>
 						</button>
 					{/if}
 					<div
 						class={`absolute z-10 right-0 h-7 hidden group-hover/div:flex ${p.bumpDownReactionHoverMenu ? 'top-10' : 'top-5'} ${p.evenBg ? 'bg-bg1 group-hover/div:bg-bg4' : 'bg-bg2 group-hover/div:bg-bg5'}`}
 					>
-						{#each reactionList.slice(0, 4) as emoji}
+						{#each shortReactionList.slice(0, 4) as emoji}
 							<button
 								class="text-sm w-7 xy hover:bg-bg7 hover:text-fg3 grayscale-75 hover:grayscale-0"
 								onclick={async () => {
 									await toggleReaction({
-										...getIdObjAsAtIdObj(p.post),
-										ms: 0,
-										by_ms: gs.accounts![0].ms,
-										in_ms: gs.lastSeenInMs!,
+										postIdObj: getIdObj(p.post),
 										emoji,
 									});
 								}}
@@ -202,14 +208,15 @@
 								{emoji}
 							</button>
 						{/each}
-						<button
-							class="hidden text-lg w-7 xy hover:bg-bg7 hover:text-fg3"
+						<!-- TODO: show all react options -->
+						<!-- <button
+							class="text-lg w-7 xy hover:bg-bg7 hover:text-fg3"
 							onclick={() => {
 								// console.log(emoji);
 							}}
 						>
 							<IconMoodPlus class="w-4" />
-						</button>
+						</button> -->
 					</div>
 				</div>
 			{/if}
@@ -312,7 +319,7 @@
 							m.areYouSureYouWantToDeleteThisPost(),
 						);
 					if (ok) {
-						let { soft } = await deletePost(getFullIdObj(p.post), null);
+						let { soft } = await deletePost(getFullIdObj(p.post), null, urlInMs !== 0);
 						console.log('soft:', soft);
 						if (soft) gs.idToPostMap[postIdStr]!.history = null;
 						else {

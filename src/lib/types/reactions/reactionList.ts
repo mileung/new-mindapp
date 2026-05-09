@@ -10,7 +10,7 @@ let uniqueArray = <const T extends readonly unknown[]>(
 	return arr;
 };
 
-export let reactionList = uniqueArray([
+export let shortReactionList = uniqueArray([
 	'😂',
 	'👍',
 	'👀',
@@ -50,4 +50,190 @@ export let reactionList = uniqueArray([
 	'😡',
 	'😈',
 	'🤡',
-]);
+]) as string[];
+
+// https://emojipedia.org/smileys
+export let fullReactionList = [
+	{
+		title: '😃 Smileys',
+		subs: [
+			{
+				subtitle: 'Smiling & Affectionate',
+				emojis: [
+					'😀',
+					'😃',
+					'😄',
+					'😁',
+					'😆',
+					'😅',
+					'🤣',
+					'😂',
+					'🙂',
+					'😉',
+					'😊',
+					'😇',
+					'🥰',
+					'😍',
+					'🤩',
+					'😘',
+					'😗',
+					'☺️',
+					'😚',
+					'😙',
+					'🥲',
+					'😏',
+				],
+			},
+			{
+				subtitle: 'Tongues, Hands & Accessories',
+				emojis: [
+					'😋',
+					'😛',
+					'😜',
+					'🤪',
+					'😝',
+					'🤑',
+					'🤗',
+					'🤭',
+					'🫢',
+					'🫣',
+					'🤫',
+					'🤔',
+					'🫡',
+					'🤤',
+					'🤠',
+					'🥳',
+					'🥸',
+					'😎',
+					'🤓',
+					'🧐',
+				],
+			},
+			{
+				subtitle: 'Neutral & Skeptical',
+				emojis: [
+					'🙃',
+					'🫠',
+					'🤐',
+					'🤨',
+					'😐',
+					'😑',
+					'😶',
+					'🫥',
+					'😶‍🌫️',
+					'😒',
+					'🙄',
+					'😬',
+					'😮‍💨',
+					'🤥',
+					'🫨',
+					'🙂‍↔️',
+					'🙂‍↕️',
+				],
+			},
+			{
+				subtitle: 'Sleepy & Unwell',
+				emojis: [
+					'😌',
+					'😔',
+					'😪',
+					'😴',
+					'🫩',
+					'😷',
+					'🤒',
+					'🤕',
+					'🤢',
+					'🤮',
+					'🤧',
+					'🥵',
+					'🥶',
+					'🥴',
+					'😵',
+					'😵‍💫',
+					'🤯',
+					'🥱',
+				],
+			},
+			{
+				subtitle: 'Concerned & Negative',
+				emojis: [
+					'😕',
+					'🫤',
+					'😟',
+					'🙁',
+					'☹️',
+					'😮',
+					'😯',
+					'😲',
+					'😳',
+					'🫪',
+					'🥺',
+					'🥹',
+					'😦',
+					'😧',
+					'😨',
+					'😰',
+					'😥',
+					'😢',
+					'😭',
+					'😱',
+					'😖',
+					'😣',
+					'😞',
+					'😓',
+					'😩',
+					'😫',
+					'😤',
+					'😡',
+					'😠',
+					'🤬',
+				],
+			},
+			{
+				subtitle: 'Costume, Creature & Animal',
+				emojis: [
+					'😈',
+					'👿',
+					'💀',
+					'☠️',
+					'💩',
+					'🤡',
+					'👹',
+					'👺',
+					'👻',
+					'👽',
+					'👾',
+					'🤖',
+					'😺',
+					'😸',
+					'😹',
+					'😻',
+					'😼',
+					'😽',
+					'🙀',
+					'😿',
+					'😾',
+					'🙈',
+					'🙉',
+					'🙊',
+				],
+			},
+		],
+	},
+];
+
+// '🧑 People'
+
+// '🐻 Animals & Nature'
+
+// '🍔 Food & Drink'
+
+// '⚽ Activity'
+
+// '🚀 Travel & Places'
+
+// '💡 Objects'
+
+// '💕 Symbols'
+
+// '🎌 Flags'

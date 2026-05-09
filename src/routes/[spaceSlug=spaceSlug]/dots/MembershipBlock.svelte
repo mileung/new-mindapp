@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { promptSum } from '$lib/dom';
 	import {
-		getUrlInMsContext,
+		getSpaceContext,
 		getWhoWhereObj,
 		gs,
 		msToAccountNameTxt,
@@ -43,13 +43,18 @@
 	let p: { membership: Membership } = $props();
 
 	let moreOptionsShown = $state(false);
-	let spaceContext = $derived(getUrlInMsContext());
-	let callerIsAdmin = $derived(spaceContext?.roleCode?.num === roleCodes.admin);
-	let callerIsMod = $derived(spaceContext?.roleCode?.num === roleCodes.mod);
 	let spaceMs = $derived(p.membership.invite.in_ms!);
 	let space = $derived(gs.msToSpaceMap[spaceMs]!);
+	let spaceContext = $derived(getSpaceContext(spaceMs));
+	let callerIsAdmin = $derived(spaceContext?.roleCode?.num === roleCodes.admin);
+	let callerIsMod = $derived(spaceContext?.roleCode?.num === roleCodes.mod);
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
+	$effect(() => {
+		callerMs;
+		moreOptionsShown = false;
+	});
+
 	let accepteeMs = $derived(p.membership.accept.by_ms!);
 	let membershipIsByCaller = $derived(accepteeMs === callerMs);
 
@@ -92,6 +97,17 @@
 				},
 			},
 		};
+
+		updateLocalCache((lc) => {
+			let accountIndex = lc.accounts.findIndex((a) => a.ms === accepteeMs);
+			if (accountIndex >= 0) {
+				let joinedSpaceContext = lc.accounts[accountIndex].joinedSpaceContexts.find(
+					(c) => c.ms === spaceMs,
+				)!;
+				if (joinedSpaceContext) Object.assign(joinedSpaceContext, update);
+			}
+			return lc;
+		});
 	};
 
 	let canReactAndPost = $derived(permissionCode.num === permissionCodes.reactAndPost);
@@ -166,7 +182,7 @@
 		}
 		if (ok) {
 			try {
-				let { ms } = await trpc().setSpaceMemberRole.mutate({
+				let { ms, reactAndPostSetBySystem } = await trpc().setSpaceMemberRole.mutate({
 					...(await getWhoWhereObj()),
 					accountMs: accepteeMs,
 					newRoleCodeNum,
@@ -178,6 +194,18 @@
 						num: newRoleCodeNum,
 					},
 				});
+				if (newRoleCodeNum === roleCodes.admin) {
+					moreOptionsShown = false;
+					if (reactAndPostSetBySystem) {
+						mergeMembershipUpdate({
+							permissionCode: {
+								ms,
+								by_ms: 0,
+								num: permissionCodes.reactAndPost,
+							},
+						});
+					}
+				}
 			} catch (error) {
 				alertError(error);
 			}
@@ -186,7 +214,7 @@
 </script>
 
 <div class="fx h-8">
-	<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${accepteeMs}_`}>
+	<a class="flex-1 fx hover:text-fg3 hover:bg-bg4" href={`/_${accepteeMs}_`}>
 		{#if memberIsAdmin}
 			<IconCrownFilled />
 		{:else if memberIsMod}

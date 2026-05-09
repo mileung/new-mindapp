@@ -125,6 +125,7 @@ export let pf = {
 		gte0: gte(pTable.num, 0),
 		lt: (v: number) => lt(pTable.num, v),
 		lte: (v: number) => lte(pTable.num, v),
+		isNull: isNull(pTable.num),
 	},
 	txt: {
 		asc: asc(pTable.txt),

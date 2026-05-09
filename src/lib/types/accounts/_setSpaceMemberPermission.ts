@@ -7,24 +7,28 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { get_roleCodeNumIdAtAccountId } from '../spaces/db-spaces';
 
-export let _setSpaceMemberPermission = async ({
-	spaceMs,
-	callerMs,
-	accountMs,
-	callerRoleCodeNum,
-	newPermissionCodeNum,
-}: WhoWhereObj & {
-	accountMs: number;
-	callerRoleCodeNum: number;
-	newPermissionCodeNum: number;
-}) => {
+export let _setSpaceMemberPermission = async (
+	{
+		spaceMs,
+		callerMs,
+		accountMs,
+		callerRoleCodeNum,
+		newPermissionCodeNum,
+	}: WhoWhereObj & {
+		accountMs: number;
+		callerRoleCodeNum?: number;
+		newPermissionCodeNum: number;
+	},
+	ownerCalled: boolean,
+) => {
 	throwIf(callerMs === accountMs);
 
 	let updatee_roleCodeNumIdAtAccountId = await get_roleCodeNumIdAtAccountId(spaceMs, accountMs);
-	throwIf(
-		!updatee_roleCodeNumIdAtAccountId || //
-			callerRoleCodeNum <= updatee_roleCodeNumIdAtAccountId.num,
-	);
+	!ownerCalled &&
+		throwIf(
+			!updatee_roleCodeNumIdAtAccountId || //
+				callerRoleCodeNum! <= updatee_roleCodeNumIdAtAccountId.num,
+		);
 
 	let ms = Date.now();
 	await tdb

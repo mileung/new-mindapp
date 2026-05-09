@@ -3,7 +3,7 @@
 	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
-	import { getIdStr, type IdObj } from '$lib/types/parts/partIds';
+	import { getIdObj, getIdStr, type IdObj } from '$lib/types/parts/partIds';
 	import type { Reaction } from '$lib/types/reactions';
 	import { getReactionHistory, reactionsPerLoad } from '$lib/types/reactions/getReactionHistory';
 	import { IconChartBarPopular, IconX } from '@tabler/icons-svelte';
@@ -29,7 +29,7 @@
 		let rxnIdObjsExclude: IdObj[] = [];
 		for (let i = reactions.length - 2; i >= 0; i--) {
 			let rxn = reactions[i];
-			if (rxn.ms === lastRxn.ms) rxnIdObjsExclude.push(rxn);
+			if (rxn.ms === lastRxn.ms) rxnIdObjsExclude.push(getIdObj(rxn));
 			else break;
 		}
 		let res = await getReactionHistory({

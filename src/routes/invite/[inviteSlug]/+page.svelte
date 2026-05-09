@@ -23,22 +23,26 @@
 		let [inviteMsStr, slugEnd] = splitUntil(page.params.inviteSlug, '_', 1);
 		let inviteMs = +inviteMsStr;
 		if (Number.isNaN(inviteMs) || slugEnd.length > 8) return (validInvite = false);
-		let { checkedInvite } = await trpc().checkInvite.mutate({
-			...(await getWhoObj()),
-			inviteMs,
-			slugEnd,
-			useIfValid: false,
-		});
-		if (checkedInvite) {
-			gs.msToProfileMap = {
-				...gs.msToProfileMap,
-				[checkedInvite.inviter.ms]: checkedInvite.inviter,
-			};
-			mergeMsToSpaceNameTxtMap({
-				[checkedInvite.partialSpace.ms]: checkedInvite.partialSpace.name.txt,
+		try {
+			let { checkedInvite } = await trpc().checkInvite.mutate({
+				...(await getWhoObj()),
+				inviteMs,
+				slugEnd,
+				useIfValid: false,
 			});
-			gs.checkedInvite = { ...checkedInvite, ms: inviteMs, slugEnd };
-		} else validInvite = false;
+			if (checkedInvite) {
+				gs.msToProfileMap = {
+					...gs.msToProfileMap,
+					[checkedInvite.inviter.ms]: checkedInvite.inviter,
+				};
+				mergeMsToSpaceNameTxtMap({
+					[checkedInvite.partialSpace.ms]: checkedInvite.partialSpace.name.txt,
+				});
+				gs.checkedInvite = { ...checkedInvite, ms: inviteMs, slugEnd };
+			} else validInvite = false;
+		} catch (error) {
+			validInvite = false;
+		}
 	});
 
 	let actionButtonClass = $derived(

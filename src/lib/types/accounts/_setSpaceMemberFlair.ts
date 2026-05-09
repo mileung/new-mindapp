@@ -8,18 +8,21 @@ import { pf } from '../parts/partFilters';
 import { roleCodes } from '../spaces';
 import { get_roleCodeNumIdAtAccountId } from '../spaces/db-spaces';
 
-export let _setSpaceMemberFlair = async ({
-	spaceMs,
-	callerMs,
-	accountMs,
-	callerRoleCodeNum,
-	flairTxt,
-}: WhoWhereObj & {
-	accountMs: number;
-	callerRoleCodeNum: number;
-	flairTxt: string;
-}) => {
-	if (callerMs !== accountMs) {
+export let _setSpaceMemberFlair = async (
+	{
+		spaceMs,
+		callerMs,
+		accountMs,
+		callerRoleCodeNum,
+		flairTxt,
+	}: WhoWhereObj & {
+		accountMs: number;
+		callerRoleCodeNum?: number;
+		flairTxt: string;
+	},
+	ownerCalled: boolean,
+) => {
+	if (!ownerCalled && callerMs !== accountMs) {
 		throwIf(
 			callerRoleCodeNum !== roleCodes.mod && //
 				callerRoleCodeNum !== roleCodes.admin,
@@ -27,7 +30,7 @@ export let _setSpaceMemberFlair = async ({
 		let updatee_roleCodeNumIdAtAccountId = await get_roleCodeNumIdAtAccountId(spaceMs, accountMs);
 		throwIf(
 			!updatee_roleCodeNumIdAtAccountId ||
-				callerRoleCodeNum <= updatee_roleCodeNumIdAtAccountId.num,
+				callerRoleCodeNum! <= updatee_roleCodeNumIdAtAccountId.num,
 		);
 	}
 

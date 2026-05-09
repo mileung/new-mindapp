@@ -1,7 +1,7 @@
 import { uniqueMapVals } from '$lib/js';
 
 export let pc = uniqueMapVals({
-	postIdWithNumAsLastVersionAtParentPostId: 0,
+	postIdLastVersionNumAtParentPostId: 0,
 	childPostIdWithNumAsDepthAtRootId: 1,
 	postIdAtCitedPostId: 2,
 	reactionIdWithEmojiTxtAtPostId: 3,
@@ -49,7 +49,7 @@ export let pc = uniqueMapVals({
 
 	tagId8AndTxtWithNumAsCount: 30,
 	coreId8AndTxtWithNumAsCount: 31,
-	reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId: 32,
+	postIdRxnEmojiTxtAndCountNum: 32,
 	// TODO?: citeCount__inMsIdAtPostId: 33,
 
 	spaceIsPublicBinId: 40,
@@ -81,4 +81,8 @@ export let pc = uniqueMapVals({
 	lastSpacePostId: 82,
 	// TODO: tagIdAtBumpedRootIdWithNumAsMs: 83,
 	// lastSpacePostMsAtLastSpaceViewId: 81,
+
+	signedInEmailRulesTxtId: 90,
+	banMsByMsAtAccountId: 91,
+	// banIdAtSpaceId: 92,
 });

@@ -4,7 +4,7 @@
     "": {
       "name": "new-mindapp",
       "dependencies": {
-        "@inlang/paraglide-js": "^2.0.0",
+        "@inlang/paraglide-js": "^2.16.0",
         "@libsql/client": "^0.17.2",
         "@tabler/icons-svelte": "^3.41.1",
         "@trpc/client": "^10.45.2",

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { getUrlInMsContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
+	import { getSpaceContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
 	import { alertError, splitUntil } from '$lib/js';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
@@ -118,7 +118,7 @@
 								name:
 									space?.name || (urlInMs > 1 && urlInMs !== callerMs ? { txt: '' } : undefined),
 								...(() => {
-									let spaceContext = getUrlInMsContext();
+									let spaceContext = getSpaceContext(urlInMs);
 									return {
 										visiting: !spaceContext,
 										accentCode: spaceContext?.accentCode || { num: -1 },
@@ -183,6 +183,7 @@
 										})),
 					};
 
+					// console.log('get:', JSON.parse(JSON.stringify(get)));
 					// console.log('get', JSON.stringify(get, null, 2));
 					// console.log(
 					// 	'get.spaceUpdatesFrom test',
@@ -244,7 +245,7 @@
 						lc.accounts = lc.accounts.map((a) => {
 							let accountUpdate = msToSignedInAccountUpdateMap[a.ms];
 							if (!checkedAnythingBefore)
-								a.signedIn = !signedOutAccountMss.some((ms) => ms === a.ms);
+								a.signedIn = a.signedIn && !signedOutAccountMss.some((ms) => ms === a.ms);
 							a.email = accountUpdate?.email || a.email;
 							a.name = accountUpdate?.name || a.name;
 							a.bio = accountUpdate?.bio || a.bio;

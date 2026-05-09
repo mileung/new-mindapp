@@ -1,6 +1,24 @@
 import { browser } from '$app/environment';
+import { page } from '$app/state';
+import { PUBLIC_OWNER_MSS } from '$env/static/public';
 import { m } from './paraglide/messages';
 import { minute, second } from './time';
+
+export let ownerViewItemsPerLoad = 88;
+export let atDomainRegex = /^@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export let emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+export let rulesAllowEmail = (rules: string[], email: string) =>
+	rules.some((r) => (r[0] === '@' ? email!.endsWith(r) : r === email));
+
+export let ownerMsSet = (() => {
+	try {
+		let arr = JSON.parse(PUBLIC_OWNER_MSS) as number[];
+		return new Set(Array.isArray(arr) ? arr : []);
+	} catch (error) {
+		console.error('PUBLIC_OWNER_MSS !== number[]');
+		return new Set([]);
+	}
+})();
 
 export let isTouchScreen = browser ? 'ontouchstart' in window || !!navigator.maxTouchPoints : false;
 
@@ -178,3 +196,30 @@ export let splitUntil = (str: string, delimiter: string, limit: number): string[
 
 export let hasDefinedKeysBesidesMs = (obj: Object) =>
 	Object.entries(obj).some(([k, v]) => k !== 'ms' && v !== undefined);
+
+export let setSearchParams = (
+	obj: Record<string, string | number | boolean | null | undefined>,
+) => {
+	let url = new URL(page.url);
+	let sp = new URLSearchParams(url.search);
+	for (let [key, value] of Object.entries(obj)) {
+		if (value === null) sp.delete(key);
+		else sp.set(key, String(value));
+	}
+	let newSearch = sp
+		.toString()
+		.replace(/%2C/g, ',')
+		.replace(/=&/g, '&')
+		.replace(/=(undefined|$)/g, '');
+	return `${url.pathname}${newSearch ? '?' + newSearch : ''}${url.hash}`;
+};
+
+let countGraphemes = (str: string) => {
+	const seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
+	return [...seg.segment(str)].length;
+};
+// https://github.com/slevithan/emoji-regex-xs
+let r = String.raw;
+let base = r`\p{Emoji}(?:\p{EMod}|[\u{E0020}-\u{E007E}]+\u{E007F}|\uFE0F?\u20E3?)`;
+let emojiRegex = new RegExp(r`\p{RI}{2}|(?![#*\d](?!\uFE0F?\u20E3))${base}(?:\u200D${base})*`, 'u');
+export let is1Emoji = (s: string) => countGraphemes(s) === 1 && emojiRegex.test(s);

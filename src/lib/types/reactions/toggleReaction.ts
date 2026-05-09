@@ -1,25 +1,26 @@
-import { gs } from '$lib/global-state.svelte';
-import type { Reaction } from '.';
-import { getAtIdStr } from '../parts/partIds';
+import { getWhoObj, gs } from '$lib/global-state.svelte';
+import { getIdStr, getUrlInMs, type IdObj } from '../parts/partIds';
 import { addReaction } from './addReaction';
 import { removeReaction } from './removeReaction';
 
-export let toggleReaction = async (rxn: Reaction) => {
-	let postIdStr = getAtIdStr(rxn);
-	let myRxns = gs.idToPostMap[postIdStr]?.myRxns || [];
-	let rxnCount = gs.idToPostMap[postIdStr]?.rxnCount || {};
-	rxnCount[rxn.emoji] = rxnCount[rxn.emoji] || 0;
-	let adding = !myRxns.includes(rxn.emoji);
+export let toggleReaction = async (input: { postIdObj: IdObj; emoji: string }) => {
+	let postIdStr = getIdStr(input.postIdObj);
+	let myRxnEmojis = gs.idToPostMap[postIdStr]?.myRxnEmojis || [];
+	let rxnEmojiCount = gs.idToPostMap[postIdStr]?.rxnEmojiCount || {};
+	rxnEmojiCount[input.emoji] ||= 0;
+	let adding = !myRxnEmojis.includes(input.emoji);
 	if (adding) {
-		myRxns = [...new Set([rxn.emoji, ...myRxns])];
-		rxnCount[rxn.emoji]++;
+		myRxnEmojis = [...new Set([input.emoji, ...myRxnEmojis])];
+		rxnEmojiCount[input.emoji]++;
 	} else {
-		myRxns = myRxns.filter((e) => e !== rxn.emoji);
-		rxnCount[rxn.emoji]--;
-		if (!rxnCount[rxn.emoji]) delete rxnCount[rxn.emoji];
+		myRxnEmojis = myRxnEmojis.filter((e) => e !== input.emoji);
+		rxnEmojiCount[input.emoji]--;
+		if (!rxnEmojiCount[input.emoji]) delete rxnEmojiCount[input.emoji];
 	}
-	gs.idToPostMap[postIdStr]!.myRxns = myRxns;
-	gs.idToPostMap[postIdStr]!.rxnCount = rxnCount;
-	let useRpc = gs.lastSeenInMs! > 0;
-	await (adding ? addReaction : removeReaction)(rxn, useRpc);
+	gs.idToPostMap[postIdStr]!.myRxnEmojis = myRxnEmojis;
+	gs.idToPostMap[postIdStr]!.rxnEmojiCount = rxnEmojiCount;
+	await (adding ? addReaction : removeReaction)(
+		{ ...(await getWhoObj()), ...input },
+		!getUrlInMs(),
+	);
 };

@@ -1,80 +1,86 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { gsdb } from '$lib/global-state.svelte';
+import { is1Emoji } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or, SQL } from 'drizzle-orm';
-import { ReactionSchema, type Reaction } from '.';
 import { type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode } from '../parts';
+import { assert1Row, channelPartsByCode, type WhoObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
+import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let removeReaction = async (rxn: Reaction, useRpc: boolean) => {
-	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	return useRpc
-		? trpc().removeReaction.mutate({ ...(await getWhoWhereObj()), rxn }) //
-		: _removeReaction(await gsdb(), rxn);
+export let removeReaction = async (
+	input: WhoObj & {
+		postIdObj: IdObj;
+		emoji: string;
+	},
+	useLocalDb: boolean,
+) => {
+	if (!is1Emoji(input.emoji)) throw new Error(`Failed is1Emoji`);
+	return useLocalDb
+		? _removeReaction(await gsdb(), input, true)
+		: trpc().removeReaction.mutate(input);
 };
 
-export let _removeReaction = async (db: Database, rxn: Reaction) => {
+export let _removeReaction = async (
+	db: Database,
+	input: WhoObj & {
+		postIdObj: IdObj;
+		emoji: string;
+	},
+	useLocalDb: boolean,
+) => {
+	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
+	let caller_reactionIdWithEmojiTxtAtPostIdFilter = and(
+		pf.idAsAtId(input.postIdObj),
+		pf.ms.gt0,
+		pf.by_ms.eq(input.callerMs),
+		pf.in_ms.eq(rxnInMs),
+		pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+		pf.num.isNull,
+		pf.txt.eq(input.emoji),
+	);
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
-		[pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId]: rEmTxtWUnqMsAndNumAsCtAtPostIdRows = [],
+		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
+					caller_reactionIdWithEmojiTxtAtPostIdFilter,
 					and(
-						pf.atIdAsId(rxn),
-						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
-						pf.num.gte0,
-						pf.txt.isNull,
-					),
-					and(
-						pf.atId(rxn),
-						pf.by_ms.eq(rxn.by_ms),
-						pf.in_ms.eq(rxn.in_ms),
-						pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-						pf.num.eq0,
-						pf.txt.eq(rxn.emoji),
-					),
-					and(
-						pf.atId(rxn),
-						pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-						pf.num.gte0,
-						pf.txt.eq(rxn.emoji),
+						pf.id(input.postIdObj),
+						pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+						pf.num.gt0,
+						pf.txt.eq(input.emoji),
 					),
 				),
 			),
 	);
 	if (!reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Reaction dne`);
-	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdRows);
-	let deleteFilters: (undefined | SQL)[] = [
-		and(
-			pf.atId(rxn),
-			pf.by_ms.eq(rxn.by_ms),
-			pf.in_ms.eq(rxn.in_ms),
-			pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-			pf.num.eq0,
-			pf.txt.eq(rxn.emoji),
-		),
-	];
-	let rEmTxtWUnqMsAndNumAsCtAtPostIdRow = assert1Row(rEmTxtWUnqMsAndNumAsCtAtPostIdRows);
-	if (rEmTxtWUnqMsAndNumAsCtAtPostIdRow.num > 1) {
-		await moveTagCoreOrRxnCountsBy1(db, [], [], [rxn], false);
-	} else {
-		deleteFilters.push(
-			and(
-				pf.atId(rEmTxtWUnqMsAndNumAsCtAtPostIdRow),
-				pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-				pf.num.eq(1),
-				pf.txt.eq(rxn.emoji),
-			),
-		);
-	}
+	let deleteFilters: (undefined | SQL)[] = [caller_reactionIdWithEmojiTxtAtPostIdFilter];
+	let postIdRxnEmojiTxtAndCountNumRow = assert1Row(postIdRxnEmojiTxtAndCountNumRows);
+	postIdRxnEmojiTxtAndCountNumRow.num! > 1
+		? await moveTagCoreOrRxnCountsBy1(
+				db,
+				[],
+				[],
+				[{ ...input.postIdObj, emoji: input.emoji }],
+				false,
+			)
+		: deleteFilters.push(
+				and(
+					pf.noAtId,
+					pf.id(input.postIdObj),
+					pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+					pf.num.lt(2),
+					pf.txt.eq(input.emoji),
+				),
+			);
+
 	await db.delete(pTable).where(or(...deleteFilters));
 	return {};
 };

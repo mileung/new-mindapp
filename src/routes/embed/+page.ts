@@ -7,7 +7,7 @@ export const load: PageLoad = ({ params }) => {
 		post: {
 			...id0,
 			history: null,
-			// rxnCount:
+			// rxnEmojiCount:
 		} satisfies Post,
 	};
 };

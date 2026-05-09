@@ -6,8 +6,7 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { idsRegex, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
-import type { Reaction } from '../reactions';
-import { reactionList } from '../reactions/reactionList';
+import { EmojiStringSchema } from '../reactions';
 
 export let normalizeTags = (tags: string[]) =>
 	[
@@ -38,8 +37,8 @@ export let PostSchema = z.strictObject({
 	by_ms: z.number().gte(0),
 	in_ms: z.number().gte(0),
 
-	myRxns: z.array(z.enum(reactionList)).optional(),
-	rxnCount: z.record(z.number()).optional(),
+	myRxnEmojis: z.array(EmojiStringSchema).optional(),
+	rxnEmojiCount: z.record(z.number()).optional(),
 	subIds: z.array(z.string()).optional(),
 
 	history: z
@@ -82,7 +81,7 @@ export let PostSchema = z.strictObject({
 export type Post = z.infer<typeof PostSchema>;
 
 export let getLastVersion = (p: Post) =>
-	p.history ? Math.max(...Object.keys(p.history).map((k) => +k)) : 0;
+	p.history ? Math.max(...Object.keys(p.history).map(Number)) : 0;
 
 export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
 
@@ -90,10 +89,10 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 	db: Database,
 	tagIdObjs: IdObj[],
 	coreIdObjs: IdObj[],
-	rxns: Reaction[],
+	postIdWithEmojis: (IdObj & { emoji: string })[],
 	increment: boolean,
 ) =>
-	(tagIdObjs.length || coreIdObjs.length || rxns.length) &&
+	(tagIdObjs.length || coreIdObjs.length || postIdWithEmojis.length) &&
 	(await db
 		.update(pTable)
 		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
@@ -117,20 +116,18 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 							pf.txt.isNotNull,
 						)
 					: undefined,
-				rxns.length
+				postIdWithEmojis.length
 					? and(
 							or(
-								...rxns.map((rxn) =>
+								...postIdWithEmojis.map((pidE) =>
 									and(
-										pf.atId(rxn), //
-										pf.txt.eq(rxn.emoji),
-										pf.in_ms.eq(rxn.in_ms),
+										pf.id(pidE), //
+										pf.txt.eq(pidE.emoji),
 									),
 								),
 							),
-							pf.ms.gt0,
-							pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-							pf.num.gte0,
+							pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+							pf.num.gt0,
 						)
 					: undefined,
 			),

@@ -3,15 +3,16 @@
 	import { scrollToHighlight, textInputFocused } from '$lib/dom';
 	import {
 		getBottomOverlayShown,
+		getCallerIsOwner,
 		getPromptSigningIn,
-		getUrlInMsContext,
+		getSpaceContext,
 		gs,
 		mergeMsToAccountNameTxtMap,
 		mergeMsToSpaceNameTxtMap,
 		mergeSpaceMsToAccountMsToMembershipMap,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { alertError, makeErrorReadable } from '$lib/js';
+	import { alertError, makeErrorReadable, setSearchParams } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
@@ -57,14 +58,15 @@
 
 	let pinnedQueryTxtId = '';
 
-	let { searchParams } = $derived(page.url);
-	let qSearchParam = $derived(searchParams.get('q') || '');
-	let view = $derived<'flat' | 'nested'>(searchParams.get('flat') !== null ? 'flat' : 'nested');
+	let qSearchParam = $derived(page.url.searchParams.get('q') || '');
+	let view = $derived<'flat' | 'nested'>(
+		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
+	);
 	let nested = $derived(view === 'nested');
 	let sortedBy = $derived<'bumped' | 'new' | 'old'>(
-		searchParams.get('new') !== null
+		page.url.searchParams.get('new') !== null
 			? 'new'
-			: searchParams.get('old') !== null
+			: page.url.searchParams.get('old') !== null
 				? 'old'
 				: qSearchParam
 					? 'new'
@@ -77,20 +79,21 @@
 	});
 	let urlInMs = $derived(getUrlInMs()!);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
-	let spaceContext = $derived(getUrlInMsContext());
+	let spaceContext = $derived(getSpaceContext(urlInMs));
 	let isMergedView = $derived('/merged-view' === page.url.pathname);
-	let isOwnerView = $derived('/owner-view' === page.url.pathname);
+	let callerIsOwner = $derived(getCallerIsOwner());
+
 	let viewable = $derived(
 		!!space?.isPublic.num || //
 			!!spaceContext?.permissionCode ||
 			isMergedView ||
-			isOwnerView,
+			callerIsOwner,
 	);
 	let showViewOnly = $derived(
 		viewable && //
-			!spaceContext?.permissionCode &&
-			!isMergedView &&
-			!isOwnerView,
+			spaceContext?.permissionCode
+			? spaceContext?.permissionCode.num === permissionCodes.viewOnly
+			: !isMergedView && !callerIsOwner,
 	);
 	let showYourTurn = $derived(
 		urlInMs && urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,
@@ -115,13 +118,14 @@
 	let endReached = $derived(feed?.endReached);
 	let postAtBumpedPostIdObjsExclude = $derived(feed?.postAtBumpedPostIdObjsExclude || []);
 	let error = $derived(feed?.error || '');
+	let useLocalDb = $derived(urlInMs === 0);
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
+		console.log('loadMorePosts');
 		if (
-			callerMs === undefined ||
-			(urlInMs === undefined && (!isMergedView || !isOwnerView)) ||
-			!gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] ||
-			promptSignIn
+			callerMs === undefined || promptSignIn || urlInMs === undefined
+				? !isMergedView && !callerIsOwner
+				: !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]
 		)
 			return;
 		// await new Promise((res) => setTimeout(res, 1000));
@@ -131,11 +135,24 @@
 		// console.log('loadMorePosts');
 
 		// TODO: Instead of set theory, implement option to save searches
-		let test = parseSearchQuery(qSearchParam);
+		let parsedQ = parseSearchQuery(qSearchParam);
 
 		let lastTopLvlPostIdStr = topLvlPostIdStrs.slice(-1)[0];
 		let lastTopLvlPostIdObj = lastTopLvlPostIdStr ? getIdStrAsIdObj(lastTopLvlPostIdStr) : null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
+		let inMssInclude: number[] = [
+			...new Set([
+				...(callerIsOwner
+					? []
+					: isMergedView
+						? (page.url.searchParams.get('in_ms') || '').split(',').map(Number)
+						: useLocalDb
+							? []
+							: [urlInMs]),
+				...parsedQ.inMssInclude,
+			]),
+		];
+
 		let getPostFeedArg: GetPostFeedArg = {
 			view,
 			sortedBy,
@@ -145,7 +162,7 @@
 			byMssExclude: [],
 			byMssInclude: [],
 			inMssExclude: [],
-			inMssInclude: urlInMs ? [urlInMs] : [],
+			inMssInclude,
 			postIdObjsExclude: [],
 			postIdObjsInclude: [],
 			tagsExclude: [],
@@ -157,10 +174,13 @@
 		try {
 			if (postIdStr) {
 				if (lastTopLvlPostIdObj?.ms) getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
-				postFeed = await getPostFeed({
-					...getPostFeedArg,
-					postIdObjsInclude: [getIdStrAsIdObj(postIdStr)],
-				});
+				postFeed = await getPostFeed(
+					{
+						...getPostFeedArg,
+						postIdObjsInclude: [getIdStrAsIdObj(postIdStr)],
+					},
+					useLocalDb,
+				);
 			} else {
 				if (lastTopLvlPostIdObj) {
 					if (sortedBy === 'bumped') {
@@ -184,7 +204,8 @@
 						getPostFeedArg.postIdObjsExclude = [...lastTopLvlPostIdObjsWithSameMs];
 					}
 				}
-				postFeed = await getPostFeed(getPostFeedArg);
+				postFeed = await getPostFeed(getPostFeedArg, useLocalDb);
+				// console.log('postFeed:', postFeed);
 			}
 			let { topLvlPostIdStrs: newTopLvlPostIdStrs, idToPostMap: newIdToPostMap } = postFeed;
 			// TODO: add account and space names to to local db using msToAccountNameTxtMap and msToSpaceNameTxtMap
@@ -310,14 +331,21 @@
 	};
 
 	let makeParams = (newView: 'nested' | 'flat', newSortedBy: 'bumped' | 'new' | 'old') => {
-		let v = newView === 'nested' ? '' : newView;
-		let s =
-			newSortedBy === 'bumped' || //
-			(qSearchParam && newSortedBy === 'new')
-				? ''
-				: newSortedBy;
-		let queryParams = `?${v}${v && s ? '&' : ''}${s}`;
-		return queryParams === '?' ? page.url.pathname : queryParams;
+		return setSearchParams({
+			...{
+				nested: null,
+				flat: null,
+				bumped: null,
+				new: null,
+				old: null,
+			},
+			...(newView === 'nested' ? {} : { flat: undefined }),
+			...(newSortedBy === 'bumped'
+				? {}
+				: newSortedBy === 'new'
+					? { new: qSearchParam ? null : undefined }
+					: { old: undefined }),
+		});
 	};
 	// TODO: when clicking to a page with the feed already cached, it takes noticeably longer to render presumably cuz it's rendering the whole feed. Get rid of this delay without taking away the ability to command-f the whole page. Scroll height mustn't change so to maintain same scroll position when switching between space and post feeds.
 	let postObjFeed = $derived(
@@ -389,7 +417,13 @@
 		{:else if showYourTurn}
 			<div class="h-9 fx">
 				<IconInbox class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl">{m.yourTurn()}</p>
+				<p class="font-bold text-xl">
+					{spaceContext?.permissionCode?.num === permissionCodes.reactOnly
+						? m.yourTurnReactOnly()
+						: spaceContext?.permissionCode?.num === permissionCodes.postOnly
+							? m.yourTurnPostOnly()
+							: m.yourTurn()}
+				</p>
 			</div>
 			{#if gs.accounts}
 				{#if gs.accounts[0].ms}
@@ -412,7 +446,7 @@
 			</div>
 		{/if}
 		<div
-			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
+			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn || isMergedView || callerIsOwner ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
 		>
 			<a
 				href={makeParams('nested', sortedBy)}

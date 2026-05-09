@@ -2,7 +2,7 @@
 	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { hasParent } from '$lib/types/parts';
-	import { getAtIdStr, getFullIdObj, getIdObjAsAtIdObj, getIdStr } from '$lib/types/parts/partIds';
+	import { getAtIdStr, getFullIdObj, getIdObj, getIdStr } from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
 	import type { RxnEmoji } from '$lib/types/reactions';
@@ -47,8 +47,11 @@
 	let layer = $derived(version === null ? null : p.post.history?.[version]);
 	let core = $derived(layer?.core);
 	let tags = $derived(layer?.tags);
-	let rxnCountEntries = $derived(
-		Object.entries(p.post.rxnCount || {}).sort(([, a], [, b]) => b - a) as [RxnEmoji, number][],
+	let rxnEmojiCountEntries = $derived(
+		Object.entries(p.post.rxnEmojiCount || {}).sort(([, a], [, b]) => b - a) as [
+			RxnEmoji,
+			number,
+		][],
 	);
 	let changeVersion = async (v: number) => {
 		if (!p.post.history?.[v]) {
@@ -169,7 +172,7 @@
 			/>
 			{#if open}
 				<div class={`pr-1 ${p.cited || p.isEmbed ? '' : 'pb-2'}`}>
-					{#if tags?.length || rxnCountEntries.length}
+					{#if tags?.length || rxnEmojiCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
 							{#each tags || [] as tag (tag)}
 								<a
@@ -179,37 +182,36 @@
 									{tag}
 								</a>
 							{/each}
-							{#each rxnCountEntries as [emoji, count], i}
+							{#each rxnEmojiCountEntries as [emoji, count], i}
 								<button
 									class={`group fx h-5 px-1 ${
 										evenBg //
-											? p.post.myRxns?.includes(emoji)
+											? p.post.myRxnEmojis?.includes(emoji)
 												? 'bg-bg4 hover:bg-bg5 border-b border-b-hl1'
 												: 'hover:bg-bg4'
-											: p.post.myRxns?.includes(emoji)
+											: p.post.myRxnEmojis?.includes(emoji)
 												? 'bg-bg5 hover:bg-bg6 border-b border-hl1'
 												: 'hover:bg-bg5'
 									}`}
 									onclick={async () => {
 										await toggleReaction({
-											...getIdObjAsAtIdObj(p.post),
-											ms: 0,
-											by_ms: gs.accounts![0].ms,
-											in_ms: gs.lastSeenInMs!,
+											postIdObj: getIdObj(p.post),
 											emoji,
 										});
 									}}
 								>
 									<p
-										class={`${p.post.myRxns?.includes(emoji) ? '' : 'grayscale-75'} group-hover:grayscale-0`}
+										class={`${p.post.myRxnEmojis?.includes(emoji) ? '' : 'grayscale-75'} group-hover:grayscale-0`}
 									>
 										{emoji}
 									</p>
-									<p class={`ml-1.5 font-bold ${p.post.myRxns?.includes(emoji) ? 'text-fg3' : ''}`}>
+									<p
+										class={`ml-1.5 font-bold ${p.post.myRxnEmojis?.includes(emoji) ? 'text-fg3' : ''}`}
+									>
 										{count}
 									</p>
 								</button>
-								{#if i === rxnCountEntries.length - 1}
+								{#if i === rxnEmojiCountEntries.length - 1}
 									<div class="h-5 xy">
 										<button
 											class={`group xy h-7 w-7 text-fg2 hover:text-fg1`}

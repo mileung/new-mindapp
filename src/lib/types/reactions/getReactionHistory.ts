@@ -20,6 +20,7 @@ export let getReactionHistory = async ({
 	rxnIdObjsExclude: IdObj[];
 }) => {
 	let baseInput = await getWhoWhereObj();
+	postIdObj = getIdObj(postIdObj);
 	return baseInput.spaceMs
 		? trpc().getReactionHistory.query({
 				...baseInput,

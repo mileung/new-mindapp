@@ -1,11 +1,13 @@
 <script lang="ts">
 	import {
-		getUrlInMsContext,
+		getCallerIsOwner,
+		getSpaceContext,
 		getWhoObj,
 		getWhoWhereObj,
 		gs,
 		msToAccountNameTxt,
 		msToSpaceNameTxt,
+		toggleAccountBan,
 	} from '$lib/global-state.svelte';
 	import { alertError, deepClone, identikana } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
@@ -13,8 +15,16 @@
 	import { trpc } from '$lib/trpc/client';
 	import { type PublicProfile } from '$lib/types/accounts';
 	import { updateLocalCache } from '$lib/types/local-cache';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { permissionCodes, roleCodes, type Space } from '$lib/types/spaces';
-	import { IconDeviceFloppy, IconEdit, IconPin, IconX } from '@tabler/icons-svelte';
+	import {
+		IconBan,
+		IconDeviceFloppy,
+		IconEdit,
+		IconPin,
+		IconUserPlus,
+		IconX,
+	} from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
@@ -50,10 +60,9 @@
 	});
 
 	let accountOrSpaceMs = $derived(p.account?.ms ?? p.space!.ms);
-	let slug = $derived(p.account ? `_${p.account.ms}_` : `__${p.space?.ms}`);
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
-	let spaceContext = $derived(getUrlInMsContext());
+	let spaceContext = $derived(p.space ? getSpaceContext(getUrlInMs()) : undefined);
 	let userCanEdit = $derived.by(() => {
 		if (p.space) return spaceContext?.roleCode?.num === roleCodes.admin;
 		if (p.account) return p.account.ms === callerMs;
@@ -68,6 +77,8 @@
 					? m.globalSpaceNote()
 					: !gs.lastSeenInMs && m.localSpaceNote()),
 	);
+
+	let callerIsOwner = $derived(getCallerIsOwner());
 
 	let visibilityAndNewMembersCan = $derived.by(() => {
 		if (
@@ -96,7 +107,7 @@
 			<SpaceIcon class="h-10 w-10" ms={accountOrSpaceMs} />
 		{/if}
 		{#if editing}
-			<div class="flex h-8">
+			<div class="flex h-8 o">
 				<button
 					class="w-8 xy hover:bg-bg3 text-fg2 hover:text-fg1"
 					onclick={() => {
@@ -192,6 +203,37 @@
 			</button>
 		{/if}
 	</div>
+	{#if p.account?.banned}
+		<p class="text-red-500">
+			{@html m.thisAccountWasBannedByNOnD({
+				by_ms: p.account.banned.by_ms!,
+				n: msToAccountNameTxt(p.account.banned.by_ms!),
+				d: formatMs(p.account.banned.ms, 'min'),
+			})}
+		</p>
+	{/if}
+	{#if p.account && callerIsOwner && p.account.ms !== callerMs}
+		<div class="flex">
+			<a
+				target="_blank"
+				href={`mailto:${p.account!.email!.txt}`}
+				class="flex-1 fx hover:text-fg3 hover:bg-bg4"
+			>
+				{p.account!.email!.txt}
+			</a>
+			<button
+				class="h-8 xy pl-0.5 pr-1 hover:bg-bg4 text-fg2 hover:text-fg1"
+				onclick={() => toggleAccountBan(p.account!.ms)}
+			>
+				{#if p.account?.banned}
+					<IconUserPlus class="h-5 w-5" />
+				{:else}
+					<IconBan class="h-5 w-5" />
+				{/if}
+				<p class="ml-1">{p.account?.banned ? m.unban() : m.ban()}</p>
+			</button>
+		</div>
+	{/if}
 	{#if editing}
 		{#if p.space ? p.space.ms > 1 && p.space.ms !== callerMs : true}
 			<p class="font-bold">{m.name()}</p>

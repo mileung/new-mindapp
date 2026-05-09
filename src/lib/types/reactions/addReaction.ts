@@ -1,44 +1,58 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { gsdb } from '$lib/global-state.svelte';
+import { is1Emoji } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
-import { ReactionSchema, type Reaction } from '.';
 import { type Database } from '../../local-db';
-import { assert1Row, assertLt2Rows, channelPartsByCode, type PartInsert } from '../parts';
+import {
+	assert1Row,
+	assertLt2Rows,
+	channelPartsByCode,
+	type PartInsert,
+	type WhoObj,
+} from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getFullIdObj } from '../parts/partIds';
+import { getIdObj, getIdObjAsAtIdObj, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagCoreOrRxnCountsBy1 } from '../posts';
 
-export let addReaction = async (rxn: Reaction, useRpc: boolean) => {
-	if (!ReactionSchema.safeParse(rxn).success) throw new Error(`Invalid post`);
-	return useRpc
-		? trpc().addReaction.mutate({ ...(await getWhoWhereObj()), rxn }) //
-		: _addReaction(await gsdb(), rxn);
+export let addReaction = async (
+	input: WhoObj & {
+		postIdObj: IdObj;
+		emoji: string;
+	},
+	useLocalDb: boolean,
+) => {
+	if (!is1Emoji(input.emoji)) throw new Error(`Failed is1Emoji`);
+	return useLocalDb //
+		? _addReaction(await gsdb(), input, true)
+		: trpc().addReaction.mutate(input);
 };
 
-export let _addReaction = async (db: Database, rxn: Reaction) => {
+export let _addReaction = async (
+	db: Database,
+	input: WhoObj & {
+		postIdObj: IdObj;
+		emoji: string;
+	},
+	useLocalDb: boolean,
+) => {
+	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
 	let ms = Date.now();
 	let reactionIdWithEmojiTxtAtPostIdObj: PartInsert = {
-		...getFullIdObj(rxn),
+		...getIdObjAsAtIdObj(input.postIdObj),
 		ms,
+		by_ms: input.callerMs,
+		in_ms: rxnInMs,
 		code: pc.reactionIdWithEmojiTxtAtPostId,
-		num: 0,
-		txt: rxn.emoji,
+		txt: input.emoji,
 	};
-	let partsToInsert: PartInsert[] = [
-		reactionIdWithEmojiTxtAtPostIdObj,
-		// TODO: bump posts if it gets a certain number of rxns?
-		// {
-		// 	...atPostIdObj,
-		// 	...postIdObj,
-		// 	code: pc.postIdAtBumpedRootId,
-		// },
-	];
+	let partsToInsert: PartInsert[] = [reactionIdWithEmojiTxtAtPostIdObj];
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: parentPostIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.postIdLastVersionNumAtParentPostId]: postIdLastVersionNumAtParentPostIdRows = [],
 		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
+		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -46,45 +60,49 @@ export let _addReaction = async (db: Database, rxn: Reaction) => {
 			.where(
 				or(
 					and(
-						pf.atIdAsId(reactionIdWithEmojiTxtAtPostIdObj),
-						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.id(input.postIdObj),
+						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
 					and(
-						pf.atId(reactionIdWithEmojiTxtAtPostIdObj),
+						pf.idAsAtId(input.postIdObj),
+						pf.ms.gt0,
+						pf.by_ms.eq(input.callerMs),
+						pf.in_ms.eq(rxnInMs),
 						pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
-						pf.num.gte0,
-						pf.txt.eq(rxn.emoji),
+						pf.num.isNull,
+						pf.txt.eq(input.emoji),
+					),
+					and(
+						pf.noAtId,
+						pf.id(input.postIdObj),
+						pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+						pf.num.gt0,
+						pf.txt.eq(input.emoji),
 					),
 				),
 			),
 	);
 	if (reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Already added this reaction`);
-	assert1Row(parentPostIdWNumAsLastVersionAtPPostIdRows);
-	let reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdRow = assertLt2Rows(
-		await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					pf.atId(reactionIdWithEmojiTxtAtPostIdObj),
-					pf.code.eq(pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId),
-					pf.num.gte0,
-					pf.txt.eq(rxn.emoji),
-				),
-			),
-	);
-	if (reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostIdRow) {
-		await moveTagCoreOrRxnCountsBy1(db, [], [], [{ ...rxn, ms }], true);
-	} else {
-		partsToInsert.push({
-			...reactionIdWithEmojiTxtAtPostIdObj,
-			code: pc.reactionEmojiTxtWithUniqueMsAndNumAsCountAtPostId,
-			num: 1,
-			txt: rxn.emoji,
-		});
-	}
+	assert1Row(postIdLastVersionNumAtParentPostIdRows);
+	assertLt2Rows(postIdRxnEmojiTxtAndCountNumRows)
+		? await moveTagCoreOrRxnCountsBy1(
+				db,
+				[],
+				[],
+				[{ ...input.postIdObj, emoji: input.emoji }],
+				true,
+			)
+		: partsToInsert.push({
+				...id0,
+				...getIdObj(input.postIdObj),
+				code: pc.postIdRxnEmojiTxtAndCountNum,
+				num: 1,
+				txt: input.emoji,
+			});
+
+	console.log('partsToInsert', JSON.stringify(partsToInsert, null, 2));
 	await db.insert(pTable).values(partsToInsert);
 	return { ms };
 };

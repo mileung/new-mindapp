@@ -1,7 +1,7 @@
 <script lang="ts">
 	import {
 		getPromptSigningIn,
-		getUrlInMsContext,
+		getSpaceContext,
 		gs,
 		msToSpaceNameTxt,
 	} from '$lib/global-state.svelte';
@@ -21,7 +21,7 @@
 
 	let urlInMs = $derived(getUrlInMs()!);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
-	let spaceContext = $derived(getUrlInMsContext());
+	let spaceContext = $derived(getSpaceContext(urlInMs));
 	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
 	let tagsData = $derived(gs.spaceMsToTagsMap[urlInMs]);
 	let tags = $derived(tagsData?.tags || []);
@@ -40,9 +40,8 @@
 			else break;
 		}
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
-		console.log('res:', res);
+		// console.log('res:', res);
 		res.tags.length && e.detail.loaded();
-
 		let endReached = res.tags.length < tagsPerLoad;
 		endReached && e.detail.complete();
 

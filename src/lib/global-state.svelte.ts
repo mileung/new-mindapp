@@ -1,9 +1,10 @@
 import { dev } from '$app/environment';
 import { page } from '$app/state';
-import { PUBLIC_OWNER_MSS } from '$env/static/public';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
-import { identikana } from './js';
+import { promptSum } from './dom';
+import { alertError, identikana, ownerMsSet } from './js';
 import { m } from './paraglide/messages';
+import { trpc } from './trpc/client';
 import { getDefaultAccount, type MyAccount, type PublicProfile } from './types/accounts';
 import { updateLocalCache } from './types/local-cache';
 import type { WhoObj, WhoWhereObj } from './types/parts';
@@ -117,6 +118,18 @@ class GlobalState {
 		>
 	>({});
 
+	ownerView = $state<{
+		signedInEmailRulesTxt?: string;
+		accountMss?: number[];
+		// accountMss?: { emailTxt: string; ms: number; banned?: Pick<IdObj, 'ms' | 'by_ms'> }[];
+		accountsEndReached?: boolean;
+		accountsError?: string;
+		spaceMss?: number[];
+		msToSpaceAdminMssMap?: Record<number, number[]>;
+		spacesEndReached?: boolean;
+		spacesError?: string;
+	}>({});
+
 	writingNew = $state<null | true>(null);
 	writingEdit = $state<null | Post>(null);
 	writingTo = $state<null | Post>(null);
@@ -186,9 +199,9 @@ export let getWhoObj = async () => {
 	} satisfies WhoObj;
 };
 
-export let getWhoWhereObj = async (forceUsingLocalDb?: boolean) => {
+export let getWhoWhereObj = async (useLocalDb?: boolean) => {
 	let attempts = 0;
-	let urlInMs = forceUsingLocalDb ? 0 : getUrlInMs();
+	let urlInMs = useLocalDb ? 0 : getUrlInMs();
 	if (urlInMs === undefined) throw new Error('urlInMs === undefined');
 	while (gs.accounts === undefined) {
 		if (++attempts > 888) throw new Error('getWhoWhereObj timed out');
@@ -208,7 +221,11 @@ export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, s
 				...obj,
 				[ms]: {
 					...(gs.msToProfileMap[+ms] || getDefaultAccount()),
-					name: { txt: nt },
+					ms: +ms,
+					name: {
+						...gs.msToProfileMap[+ms]?.name,
+						txt: nt,
+					},
 				} satisfies PublicProfile,
 			}),
 			{},
@@ -226,7 +243,10 @@ export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, strin
 					[ms]: {
 						...(gs.msToSpaceMap[+ms] || getDefaultSpace()),
 						ms: +ms,
-						name: { txt: nt },
+						name: {
+							...gs.msToSpaceMap[+ms]?.name,
+							txt: nt,
+						},
 					} satisfies Space,
 				}),
 				{},
@@ -271,24 +291,44 @@ export let mergeSpaceMsToAccountMsToMembershipMap = (
 	);
 };
 
-export let getUrlInMsContext = (): undefined | SpaceContext => {
-	let urlInMs = getUrlInMs();
-	if (!gs.accounts || urlInMs === undefined) return;
+export let getSpaceContext = (spaceMs?: number): undefined | SpaceContext => {
+	if (!gs.accounts || spaceMs === undefined) return;
 	let caller = gs.accounts[0];
-	return urlInMs === 0 || urlInMs === caller.ms
+	return spaceMs === 0 || spaceMs === caller.ms
 		? {
-				ms: urlInMs,
+				ms: spaceMs,
 				roleCode: { num: roleCodes.admin },
 				permissionCode: { num: permissionCodes.reactAndPost },
 				accentCode: { num: accentCodes.none },
 			}
-		: caller.joinedSpaceContexts.find((c) => c.ms === urlInMs);
+		: caller.joinedSpaceContexts.find((c) => c.ms === spaceMs);
 };
 
 export let getCallerIsOwner = () => {
-	let publicOwnerMss = JSON.parse(PUBLIC_OWNER_MSS) as number[];
 	let callerMs = gs.accounts?.[0].ms;
-	return Array.isArray(publicOwnerMss) && callerMs !== undefined
-		? publicOwnerMss.includes(callerMs)
-		: false;
+	return callerMs !== undefined ? ownerMsSet.has(callerMs) : false;
+};
+
+export let toggleAccountBan = async (accountMs: number) => {
+	let account = gs.msToProfileMap[accountMs]!;
+	if (
+		promptSum((a, b) =>
+			m.enterTheSumOfAAndBToBanC({
+				a,
+				b,
+				c: `${msToAccountNameTxt(account.ms)} (${account.email!.txt})`,
+			}),
+		)
+	) {
+		try {
+			let { ms } = await trpc().setAccountBan.mutate({
+				...(await getWhoObj()),
+				accountMs: account.ms,
+				banned: !account.banned,
+			});
+			account.banned = account.banned ? undefined : { ms, by_ms: gs.accounts?.[0].ms! };
+		} catch (error) {
+			alertError(error);
+		}
+	}
 };

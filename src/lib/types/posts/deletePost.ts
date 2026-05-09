@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gs, gsdb } from '$lib/global-state.svelte';
+import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
 import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
@@ -16,12 +16,15 @@ import { pf } from '../parts/partFilters';
 import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let deletePost = async (fullPostIdObj: FullIdObj, version: null | number) => {
-	let useRpc = gs.lastSeenInMs! > 0;
-	let baseInput = await getWhoWhereObj();
-	return useRpc || baseInput.spaceMs
-		? trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version })
-		: _deletePost(await gsdb(), fullPostIdObj, version);
+export let deletePost = async (
+	fullPostIdObj: FullIdObj,
+	version: null | number,
+	useLocalDb: boolean,
+) => {
+	let baseInput = await getWhoObj();
+	return useLocalDb
+		? _deletePost(await gsdb(), fullPostIdObj, version)
+		: trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version });
 };
 
 export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version: null | number) => {
@@ -31,7 +34,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
 		pf.atId(fullPostIdObj),
 		pf.id(fullPostIdObj),
-		pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+		pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 		pf.txt.isNull,
 	);
 	let postIdAtBumpedRootIdRowsFilter = and(
@@ -42,7 +45,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	);
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdRows = [],
+		[pc.postIdLastVersionNumAtParentPostId]: mainPIdWNumAsLastVersionAtPPIdRows = [],
 		[pc.postIdAtBumpedRootId]: postIdAtBumpedRootIdRows = [],
 		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
 		[pc.exPostTagIdWithVersionNumAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
@@ -98,7 +101,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			.where(
 				and(
 					pf.idAsAtId(fullPostIdObj),
-					pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+					pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 					pf.num.gte0,
 					pf.txt.isNull,
 				),

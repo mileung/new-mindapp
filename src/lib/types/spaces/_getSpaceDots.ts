@@ -35,6 +35,7 @@ export let _getSpaceDots = async (
 		excludeMemberMss?: number[];
 		lastMemberListRoleCodeNum?: number;
 	},
+	ownerCalled: boolean,
 ) => {
 	let {
 		callerRoleCodeNum,
@@ -103,7 +104,9 @@ export let _getSpaceDots = async (
 				or(
 					getCallerMembership &&
 						!isLocalOrPersonal &&
-						(callerRoleCodeNum === roleCodes.mod || callerRoleCodeNum === roleCodes.admin)
+						(ownerCalled ||
+							callerRoleCodeNum === roleCodes.mod ||
+							callerRoleCodeNum === roleCodes.admin)
 						? makeMyValidInvitesFilter(callerMs, spaceMs)
 						: undefined,
 					firstLoad

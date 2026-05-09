@@ -7,19 +7,20 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { roleCodes } from '../spaces';
 import {
-	getAnother_roleCodeNumIdAtAccountIdRow,
+	getAnotherAdmin_roleCodeNumIdAtAccountIdRow,
 	moveSpaceMemberCountBy1,
 } from '../spaces/db-spaces';
 
 export let _removeSpaceMember = async (
 	input: WhoWhereObj & {
 		accountMs: number;
-		callerRoleCodeNum: number;
+		callerRoleCodeNum?: number;
 	},
+	ownerCalled: boolean,
 ) => {
 	let { callerRoleCodeNum, callerMs, spaceMs, accountMs } = input;
-	if (callerRoleCodeNum === roleCodes.admin) {
-		if (!(await getAnother_roleCodeNumIdAtAccountIdRow(spaceMs, callerMs)))
+	if (!ownerCalled && callerRoleCodeNum === roleCodes.admin) {
+		if (!(await getAnotherAdmin_roleCodeNumIdAtAccountIdRow(spaceMs, callerMs)))
 			throw new Error(m.assignAnotherAdminToLeaveThisSpace());
 	}
 	await moveSpaceMemberCountBy1(spaceMs, false);

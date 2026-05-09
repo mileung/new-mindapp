@@ -17,14 +17,14 @@ import { pf } from '../parts/partFilters';
 import { getIdObjAsAtIdObj, getIdStr, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let editPost = async (post: Post, forceUsingLocalDb?: boolean) => {
+export let editPost = async (post: Post, useLocalDb?: boolean) => {
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
 		throw new Error(`Invalid post`);
 	}
 	let baseInput = await getWhoWhereObj();
-	return forceUsingLocalDb || !baseInput.spaceMs
+	return useLocalDb || !baseInput.spaceMs
 		? _editPost(await gsdb(), parsedPost.data)
 		: trpc().editPost.mutate({ ...baseInput, post: parsedPost.data });
 };
@@ -38,13 +38,13 @@ export let _editPost = async (db: Database, post: Post) => {
 	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
 		pf.atId(post),
 		pf.id(post),
-		pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+		pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 		pf.num.gte0,
 		pf.txt.isNull,
 	);
 
 	let {
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.postIdLastVersionNumAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVrsnAtPIdRows = [],
 		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVrsnAtPIdRows = [],
 	} = channelPartsByCode(

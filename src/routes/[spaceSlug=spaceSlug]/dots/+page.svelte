@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import {
 		getPromptSigningIn,
-		getUrlInMsContext,
+		getSpaceContext,
 		getWhoWhereObj,
 		gs,
 		mergeMsToAccountNameTxtMap,
@@ -40,11 +40,9 @@
 	let urlInMs = $derived(getUrlInMs()!);
 	let identifier = $derived(callerMs + '_' + urlInMs);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
-	let spaceContext = $derived(getUrlInMsContext());
+	let spaceContext = $derived(getSpaceContext(urlInMs));
 	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
-	let dots = $derived(gs.accountMsToSpaceMsToDots[callerMs!]?.[urlInMs]);
-	let myInvites = $derived(dots?.invites || []);
-	let error = $derived(dots?.error);
+	let myDots = $derived(gs.accountMsToSpaceMsToDots[callerMs!]?.[urlInMs]);
 	let dotsFeed = $derived(gs.spaceMsToDotsFeed[urlInMs]);
 	let accountMsToMembershipMap = $derived(gs.spaceMsToAccountMsToMembershipMap[urlInMs]);
 	let memberMss = $derived(
@@ -61,8 +59,11 @@
 			})
 			.map(([k]) => +k),
 	);
+	// $effect(() => {
+	// 	console.log('dots', JSON.stringify(dots, null, 2));
+	// });
 	let memberships = $derived(
-		spaceContext && !dots?.invites
+		spaceContext && !myDots?.invites
 			? [] // this [] is needed to retrigger on:infinite...
 			: (memberMss.map((ms) => accountMsToMembershipMap![ms]) as Membership[]),
 	);
@@ -75,7 +76,14 @@
 			callerMs === undefined
 		)
 			return;
-		if (urlInMs < 1 || dotsFeed?.endReached) {
+		// console.log('dotsFeed?.endReached:', dotsFeed?.endReached);
+		if (
+			(spaceContext?.roleCode.num === roleCodes.mod ||
+				spaceContext?.roleCode.num === roleCodes.admin) &&
+			myDots?.invites
+		) {
+		}
+		if (urlInMs < 1 || (myDots && dotsFeed?.endReached)) {
 			e.detail.loaded();
 			return e.detail.complete();
 		}
@@ -159,7 +167,7 @@
 				[callerMs]: {
 					...gs.accountMsToSpaceMsToDots[callerMs],
 					[urlInMs]: {
-						invites: myInvites,
+						invites: myDots?.invites || [],
 						error: makeErrorReadable(error),
 					},
 				},
@@ -246,26 +254,26 @@
 						/>
 					</div>
 				</div>
-				{#each myInvites as myInvite}
+				{#each myDots?.invites || [] as invite}
 					<div class="mt-2">
 						<div class="fx">
 							<button
 								class="flex-1 fx text-fg1 hover:text-fg3 hover:bg-bg4"
 								onclick={() => {
 									navigator.clipboard.writeText(
-										`${page.url.origin}/invite/${myInvite.ms}_${myInvite.slugEnd}`,
+										`${page.url.origin}/invite/${invite.ms}_${invite.slugEnd}`,
 									);
-									copiedInviteMs = myInvite.ms;
+									copiedInviteMs = invite.ms;
 									clearTimeout(copiedInviteSlugTimeout);
 									copiedInviteSlugTimeout = setTimeout(() => {
-										if (copiedInviteMs === myInvite.ms) copiedInviteMs = 0;
+										if (copiedInviteMs === invite.ms) copiedInviteMs = 0;
 									}, 888);
 								}}
 							>
 								<p class="">
-									{page.url.protocol}//...{myInvite.slugEnd}
+									{page.url.protocol}//...{invite.slugEnd}
 								</p>
-								{#if copiedInviteMs === myInvite.ms}
+								{#if copiedInviteMs === invite.ms}
 									<IconCheck class="h-4" />
 								{:else}
 									<IconCopy class="h-4" />
@@ -275,7 +283,7 @@
 								class="fx hover:text-fg3 hover:bg-bg4"
 								onclick={() =>
 									navigator.share({
-										url: `${page.url.origin}/invite/${myInvite.ms}_${myInvite.slugEnd}`,
+										url: `${page.url.origin}/invite/${invite.ms}_${invite.slugEnd}`,
 									})}
 							>
 								{m.share()}
@@ -283,23 +291,23 @@
 							</button>
 						</div>
 						<div class="fx justify-between text-fg2">
-							{#if myInvite.expiryMs}
-								<p>{m.expiresD({ d: formatMs(myInvite.expiryMs, 'min') })}</p>
+							{#if invite.expiryMs}
+								<p>{m.expiresD({ d: formatMs(invite.expiryMs, 'min') })}</p>
 							{:else}
 								<p>{m.neverExpires()}</p>
 							{/if}
-							{#if myInvite.maxUses}
+							{#if invite.maxUses}
 								<p>
-									{myInvite.maxUses === 1
+									{invite.maxUses === 1
 										? m.one1UseLeft()
 										: m.nmUsesLeft({
-												n: myInvite.maxUses - myInvite.useCount,
-												m: myInvite.maxUses,
+												n: invite.maxUses - invite.useCount,
+												m: invite.maxUses,
 											})}
 								</p>
 							{:else}
 								<p>
-									{myInvite.useCount === 1 ? m.used1Time() : m.usedNTimes({ n: myInvite.useCount })}
+									{invite.useCount === 1 ? m.used1Time() : m.usedNTimes({ n: invite.useCount })}
 								</p>
 							{/if}
 						</div>
@@ -309,11 +317,11 @@
 								if (confirm('Are you sure you want to revoke this invite link?')) {
 									await trpc().revokeInviteLink.mutate({
 										...(await getWhoWhereObj()),
-										inviteMs: myInvite.ms,
-										slugEnd: myInvite.slugEnd,
+										inviteMs: invite.ms,
+										slugEnd: invite.slugEnd,
 									});
-									myInvites = myInvites.filter(
-										(mi) => mi.ms !== myInvite.ms || mi.slugEnd !== myInvite.slugEnd,
+									myDots!.invites = myDots!.invites.filter(
+										(i) => i.ms !== invite.ms || i.slugEnd !== invite.slugEnd,
 									);
 								}
 							}}
@@ -342,7 +350,7 @@
 									[urlInMs]: {
 										...gs.accountMsToSpaceMsToDots[callerMs]![urlInMs],
 										invites: [
-											...myInvites,
+											...(myDots?.invites || []),
 											{
 												by_ms: callerMs,
 												in_ms: urlInMs,
@@ -373,7 +381,7 @@
 		{/if}
 		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>
-				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
+				<p slot="error" class="m-2 text-lg text-fg2">{myDots?.error}</p>
 				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
 					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 				</div>

@@ -23,11 +23,24 @@ export let initLocalDb = async () => {
 				in_ms INTEGER NOT NULL,
 				code INTEGER NOT NULL,
 				num REAL,
-				txt TEXT,
-				PRIMARY KEY (at_ms, at_by_ms, at_in_ms, ms, by_ms, in_ms, code, num)
+				txt TEXT
 			);
 
-			CREATE INDEX IF NOT EXISTS txt_idx ON parts(txt);
+			CREATE INDEX IF NOT EXISTS post_feed_idx ON parts(
+				code,
+				in_ms,
+				ms,
+				by_ms,
+				at_in_ms,
+				at_ms,
+				at_by_ms
+			);
+
+			CREATE INDEX IF NOT EXISTS tag_idx ON parts(
+				code,
+				in_ms,
+				txt
+			) WHERE code = 30;
 	`;
 	} catch (error) {
 		// console.error(error);

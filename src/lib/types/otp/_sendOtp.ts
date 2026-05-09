@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
-import { m } from '$lib/paraglide/messages';
 import { _getEmailRow } from '$lib/server/_getEmailRow';
 import { tdb } from '$lib/server/db';
+import { throwIf } from '$lib/server/errors';
 import { pc } from '../parts/partCodes';
 import { id0 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
@@ -21,9 +21,7 @@ export let _sendOtp = async (input: {
 	if (!will.signIn) {
 		// _signIn already checks for email row
 		let emailRow = await _getEmailRow(email);
-		if (will.createAccount) {
-			if (emailRow) throw new Error(m.emailAlreadyInUse());
-		} else if (!emailRow) throw new Error(m.anErrorOccurred());
+		throwIf(will.createAccount ? emailRow : !emailRow);
 	}
 
 	let pin = +('' + Math.random()).slice(-8);

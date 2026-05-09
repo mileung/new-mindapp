@@ -1,7 +1,6 @@
-import { ranStr } from '$lib/js';
-import { m } from '$lib/paraglide/messages';
-import { _getEmailRow } from '$lib/server/_getEmailRow';
+import { ranStr, rulesAllowEmail } from '$lib/js';
 import { tdb } from '$lib/server/db';
+import { throwIf } from '$lib/server/errors';
 import { getValidAuthCookie, setCookie } from '$lib/server/sessions';
 import { type Context } from '$lib/trpc/context';
 import { MyAccountSchema, reduceMyAccountRows, type MyAccount } from '$lib/types/accounts';
@@ -9,9 +8,9 @@ import { pc } from '$lib/types/parts/partCodes';
 import { id0 } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
 import * as argon2 from 'argon2';
-import { and } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { _checkOtp } from '../otp/_checkOtp';
-import type { PartInsert } from '../parts';
+import { assertLt2Rows, channelPartsByCode, type PartInsert } from '../parts';
 import { pf } from '../parts/partFilters';
 import { normalizeTags } from '../posts';
 import { makeNewSpaceRows } from '../spaces/_createSpace';
@@ -31,7 +30,41 @@ export let _createAccount = async (
 		deleteIfCorrect: true,
 	});
 	if (res.strike || res.expiredOtp) return res;
-	if (await _getEmailRow(input.email)) throw new Error(m.emailAlreadyInUse());
+	let {
+		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
+		[pc.signedInEmailRulesTxtId]: signedInEmailRulesTxtIdRows = [],
+	} = channelPartsByCode(
+		await tdb
+			.select()
+			.from(pTable)
+			.where(
+				or(
+					and(
+						pf.noAtId,
+						pf.ms.gt0,
+						pf.by_ms.gt0,
+						pf.in_ms.eq0,
+						pf.code.eq(pc.accountEmailTxtMsByMs),
+						pf.num.eq0,
+						pf.txt.eq(input.email),
+					),
+					and(
+						pf.noAtId,
+						pf.in_ms.eq0,
+						pf.code.eq(pc.signedInEmailRulesTxtId),
+						pf.num.eq0,
+						pf.txt.isNotNull,
+					),
+				),
+			),
+	);
+
+	throwIf(accountEmailTxtMsByMsRows.length);
+	let signedInEmailRulesTxt = assertLt2Rows(signedInEmailRulesTxtIdRows)?.txt || '';
+	throwIf(
+		signedInEmailRulesTxt && //
+			!rulesAllowEmail(signedInEmailRulesTxt.split('\n'), input.email),
+	);
 
 	let top88MostUsedGlobalTags = normalizeTags(
 		(

@@ -30,14 +30,14 @@ import {
 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let addPost = async (post: Post, forceUsingLocalDb?: boolean) => {
-	let baseInput = await getWhoWhereObj(forceUsingLocalDb);
+export let addPost = async (post: Post, useLocalDb?: boolean) => {
+	let baseInput = await getWhoWhereObj(useLocalDb);
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
 		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
 		throw new Error(`Invalid post`);
 	}
-	return forceUsingLocalDb || !baseInput.spaceMs
+	return useLocalDb || !baseInput.spaceMs
 		? _addPost(await gsdb(), parsedPost.data)
 		: trpc().addPost.mutate({ ...baseInput, post: parsedPost.data });
 };
@@ -53,7 +53,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		ms: post.ms || Date.now(),
 		by_ms: post.by_ms,
 		in_ms: post.in_ms,
-		code: pc.postIdWithNumAsLastVersionAtParentPostId,
+		code: pc.postIdLastVersionNumAtParentPostId,
 		num: lastVersion,
 	};
 	let postIsChild = hasParent(post);
@@ -141,7 +141,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					and(
 						pf.noAtId,
 						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
-						pf.code.eq(pc.postIdWithNumAsLastVersionAtParentPostId),
+						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -169,7 +169,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 
 	let {
 		[pc.childPostIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdRows = [],
-		[pc.postIdWithNumAsLastVersionAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.postIdLastVersionNumAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
 		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountRows = [],
 		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(

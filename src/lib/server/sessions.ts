@@ -1,6 +1,9 @@
 import { splitUntil } from '$lib/js';
-import { week } from '$lib/time';
+import { minute, week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
+import { pc } from '$lib/types/parts/partCodes';
+import { pf } from '$lib/types/parts/partFilters';
+import { and, or } from 'drizzle-orm';
 
 type CookieName = 'ms_clientKey' | 'ms_sessionKey';
 export type CookieObj = { ms: number; txt: string };
@@ -36,3 +39,29 @@ export let getValidAuthCookie = (ctx: Context, cookieName: CookieName) => {
 	}
 	return undefined;
 };
+
+export let getExpiredRowsFilters = (ms = Date.now()) => [
+	and(
+		pf.noAtId,
+		pf.ms.lt(ms - 5 * minute),
+		pf.code.eq(pc.otpMs_Pin_StrikeCountIdAndEmailTxt),
+		pf.num.eq0,
+	),
+	and(
+		pf.at_ms.gt0,
+		pf.at_by_ms.eq0,
+		pf.at_in_ms.eq0,
+		pf.ms.gt0,
+		or(
+			pf.ms.lt(ms - week),
+			and(
+				pf.by_ms.gt0, //
+				pf.by_ms.lt(ms),
+			),
+		),
+		pf.in_ms.eq0,
+		pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+		pf.num.eq0,
+		pf.txt.isNotNull,
+	),
+];

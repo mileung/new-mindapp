@@ -20,7 +20,7 @@ export let moveSpaceMemberCountBy1 = async (spaceMs: number, increment: boolean)
 			),
 		);
 
-export let getAnother_roleCodeNumIdAtAccountIdRow = async (
+export let getAnotherAdmin_roleCodeNumIdAtAccountIdRow = async (
 	spaceMs: number,
 	callerMs: number,
 ): Promise<undefined | PartSelect> =>

@@ -1,6 +1,7 @@
 import { dev } from '$app/environment';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
+import { throwIf } from '$lib/server/errors';
 import { week } from '$lib/time';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and, lt, or, sql } from 'drizzle-orm';
@@ -12,6 +13,7 @@ import {
 	assertLt2Rows,
 	channelPartsByCode,
 	type PartInsert,
+	type PartSelect,
 	type WhoObj,
 } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -128,6 +130,12 @@ export let _checkInvite = async (
 					num: 0,
 					txt: input.slugEnd,
 				},
+				{
+					...id0,
+					code: pc.signedInEmailRulesTxtId,
+					num: 0,
+					txt: '',
+				},
 			]);
 			return { redeemed: true };
 		}
@@ -151,8 +159,8 @@ export let _checkInvite = async (
 			if (input.useIfValid) {
 				if (input.callerMs === inviteRow.by_ms) throw new Error(m.cannotUseYourOwnInvite());
 				let {
-					[pc.roleCodeNumIdAtAccountId]: caller_roleCodeNumIdAtAccountIdRows = [],
 					[pc.newMemberPermissionCodeNumId]: newMemberPermissionCodeNumIdRows = [],
+					[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
 				} = channelPartsByCode(
 					await tdb
 						.select()
@@ -160,29 +168,43 @@ export let _checkInvite = async (
 						.where(
 							or(
 								and(
-									pf.at_ms.eq(input.callerMs),
-									pf.in_ms.eq(inviteRow.in_ms),
-									pf.code.eq(pc.roleCodeNumIdAtAccountId),
-								),
-								and(
 									pf.noAtId,
 									pf.in_ms.eq(inviteRow.in_ms),
 									pf.code.eq(pc.newMemberPermissionCodeNumId),
 									pf.num.gte0,
 									pf.txt.isNull,
 								),
+								and(
+									or(
+										pf.at_ms.eq(input.callerMs), //
+										pf.at_ms.eq(inviteRow.by_ms),
+									),
+									pf.ms.gt0,
+									pf.in_ms.eq(inviteRow.in_ms),
+									pf.code.eq(pc.roleCodeNumIdAtAccountId),
+									pf.txt.isNull,
+								),
 							),
 						),
 				);
-				let caller_roleCodeNumIdAtAccountIdRow = assertLt2Rows(caller_roleCodeNumIdAtAccountIdRows);
+				let caller_roleCodeNumIdAtAccountIdRow: undefined | PartSelect;
+				let inviter_roleCodeNumIdAtAccountIdRow: undefined | PartSelect;
+				for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
+					let row = roleCodeNumIdAtAccountIdRows[i];
+					if (row.at_ms === input.callerMs) caller_roleCodeNumIdAtAccountIdRow = row;
+					if (row.at_ms === inviteRow.by_ms) inviter_roleCodeNumIdAtAccountIdRow = row;
+				}
 				if (caller_roleCodeNumIdAtAccountIdRow) throw new Error(m.alreadyJoinedThisSpace());
+				let inviterRoleCodeNum = inviter_roleCodeNumIdAtAccountIdRow!.num;
+				throwIf(inviterRoleCodeNum !== roleCodes.admin && inviterRoleCodeNum !== roleCodes.mod);
+
 				let newMemberPermissionCodeNumIdRow = assert1Row(newMemberPermissionCodeNumIdRows);
 				await tdb.insert(pTable).values(
 					makeRowsForJoiningSpace({
 						ms,
 						inviteIdObj: inviteRow,
 						callerMs: input.callerMs,
-						permissionCodeNum: newMemberPermissionCodeNumIdRow.num,
+						permissionCodeNum: newMemberPermissionCodeNumIdRow.num!,
 						roleCodeNum: roleCodes.member,
 					}),
 				);
@@ -198,6 +220,7 @@ export let _checkInvite = async (
 					[pc.spaceDescriptionTxtIdAndMemberCountNum]: spaceDescriptionTxtIdAndMemberCountNumRows = [],
 					[pc.spaceNameTxtId]: spaceNameTxtIdRows = [],
 					[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
+					[pc.roleCodeNumIdAtAccountId]: inviter_roleCodeNumIdAtAccountIdRows = [],
 				} = channelPartsByCode(
 					await tdb
 						.select()
@@ -221,9 +244,23 @@ export let _checkInvite = async (
 									pf.num.eq0,
 									pf.txt.isNotNull,
 								),
+								and(
+									pf.at_ms.eq(inviteRow.by_ms),
+									pf.ms.gt0,
+									pf.in_ms.eq(inviteRow.in_ms),
+									pf.code.eq(pc.roleCodeNumIdAtAccountId),
+									pf.txt.isNull,
+								),
 							),
 						),
 				);
+
+				let inviter_roleCodeNumIdAtAccountIdRow = assertLt2Rows(
+					inviter_roleCodeNumIdAtAccountIdRows,
+				);
+				let inviterRoleCodeNum = inviter_roleCodeNumIdAtAccountIdRow?.num;
+				if (inviterRoleCodeNum !== roleCodes.admin && inviterRoleCodeNum !== roleCodes.mod)
+					return {};
 
 				let spaceNameTxtIdRow = assertLt2Rows(spaceNameTxtIdRows);
 				let spaceDescriptionTxtIdAndMemberCountNumRow = assert1Row(
@@ -231,7 +268,7 @@ export let _checkInvite = async (
 				);
 				checkedInvite.partialSpace.ms = inviteRow.in_ms;
 				checkedInvite.partialSpace.name.txt = spaceNameTxtIdRow?.txt || '';
-				checkedInvite.partialSpace.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num;
+				checkedInvite.partialSpace.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num!;
 				checkedInvite.partialSpace.description.txt = spaceDescriptionTxtIdAndMemberCountNumRow.txt!;
 				let accountNameTxtMsByMsRow = assert1Row(accountNameTxtMsByMsRows);
 				checkedInvite.inviter.ms = accountNameTxtMsByMsRow.by_ms;

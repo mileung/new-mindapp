@@ -9,7 +9,7 @@
 		msToSpaceNameTxt,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { identikana, isTouchScreen } from '$lib/js';
+	import { identikana, isTouchScreen, setSearchParams } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import {
 		signOut,
@@ -44,6 +44,18 @@
 
 	let hideExtensionLink = $state(isTouchScreen);
 	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
+	let trimmedSearchVal = $derived(searchVal.trim());
+
+	let searchUrl = $derived(
+		setSearchParams({
+			nested: null,
+			flat: null,
+			bumped: null,
+			new: null,
+			old: null,
+			q: trimmedSearchVal,
+		}),
+	);
 
 	let searchIptFocused = $state(false);
 	let tagXFocused = $state(false);
@@ -54,7 +66,7 @@
 
 	let callerIsOwner = $derived(getCallerIsOwner());
 	let tagFilter = $derived(
-		searchVal.trim().replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
+		trimmedSearchVal.replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
 	);
 	let savedTagsSet = $derived(
 		new Set(
@@ -196,12 +208,8 @@
 						let tag = suggestedTags[tagIndex];
 						if (tagXFocused) updateSavedTags([tag], true);
 						else if (tag) addTagToSearchInput(tag);
-						else {
-							let q = searchVal.trim();
-							if (q) {
-								let href = `/__${gs.lastSeenInMs}?q=${q}`;
-								e.metaKey ? open(href, '_blank') : goto(href);
-							}
+						else if (trimmedSearchVal) {
+							e.metaKey ? open(searchUrl, '_blank') : goto(searchUrl);
 						}
 					}
 					if (e.key === 'Tab' && !tagFilter) return;
@@ -239,8 +247,8 @@
 				}}
 			/>
 			<a
-				class={`xy -ml-9 w-9 group ${searchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
-				href={`/__${gs.lastSeenInMs}?q=${searchVal}`}
+				class={`xy -ml-9 w-9 group ${trimmedSearchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
+				href={searchUrl}
 			>
 				<div class={`xy ${searchIptFocused ? 'h-8 w-8' : 'h-9 w-9'} group-hover:bg-bg5`}>
 					<IconSearch class="h-6 w-6" />
@@ -300,12 +308,14 @@
 						<button
 							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 font-medium flex-1 ${a.name ? '' : 'italic'}`}
 							onclick={() => {
-								if (a.signedIn || !a.ms)
+								if (a.signedIn || !a.ms) {
+									gs.urlToPostFeedMap = {};
+									delete gs.accountMsToSpaceMsToCheckedMap[a.ms];
 									updateLocalCache((lc) => ({
 										...lc,
 										accounts: [a, ...lc.accounts.filter((acc) => acc.ms !== a.ms)],
 									}));
-								else goto('/sign-in', { state: { prefilledEmail: a.email.txt } });
+								} else goto('/sign-in', { state: { prefilledEmail: a.email.txt } });
 							}}
 						>
 							{#if !i}

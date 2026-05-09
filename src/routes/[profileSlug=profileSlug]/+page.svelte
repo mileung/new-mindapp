@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { getWhoObj, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
+	import {
+		getWhoObj,
+		gs,
+		mergeMsToAccountNameTxtMap,
+		msToSpaceNameTxt,
+	} from '$lib/global-state.svelte';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
 	import { trpc } from '$lib/trpc/client';
@@ -45,8 +50,13 @@
 						possibleMutualSpaceMss: gs.accounts?.[0].joinedSpaceContexts.map((j) => j.ms),
 					});
 					// console.log('res:', res);
+					if (res.banned) {
+						mergeMsToAccountNameTxtMap({ [res.banned.by_ms]: res.banned.bannerNameTxt });
+					}
 					publicProfile = {
 						ms: profileMs,
+						banned: res.banned,
+						email: res.email,
 						name: res.name,
 						bio: res.bio,
 						callerMsToMutualSpaceMsToJoinMsMap: {
