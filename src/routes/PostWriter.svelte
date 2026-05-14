@@ -7,11 +7,11 @@
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 
-	import { is1Emoji } from '$lib/js';
+	import { getTagVal, is1Emoji } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getIdObj, getIdStr, getUrlInMs } from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTags } from '$lib/types/posts';
+	import { getLastVersion, normalizeTag, normalizeTags } from '$lib/types/posts';
 	import { shortReactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
 	import { permissionCodes } from '$lib/types/spaces';
@@ -57,7 +57,7 @@
 		typedEmoji = '';
 	});
 	let writingToMyRxnEmojis = $derived(gs.writingTo?.myRxnEmojis || []);
-	let tagFilter = $derived(gs.writerTagVal.trim());
+	let tagFilter = $derived(normalizeTag(gs.writerTagVal));
 	let savedTagsSet = $derived(
 		new Set(
 			gs.accounts //
@@ -69,7 +69,7 @@
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
 		let arr = matchSorter([...savedTagsSet], filter)
-			.slice(0, 99)
+			.slice(0, 88)
 			.concat(tagFilter);
 		return [...new Set(arr)];
 	});
@@ -150,12 +150,13 @@
 	let writingInMs = $derived((gs.writingTo || gs.writingEdit)?.in_ms || getUrlInMs()!);
 	let writingInSpaceName = $derived(msToSpaceNameTxt(writingInMs));
 	let writingInMsPermissionCodeNum = $derived(getSpaceContext(writingInMs)?.permissionCode.num);
-	let reactAndPost = $derived(writingInMsPermissionCodeNum === permissionCodes.reactAndPost);
+	let whatTagEquals = $derived(getTagVal(gs.writerTagVal));
+	let canReactAndPost = $derived(writingInMsPermissionCodeNum === permissionCodes.reactAndPost);
 	let showPostingInputs = $derived(
-		reactAndPost || writingInMsPermissionCodeNum === permissionCodes.postOnly,
+		canReactAndPost || writingInMsPermissionCodeNum === permissionCodes.postOnly,
 	);
 	let reactOnly = $derived(writingInMsPermissionCodeNum === permissionCodes.reactOnly);
-	let showReactEmojis = $derived(gs.writingTo && (reactAndPost || reactOnly));
+	let showReactEmojis = $derived(gs.writingTo && (canReactAndPost || reactOnly));
 	let rxnEmojiOptions = $derived([
 		...writingToMyRxnEmojis.filter((e) => !shortReactionList.includes(e)),
 		...shortReactionList,
@@ -171,6 +172,18 @@
 		});
 	};
 </script>
+
+{#snippet styledTag(tag: string)}
+	{#if tag.includes('=')}
+		<p class="font-mono whitespace-pre">
+			{tag.slice(0, tag.indexOf('='))}<span
+				class={typeof getTagVal(tag) === 'string' ? 'text-amber-500' : 'text-emerald-500'}>=</span
+			>{tag.slice(tag.indexOf('=') + 1)}
+		</p>
+	{:else}
+		<p class="whitespace-pre">{tag}</p>
+	{/if}
+{/snippet}
 
 <div class="h-[var(--h-post-writer)] flex flex-col">
 	<div class="flex group bg-bg4 relative w-full">
@@ -224,7 +237,7 @@
 	>
 		{#each gs.writerTags as tag, i}
 			<div class="fx">
-				{tag}
+				{@render styledTag(tag)}
 				<button
 					class="xy -ml-0.5 h-7 w-7 text-fg2 hover:text-fg1"
 					bind:this={undoTagRefs[i]}
@@ -329,22 +342,31 @@
 	</div>
 	<div class={`${showPostingInputs ? '' : 'hidden'} flex-1 relative flex flex-col`}>
 		<div
-			class={`z-30 bg-bg3 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full shadow ${
+			class={`z-30 bg-bg4 flex flex-col overflow-scroll absolute w-full backdrop-blur-md max-h-full ${
 				suggestingTags ? '' : 'hidden'
 			}`}
 			onmousedown={(e) => e.preventDefault()}
 		>
 			{#each suggestedTags as tag, i}
-				<div class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}>
+				<div class={`group/tag fx hover:bg-bg7 ${tagIndex === i ? 'bg-bg7' : ''}`}>
 					{#if tagIndex === i && !xFocused}
 						<div class="absolute z-10 h-8 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
 					{/if}
 					<button
 						bind:this={tagSuggestionsRefs[i]}
-						class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
+						class={`flex w-full ${tag.includes('=') ? 'font-mono' : ''} relative h-8 flex-1 px-2 text-lg`}
 						onclick={() => addTag(tag)}
 					>
-						{tag}
+						<div class="flex-1 text-left text-nowrap overflow-scroll">
+							{@render styledTag(tag)}
+						</div>
+						{#if tag.includes('=')}
+							{#if typeof getTagVal(tag) === 'string'}
+								<p class="xy text-amber-500">{m.text()}</p>
+							{:else}
+								<p class="xy text-emerald-500">{m.number()}</p>
+							{/if}
+						{/if}
 					</button>
 					{#if savedTagsSet.has(tag)}
 						<button

@@ -15,7 +15,7 @@ export let getGranularNumProp = (part: PartInsert) =>
 	({
 		ms: part.ms,
 		by_ms: part.by_ms,
-		num: part.num,
+		num: part.num!,
 	}) satisfies GranularNumProp;
 export let sameGranularNum = (a?: GranularNumProp, b?: GranularNumProp) =>
 	a?.ms === b?.ms && a?.by_ms === b?.by_ms && a?.num === b?.num;
@@ -45,7 +45,7 @@ export let getGranularNumTxtProp = (part: PartInsert) =>
 	({
 		ms: part.ms,
 		by_ms: part.by_ms,
-		num: part.num,
+		num: part.num!,
 		txt: part.txt!,
 	}) satisfies GranularNumTxtProp;
 

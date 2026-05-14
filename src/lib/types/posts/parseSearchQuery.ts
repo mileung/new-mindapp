@@ -259,3 +259,95 @@ export let parseSearchQuery = (query = '') => {
 // console.log(parseSearchQuery(`date>1999`));
 // console.log(parseSearchQuery(`date>=1999`));
 // console.log(parseSearchQuery(`1769812970345_1769809883559_1`));
+
+// let searchQuery=
+('[tag1][tag2][tag3]'); // posts that have tag1, tag2, and tag3
+('[tag1] [tag2][tag3]'); // posts that have tag1 or tag2 and tag3
+('[tag1][tag2]-[tag3]'); // posts that have tag1 and tag2 and not tag3
+('lorem ipsum'); // posts whose core has "lorem" or "ipsum"
+('"lorem ipsum"'); // posts whose core has "lorem ipsum"
+
+// below are undecided
+('"lorem"-"ipsum"'); // posts whose core has "lorem" and not "ipsum"
+('(* Music)'); // posts with tags that end with " Music"
+('(tag1=)'); // posts where tag1 === ""
+('[tag1  = 1]'); // posts with tag equal to "tag1  = 1" (impossible due to normalizeTag)
+('(tag1 > 0)'); // posts where tag1 > 0
+
+// Want to search posts
+// Posts consist of `tags` that are trimmed arbitrary strings (most have spaces) and `core` which is the main part of the post
+// Come up with: query syntax requirements
+// Minimal use of language specific keywords
+// search posts that have an arbitrary set of tags
+// search posts that do not have an arbitrary set of tags
+// search posts that have phrases in their core
+// search posts that do not have phrases in their core
+// post before a certain date
+// post on a certain date
+// post after a certain date
+// posts with tags that have a numeric component (e.g. [tag=88]) lt/eq/gt than
+
+('[tag1][tag2] [tag3] "lorem ipsum" (yyyy<=2020) wow -"hello world" -[test] |');
+
+('[...]'); // posts with tag called "..."
+('-[...]'); // posts without tag called "..."
+('888 ...'); // posts with cores containing "888" or "..."
+('"888 ..."'); // posts with cores containing "888 ..."
+('-"888 ..."'); // posts with cores not containing "888 ..."
+('(...)'); // posts with tags starting with "...="
+('(...]'); // posts with tags ending with "..."
+('[...)'); // posts with tags starting with "..."
+('[...] | [888] -[...]'); // posts with "..." or "888" and not "..."
+('(...<888)'); // posts with tags starting with "...=" and ending with a number less than 888
+// Supported operators: =, <, <=, >, >=
+
+export let searchGuideArr = [
+	{
+		title: 'Simple',
+		syntax: [
+			['[...]', 'Posts with a tag called "..."'],
+			['"..."', 'Posts with a core containing "..." (quotes optional)'],
+			['_8_', 'Posts by account _8_'],
+		],
+		examples: [
+			['[Music]', 'Posts tagged with "Music"'],
+			['Hello world', 'Posts with a core containing "Hello world"'],
+			[
+				'[Book][Quote]"Lorem ipsum"',
+				'Posts tagged with "Book" and "Quote" and has a core containing "Lorem ipsum"',
+			],
+		],
+	},
+	{
+		title: 'Complex',
+		syntax: [
+			['[... ]', 'Posts with a tag starting with "..."'],
+			['[ ...]', 'Posts with a tag ending with "..."'],
+			['-[...]', 'Posts without a tag called "..."'],
+			['-"..."', 'Posts with a core not containing "..."'],
+			['@_8_', 'Posts at account _8_'],
+			['@_8_!', 'Posts at account _8_ that account _8_ has not replied to'],
+			// ['"888"|"..."', 'Group posts with a core containing "888" or "..."'],
+			// ['8 8([8]|[...])', 'Posts with a core containing "8 8" and tagged with either "8" or "..."'],
+			[
+				'{...<888}',
+				'Posts with tags starting with "...=" and ending with a number less than 888\nSupported operators: =, <, <=, >, >=',
+			],
+		],
+		examples: [
+			['[My ]-"I "', 'Posts with a tag starting with "My" and a core not containing "I "'],
+			[
+				'[ Music]{Year>=1990}{Year<2020}',
+				'Posts with a tag ending with "Music" and has a tag starting with "Year=" and ending with a number of at least 1990 and below 2020',
+			],
+			[
+				'[Bicycle]-[Brand=Lorem][Color=Orange]{Weight (kg)<8}',
+				'Posts tagged with "Bicycle", not tagged with "Brand=Lorem", tagged with "Color=Orange", and has a tag starting with "Weight (kg)=..." and ending with a number less than 8',
+			],
+			// [
+			// 	'[Bicycle]-[Brand=Lorem]([Color=White]|[Color=Orange]){Weight (kg)<8}',
+			// 	'Posts tagged with "Bicycle", not tagged with "Brand=Lorem", tagged with either "Color=White" or "Color=Orange", and has a tag starting with "Weight (kg)=..." and ending with a number less than 8',
+			// ],
+		],
+	},
+];

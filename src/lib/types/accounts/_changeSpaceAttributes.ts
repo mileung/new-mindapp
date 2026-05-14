@@ -30,7 +30,8 @@ export let _changeSpaceAttributes = async (
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
 					pf.code.eq(pc.spaceNameTxtId),
-					pf.num.eq0,
+					pf.num.isNull,
+					pf.txt.isNotNull,
 				),
 			);
 	}
@@ -49,6 +50,7 @@ export let _changeSpaceAttributes = async (
 					pf.in_ms.eq(input.spaceMs),
 					pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
 					pf.num.gt0,
+					pf.txt.isNotNull,
 				),
 			);
 	}
@@ -66,7 +68,8 @@ export let _changeSpaceAttributes = async (
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
 					pf.code.eq(pc.spacePinnedQueryTxtId),
-					pf.num.eq0,
+					pf.num.isNull,
+					pf.txt.isNotNull,
 				),
 			);
 	}

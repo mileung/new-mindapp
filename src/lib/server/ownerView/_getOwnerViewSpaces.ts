@@ -16,7 +16,7 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 				pf.noAtId,
 				pf.in_ms.lt(input.msBefore || Number.MAX_SAFE_INTEGER),
 				pf.code.eq(pc.spaceNameTxtId),
-				pf.num.eq0,
+				pf.num.isNull,
 				pf.txt.isNotNull,
 			),
 		)
@@ -50,7 +50,7 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 					// 	pf.by_ms.gt0,
 					// 	pf.in_ms.eq0,
 					// 	pf.code.eq(pc.banIdAtSpaceId),
-					// 	pf.num.eq0,
+					// 	pf.num.isNull,
 					// 	pf.txt.isNull,
 					// ),
 				),
@@ -67,7 +67,7 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 				or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.by_ms.eq(r.at_ms))),
 				pf.in_ms.eq0,
 				pf.code.eq(pc.accountNameTxtMsByMs),
-				pf.num.eq0,
+				pf.num.isNull,
 				pf.txt.isNotNull,
 			),
 		);

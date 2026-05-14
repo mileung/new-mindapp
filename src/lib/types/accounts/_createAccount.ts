@@ -45,14 +45,14 @@ export let _createAccount = async (
 						pf.by_ms.gt0,
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountEmailTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.eq(input.email),
 					),
 					and(
 						pf.noAtId,
 						pf.in_ms.eq0,
 						pf.code.eq(pc.signedInEmailRulesTxtId),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				),
@@ -93,7 +93,6 @@ export let _createAccount = async (
 			ms,
 			by_ms: ms,
 			code: pc.accountEmailTxtMsByMs,
-			num: 0,
 			txt: input.email,
 		},
 		{
@@ -101,7 +100,6 @@ export let _createAccount = async (
 			ms,
 			by_ms: ms,
 			code: pc.accountNameTxtMsByMs,
-			num: 0,
 			txt: input.name,
 		},
 		{
@@ -109,7 +107,6 @@ export let _createAccount = async (
 			ms,
 			by_ms: ms,
 			code: pc.accountBioTxtMsByMs,
-			num: 0,
 			txt: '',
 		},
 		{
@@ -117,7 +114,6 @@ export let _createAccount = async (
 			ms,
 			by_ms: ms,
 			code: pc.accountSavedTagsTxtMsByMs,
-			num: 0,
 			txt: JSON.stringify(top88MostUsedGlobalTags),
 		},
 	];
@@ -146,7 +142,6 @@ export let _createAccount = async (
 			ms,
 			by_ms: ms,
 			code: pc.accountPwHashTxtMsByMs,
-			num: 0,
 			txt: await argon2.hash(input.password),
 		},
 		{
@@ -154,7 +149,6 @@ export let _createAccount = async (
 			at_ms: ms,
 			ms: clientIdObj.ms,
 			code: pc.clientKeyTxtMsAtAccountId,
-			num: 0,
 			txt: clientIdObj.txt,
 		},
 		{
@@ -162,7 +156,6 @@ export let _createAccount = async (
 			at_ms: ms,
 			ms: sessionIdObj.ms,
 			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
-			num: 0,
 			txt: sessionIdObj.txt,
 		},
 	];

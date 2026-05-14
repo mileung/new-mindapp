@@ -223,3 +223,15 @@ let r = String.raw;
 let base = r`\p{Emoji}(?:\p{EMod}|[\u{E0020}-\u{E007E}]+\u{E007F}|\uFE0F?\u20E3?)`;
 let emojiRegex = new RegExp(r`\p{RI}{2}|(?![#*\d](?!\uFE0F?\u20E3))${base}(?:\u200D${base})*`, 'u');
 export let is1Emoji = (s: string) => countGraphemes(s) === 1 && emojiRegex.test(s);
+
+export let getTagVal = (str: string) => {
+	let tagValEqualsIndex = str.indexOf('=');
+	if (tagValEqualsIndex >= 0) {
+		let txtAfterEquals = str.slice(tagValEqualsIndex + 1);
+		if (!txtAfterEquals) return '';
+		let num = +txtAfterEquals;
+		// || /[^.0-9]/.test(txtAfterEquals)
+		return Number.isNaN(num) ? txtAfterEquals : num;
+	}
+	return null;
+};

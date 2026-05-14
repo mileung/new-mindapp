@@ -68,7 +68,6 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 						...atPostIdObj,
 						...postIdObj,
 						code: pc.postIdAtBumpedRootId,
-						num: 0,
 					},
 				]),
 	];
@@ -113,7 +112,6 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 						...getIdStrAsAtIdObj(id),
 						...postIdObj,
 						code: pc.postIdAtCitedPostId,
-						num: 0,
 					})),
 				);
 			}
@@ -196,7 +194,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			...postIdObj,
 			code: pc.childPostIdWithNumAsDepthAtRootId,
 			txt: null,
-			num: (parentIsRoot ? 0 : parentRow.num) + 1,
+			num: (parentIsRoot ? 0 : parentRow.num!) + 1,
 		});
 		let bumpedRootRow = await db
 			.update(pTable)
@@ -207,7 +205,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					pf.ms.gt0,
 					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
 					pf.code.eq(pc.postIdAtBumpedRootId),
-					pf.num.eq0,
+					pf.num.isNull,
 					pf.txt.isNull,
 				),
 			)
@@ -217,7 +215,6 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 				...atRootIdObj,
 				...postIdObj,
 				code: pc.postIdAtBumpedRootId,
-				num: 0,
 			});
 		}
 	}

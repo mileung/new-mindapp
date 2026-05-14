@@ -133,7 +133,6 @@ export let _checkInvite = async (
 				{
 					...id0,
 					code: pc.signedInEmailRulesTxtId,
-					num: 0,
 					txt: '',
 				},
 			]);
@@ -150,7 +149,7 @@ export let _checkInvite = async (
 			pf.by_ms.gt0,
 			pf.in_ms.gt0,
 			pf.code.eq(pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt),
-			pf.num.eq0,
+			pf.num.isNull,
 			pf.txt.eq(input.slugEnd),
 		);
 		let inviteRows = await tdb.select().from(pTable).where(inviteFilter);
@@ -241,7 +240,7 @@ export let _checkInvite = async (
 									pf.noAtId,
 									pf.by_ms.eq(inviteRow.by_ms),
 									pf.code.eq(pc.accountNameTxtMsByMs),
-									pf.num.eq0,
+									pf.num.isNull,
 									pf.txt.isNotNull,
 								),
 								and(

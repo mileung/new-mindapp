@@ -165,7 +165,7 @@
 						let lastVersion = getLastVersion(p.post);
 						let tags = p.post.history?.[lastVersion]?.tags || [];
 						gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
-						gs.writerCore = `${gs.writerCore}\n${postIdStr}`;
+						gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
 					}}
 				>
 					<div class={`h-5 px-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
@@ -319,7 +319,7 @@
 							m.areYouSureYouWantToDeleteThisPost(),
 						);
 					if (ok) {
-						let { soft } = await deletePost(getFullIdObj(p.post), null, urlInMs !== 0);
+						let { soft } = await deletePost(getFullIdObj(p.post), null, !urlInMs);
 						console.log('soft:', soft);
 						if (soft) gs.idToPostMap[postIdStr]!.history = null;
 						else {

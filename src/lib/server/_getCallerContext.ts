@@ -115,7 +115,7 @@ export let _getCallerContext = async (
 								or(...signedInAccountUpdatesFrom.map((a) => pf.atId({ at_ms: a.ms }))),
 								pf.id({ ms: sessionIdObj.ms }),
 								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-								pf.num.gte0,
+								pf.num.isNull,
 								pf.txt.eq(sessionIdObj.txt),
 							)
 						: undefined,
@@ -145,7 +145,7 @@ export let _getCallerContext = async (
 						...id0,
 						in_ms: su.ms,
 						code: pc.spaceIsPublicBinId,
-						num: 0,
+						num: null,
 						txt: null,
 					});
 				if (su.ms === spaceMs) {
@@ -205,7 +205,7 @@ export let _getCallerContext = async (
 							pf.notGranularTxt(su.pinnedQuery),
 							pf.in_ms.eq(su.ms),
 							pf.code.eq(pc.spacePinnedQueryTxtId),
-							pf.num.eq0,
+							pf.num.isNull,
 							pf.txt.isNotNull,
 						)
 					: undefined,
@@ -225,7 +225,7 @@ export let _getCallerContext = async (
 										pf.notGranularTxt(su.name),
 										pf.in_ms.eq(su.ms),
 										pf.code.eq(pc.spaceNameTxtId),
-										pf.num.eq0,
+										pf.num.isNull,
 										pf.txt.isNotNull,
 									)
 								: undefined,
@@ -251,6 +251,16 @@ export let _getCallerContext = async (
 													pf.txt.isNull,
 												)
 											: undefined,
+										su.flair
+											? and(
+													pf.atId({ at_ms: callerMs }),
+													pf.notGranularTxt(su.flair),
+													pf.in_ms.eq(su.ms),
+													pf.code.eq(pc.flairTxtIdAtAccountId),
+													pf.num.isNull,
+													pf.txt.isNotNull,
+												)
+											: undefined,
 									]
 								: []),
 						]
@@ -266,7 +276,7 @@ export let _getCallerContext = async (
 						pf.by_ms.eq(signedInAccountUpdate.ms),
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountEmailTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				signedInAccountUpdate.name &&
@@ -276,7 +286,7 @@ export let _getCallerContext = async (
 						pf.by_ms.eq(signedInAccountUpdate.ms),
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountNameTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				signedInAccountUpdate.bio &&
@@ -286,7 +296,7 @@ export let _getCallerContext = async (
 						pf.by_ms.eq(signedInAccountUpdate.ms),
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountBioTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				signedInAccountUpdate.savedTags &&
@@ -296,7 +306,7 @@ export let _getCallerContext = async (
 						pf.by_ms.eq(signedInAccountUpdate.ms),
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountSavedTagsTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 			];
@@ -311,6 +321,7 @@ export let _getCallerContext = async (
 		[pc.spacePinnedQueryTxtId]: spacePinnedQueryTxtIdRows = [],
 		[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
 		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
+		[pc.flairTxtIdAtAccountId]: flairTxtIdAtAccountIdRows = [],
 		[pc.spacePriorityIdAccentCodeNumAtAccountId]: spacePriorityIdAccentCodeNumAtAccountIdRows = [],
 
 		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
@@ -386,7 +397,7 @@ export let _getCallerContext = async (
 										pf.code.eq(pc.spaceNameTxtId), //
 										pf.code.eq(pc.spacePinnedQueryTxtId),
 									),
-									pf.num.eq0, //
+									pf.num.isNull,
 									pf.txt.isNotNull,
 								),
 							),
@@ -405,6 +416,7 @@ export let _getCallerContext = async (
 		...spacePinnedQueryTxtIdRows,
 		...permissionCodeNumIdAtAccountIdRows,
 		...roleCodeNumIdAtAccountIdRows,
+		...flairTxtIdAtAccountIdRows,
 		...spacePriorityIdAccentCodeNumAtAccountIdRows,
 	];
 	let spaceMsToRowsMap: Record<number, PartSelect[]> = {};
@@ -476,7 +488,7 @@ export let _getCallerContext = async (
 					);
 					if (caller_roleCodeNumIdAtAccountIdRow) {
 						let { ms, num } = caller_roleCodeNumIdAtAccountIdRow;
-						roleCode = { ms, num };
+						roleCode = { ms, num: num! };
 					} else roleCode = undefined;
 				}
 			}
@@ -489,7 +501,7 @@ export let _getCallerContext = async (
 					);
 					if (caller_permissionCodeNumIdAtAccountIdRow) {
 						let { ms, num } = caller_permissionCodeNumIdAtAccountIdRow;
-						permissionCode = { ms, num };
+						permissionCode = { ms, num: num! };
 					} else permissionCode = undefined;
 				}
 			}
@@ -501,7 +513,6 @@ export let _getCallerContext = async (
 				...id0,
 				at_ms: callerMs,
 				code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
-				num: 0,
 				...newSessionObj,
 			});
 			if (!caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.num) {
@@ -511,7 +522,7 @@ export let _getCallerContext = async (
 					pf.ms.eq(caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.ms),
 					pf.in_ms.eq0,
 					pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-					pf.num.eq0,
+					pf.num.isNull,
 					pf.txt.eq(caller_sessionKeyTxtMs_ExpiryMs_AtAccountIdRow.txt!),
 				];
 				await tdb
@@ -547,7 +558,7 @@ export let _getCallerContext = async (
 			);
 			if (caller_spaceIsPublicBinIdRow) {
 				let { ms, num } = caller_spaceIsPublicBinIdRow;
-				isPublic = permissionCode || num ? { ms, num } : undefined;
+				isPublic = permissionCode || num ? { ms, num: num! } : undefined;
 			} else isPublic = undefined;
 		}
 	}

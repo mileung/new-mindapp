@@ -172,7 +172,8 @@ export let _getSpaceDots = async (
 										),
 										and(
 											pf.code.eq(pc.flairTxtIdAtAccountId),
-											pf.num.eq0, //
+											pf.num.isNull,
+											pf.txt.isNotNull,
 											pf.txt.notEq(''),
 										),
 									),
@@ -189,7 +190,7 @@ export let _getSpaceDots = async (
 			spaceDescriptionTxtIdAndMemberCountNumRows,
 		);
 		if (spaceDescriptionTxtIdAndMemberCountNumRow) {
-			spaceUpdate.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num;
+			spaceUpdate.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num!;
 			spaceUpdate.description = getGranularTxtProp(spaceDescriptionTxtIdAndMemberCountNumRow);
 		}
 		let newMemberPermissionCodeNumIdRow = assertLt2Rows(newMemberPermissionCodeNumIdRows);
@@ -230,7 +231,7 @@ export let _getSpaceDots = async (
 		accountMsToMembershipMap[at_ms] = {
 			invite: { by_ms: 0 },
 			accept: { ms: 0 },
-			roleCode: { num, ms, by_ms },
+			roleCode: { num: num!, ms, by_ms },
 			permissionCode: { num: 0, ms: 0, by_ms: 0 },
 			flair: { txt: '' },
 		};
@@ -245,7 +246,7 @@ export let _getSpaceDots = async (
 	for (let i = 0; i < permissionCodeNumIdAtAccountIdRows.length; i++) {
 		let { num, ms, by_ms, at_ms } = permissionCodeNumIdAtAccountIdRows[i];
 		checkMissingAccountMsName(by_ms);
-		accountMsToMembershipMap[at_ms].permissionCode = { num, ms, by_ms };
+		accountMsToMembershipMap[at_ms].permissionCode = { num: num!, ms, by_ms };
 	}
 	for (let i = 0; i < flairTxtIdAtAccountIdRows.length; i++) {
 		let { txt, ms, by_ms, at_ms } = flairTxtIdAtAccountIdRows[i];

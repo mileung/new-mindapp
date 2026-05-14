@@ -55,6 +55,7 @@
 	import PostWriter from './PostWriter.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
 	import ReactionHistory from './ReactionHistory.svelte';
+	import SearchBar from './SearchBar.svelte';
 
 	let pinnedQueryTxtId = '';
 
@@ -402,7 +403,7 @@
 		{#if qSearchParam}
 			<div class="h-9 fx">
 				<IconListSearch class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl truncate">{qSearchParam}</p>
+				<p class="whitespace-pre font-bold text-xl overflow-scroll">{qSearchParam}</p>
 			</div>
 		{:else if postIdStr}
 			<div class="h-9 fx">
@@ -484,6 +485,11 @@
 			>
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
+			<button class="ml-auto">2020-05-13</button>
+			<div class="self-center mx-1">-</div>
+			<button class="">Today</button>
+			<!-- <input class="ml-auto" type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" />
+			<input type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" /> -->
 		</div>
 		{#each postObjFeed as post, i (getIdStr(post))}
 			{#if postIdStr && i === 1}
@@ -508,24 +514,27 @@
 				</div>
 			</InfiniteLoading>
 		{/if}
-		{#if postIdStr}
-			<a
-				href={`/__${urlInMs}`}
-				onclick={() => {
-					gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
-				}}
-				class="z-50 fixed xy right-0 bottom-9 xs:bottom-0 h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
-			>
-				<IconX class="w-8" />
-			</a>
-		{:else if allowTopLvlPosting}
-			<button
-				class="z-40 fixed xy right-0 bottom-9 xs:bottom-0 h-8 w-8 xs:h-9 xs:w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
-				onclick={() => (gs.writingNew = true)}
-			>
-				<IconPencilPlus class="h-8 xs:h-9" />
-			</button>
-		{/if}
+		<div class="z-50 flex fixed left-18 xs:left-[var(--w-sidebar)] right-0 bottom-0">
+			<SearchBar />
+			{#if postIdStr}
+				<a
+					href={`/__${urlInMs}`}
+					onclick={() => {
+						gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
+					}}
+					class="xy h-9 w-9 bg-bg5 border-b-2 border-hl1 hover:bg-bg7 hover:text-fg3 hover:border-hl2"
+				>
+					<IconX class="w-8" />
+				</a>
+			{:else if allowTopLvlPosting}
+				<button
+					class="xy h-9 w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
+					onclick={() => (gs.writingNew = true)}
+				>
+					<IconPencilPlus class="h-8 xs:h-9" />
+				</button>
+			{/if}
+		</div>
 		<div class="flex-1"></div>
 		<div
 			class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}

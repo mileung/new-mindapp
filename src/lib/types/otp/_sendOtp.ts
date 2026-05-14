@@ -41,7 +41,6 @@ export let _sendOtp = async (input: {
 		ms,
 		by_ms: pin,
 		code: pc.otpMs_Pin_StrikeCountIdAndEmailTxt,
-		num: 0,
 		txt: email,
 	});
 	return { otpMs: ms };

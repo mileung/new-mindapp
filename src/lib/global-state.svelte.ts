@@ -299,6 +299,7 @@ export let getSpaceContext = (spaceMs?: number): undefined | SpaceContext => {
 				ms: spaceMs,
 				roleCode: { num: roleCodes.admin },
 				permissionCode: { num: permissionCodes.reactAndPost },
+				flair: { txt: '' },
 				accentCode: { num: accentCodes.none },
 			}
 		: caller.joinedSpaceContexts.find((c) => c.ms === spaceMs);

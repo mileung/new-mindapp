@@ -85,7 +85,7 @@ export let _signIn = async (
 						pf.atId({ at_ms: accountMs }),
 						pf.id({ ms: clientIdObj.ms }),
 						pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.eq(clientIdObj.txt),
 					),
 				)
@@ -102,7 +102,6 @@ export let _signIn = async (
 				at_ms: accountMs,
 				ms: clientIdObj.ms,
 				code: pc.clientKeyTxtMsAtAccountId,
-				num: 0,
 				txt: clientIdObj.txt,
 			});
 		} else {
@@ -132,7 +131,7 @@ export let _signIn = async (
 								pf.ms.eq(sessionIdObj.ms),
 								pf.in_ms.eq0,
 								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-								pf.num.eq0,
+								pf.num.isNull,
 								// omitting pf.txt.eq(sessionIdObj.txt) since this check is to see if
 								// there is a primary key conflict. txt is not part of pk
 							)
@@ -148,7 +147,7 @@ export let _signIn = async (
 							pf.code.eq(pc.accountBioTxtMsByMs),
 							pf.code.eq(pc.accountSavedTagsTxtMsByMs),
 						),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				),
@@ -164,7 +163,6 @@ export let _signIn = async (
 			at_ms: accountMs,
 			ms: sessionIdObj.ms,
 			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
-			num: 0,
 			txt: sessionIdObj.txt,
 		});
 	}

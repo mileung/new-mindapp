@@ -90,6 +90,8 @@
 	"invalidLocalCacheReset": "Invalid local cache. Reset?",
 	"system": "System",
 	"tags": "Tags",
+	"text": "TEXT",
+	"number": "NUMBER",
 	"email": "Email",
 	"showEmail": "Show email",
 	"oldPassword": "Old password",

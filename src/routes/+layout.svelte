@@ -11,6 +11,7 @@
 		getDefaultCallerContext,
 		type GetCallerContextGetArg,
 		type MyAccountUpdates,
+		type PublicProfile,
 	} from '$lib/types/accounts';
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
@@ -29,6 +30,19 @@
 	let p: { data: LayoutData; children: Snippet } = $props();
 
 	let isEmbed = $derived(page.url.pathname.startsWith('/embed'));
+	let set_msToProfileMap = () => {
+		gs.msToProfileMap = {
+			...gs.msToProfileMap,
+			...gs.accounts?.reduce(
+				(obj, account) => ({
+					...obj,
+					[account.ms]: account satisfies PublicProfile,
+				}),
+				{},
+			),
+		};
+	};
+
 	onMount(async () => {
 		if (isEmbed) return;
 		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
@@ -38,6 +52,7 @@
 		gs.accounts = localCache.accounts;
 		gs.lastSeenInMs = localCache.lastSeenInMs;
 		gs.msToSpaceMap = localCache.msToSpaceMap;
+		set_msToProfileMap();
 
 		try {
 			await initLocalDb();
@@ -121,9 +136,10 @@
 									let spaceContext = getSpaceContext(urlInMs);
 									return {
 										visiting: !spaceContext,
-										accentCode: spaceContext?.accentCode || { num: -1 },
 										roleCode: spaceContext?.roleCode || { num: -1 },
 										permissionCode: spaceContext?.permissionCode || { num: -1 },
+										flair: spaceContext?.flair || { txt: '' },
+										accentCode: spaceContext?.accentCode || { num: -1 },
 									};
 								})(),
 							};
@@ -151,6 +167,7 @@
 																	pinnedQuery: space.pinnedQuery,
 																	roleCode: spaceCtx.roleCode,
 																	permissionCode: spaceCtx.permissionCode,
+																	flair: spaceCtx.flair,
 																}
 															: {}),
 													}
@@ -269,9 +286,10 @@
 									(su) =>
 										({
 											ms: su.ms,
-											accentCode: su.accentCode || { num: -1 },
-											permissionCode: su.permissionCode || { num: -1 },
 											roleCode: su.roleCode || { num: -1 },
+											permissionCode: su.permissionCode || { num: -1 },
+											flair: su.flair || { txt: '' },
+											accentCode: su.accentCode || { num: -1 },
 										}) satisfies SpaceContext,
 								);
 							console.log('newJoinedSpaceContexts:', newJoinedSpaceContexts);
@@ -286,9 +304,10 @@
 										let spaceUpdate = msToJoinedSpaceUpdateMap[sc.ms];
 										return {
 											ms: sc.ms,
-											accentCode: spaceUpdate?.accentCode || sc.accentCode,
-											permissionCode: spaceUpdate?.permissionCode || sc.permissionCode,
 											roleCode: spaceUpdate?.roleCode || sc.roleCode,
+											permissionCode: spaceUpdate?.permissionCode || sc.permissionCode,
+											flair: spaceUpdate?.flair || sc.flair,
+											accentCode: spaceUpdate?.accentCode || sc.accentCode,
 										};
 									})
 									.sort((a, b) => (b.accentCode.ms || 0) - (a.accentCode.ms || 0)),
@@ -315,17 +334,7 @@
 						});
 						return lc;
 					});
-
-					// gs.msToProfileMap = {
-					// 	...gs.msToProfileMap,
-					// 	...gs.accounts.reduce(
-					// 		(obj, account) => ({
-					// 			...obj, //
-					// 			[account.ms]: account satisfies PublicProfile,
-					// 		}),
-					// 		{},
-					// 	),
-					// };
+					set_msToProfileMap();
 				}
 			})();
 		} catch (error) {

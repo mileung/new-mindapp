@@ -46,7 +46,7 @@ export let _getSpaceTags = async (
 	return {
 		tags: tagIdAndTxtWithNumAsCountRows.map((r) => ({
 			txt: r.txt!,
-			num: r.num,
+			num: r.num!,
 			...(r.in_ms ? { in_ms: r.in_ms } : {}),
 		})),
 	};

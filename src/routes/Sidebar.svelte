@@ -6,25 +6,19 @@
 		getBottomOverlayShown,
 		getCallerIsOwner,
 		gs,
+		msToAccountNameTxt,
 		msToSpaceNameTxt,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { identikana, isTouchScreen, setSearchParams } from '$lib/js';
+	import { identikana, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import {
-		signOut,
-		unsaveAccount,
-		updateLocalCache,
-		updateSavedTags,
-	} from '$lib/types/local-cache';
-	import { bracketRegex } from '$lib/types/posts/getPostFeed';
+	import { signOut, unsaveAccount, updateLocalCache } from '$lib/types/local-cache';
 	import {
 		IconArrowMergeBoth,
 		IconBook2,
 		IconDotsVertical,
 		IconLogout,
 		IconPuzzle,
-		IconSearch,
 		IconSettings,
 		IconSquarePlus2,
 		IconTags,
@@ -33,63 +27,19 @@
 		IconView360,
 		IconX,
 	} from '@tabler/icons-svelte';
-	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
-	let searchIpt: HTMLInputElement;
-	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
-	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
-
-	let hideExtensionLink = $state(isTouchScreen);
-	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
-	let trimmedSearchVal = $derived(searchVal.trim());
-
-	let searchUrl = $derived(
-		setSearchParams({
-			nested: null,
-			flat: null,
-			bumped: null,
-			new: null,
-			old: null,
-			q: trimmedSearchVal,
-		}),
-	);
-
-	let searchIptFocused = $state(false);
-	let tagXFocused = $state(false);
-
-	let showAccountMenu = $state(false);
-	let showSpaceMenu = $state(false);
-	let tagIndex = $state(-1);
-
 	let callerIsOwner = $derived(getCallerIsOwner());
-	let tagFilter = $derived(
-		trimmedSearchVal.replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
-	);
-	let savedTagsSet = $derived(
-		new Set(
-			gs.accounts //
-				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
-				: [],
-		),
-	);
-	let showSuggestedTags = $derived(searchIptFocused && tagFilter);
-	let suggestedTags = $derived.by(() => {
-		if (!showSuggestedTags) return [];
-		let filter = tagFilter.replace(/\s+/g, ' ');
-		let arr = matchSorter([...savedTagsSet], filter)
-			.slice(0, 88)
-			.concat(tagFilter);
-		return [...new Set(arr)];
-	});
+	let showAccountMenu = $state(false);
+	let hideExtensionLink = $state(isTouchScreen);
+	let showSpaceMenu = $state(false);
 
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
 			if (!textInputFocused() && gs.lastSeenInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
-				e.key === '/' && setTimeout(() => searchIpt.focus(), 0);
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
 				e.key === 'h' && goto(`/__${gs.lastSeenInMs}`);
@@ -118,22 +68,9 @@
 		return () => window.removeEventListener('keydown', handler);
 	});
 
-	$effect(() => {
-		!savedTagsSet.size && (tagXFocused = false);
-	});
-
 	let highlightLastSeenInMs = $derived(
 		(page.params.feedSlug || page.params.spaceSlug)?.endsWith(`_${gs.lastSeenInMs}`),
 	);
-
-	let addTagToSearchInput = (tag: string) => {
-		searchVal = `${searchVal
-			.replace(/\s\s+/g, ' ')
-			.trim()
-			.replace(new RegExp(tagFilter + '$'), '')
-			.trim()}[${tag}] `.trimStart();
-		setTimeout(() => searchIpt!.scrollTo({ left: Number.MAX_SAFE_INTEGER }), 0);
-	};
 
 	let sidebarSpaceMss = $derived<number[]>([
 		// local space ms - everything private in OPFS
@@ -160,24 +97,34 @@
 	<div class="h-full flex flex-col-reverse xs:flex-col">
 		<div class="flex h-9">
 			<button
-				class="w-9 xy text-fg1 hover:text-fg3 hover:bg-bg5"
-				onmousedown={(e) => showSuggestedTags && e.preventDefault()}
+				class="w-9 xs:w-full xy text-fg1 hover:text-fg3 hover:bg-bg5"
 				onclick={() => {
-					if (showSuggestedTags) searchVal = '';
-					else {
-						showSpaceMenu = false;
-						showAccountMenu = !showAccountMenu;
-					}
+					// onmousedown={(e) => showSuggestedTags && e.preventDefault()}
+					// 	if (showSuggestedTags) searchVal = '';
+					// 	else {
+					showSpaceMenu = false;
+					showAccountMenu = !showAccountMenu;
+					// }
 				}}
 			>
-				{#if showAccountMenu || showSuggestedTags}
+				{#if showAccountMenu}
+					<!-- {#if showAccountMenu || showSuggestedTags} -->
 					<IconX class="h-6 w-6" />
 				{:else if gs.accounts}
-					<AccountIcon isUser ms={gs.accounts[0]?.ms} class="h-6 w-6" />
+					<div class="w-9 xy">
+						<AccountIcon isUser ms={gs.accounts[0]?.ms} class="h-6 w-6" />
+					</div>
+					<div class="hidden xs:block flex-1 pr-2">
+						<p
+							class={`text-left ${gs.msToProfileMap[gs.accounts[0]?.ms]?.name.txt ? '' : 'italic'}`}
+						>
+							{msToAccountNameTxt(gs.accounts[0]?.ms)}
+						</p>
+					</div>
 				{/if}
 			</button>
 			<button
-				class={`xs:hidden h-9 w-9 xy hover:bg-bg5 text-fg1 ${showSuggestedTags ? 'hidden' : ''}`}
+				class="xs:hidden h-9 w-9 xy hover:bg-bg5 text-fg1"
 				onclick={() => {
 					showAccountMenu = false;
 					showSpaceMenu = !showSpaceMenu;
@@ -189,74 +136,9 @@
 					<SpaceIcon ms={gs.lastSeenInMs!} class="h-6 w-6" />
 				{/if}
 			</button>
-			<input
-				bind:this={searchIpt}
-				bind:value={searchVal}
-				enterkeyhint="search"
-				class="shrink-0 w-0 flex-1 pl-2 pr-10 hover:bg-bg5"
-				placeholder={m.search()}
-				onfocus={() => {
-					searchIptFocused = true;
-					showAccountMenu = false;
-					showSpaceMenu = false;
-				}}
-				onblur={() => (searchIptFocused = false)}
-				oninput={(e) => (tagIndex = -1)}
-				onkeydown={(e) => {
-					if (e.key === 'Escape') setTimeout(() => searchIpt.blur(), 0);
-					if (e.key === 'Enter') {
-						let tag = suggestedTags[tagIndex];
-						if (tagXFocused) updateSavedTags([tag], true);
-						else if (tag) addTagToSearchInput(tag);
-						else if (trimmedSearchVal) {
-							e.metaKey ? open(searchUrl, '_blank') : goto(searchUrl);
-						}
-					}
-					if (e.key === 'Tab' && !tagFilter) return;
-					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
-						if (e.key === 'Tab' && tagIndex === -1) return;
-						e.preventDefault();
-						if (e.key === 'Tab') {
-							tagXFocused = !tagXFocused;
-							if (!tagXFocused) return;
-						} else tagXFocused = false;
-						let index = Math.max(tagIndex - 1, -1);
-						tagSuggestionsRefs[index]?.focus();
-						tagIndex = index;
-						searchIpt.focus();
-					}
-					if ((e.key === 'Tab' && !e.shiftKey) || e.key === 'ArrowDown') {
-						if (e.key === 'Tab') {
-							if (tagIndex === suggestedTags.length - 1) {
-								if (savedTagsSet.has(suggestedTags[tagIndex])) {
-									if (tagXFocused) return;
-								} else return;
-							}
-						}
-						e.preventDefault();
-						if (e.key === 'Tab' && !tagXFocused && tagIndex > -1) {
-							tagXFocused = true;
-						} else {
-							tagXFocused = false;
-							let index = Math.min(tagIndex + 1, suggestedTags.length - 1);
-							tagSuggestionsRefs[index]?.focus();
-							tagIndex = index;
-						}
-						searchIpt.focus();
-					}
-				}}
-			/>
-			<a
-				class={`xy -ml-9 w-9 group ${trimmedSearchVal ? 'text-fg1 hover:text-fg3' : 'text-fg2 pointer-events-none'}`}
-				href={searchUrl}
-			>
-				<div class={`xy ${searchIptFocused ? 'h-8 w-8' : 'h-9 w-9'} group-hover:bg-bg5`}>
-					<IconSearch class="h-6 w-6" />
-				</div>
-			</a>
 		</div>
 		<div
-			class={`${showSuggestedTags || showAccountMenu || showSpaceMenu ? '' : 'hidden'} ${showSuggestedTags ? 'max-h-18' : 'max-h-38'} xs:max-h-none relative flex-1 xs:flex flex-col text-nowrap overflow-scroll`}
+			class={`${showAccountMenu || showSpaceMenu ? '' : 'hidden'} max-h-38 xs:max-h-none relative flex-1 xs:flex flex-col text-nowrap overflow-scroll`}
 			onclick={(e) => {
 				setTimeout(() => {
 					if (!e.metaKey) {
@@ -266,39 +148,7 @@
 				}, 0);
 			}}
 		>
-			{#if showSuggestedTags}
-				<!-- {#if tagFilter}
-					<p class="ml-1 mt-1 text-sm text-fg2">{m.tags()}</p>
-				{/if} -->
-				{#each suggestedTags as tag, i (tag)}
-					<div
-						class={`group/tag fx hover:bg-bg5 ${tagIndex === i ? 'bg-bg5' : ''}`}
-						onmousedown={(e) => e.preventDefault()}
-					>
-						{#if tagIndex === i && !tagXFocused}
-							<div class="absolute z-10 h-8 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
-						{/if}
-						<button
-							bind:this={tagSuggestionsRefs[i]}
-							class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
-							onclick={() => addTagToSearchInput(tag)}
-						>
-							{tag}
-						</button>
-						{#if savedTagsSet.has(tag)}
-							<button
-								bind:this={unsaveTagXRefs[i]}
-								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg3 ${tagXFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-								onclick={() => {
-									updateSavedTags([tag], true);
-								}}
-							>
-								<IconX class="h-5 w-5" />
-							</button>
-						{/if}
-					</div>
-				{/each}
-			{:else if showAccountMenu}
+			{#if showAccountMenu}
 				<a href="/sign-in" class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}

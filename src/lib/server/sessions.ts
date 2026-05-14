@@ -45,7 +45,8 @@ export let getExpiredRowsFilters = (ms = Date.now()) => [
 		pf.noAtId,
 		pf.ms.lt(ms - 5 * minute),
 		pf.code.eq(pc.otpMs_Pin_StrikeCountIdAndEmailTxt),
-		pf.num.eq0,
+		pf.num.isNull,
+		pf.txt.isNotNull,
 	),
 	and(
 		pf.at_ms.gt0,
@@ -61,7 +62,7 @@ export let getExpiredRowsFilters = (ms = Date.now()) => [
 		),
 		pf.in_ms.eq0,
 		pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-		pf.num.eq0,
+		pf.num.isNull,
 		pf.txt.isNotNull,
 	),
 ];

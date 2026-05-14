@@ -18,7 +18,7 @@ export let _setOwnerViewAttributes = async (
 		pf.noAtId,
 		pf.in_ms.eq0,
 		pf.code.eq(pc.signedInEmailRulesTxtId),
-		pf.num.eq0,
+		pf.num.isNull,
 		pf.txt.isNotNull,
 	);
 	let {
@@ -37,7 +37,7 @@ export let _setOwnerViewAttributes = async (
 						or(...[...ownerMsSet].map((ms) => pf.by_ms.eq(ms))),
 						pf.in_ms.eq0,
 						pf.code.eq(pc.accountEmailTxtMsByMs),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 				),
@@ -56,7 +56,6 @@ export let _setOwnerViewAttributes = async (
 			ms,
 			by_ms: input.callerMs,
 			code: pc.signedInEmailRulesTxtId,
-			num: 0,
 			txt,
 		});
 	} else {

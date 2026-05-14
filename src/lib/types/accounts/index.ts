@@ -124,6 +124,6 @@ export let filterAccountPwHashRow = (accountMs: number) =>
 		pf.by_ms.eq(accountMs),
 		pf.in_ms.eq0,
 		pf.code.eq(pc.accountPwHashTxtMsByMs),
-		pf.num.eq0,
+		pf.num.isNull,
 		pf.txt.isNotNull,
 	);

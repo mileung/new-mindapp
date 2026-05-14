@@ -65,6 +65,7 @@ export let SpaceContextSchema = z.strictObject({
 	ms: z.number(),
 	roleCode: GranularNumPropSchema,
 	permissionCode: GranularNumPropSchema,
+	flair: GranularTxtPropSchema,
 	accentCode: GranularNumPropSchema,
 });
 export type SpaceContext = z.infer<typeof SpaceContextSchema>;
@@ -86,6 +87,7 @@ export let MySpaceUpdateSchema = z.strictObject({
 	// If caller was remove from a public space, the above is still fetched, the below is nulled
 	permissionCode: GranularNumPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
+	flair: GranularTxtPropSchema.optional(),
 	accentCode: GranularNumPropSchema.optional(),
 });
 export type MySpaceUpdate = z.infer<typeof MySpaceUpdateSchema>;
@@ -94,6 +96,7 @@ export let MySpaceUpdateFromSchema = MySpaceUpdateSchema.extend({
 	visiting: z.boolean().optional(),
 	permissionCode: GranularNumPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
+	flair: GranularTxtPropSchema.optional(),
 	accentCode: GranularNumPropSchema.optional(),
 });
 export type MySpaceUpdateFrom = z.infer<typeof MySpaceUpdateFromSchema>;
@@ -104,17 +107,19 @@ export let reduceMySpaceUpdateRows = (rows: PartInsert[]) => {
 		let part = rows[i];
 		!i && (spaceUpdates.ms = part.in_ms);
 		if (part.code === pc.spaceIsPublicBinId) {
-			spaceUpdates.isPublic = { ms: part.ms, num: part.num };
+			spaceUpdates.isPublic = { ms: part.ms, num: part.num! };
 		} else if (part.code === pc.spaceNameTxtId) {
 			spaceUpdates.name = { ms: part.ms, txt: part.txt! };
 		} else if (part.code === pc.spacePinnedQueryTxtId) {
 			spaceUpdates.pinnedQuery = { ms: part.ms, txt: part.txt! };
 		} else if (part.code === pc.permissionCodeNumIdAtAccountId) {
-			spaceUpdates.permissionCode = { ms: part.ms, num: part.num };
+			spaceUpdates.permissionCode = { ms: part.ms, num: part.num! };
 		} else if (part.code === pc.roleCodeNumIdAtAccountId) {
-			spaceUpdates.roleCode = { ms: part.ms, num: part.num };
+			spaceUpdates.roleCode = { ms: part.ms, num: part.num! };
+		} else if (part.code === pc.flairTxtIdAtAccountId) {
+			spaceUpdates.flair = { ms: part.ms, txt: part.txt! };
 		} else if (part.code === pc.spacePriorityIdAccentCodeNumAtAccountId) {
-			spaceUpdates.accentCode = { ms: part.ms, num: part.num };
+			spaceUpdates.accentCode = { ms: part.ms, num: part.num! };
 		}
 	}
 	return spaceUpdates;

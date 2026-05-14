@@ -115,6 +115,7 @@ export let pf = {
 	},
 	code: {
 		eq: (v: number) => eq(pTable.code, v),
+		// TODO?: Record<keyof typeof pc, ...>
 	},
 	num: {
 		desc: desc(pTable.num),

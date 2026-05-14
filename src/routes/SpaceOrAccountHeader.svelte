@@ -107,7 +107,7 @@
 			<SpaceIcon class="h-10 w-10" ms={accountOrSpaceMs} />
 		{/if}
 		{#if editing}
-			<div class="flex h-8 o">
+			<div class="flex h-8">
 				<button
 					class="w-8 xy hover:bg-bg3 text-fg2 hover:text-fg1"
 					onclick={() => {

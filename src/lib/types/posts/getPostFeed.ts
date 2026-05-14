@@ -134,7 +134,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						pf.notId(fullIdObj),
 					]),
 					pf.code.eq(pc.postIdAtBumpedRootId),
-					pf.num.eq0,
+					pf.num.isNull,
 					pf.txt.isNull,
 				),
 			)
@@ -186,7 +186,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 							pf.ms.gt0,
 							...byMsInMsFilters, // TODO: Option to show posts from outside spaces that cite the highlighted post?
 							pf.code.eq(pc.postIdAtCitedPostId),
-							pf.num.eq0,
+							pf.num.isNull,
 							pf.txt.isNull,
 						),
 					),
@@ -452,8 +452,8 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 	}
 
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8AndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountRows = [],
+		[pc.tagId8AndTxtWithNumAsCount]: tagId8AndTxtWithNumAsCountRows = [],
+		[pc.coreId8AndTxtWithNumAsCount]: coreId8AndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		curPostTagIdWNumAsVersionAtPostIdRows.length || curPostCoreIdWNumAsVersionAtPostIdRows.length
 			? await db
@@ -499,8 +499,8 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 				: null,
 		};
 	}
-	let tagIdToTxtMap = reduceTxtRowsToMap(tagIdAndTxtWithNumAsCountRows);
-	let coreIdToTxtMap = reduceTxtRowsToMap(coreIdAndTxtWithNumAsCountRows);
+	let tagIdToTxtMap = reduceTxtRowsToMap(tagId8AndTxtWithNumAsCountRows);
+	let coreIdToTxtMap = reduceTxtRowsToMap(coreId8AndTxtWithNumAsCountRows);
 	let subParts = [
 		...curPostTagIdWNumAsVersionAtPostIdRows,
 		...curPostCoreIdWNumAsVersionAtPostIdRows,

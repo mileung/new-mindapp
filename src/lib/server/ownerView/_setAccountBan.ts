@@ -17,7 +17,7 @@ export let _setAccountBan = async (
 	let banRowFilter = and(
 		pf.atId({ at_ms: input.accountMs }),
 		pf.code.eq(pc.banMsByMsAtAccountId),
-		pf.num.eq0,
+		pf.num.isNull,
 	);
 
 	let ms = Date.now();
@@ -29,7 +29,6 @@ export let _setAccountBan = async (
 				ms,
 				by_ms: input.callerMs,
 				code: pc.banMsByMsAtAccountId,
-				num: 0,
 			});
 			await tdb
 				.delete(pTable)

@@ -8,9 +8,20 @@ import { idsRegex, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { EmojiStringSchema } from '../reactions';
 
+export let normalizeTag = (t: string) => {
+	t = t.trim();
+	let equalsIndex = t.indexOf('=');
+	if (equalsIndex >= 0) {
+		let key = t.slice(0, equalsIndex).trim();
+		let val = t.slice(equalsIndex + 1).trim();
+		t = `${key}=${val}`;
+	}
+	return t;
+};
+
 export let normalizeTags = (tags: string[]) =>
 	[
-		...new Set(tags.map((tag) => tag.trim()).filter((t) => !!t)), //
+		...new Set(tags.map(normalizeTag).filter((t) => !!t)), //
 	].sort((a, b) => a.localeCompare(b));
 
 let HistoryLayerSchema = z.strictObject({

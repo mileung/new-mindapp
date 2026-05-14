@@ -27,7 +27,7 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 										pf.code.eq(pc.clientKeyTxtMsAtAccountId),
 										pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 									),
-									pf.num.eq0,
+									pf.num.isNull,
 									pf.txt.isNotNull,
 								),
 								and(
@@ -40,7 +40,7 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 										pf.code.eq(pc.clientKeyTxtMsAtAccountId),
 										pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
 									),
-									pf.num.eq0,
+									pf.num.isNull,
 									pf.txt.isNotNull,
 								),
 							)
@@ -49,7 +49,7 @@ export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean
 								pf.ms.eq(sessionIdObj.ms),
 								pf.in_ms.eq0,
 								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
-								pf.num.eq0,
+								pf.num.isNull,
 								pf.txt.eq(sessionIdObj.txt),
 							),
 				),

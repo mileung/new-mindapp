@@ -23,7 +23,8 @@ export let _changeMyAccountAttributes = async (
 					pf.by_ms.eq(input.callerMs),
 					pf.in_ms.eq0,
 					pf.code.eq(pc.accountNameTxtMsByMs),
-					pf.num.eq0,
+					pf.num.isNull,
+					pf.txt.isNotNull,
 				),
 			);
 	}
@@ -38,7 +39,8 @@ export let _changeMyAccountAttributes = async (
 					pf.by_ms.eq(input.callerMs),
 					pf.in_ms.eq0,
 					pf.code.eq(pc.accountBioTxtMsByMs),
-					pf.num.eq0,
+					pf.num.isNull,
+					pf.txt.isNotNull,
 				),
 			);
 	}

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
+	import { getTagVal } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { hasParent } from '$lib/types/parts';
 	import { getAtIdStr, getFullIdObj, getIdObj, getIdStr } from '$lib/types/parts/partIds';
@@ -46,7 +47,15 @@
 	let version = $state((() => lastVersion)());
 	let layer = $derived(version === null ? null : p.post.history?.[version]);
 	let core = $derived(layer?.core);
-	let tags = $derived(layer?.tags);
+	let tagObjs = $derived(
+		(layer?.tags || []).map((tag) => {
+			let val = getTagVal(tag);
+			if (val === null) return { tag };
+			let equalsIndex = tag.indexOf('=');
+			return { tag, val, key: tag.slice(0, equalsIndex), valStr: tag.slice(equalsIndex + 1) };
+		}),
+	);
+
 	let rxnEmojiCountEntries = $derived(
 		Object.entries(p.post.rxnEmojiCount || {}).sort(([, a], [, b]) => b - a) as [
 			RxnEmoji,
@@ -172,15 +181,34 @@
 			/>
 			{#if open}
 				<div class={`pr-1 ${p.cited || p.isEmbed ? '' : 'pb-2'}`}>
-					{#if tags?.length || rxnEmojiCountEntries.length}
+					{#if tagObjs.length || rxnEmojiCountEntries.length}
 						<div class="-mx-1 flex flex-wrap text-sm">
-							{#each tags || [] as tag (tag)}
-								<a
-									href={`/__${gs.lastSeenInMs}?q=${`[${tag}]`}`}
-									class={`font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-								>
-									{tag}
-								</a>
+							{#each tagObjs as { tag, key, val, valStr } (tag)}
+								{#if key}
+									<div class={`flex font-mono flex-row-reverse font-bold text-fg2`}>
+										<a
+											href={`/__${gs.lastSeenInMs}?q=${`[${tag}]`}`}
+											class={`whitespace-pre pr-1 peer hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+											>{valStr}</a
+										><a
+											href={`/__${gs.lastSeenInMs}?q=${`[${key}=]`}`}
+											class={`whitespace-pre pl-1 hover:text-fg1 group peer-hover:text-fg1 ${evenBg ? 'hover:bg-bg4 peer-hover:bg-bg4' : 'hover:bg-bg5 peer-hover:bg-bg5'}`}
+											>{key}<span
+												class={typeof val === 'string'
+													? 'group-peer-hover:text-amber-500 group-hover:text-amber-500'
+													: 'group-peer-hover:text-emerald-500 group-hover:text-emerald-500'}
+												>=</span
+											>
+										</a>
+									</div>
+								{:else}
+									<a
+										href={`/__${gs.lastSeenInMs}?q=${`[${tag}]`}`}
+										class={`whitespace-pre font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+									>
+										{tag}
+									</a>
+								{/if}
 							{/each}
 							{#each rxnEmojiCountEntries as [emoji, count], i}
 								<button

@@ -40,7 +40,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	let postIdAtBumpedRootIdRowsFilter = and(
 		pf.id(fullPostIdObj),
 		pf.code.eq(pc.postIdAtBumpedRootId),
-		pf.num.eq0,
+		pf.num.isNull,
 		pf.txt.isNull,
 	);
 
@@ -169,7 +169,6 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 								...getAtIdObjAsIdObj(postIdAtBumpedRootIdRow),
 							}),
 					code: pc.postIdAtBumpedRootId,
-					num: 0,
 				});
 		}
 	} else {

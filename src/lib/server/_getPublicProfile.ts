@@ -38,7 +38,8 @@ export let _getPublicProfile = async (
 							pf.code.eq(pc.accountNameTxtMsByMs),
 							pf.code.eq(pc.accountBioTxtMsByMs),
 						),
-						pf.num.eq0,
+						pf.num.isNull,
+						pf.txt.isNotNull,
 					),
 					input.profileMs !== input.callerMs &&
 						(ownerCalled || input.possibleMutualSpaceMss?.length)
@@ -52,7 +53,7 @@ export let _getPublicProfile = async (
 									? undefined
 									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.at_in_ms.eq(ms))),
 								pf.code.eq(pc.acceptMsByMsAtInviteId),
-								pf.num.eq0,
+								pf.num.isNull,
 								pf.txt.isNull,
 							)
 						: undefined,
@@ -62,7 +63,7 @@ export let _getPublicProfile = async (
 						pf.by_ms.gt0,
 						pf.in_ms.eq0,
 						pf.code.eq(pc.banMsByMsAtAccountId),
-						pf.num.eq0,
+						pf.num.isNull,
 						pf.txt.isNull,
 					),
 				),
@@ -117,7 +118,7 @@ export let _getPublicProfile = async (
 					pf.by_ms.eq(banMsByMsAtAccountIdRow.by_ms),
 					pf.in_ms.eq0,
 					pf.code.eq(pc.accountNameTxtMsByMs),
-					pf.num.eq0,
+					pf.num.isNull,
 					pf.txt.isNotNull,
 				),
 			);

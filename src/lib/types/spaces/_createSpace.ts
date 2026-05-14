@@ -28,7 +28,6 @@ export let makeNewSpaceRows = (a: {
 			ms: a.spaceMs,
 			in_ms: a.spaceMs,
 			code: pc.spacePinnedQueryTxtId,
-			num: 0,
 			txt: a.spacePinnedQueryTxt || '',
 		},
 	];
@@ -58,7 +57,6 @@ export let makeNewSpaceRows = (a: {
 							ms: a.spaceMs,
 							in_ms: a.spaceMs,
 							code: pc.spaceNameTxtId,
-							num: 0,
 							txt: a.spaceNameTxt,
 						},
 						{
@@ -93,7 +91,6 @@ export let makeRowsForJoiningSpace = (a: {
 		ms: a.ms,
 		by_ms: a.callerMs,
 		code: pc.acceptMsByMsAtInviteId,
-		num: 0,
 	},
 	{
 		...id0,
@@ -117,7 +114,6 @@ export let makeRowsForJoiningSpace = (a: {
 		ms: a.ms,
 		in_ms: a.inviteIdObj.in_ms,
 		code: pc.flairTxtIdAtAccountId,
-		num: 0,
 		txt: '',
 	},
 	{
