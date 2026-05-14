@@ -8,14 +8,14 @@ import { pf } from '../../types/parts/partFilters';
 import { pTable } from '../../types/parts/partsTable';
 
 export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
-	let spaceNameTxtIdRows = await tdb
+	let id__spaceNameRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
 			and(
 				pf.noAtId,
 				pf.in_ms.lt(input.msBefore || Number.MAX_SAFE_INTEGER),
-				pf.code.eq(pc.spaceNameTxtId),
+				pf.code.eq(pc.id__spaceName),
 				pf.num.isNull,
 				pf.txt.isNotNull,
 			),
@@ -24,7 +24,7 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 		.limit(ownerViewItemsPerLoad);
 
 	let {
-		[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
+		[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
 		// [pc.banIdAtSpaceId]: banIdAtSpaceIdRows = [],
 	} = channelPartsByCode(
 		await tdb
@@ -38,14 +38,14 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 						pf.at_in_ms.eq0,
 						or(
 							pf.in_ms.eq(1), //
-							...spaceNameTxtIdRows.map((r) => pf.in_ms.eq(r.in_ms)),
+							...id__spaceNameRows.map((r) => pf.in_ms.eq(r.in_ms)),
 						),
-						pf.code.eq(pc.roleCodeNumIdAtAccountId),
+						pf.code.eq(pc.id__accountMs_roleCode),
 						pf.num.eq(roleCodes.admin),
 						pf.txt.isNull,
 					),
 					// and(
-					// 	or(...spaceNameTxtIdRows.map((r) => pf.atId({ at_ms: r.in_ms }))),
+					// 	or(...id__spaceNameRows.map((r) => pf.atId({ at_ms: r.in_ms }))),
 					// 	pf.ms.gt0,
 					// 	pf.by_ms.gt0,
 					// 	pf.in_ms.eq0,
@@ -57,37 +57,37 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 			),
 	);
 
-	let accountNameTxtMsByMsRows = await tdb
+	let msByMs__accountNameRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
 			and(
 				pf.noAtId,
 				pf.ms.gt0,
-				or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.by_ms.eq(r.at_ms))),
+				or(...id__accountMs_roleCodeRows.map((r) => pf.by_ms.eq(r.at_ms))),
 				pf.in_ms.eq0,
-				pf.code.eq(pc.accountNameTxtMsByMs),
+				pf.code.eq(pc.msByMs__accountName),
 				pf.num.isNull,
 				pf.txt.isNotNull,
 			),
 		);
 
 	let msToSpaceNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < spaceNameTxtIdRows.length; i++) {
-		let { txt, in_ms } = spaceNameTxtIdRows[i];
+	for (let i = 0; i < id__spaceNameRows.length; i++) {
+		let { txt, in_ms } = id__spaceNameRows[i];
 		msToSpaceNameTxtMap[in_ms] = txt!;
 	}
 
 	let msToSpaceAdminMssMap: Record<number, number[]> = {};
-	for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
-		let { in_ms, at_ms } = roleCodeNumIdAtAccountIdRows[i];
+	for (let i = 0; i < id__accountMs_roleCodeRows.length; i++) {
+		let { in_ms, at_ms } = id__accountMs_roleCodeRows[i];
 		msToSpaceAdminMssMap[in_ms] ||= [];
 		msToSpaceAdminMssMap[in_ms].push(at_ms);
 	}
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < accountNameTxtMsByMsRows.length; i++) {
-		let { txt, by_ms } = accountNameTxtMsByMsRows[i];
+	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
+		let { txt, by_ms } = msByMs__accountNameRows[i];
 		msToAccountNameTxtMap[by_ms] = txt!;
 	}
 
@@ -100,7 +100,7 @@ export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
 	return {
 		msToSpaceAdminMssMap,
 		msToAccountNameTxtMap,
-		spaces: spaceNameTxtIdRows.map((r) => ({
+		spaces: id__spaceNameRows.map((r) => ({
 			ms: r.in_ms,
 			nameTxt: msToSpaceNameTxtMap[r.in_ms],
 			// banned: spaceMsToBannedIdMap[r.in_ms],

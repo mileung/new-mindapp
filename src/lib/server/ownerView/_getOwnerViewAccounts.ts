@@ -7,7 +7,7 @@ import { pf } from '../../types/parts/partFilters';
 import { pTable } from '../../types/parts/partsTable';
 
 export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
-	let accountEmailTxtMsByMsRows = await tdb
+	let msByMs__accountEmailRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
@@ -17,7 +17,7 @@ export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
 				pf.ms.lt(input.msBefore || Number.MAX_SAFE_INTEGER),
 				pf.by_ms.gt0,
 				pf.in_ms.eq0,
-				pf.code.eq(pc.accountEmailTxtMsByMs),
+				pf.code.eq(pc.msByMs__accountEmail),
 				pf.num.isNull,
 				pf.txt.isNotNull,
 			),
@@ -26,9 +26,9 @@ export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
 		.limit(ownerViewItemsPerLoad);
 
 	let {
-		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
-		[pc.banMsByMsAtAccountId]: banMsByMsAtAccountIdRows = [],
-		[pc.signedInEmailRulesTxtId]: signedInEmailRulesTxtIdRows = [],
+		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
+		[pc.banMsByMs__accountMs]: banMsByMs__accountMsRows = [],
+		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -38,25 +38,25 @@ export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
 					and(
 						pf.noAtId,
 						pf.ms.gt0,
-						or(...accountEmailTxtMsByMsRows.map((r) => pf.by_ms.eq(r.by_ms))),
+						or(...msByMs__accountEmailRows.map((r) => pf.by_ms.eq(r.by_ms))),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.accountNameTxtMsByMs),
+						pf.code.eq(pc.msByMs__accountName),
 						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
 					and(
-						or(...accountEmailTxtMsByMsRows.map((r) => pf.atId({ at_ms: r.by_ms }))),
+						or(...msByMs__accountEmailRows.map((r) => pf.atId({ at_ms: r.by_ms }))),
 						pf.ms.gt0,
 						pf.by_ms.gt0,
 						pf.in_ms.eq0,
-						pf.code.eq(pc.banMsByMsAtAccountId),
+						pf.code.eq(pc.banMsByMs__accountMs),
 						pf.num.isNull,
 						pf.txt.isNull,
 					),
 					and(
 						pf.noAtId,
 						pf.in_ms.eq0,
-						pf.code.eq(pc.signedInEmailRulesTxtId),
+						pf.code.eq(pc.id__signedInEmailRules),
 						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
@@ -65,20 +65,20 @@ export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
 	);
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < accountNameTxtMsByMsRows.length; i++) {
-		let { txt, by_ms } = accountNameTxtMsByMsRows[i];
+	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
+		let { txt, by_ms } = msByMs__accountNameRows[i];
 		msToAccountNameTxtMap[by_ms] = txt!;
 	}
 
 	let accountMsToBannedMap: Record<number, undefined | { ms: number }> = {};
-	for (let i = 0; i < banMsByMsAtAccountIdRows.length; i++) {
-		let { ms, at_ms } = banMsByMsAtAccountIdRows[i];
+	for (let i = 0; i < banMsByMs__accountMsRows.length; i++) {
+		let { ms, at_ms } = banMsByMs__accountMsRows[i];
 		accountMsToBannedMap[at_ms] = { ms };
 	}
 
 	return {
-		signedInEmailRulesTxt: assertLt2Rows(signedInEmailRulesTxtIdRows)?.txt || '',
-		accounts: accountEmailTxtMsByMsRows.map((r) => ({
+		signedInEmailRulesTxt: assertLt2Rows(id__signedInEmailRulesRows)?.txt || '',
+		accounts: msByMs__accountEmailRows.map((r) => ({
 			emailTxt: r.txt!,
 			nameTxt: msToAccountNameTxtMap[r.by_ms],
 			ms: r.by_ms,

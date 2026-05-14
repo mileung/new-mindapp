@@ -6,7 +6,7 @@ import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { permissionCodes, roleCodes } from '../spaces';
-import { getAnotherAdmin_roleCodeNumIdAtAccountIdRow } from '../spaces/db-spaces';
+import { getAnotherAdmin_id__accountMs_roleCodeRow } from '../spaces/db-spaces';
 
 export let _setSpaceMemberRole = async (
 	{
@@ -26,7 +26,7 @@ export let _setSpaceMemberRole = async (
 		pf.atId({ at_ms: accountMs }),
 		pf.ms.gt0,
 		pf.in_ms.eq(spaceMs),
-		pf.code.eq(pc.roleCodeNumIdAtAccountId),
+		pf.code.eq(pc.id__accountMs_roleCode),
 	);
 	let toMember = newRoleCodeNum === roleCodes.member;
 	let toMod = newRoleCodeNum === roleCodes.mod;
@@ -61,11 +61,11 @@ export let _setSpaceMemberRole = async (
 		if (updatingSelf) {
 			if (callerIsMod && toMember) ok = true;
 			if (callerIsAdmin && toMod) {
-				let another_roleCodeNumIdAtAccountIdRow = await getAnotherAdmin_roleCodeNumIdAtAccountIdRow(
+				let another_id__accountMs_roleCodeRow = await getAnotherAdmin_id__accountMs_roleCodeRow(
 					spaceMs,
 					callerMs,
 				);
-				ok = !!another_roleCodeNumIdAtAccountIdRow;
+				ok = !!another_id__accountMs_roleCodeRow;
 			}
 		} else if (callerIsAdmin) {
 			if (updateeIsMod && (toMember || toAdmin)) ok = true;
@@ -90,7 +90,7 @@ export let _setSpaceMemberRole = async (
 			pf.atId({ at_ms: accountMs }),
 			pf.ms.gt0,
 			pf.in_ms.eq(spaceMs),
-			pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+			pf.code.eq(pc.id__accountMs_permissionCode),
 		);
 		let updateePermissionRow = assert1Row(
 			await tdb //

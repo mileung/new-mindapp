@@ -53,7 +53,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		ms: post.ms || Date.now(),
 		by_ms: post.by_ms,
 		in_ms: post.in_ms,
-		code: pc.postIdLastVersionNumAtParentPostId,
+		code: pc.postId__parentPostId_lastVersion,
 		num: lastVersion,
 	};
 	let postIsChild = hasParent(post);
@@ -67,7 +67,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					{
 						...atPostIdObj,
 						...postIdObj,
-						code: pc.postIdAtBumpedRootId,
+						code: pc.postId__bumpedRootId,
 					},
 				]),
 	];
@@ -90,11 +90,11 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			code:
 				layer.tags === null
 					? isLastVersion
-						? pc.currentSoftDeletedVersionNumMsAtPostId
-						: pc.exSoftDeletedVersionNumMsAtPostId
+						? pc.ms__postId_currentSoftDeletedVersion
+						: pc.ms__postId_exSoftDeletedVersion
 					: isLastVersion
-						? pc.currentVersionNumMsAtPostId
-						: pc.exVersionNumMsAtPostId,
+						? pc.ms__postId_currentVersion
+						: pc.ms__postId_exVersion,
 			num: version,
 		});
 
@@ -111,7 +111,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					...citedPostIds.map((id) => ({
 						...getIdStrAsAtIdObj(id),
 						...postIdObj,
-						code: pc.postIdAtCitedPostId,
+						code: pc.postId__citedPostId,
 					})),
 				);
 			}
@@ -132,14 +132,14 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			? [
 					and(
 						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
-						pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+						pf.code.eq(pc.childPostId__rootId_depth),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
 					and(
 						pf.noAtId,
 						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
-						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+						pf.code.eq(pc.postId__parentPostId_lastVersion),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -149,7 +149,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			? and(
 					pf.noAtId,
 					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-					pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+					pf.code.eq(pc.tagId8_count_txt),
 					pf.num.gte0,
 					or(...tagStrsFromAllLayers.map((t) => pf.txt.eq(t))),
 				)
@@ -158,7 +158,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			? and(
 					pf.noAtId,
 					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-					pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+					pf.code.eq(pc.coreId8_count_txt),
 					pf.num.gte0,
 					or(...coreStrsFromAllLayers.map((t) => pf.txt.eq(t))),
 				)
@@ -166,10 +166,10 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 	];
 
 	let {
-		[pc.childPostIdWithNumAsDepthAtRootId]: postIdWithNumAsDepthAtRootIdRows = [],
-		[pc.postIdLastVersionNumAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.tagId8AndTxtWithNumAsCount]: existingTagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8AndTxtWithNumAsCount]: existingCoreIdAndTxtWithNumAsCountRows = [],
+		[pc.childPostId__rootId_depth]: postIdWithNumAsDepthAtRootIdRows = [],
+		[pc.postId__parentPostId_lastVersion]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.tagId8_count_txt]: existingTagIdAndTxtWithNumAsCountRows = [],
+		[pc.coreId8_count_txt]: existingCoreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		filters.some((f) => f)
 			? await db
@@ -192,7 +192,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		partsToInsert.push({
 			...atRootIdObj,
 			...postIdObj,
-			code: pc.childPostIdWithNumAsDepthAtRootId,
+			code: pc.childPostId__rootId_depth,
 			txt: null,
 			num: (parentIsRoot ? 0 : parentRow.num!) + 1,
 		});
@@ -204,7 +204,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					pf.atId(atRootIdObj),
 					pf.ms.gt0,
 					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
-					pf.code.eq(pc.postIdAtBumpedRootId),
+					pf.code.eq(pc.postId__bumpedRootId),
 					pf.num.isNull,
 					pf.txt.isNull,
 				),
@@ -214,7 +214,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 			partsToInsert.push({
 				...atRootIdObj,
 				...postIdObj,
-				code: pc.postIdAtBumpedRootId,
+				code: pc.postId__bumpedRootId,
 			});
 		}
 	}
@@ -258,8 +258,8 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 						by_ms: tagRow.by_ms,
 						in_ms: tagRow.in_ms,
 						code: isLastVersion
-							? pc.currentPostTagIdWithVersionNumAtPostId
-							: pc.exPostTagIdWithVersionNumAtPostId,
+							? pc.currentPostTagId__postId_version
+							: pc.exPostTagId__postId_version,
 						num: version,
 					});
 				}
@@ -272,8 +272,8 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 					by_ms: coreRow.by_ms,
 					in_ms: coreRow.in_ms,
 					code: isLastVersion
-						? pc.currentPostCoreIdWithVersionNumAtPostId
-						: pc.exPostCoreIdWithVersionNumAtPostId,
+						? pc.currentPostCoreId__postId_version
+						: pc.exPostCoreId__postId_version,
 					num: version,
 				});
 			}
@@ -298,7 +298,7 @@ let addNewTagOrCoreRows = (
 		txtToIdAndTxtWithNumAsCountObjMap[existingTagOrCoreTxtObj.txt!] = existingTagOrCoreTxtObj;
 	}
 	let newRowsCount = 0;
-	let code = isTag ? pc.tagId8AndTxtWithNumAsCount : pc.coreId8AndTxtWithNumAsCount;
+	let code = isTag ? pc.tagId8_count_txt : pc.coreId8_count_txt;
 	for (let i = 0; i < allTagOrCoreStrs.length; i++) {
 		let tagOrCoreStr = allTagOrCoreStrs[i];
 		let tagOrCoreRow = txtToIdAndTxtWithNumAsCountObjMap[tagOrCoreStr];

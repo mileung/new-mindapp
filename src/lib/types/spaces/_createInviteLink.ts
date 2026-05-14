@@ -36,7 +36,7 @@ export let _createInviteLink = async (
 			ms,
 			by_ms: input.callerMs,
 			in_ms: input.spaceMs,
-			code: pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt,
+			code: pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd,
 			num: 0,
 			txt: slugEnd,
 		},

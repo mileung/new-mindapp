@@ -16,7 +16,7 @@ export let _getEmailRow = async (email: string) =>
 					pf.ms.gt0,
 					pf.by_ms.gt0,
 					pf.in_ms.eq0,
-					pf.code.eq(pc.accountEmailTxtMsByMs),
+					pf.code.eq(pc.msByMs__accountEmail),
 					pf.num.isNull,
 					pf.txt.eq(email),
 				),

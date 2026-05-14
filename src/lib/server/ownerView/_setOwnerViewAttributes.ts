@@ -14,29 +14,29 @@ export let _setOwnerViewAttributes = async (
 		signedInEmailRules: string[];
 	},
 ) => {
-	let signedInEmailRulesTxtIdRowsFilter = and(
+	let id__signedInEmailRulesRowsFilter = and(
 		pf.noAtId,
 		pf.in_ms.eq0,
-		pf.code.eq(pc.signedInEmailRulesTxtId),
+		pf.code.eq(pc.id__signedInEmailRules),
 		pf.num.isNull,
 		pf.txt.isNotNull,
 	);
 	let {
-		[pc.signedInEmailRulesTxtId]: signedInEmailRulesTxtIdRows = [],
-		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
+		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
+		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					signedInEmailRulesTxtIdRowsFilter, //
+					id__signedInEmailRulesRowsFilter, //
 					and(
 						pf.noAtId,
 						pf.ms.gt0,
 						or(...[...ownerMsSet].map((ms) => pf.by_ms.eq(ms))),
 						pf.in_ms.eq0,
-						pf.code.eq(pc.accountEmailTxtMsByMs),
+						pf.code.eq(pc.msByMs__accountEmail),
 						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
@@ -44,18 +44,18 @@ export let _setOwnerViewAttributes = async (
 			),
 	);
 
-	if (!accountEmailTxtMsByMsRows.length) throw new Error(`No owner email founds`);
-	if (accountEmailTxtMsByMsRows.some((r) => !rulesAllowEmail(input.signedInEmailRules, r.txt!)))
+	if (!msByMs__accountEmailRows.length) throw new Error(`No owner email founds`);
+	if (msByMs__accountEmailRows.some((r) => !rulesAllowEmail(input.signedInEmailRules, r.txt!)))
 		throw new Error(m.rulesMustAllowAllOwnerEmails());
 
 	let ms = Date.now();
 	let txt = input.signedInEmailRules.join('\n');
-	if (!signedInEmailRulesTxtIdRows.length) {
+	if (!id__signedInEmailRulesRows.length) {
 		await tdb.insert(pTable).values({
 			...id0,
 			ms,
 			by_ms: input.callerMs,
-			code: pc.signedInEmailRulesTxtId,
+			code: pc.id__signedInEmailRules,
 			txt,
 		});
 	} else {
@@ -66,7 +66,7 @@ export let _setOwnerViewAttributes = async (
 				by_ms: input.callerMs,
 				txt,
 			})
-			.where(signedInEmailRulesTxtIdRowsFilter);
+			.where(id__signedInEmailRulesRowsFilter);
 	}
 
 	if (input.signedInEmailRules.length) {
@@ -81,7 +81,7 @@ export let _setOwnerViewAttributes = async (
 					pf.at_in_ms.gt0,
 					pf.ms.gt0,
 					pf.in_ms.eq0,
-					pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+					pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
 					pf.txt.isNotNull,
 				),
 			);

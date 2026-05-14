@@ -32,38 +32,38 @@ export let _removeReaction = async (
 	useLocalDb: boolean,
 ) => {
 	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
-	let caller_reactionIdWithEmojiTxtAtPostIdFilter = and(
+	let caller_reactionId__postId__emojiFilter = and(
 		pf.idAsAtId(input.postIdObj),
 		pf.ms.gt0,
 		pf.by_ms.eq(input.callerMs),
 		pf.in_ms.eq(rxnInMs),
-		pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+		pf.code.eq(pc.reactionId__postId__emoji),
 		pf.num.isNull,
 		pf.txt.eq(input.emoji),
 	);
 	let {
-		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
-		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
+		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
+		[pc.postId_count_emoji]: postId_count_emojiRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					caller_reactionIdWithEmojiTxtAtPostIdFilter,
+					caller_reactionId__postId__emojiFilter,
 					and(
 						pf.id(input.postIdObj),
-						pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+						pf.code.eq(pc.postId_count_emoji),
 						pf.num.gt0,
 						pf.txt.eq(input.emoji),
 					),
 				),
 			),
 	);
-	if (!reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Reaction dne`);
-	let deleteFilters: (undefined | SQL)[] = [caller_reactionIdWithEmojiTxtAtPostIdFilter];
-	let postIdRxnEmojiTxtAndCountNumRow = assert1Row(postIdRxnEmojiTxtAndCountNumRows);
-	postIdRxnEmojiTxtAndCountNumRow.num! > 1
+	if (!reactionId__postId__emojiRows.length) throw new Error(`Reaction dne`);
+	let deleteFilters: (undefined | SQL)[] = [caller_reactionId__postId__emojiFilter];
+	let postId_count_emojiRow = assert1Row(postId_count_emojiRows);
+	postId_count_emojiRow.num! > 1
 		? await moveTagCoreOrRxnCountsBy1(
 				db,
 				[],
@@ -75,7 +75,7 @@ export let _removeReaction = async (
 				and(
 					pf.noAtId,
 					pf.id(input.postIdObj),
-					pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+					pf.code.eq(pc.postId_count_emoji),
 					pf.num.lt(2),
 					pf.txt.eq(input.emoji),
 				),

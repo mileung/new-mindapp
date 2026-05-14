@@ -1,19 +1,19 @@
 import { uniqueMapVals } from '$lib/js';
 
 export let pc = uniqueMapVals({
-	postIdLastVersionNumAtParentPostId: 0,
-	childPostIdWithNumAsDepthAtRootId: 1,
-	postIdAtCitedPostId: 2,
-	reactionIdWithEmojiTxtAtPostId: 3,
+	postId__parentPostId_lastVersion: 0,
+	childPostId__rootId_depth: 1,
+	postId__citedPostId: 2,
+	reactionId__postId__emoji: 3,
 	// TODO: Calendar events? Just make it a reserved tag?
 
-	currentVersionNumMsAtPostId: 10,
-	exVersionNumMsAtPostId: 11,
-	currentSoftDeletedVersionNumMsAtPostId: 12,
-	exSoftDeletedVersionNumMsAtPostId: 13,
+	ms__postId_currentVersion: 10,
+	ms__postId_exVersion: 11,
+	ms__postId_currentSoftDeletedVersion: 12,
+	ms__postId_exSoftDeletedVersion: 13,
 
-	currentPostTagIdWithVersionNumAtPostId: 20,
-	exPostTagIdWithVersionNumAtPostId: 21,
+	currentPostTagId__postId_version: 20,
+	exPostTagId__postId_version: 21,
 
 	// TODO: numAtTag  AtPostId: 30,
 	// ot numAtTagId8: 30,
@@ -39,50 +39,50 @@ export let pc = uniqueMapVals({
 	// hour=31
 	// TagWithParsedDate
 
-	currentPostCoreIdWithVersionNumAtPostId: 22,
-	exPostCoreIdWithVersionNumAtPostId: 23,
+	currentPostCoreId__postId_version: 22,
+	exPostCoreId__postId_version: 23,
 
 	// prob won't do this:
 	// tagId
 	// tagTxtAtId
 	// tagCountAtSpaceId
 
-	tagId8AndTxtWithNumAsCount: 30,
-	coreId8AndTxtWithNumAsCount: 31,
-	postIdRxnEmojiTxtAndCountNum: 32,
+	tagId8_count_txt: 30,
+	coreId8_count_txt: 31,
+	postId_count_emoji: 32,
 	// TODO?: citeCount__inMsIdAtPostId: 33,
 
-	spaceIsPublicBinId: 40,
-	spaceNameTxtId: 41,
-	spaceDescriptionTxtIdAndMemberCountNum: 42,
-	spacePinnedQueryTxtId: 43,
-	newMemberPermissionCodeNumId: 44,
-	roleCodeNumIdAtAccountId: 45,
-	permissionCodeNumIdAtAccountId: 46,
-	flairTxtIdAtAccountId: 47, // TODO: Indicate if the flair by_ms is a mod/admin
-	spacePriorityIdAccentCodeNumAtAccountId: 48,
+	id_spaceIsPublic: 40,
+	id__spaceName: 41,
+	id_memberCount_spaceDescription: 42,
+	id__spacePinnedQuery: 43,
+	id_newMemberPermissionCode: 44,
+	id__accountMs_roleCode: 45,
+	id__accountMs_permissionCode: 46,
+	id__accountMs__flair: 47, // TODO: Indicate if the flair by_ms is a mod/admin
+	spacePriorityId__accountMs_accentCode: 48,
 
-	accountEmailTxtMsByMs: 50,
-	accountPwHashTxtMsByMs: 51,
-	accountNameTxtMsByMs: 52,
-	accountBioTxtMsByMs: 53,
-	accountSavedTagsTxtMsByMs: 54,
+	msByMs__accountEmail: 50,
+	msByMs__accountPwHash: 51,
+	msByMs__accountName: 52,
+	msByMs__accountBio: 53,
+	msByMs__accountSavedTags: 54,
 
-	clientKeyTxtMsAtAccountId: 60,
-	sessionKeyTxtMs_ExpiryMs_AtAccountId: 61,
-	otpMs_Pin_StrikeCountIdAndEmailTxt: 62,
+	ms__accountMs__clientKey: 60,
+	ms_ExpiryMs__accountMs__sessionKey: 61,
+	otpMs_pin_strikeCount__email: 62,
 
-	inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt: 70,
-	acceptMsByMsAtInviteId: 71,
+	inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd: 70,
+	acceptMsByMs__inviteId: 71,
 	// TODO: acceptMs_ByMs_LastWriteMsIdAtInviteId: 71,
 
-	postIdAtBumpedRootId: 80,
-	lastSpaceViewId: 81,
-	lastSpacePostId: 82,
+	postId__bumpedRootId: 80,
+	// lastSpaceViewId: 81,
+	// lastSpacePostId: 82,
 	// TODO: tagIdAtBumpedRootIdWithNumAsMs: 83,
 	// lastSpacePostMsAtLastSpaceViewId: 81,
 
-	signedInEmailRulesTxtId: 90,
-	banMsByMsAtAccountId: 91,
+	id__signedInEmailRules: 90,
+	banMsByMs__accountMs: 91,
 	// banIdAtSpaceId: 92,
 });

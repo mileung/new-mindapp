@@ -155,7 +155,7 @@
 												.where(
 													and(
 														pf.id(post), //
-														pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+														pf.code.eq(pc.postId__parentPostId_lastVersion),
 													),
 												)
 										)[0],

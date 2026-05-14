@@ -30,9 +30,9 @@ export let pTable = sqliteTable(
 		// Can't import pc for some reason when running bun run db:push
 		index('tag_idx')
 			.on(table.code, table.in_ms, table.txt)
-			.where(sql`${table.code} = 30`), // pc.tagId8AndTxtWithNumAsCount
+			.where(sql`${table.code} = 30`), // pc.tagId8_count_txt
 		index('email_idx')
 			.on(table.code, table.txt)
-			.where(sql`${table.code} = 50`), // pc.accountEmailTxtMsByMs
+			.where(sql`${table.code} = 50`), // pc.msByMs__accountEmail
 	],
 );

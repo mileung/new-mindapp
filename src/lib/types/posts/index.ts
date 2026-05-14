@@ -113,7 +113,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 					? and(
 							pf.noAtId,
 							or(...tagIdObjs.map((tagIdObj) => pf.id(tagIdObj))),
-							pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+							pf.code.eq(pc.tagId8_count_txt),
 							pf.num.gte0,
 							pf.txt.isNotNull,
 						)
@@ -122,7 +122,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 					? and(
 							pf.noAtId,
 							or(...coreIdObjs.map((coreIdObj) => pf.id(coreIdObj))),
-							pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+							pf.code.eq(pc.coreId8_count_txt),
 							pf.num.gte0,
 							pf.txt.isNotNull,
 						)
@@ -137,7 +137,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 									),
 								),
 							),
-							pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+							pf.code.eq(pc.postId_count_emoji),
 							pf.num.gt0,
 						)
 					: undefined,
@@ -165,12 +165,12 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 									pf.id(tagOrCoreIdObj),
 									isTag
 										? or(
-												pf.code.eq(pc.currentPostTagIdWithVersionNumAtPostId),
-												pf.code.eq(pc.exPostTagIdWithVersionNumAtPostId),
+												pf.code.eq(pc.currentPostTagId__postId_version),
+												pf.code.eq(pc.exPostTagId__postId_version),
 											)
 										: or(
-												pf.code.eq(pc.currentPostCoreIdWithVersionNumAtPostId),
-												pf.code.eq(pc.exPostCoreIdWithVersionNumAtPostId),
+												pf.code.eq(pc.currentPostCoreId__postId_version),
+												pf.code.eq(pc.exPostCoreId__postId_version),
 											),
 									pf.num.gte0,
 									pf.txt.isNull,
@@ -200,8 +200,8 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 					),
 					pf.code.eq(
 						isTag
-							? pc.tagId8AndTxtWithNumAsCount //
-							: pc.coreId8AndTxtWithNumAsCount,
+							? pc.tagId8_count_txt //
+							: pc.coreId8_count_txt,
 					),
 					pf.num.eq0,
 				),

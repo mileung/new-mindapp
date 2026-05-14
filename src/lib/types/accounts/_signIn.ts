@@ -84,7 +84,7 @@ export let _signIn = async (
 					and(
 						pf.atId({ at_ms: accountMs }),
 						pf.id({ ms: clientIdObj.ms }),
-						pf.code.eq(pc.clientKeyTxtMsAtAccountId),
+						pf.code.eq(pc.ms__accountMs__clientKey),
 						pf.num.isNull,
 						pf.txt.eq(clientIdObj.txt),
 					),
@@ -101,7 +101,7 @@ export let _signIn = async (
 				...id0,
 				at_ms: accountMs,
 				ms: clientIdObj.ms,
-				code: pc.clientKeyTxtMsAtAccountId,
+				code: pc.ms__accountMs__clientKey,
 				txt: clientIdObj.txt,
 			});
 		} else {
@@ -114,11 +114,11 @@ export let _signIn = async (
 
 	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	let {
-		[pc.sessionKeyTxtMs_ExpiryMs_AtAccountId]: sessionIdObjTxtMsAtAccountIdRows = [],
-		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
-		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
-		[pc.accountBioTxtMsByMs]: accountBioTxtMsByMsRows = [],
-		[pc.accountSavedTagsTxtMsByMs]: accountSavedTagsTxtMsByMsRows = [],
+		[pc.ms_ExpiryMs__accountMs__sessionKey]: sessionIdObjTxtMsAtAccountIdRows = [],
+		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
+		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
+		[pc.msByMs__accountBio]: msByMs__accountBioRows = [],
+		[pc.msByMs__accountSavedTags]: msByMs__accountSavedTagsRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -130,7 +130,7 @@ export let _signIn = async (
 								pf.atId({ at_ms: accountMs }),
 								pf.ms.eq(sessionIdObj.ms),
 								pf.in_ms.eq0,
-								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+								pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
 								pf.num.isNull,
 								// omitting pf.txt.eq(sessionIdObj.txt) since this check is to see if
 								// there is a primary key conflict. txt is not part of pk
@@ -142,10 +142,10 @@ export let _signIn = async (
 						pf.by_ms.eq(accountMs),
 						pf.in_ms.eq0,
 						or(
-							pf.code.eq(pc.accountEmailTxtMsByMs),
-							pf.code.eq(pc.accountNameTxtMsByMs),
-							pf.code.eq(pc.accountBioTxtMsByMs),
-							pf.code.eq(pc.accountSavedTagsTxtMsByMs),
+							pf.code.eq(pc.msByMs__accountEmail),
+							pf.code.eq(pc.msByMs__accountName),
+							pf.code.eq(pc.msByMs__accountBio),
+							pf.code.eq(pc.msByMs__accountSavedTags),
 						),
 						pf.num.isNull,
 						pf.txt.isNotNull,
@@ -162,15 +162,15 @@ export let _signIn = async (
 			...id0,
 			at_ms: accountMs,
 			ms: sessionIdObj.ms,
-			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
+			code: pc.ms_ExpiryMs__accountMs__sessionKey,
 			txt: sessionIdObj.txt,
 		});
 	}
 	let account = reduceMyAccountRows([
-		...accountEmailTxtMsByMsRows,
-		...accountNameTxtMsByMsRows,
-		...accountBioTxtMsByMsRows,
-		...accountSavedTagsTxtMsByMsRows,
+		...msByMs__accountEmailRows,
+		...msByMs__accountNameRows,
+		...msByMs__accountBioRows,
+		...msByMs__accountSavedTagsRows,
 	]);
 	if (partsToInsert.length) await tdb.insert(pTable).values(partsToInsert);
 	return { account };

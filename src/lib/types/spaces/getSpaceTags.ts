@@ -34,7 +34,7 @@ export let _getSpaceTags = async (
 				pf.noAtId,
 				pf.ms.gt0,
 				!input.spaceMs ? undefined : pf.in_ms.eq(input.spaceMs),
-				pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+				pf.code.eq(pc.tagId8_count_txt),
 				pf.num.lte(input.fromCount),
 				pf.num.gt0,
 				and(...input.excludeTags.map((t) => pf.txt.notEq(t))),

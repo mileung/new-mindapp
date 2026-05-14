@@ -17,7 +17,7 @@ export let _checkOtp = async (input: {
 		pf.noAtId,
 		pf.ms.eq(input.otpMs),
 		pf.in_ms.lt(3),
-		pf.code.eq(pc.otpMs_Pin_StrikeCountIdAndEmailTxt),
+		pf.code.eq(pc.otpMs_pin_strikeCount__email),
 		pf.num.isNull,
 		pf.txt.eq(input.email),
 	);

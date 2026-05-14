@@ -39,20 +39,20 @@ export let _addReaction = async (
 ) => {
 	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
 	let ms = Date.now();
-	let reactionIdWithEmojiTxtAtPostIdObj: PartInsert = {
+	let reactionId__postId__emojiObj: PartInsert = {
 		...getIdObjAsAtIdObj(input.postIdObj),
 		ms,
 		by_ms: input.callerMs,
 		in_ms: rxnInMs,
-		code: pc.reactionIdWithEmojiTxtAtPostId,
+		code: pc.reactionId__postId__emoji,
 		txt: input.emoji,
 	};
-	let partsToInsert: PartInsert[] = [reactionIdWithEmojiTxtAtPostIdObj];
+	let partsToInsert: PartInsert[] = [reactionId__postId__emojiObj];
 
 	let {
-		[pc.postIdLastVersionNumAtParentPostId]: postIdLastVersionNumAtParentPostIdRows = [],
-		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
-		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
+		[pc.postId__parentPostId_lastVersion]: postId__parentPostId_lastVersionRows = [],
+		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
+		[pc.postId_count_emoji]: postId_count_emojiRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -61,7 +61,7 @@ export let _addReaction = async (
 				or(
 					and(
 						pf.id(input.postIdObj),
-						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+						pf.code.eq(pc.postId__parentPostId_lastVersion),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -70,23 +70,23 @@ export let _addReaction = async (
 						pf.ms.gt0,
 						pf.by_ms.eq(input.callerMs),
 						pf.in_ms.eq(rxnInMs),
-						pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+						pf.code.eq(pc.reactionId__postId__emoji),
 						pf.num.isNull,
 						pf.txt.eq(input.emoji),
 					),
 					and(
 						pf.noAtId,
 						pf.id(input.postIdObj),
-						pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+						pf.code.eq(pc.postId_count_emoji),
 						pf.num.gt0,
 						pf.txt.eq(input.emoji),
 					),
 				),
 			),
 	);
-	if (reactionIdWithEmojiTxtAtPostIdRows.length) throw new Error(`Already added this reaction`);
-	assert1Row(postIdLastVersionNumAtParentPostIdRows);
-	assertLt2Rows(postIdRxnEmojiTxtAndCountNumRows)
+	if (reactionId__postId__emojiRows.length) throw new Error(`Already added this reaction`);
+	assert1Row(postId__parentPostId_lastVersionRows);
+	assertLt2Rows(postId_count_emojiRows)
 		? await moveTagCoreOrRxnCountsBy1(
 				db,
 				[],
@@ -97,7 +97,7 @@ export let _addReaction = async (
 		: partsToInsert.push({
 				...id0,
 				...getIdObj(input.postIdObj),
-				code: pc.postIdRxnEmojiTxtAndCountNum,
+				code: pc.postId_count_emoji,
 				num: 1,
 				txt: input.emoji,
 			});

@@ -23,7 +23,7 @@ export let _updateSavedTags = async (
 				pf.ms.gt0,
 				pf.by_ms.eq(input.callerMs),
 				pf.in_ms.eq0,
-				pf.code.eq(pc.accountSavedTagsTxtMsByMs),
+				pf.code.eq(pc.msByMs__accountSavedTags),
 				pf.num.isNull,
 				pf.txt.isNotNull,
 			),

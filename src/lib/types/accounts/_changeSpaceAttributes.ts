@@ -29,7 +29,7 @@ export let _changeSpaceAttributes = async (
 					pf.noAtId,
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.spaceNameTxtId),
+					pf.code.eq(pc.id__spaceName),
 					pf.num.isNull,
 					pf.txt.isNotNull,
 				),
@@ -48,7 +48,7 @@ export let _changeSpaceAttributes = async (
 					pf.noAtId,
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
+					pf.code.eq(pc.id_memberCount_spaceDescription),
 					pf.num.gt0,
 					pf.txt.isNotNull,
 				),
@@ -67,7 +67,7 @@ export let _changeSpaceAttributes = async (
 					pf.noAtId,
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.spacePinnedQueryTxtId),
+					pf.code.eq(pc.id__spacePinnedQuery),
 					pf.num.isNull,
 					pf.txt.isNotNull,
 				),
@@ -96,7 +96,7 @@ export let _changeSpaceAttributes = async (
 					pf.noAtId,
 					pf.ms.gt0, //
 					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.spaceIsPublicBinId),
+					pf.code.eq(pc.id_spaceIsPublic),
 				),
 			);
 	}
@@ -113,7 +113,7 @@ export let _changeSpaceAttributes = async (
 					pf.noAtId,
 					pf.ms.gt0,
 					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.newMemberPermissionCodeNumId),
+					pf.code.eq(pc.id_newMemberPermissionCode),
 				),
 			);
 	}

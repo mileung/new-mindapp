@@ -19,9 +19,9 @@ export let getPostHistory = async (postIdObj: IdObj, version: number) => {
 // TODO: paginate history versions?
 export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
-		[pc.exVersionNumMsAtPostId]: exVersionNumAndMsAtPostIdRows = [],
-		[pc.exPostTagIdWithVersionNumAtPostId]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
-		[pc.exPostCoreIdWithVersionNumAtPostId]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
+		[pc.ms__postId_exVersion]: exVersionNumAndMsAtPostIdRows = [],
+		[pc.exPostTagId__postId_version]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.exPostCoreId__postId_version]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -31,9 +31,9 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 					pf.idAsAtId(postIdObj),
 					or(
 						...[
-							pc.exVersionNumMsAtPostId,
-							pc.exPostTagIdWithVersionNumAtPostId,
-							pc.exPostCoreIdWithVersionNumAtPostId,
+							pc.ms__postId_exVersion,
+							pc.exPostTagId__postId_version,
+							pc.exPostCoreId__postId_version,
 						].map((code) => pf.code.eq(code)),
 					),
 					eq(pTable.num, version),
@@ -45,8 +45,8 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 	assertLt2Rows(exPostCoreIdWithNumAsVersionAtPostIdRows);
 
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: tagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8AndTxtWithNumAsCount]: coreIdAndTxtWithNumAsCountRows = [],
+		[pc.tagId8_count_txt]: tagIdAndTxtWithNumAsCountRows = [],
+		[pc.coreId8_count_txt]: coreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		exPostTagIdWithNumAsVersionAtPostIdRows.length ||
 			exPostCoreIdWithNumAsVersionAtPostIdRows.length
@@ -58,14 +58,14 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 							and(
 								pf.noAtId,
 								or(...exPostTagIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
-								pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pf.code.eq(pc.tagId8_count_txt),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
 							and(
 								pf.noAtId,
 								or(...exPostCoreIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
-								pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pf.code.eq(pc.coreId8_count_txt),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
@@ -88,13 +88,13 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 
 	for (let i = 0; i < parts.length; i++) {
 		let part = parts[i];
-		if (part.code === pc.exPostTagIdWithVersionNumAtPostId) {
+		if (part.code === pc.exPostTagId__postId_version) {
 			history[version]!.tags = [getIdStr(part), ...(history[version]!.tags || [])];
-		} else if (part.code === pc.exPostCoreIdWithVersionNumAtPostId) {
+		} else if (part.code === pc.exPostCoreId__postId_version) {
 			history[version]!.core = getIdStr(part);
-		} else if (part.code === pc.tagId8AndTxtWithNumAsCount) {
+		} else if (part.code === pc.tagId8_count_txt) {
 			tagIdToTxtMap[getIdStr(part)] = part.txt!;
-		} else if (part.code === pc.coreId8AndTxtWithNumAsCount) {
+		} else if (part.code === pc.coreId8_count_txt) {
 			coreIdToTxtMap[getIdStr(part)] = part.txt!;
 		}
 	}

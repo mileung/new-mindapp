@@ -17,11 +17,11 @@ export let _getPublicProfile = async (
 	ownerCalled: boolean,
 ) => {
 	let {
-		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
-		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
-		[pc.accountBioTxtMsByMs]: accountBioTxtMsByMsRows = [],
-		[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
-		[pc.banMsByMsAtAccountId]: banMsByMsAtAccountIdRows = [],
+		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
+		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
+		[pc.msByMs__accountBio]: msByMs__accountBioRows = [],
+		[pc.acceptMsByMs__inviteId]: acceptMsByMs__inviteIdRows = [],
+		[pc.banMsByMs__accountMs]: banMsByMs__accountMsRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -34,9 +34,9 @@ export let _getPublicProfile = async (
 						pf.by_ms.eq(input.profileMs),
 						pf.in_ms.eq0,
 						or(
-							ownerCalled ? pf.code.eq(pc.accountEmailTxtMsByMs) : undefined,
-							pf.code.eq(pc.accountNameTxtMsByMs),
-							pf.code.eq(pc.accountBioTxtMsByMs),
+							ownerCalled ? pf.code.eq(pc.msByMs__accountEmail) : undefined,
+							pf.code.eq(pc.msByMs__accountName),
+							pf.code.eq(pc.msByMs__accountBio),
 						),
 						pf.num.isNull,
 						pf.txt.isNotNull,
@@ -52,7 +52,7 @@ export let _getPublicProfile = async (
 								ownerCalled
 									? undefined
 									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.at_in_ms.eq(ms))),
-								pf.code.eq(pc.acceptMsByMsAtInviteId),
+								pf.code.eq(pc.acceptMsByMs__inviteId),
 								pf.num.isNull,
 								pf.txt.isNull,
 							)
@@ -62,7 +62,7 @@ export let _getPublicProfile = async (
 						pf.ms.gt0,
 						pf.by_ms.gt0,
 						pf.in_ms.eq0,
-						pf.code.eq(pc.banMsByMsAtAccountId),
+						pf.code.eq(pc.banMsByMs__accountMs),
 						pf.num.isNull,
 						pf.txt.isNull,
 					),
@@ -70,71 +70,71 @@ export let _getPublicProfile = async (
 			),
 	);
 
-	let accountNameTxtMsByMsRow = assert1Row(accountNameTxtMsByMsRows);
-	let accountBioTxtMsByMsRow = assert1Row(accountBioTxtMsByMsRows);
+	let msByMs__accountNameRow = assert1Row(msByMs__accountNameRows);
+	let msByMs__accountBioRow = assert1Row(msByMs__accountBioRows);
 	let mutualSpaceMsToJoinMsMap: undefined | Record<number, number>;
 
-	if (acceptMsByMsAtInviteIdRows.length) {
-		let caller_acceptMsByMsAtInviteIdRows: PartSelect[] = [];
-		let profile_acceptMsByMsAtInviteIdRows: PartSelect[] = [];
-		for (let i = 0; i < acceptMsByMsAtInviteIdRows.length; i++) {
-			let acceptMsByMsAtInviteIdRow = acceptMsByMsAtInviteIdRows[i];
-			(acceptMsByMsAtInviteIdRow.by_ms === input.callerMs
-				? caller_acceptMsByMsAtInviteIdRows
-				: profile_acceptMsByMsAtInviteIdRows
-			).push(acceptMsByMsAtInviteIdRow);
+	if (acceptMsByMs__inviteIdRows.length) {
+		let caller_acceptMsByMs__inviteIdRows: PartSelect[] = [];
+		let profile_acceptMsByMs__inviteIdRows: PartSelect[] = [];
+		for (let i = 0; i < acceptMsByMs__inviteIdRows.length; i++) {
+			let acceptMsByMs__inviteIdRow = acceptMsByMs__inviteIdRows[i];
+			(acceptMsByMs__inviteIdRow.by_ms === input.callerMs
+				? caller_acceptMsByMs__inviteIdRows
+				: profile_acceptMsByMs__inviteIdRows
+			).push(acceptMsByMs__inviteIdRow);
 		}
 
 		mutualSpaceMsToJoinMsMap = {};
 		if (ownerCalled) {
-			for (let i = 0; i < profile_acceptMsByMsAtInviteIdRows.length; i++) {
-				let profile_acceptMsByMsAtInviteIdRow = profile_acceptMsByMsAtInviteIdRows[i];
-				let spaceMs = profile_acceptMsByMsAtInviteIdRow.at_in_ms;
-				mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMsAtInviteIdRow.ms;
+			for (let i = 0; i < profile_acceptMsByMs__inviteIdRows.length; i++) {
+				let profile_acceptMsByMs__inviteIdRow = profile_acceptMsByMs__inviteIdRows[i];
+				let spaceMs = profile_acceptMsByMs__inviteIdRow.at_in_ms;
+				mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMs__inviteIdRow.ms;
 			}
 		} else {
-			for (let i = 0; i < caller_acceptMsByMsAtInviteIdRows.length; i++) {
-				let spaceMs = caller_acceptMsByMsAtInviteIdRows[i].at_in_ms;
-				let profile_acceptMsByMsAtInviteIdRow = profile_acceptMsByMsAtInviteIdRows.find(
+			for (let i = 0; i < caller_acceptMsByMs__inviteIdRows.length; i++) {
+				let spaceMs = caller_acceptMsByMs__inviteIdRows[i].at_in_ms;
+				let profile_acceptMsByMs__inviteIdRow = profile_acceptMsByMs__inviteIdRows.find(
 					(r) => r.at_in_ms === spaceMs,
 				);
-				if (profile_acceptMsByMsAtInviteIdRow) {
-					mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMsAtInviteIdRow.ms;
+				if (profile_acceptMsByMs__inviteIdRow) {
+					mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMs__inviteIdRow.ms;
 				}
 			}
 		}
 	}
 
-	let banMsByMsAtAccountIdRow = assertLt2Rows(banMsByMsAtAccountIdRows);
+	let banMsByMs__accountMsRow = assertLt2Rows(banMsByMs__accountMsRows);
 	let bannerNameTxt = '';
-	if (banMsByMsAtAccountIdRow) {
-		let owner_accountNameTxtMsByMsRows = await tdb
+	if (banMsByMs__accountMsRow) {
+		let owner_msByMs__accountNameRows = await tdb
 			.select()
 			.from(pTable)
 			.where(
 				and(
 					pf.noAtId,
 					pf.ms.gt0,
-					pf.by_ms.eq(banMsByMsAtAccountIdRow.by_ms),
+					pf.by_ms.eq(banMsByMs__accountMsRow.by_ms),
 					pf.in_ms.eq0,
-					pf.code.eq(pc.accountNameTxtMsByMs),
+					pf.code.eq(pc.msByMs__accountName),
 					pf.num.isNull,
 					pf.txt.isNotNull,
 				),
 			);
-		bannerNameTxt = assert1Row(owner_accountNameTxtMsByMsRows).txt!;
+		bannerNameTxt = assert1Row(owner_msByMs__accountNameRows).txt!;
 	}
 
 	return {
 		email: ownerCalled //
-			? { txt: assert1Row(accountEmailTxtMsByMsRows).txt! }
+			? { txt: assert1Row(msByMs__accountEmailRows).txt! }
 			: undefined,
-		banned: banMsByMsAtAccountIdRow
-			? { bannerNameTxt, ms: banMsByMsAtAccountIdRow.ms, by_ms: banMsByMsAtAccountIdRow.by_ms }
+		banned: banMsByMs__accountMsRow
+			? { bannerNameTxt, ms: banMsByMs__accountMsRow.ms, by_ms: banMsByMs__accountMsRow.by_ms }
 			: undefined,
 		mutualSpaceMsToJoinMsMap,
-		name: { txt: accountNameTxtMsByMsRow.txt! },
-		bio: { txt: accountBioTxtMsByMsRow.txt! },
+		name: { txt: msByMs__accountNameRow.txt! },
+		bio: { txt: msByMs__accountBioRow.txt! },
 	} satisfies Omit<PublicProfile, 'ms' | 'callerMsToMutualSpaceMsToJoinMsMap'> & {
 		mutualSpaceMsToJoinMsMap?: Record<number, number>;
 	};

@@ -7,7 +7,7 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { roleCodes } from '../spaces';
 import {
-	getAnotherAdmin_roleCodeNumIdAtAccountIdRow,
+	getAnotherAdmin_id__accountMs_roleCodeRow,
 	moveSpaceMemberCountBy1,
 } from '../spaces/db-spaces';
 
@@ -20,7 +20,7 @@ export let _removeSpaceMember = async (
 ) => {
 	let { callerRoleCodeNum, callerMs, spaceMs, accountMs } = input;
 	if (!ownerCalled && callerRoleCodeNum === roleCodes.admin) {
-		if (!(await getAnotherAdmin_roleCodeNumIdAtAccountIdRow(spaceMs, callerMs)))
+		if (!(await getAnotherAdmin_id__accountMs_roleCodeRow(spaceMs, callerMs)))
 			throw new Error(m.assignAnotherAdminToLeaveThisSpace());
 	}
 	await moveSpaceMemberCountBy1(spaceMs, false);
@@ -30,16 +30,16 @@ export let _removeSpaceMember = async (
 				pf.atId({ at_ms: accountMs }),
 				pf.in_ms.eq(spaceMs),
 				or(
-					pf.code.eq(pc.roleCodeNumIdAtAccountId),
-					pf.code.eq(pc.permissionCodeNumIdAtAccountId),
-					pf.code.eq(pc.flairTxtIdAtAccountId),
-					pf.code.eq(pc.spacePriorityIdAccentCodeNumAtAccountId),
+					pf.code.eq(pc.id__accountMs_roleCode),
+					pf.code.eq(pc.id__accountMs_permissionCode),
+					pf.code.eq(pc.id__accountMs__flair),
+					pf.code.eq(pc.spacePriorityId__accountMs_accentCode),
 				),
 			),
 			and(
 				pf.at_in_ms.eq(spaceMs),
 				pf.by_ms.eq(accountMs), //
-				pf.code.eq(pc.acceptMsByMsAtInviteId),
+				pf.code.eq(pc.acceptMsByMs__inviteId),
 			),
 		),
 	);

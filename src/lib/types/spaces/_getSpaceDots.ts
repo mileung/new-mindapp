@@ -54,7 +54,7 @@ export let _getSpaceDots = async (
 	let isPersonal = !isLocal && callerMs === spaceMs;
 	let isLocalOrPersonal = isLocal || isPersonal;
 
-	let roleCodeNumIdAtAccountIdRows = isLocalOrPersonal
+	let id__accountMs_roleCodeRows = isLocalOrPersonal
 		? []
 		: await db
 				.select()
@@ -72,7 +72,7 @@ export let _getSpaceDots = async (
 							pf.num.lt(lastMemberListRoleCodeNum),
 						),
 						pf.in_ms.eq(spaceMs),
-						pf.code.eq(pc.roleCodeNumIdAtAccountId),
+						pf.code.eq(pc.id__accountMs_roleCode),
 						pf.txt.isNull,
 					),
 				)
@@ -88,14 +88,14 @@ export let _getSpaceDots = async (
 	// TODO: sort all admins and mods to the top
 
 	let {
-		[pc.spaceDescriptionTxtIdAndMemberCountNum]: spaceDescriptionTxtIdAndMemberCountNumRows = [],
-		[pc.newMemberPermissionCodeNumId]: newMemberPermissionCodeNumIdRows = [],
+		[pc.id_memberCount_spaceDescription]: id_memberCount_spaceDescriptionRows = [],
+		[pc.id_newMemberPermissionCode]: id_newMemberPermissionCodeRows = [],
 		// prettier-ignore
-		[pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt]: inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxtRows = [],
-		[pc.permissionCodeNumIdAtAccountId]: permissionCodeNumIdAtAccountIdRows = [],
-		[pc.acceptMsByMsAtInviteId]: acceptMsByMsAtInviteIdRows = [],
-		[pc.flairTxtIdAtAccountId]: flairTxtIdAtAccountIdRows = [],
-		[pc.accountNameTxtMsByMs]: accountNameTxtMsByMsRows = [],
+		[pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd]: inviteId__expiryMs_useCount_maxUses_revokedMs_slugEndRows = [],
+		[pc.id__accountMs_permissionCode]: id__accountMs_permissionCodeRows = [],
+		[pc.acceptMsByMs__inviteId]: acceptMsByMs__inviteIdRows = [],
+		[pc.id__accountMs__flair]: id__accountMs__flairRows = [],
+		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -119,14 +119,14 @@ export let _getSpaceDots = async (
 											pf.in_ms.eq(spaceMs),
 											input.newMemberPermissionCode &&
 												pf.notGranularNum(input.newMemberPermissionCode),
-											pf.code.eq(pc.newMemberPermissionCodeNumId),
+											pf.code.eq(pc.id_newMemberPermissionCode),
 											pf.txt.isNull,
 										),
 								and(
 									pf.noAtId,
 									pf.ms.gt0,
 									pf.in_ms.eq(spaceMs),
-									pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
+									pf.code.eq(pc.id_memberCount_spaceDescription),
 									or(
 										...(input.memberCount === undefined || input.description === undefined
 											? []
@@ -140,38 +140,38 @@ export let _getSpaceDots = async (
 								),
 							)
 						: undefined,
-					...(roleCodeNumIdAtAccountIdRows.length
+					...(id__accountMs_roleCodeRows.length
 						? [
 								and(
 									pf.noAtId,
 									pf.ms.gt0,
 									or(
 										...[
-											...new Set(roleCodeNumIdAtAccountIdRows.flatMap((r) => [r.by_ms, r.at_ms])),
+											...new Set(id__accountMs_roleCodeRows.flatMap((r) => [r.by_ms, r.at_ms])),
 										].map((accountMs) => pf.by_ms.eq(accountMs)),
 									),
 									pf.in_ms.eq0,
-									pf.code.eq(pc.accountNameTxtMsByMs),
+									pf.code.eq(pc.msByMs__accountName),
 								),
 								and(
 									pf.at_in_ms.eq(spaceMs),
 									pf.ms.gt0,
-									or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.by_ms.eq(r.at_ms))),
+									or(...id__accountMs_roleCodeRows.map((r) => pf.by_ms.eq(r.at_ms))),
 									pf.in_ms.eq0,
-									pf.code.eq(pc.acceptMsByMsAtInviteId),
+									pf.code.eq(pc.acceptMsByMs__inviteId),
 								),
 								and(
-									or(...roleCodeNumIdAtAccountIdRows.map((r) => pf.atId({ at_ms: r.at_ms }))),
+									or(...id__accountMs_roleCodeRows.map((r) => pf.atId({ at_ms: r.at_ms }))),
 									pf.ms.gt0,
 									pf.in_ms.eq(spaceMs),
 									or(
 										and(
-											pf.code.eq(pc.permissionCodeNumIdAtAccountId),
+											pf.code.eq(pc.id__accountMs_permissionCode),
 											pf.num.gte0, //
 											pf.txt.isNull,
 										),
 										and(
-											pf.code.eq(pc.flairTxtIdAtAccountId),
+											pf.code.eq(pc.id__accountMs__flair),
 											pf.num.isNull,
 											pf.txt.isNotNull,
 											pf.txt.notEq(''),
@@ -186,36 +186,32 @@ export let _getSpaceDots = async (
 
 	if (firstLoad) {
 		spaceUpdate = { ms: spaceMs };
-		let spaceDescriptionTxtIdAndMemberCountNumRow = assertLt2Rows(
-			spaceDescriptionTxtIdAndMemberCountNumRows,
-		);
-		if (spaceDescriptionTxtIdAndMemberCountNumRow) {
-			spaceUpdate.memberCount = spaceDescriptionTxtIdAndMemberCountNumRow.num!;
-			spaceUpdate.description = getGranularTxtProp(spaceDescriptionTxtIdAndMemberCountNumRow);
+		let id_memberCount_spaceDescriptionRow = assertLt2Rows(id_memberCount_spaceDescriptionRows);
+		if (id_memberCount_spaceDescriptionRow) {
+			spaceUpdate.memberCount = id_memberCount_spaceDescriptionRow.num!;
+			spaceUpdate.description = getGranularTxtProp(id_memberCount_spaceDescriptionRow);
 		}
-		let newMemberPermissionCodeNumIdRow = assertLt2Rows(newMemberPermissionCodeNumIdRows);
-		if (newMemberPermissionCodeNumIdRow) {
-			spaceUpdate.newMemberPermissionCode = getGranularNumProp(newMemberPermissionCodeNumIdRow);
+		let id_newMemberPermissionCodeRow = assertLt2Rows(id_newMemberPermissionCodeRows);
+		if (id_newMemberPermissionCodeRow) {
+			spaceUpdate.newMemberPermissionCode = getGranularNumProp(id_newMemberPermissionCodeRow);
 		}
 
 		if (!hasDefinedKeysBesidesMs(spaceUpdate)) spaceUpdate = undefined;
 
-		invites = inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxtRows.map(
-			(row) => ({
-				ms: row.ms,
-				by_ms: row.by_ms,
-				in_ms: row.in_ms,
-				expiryMs: row.at_ms,
-				maxUses: row.at_in_ms,
-				useCount: row.at_by_ms,
-				slugEnd: row.txt!,
-			}),
-		);
+		invites = inviteId__expiryMs_useCount_maxUses_revokedMs_slugEndRows.map((row) => ({
+			ms: row.ms,
+			by_ms: row.by_ms,
+			in_ms: row.in_ms,
+			expiryMs: row.at_ms,
+			maxUses: row.at_in_ms,
+			useCount: row.at_by_ms,
+			slugEnd: row.txt!,
+		}));
 	}
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < accountNameTxtMsByMsRows.length; i++) {
-		let { txt, by_ms } = accountNameTxtMsByMsRows[i];
+	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
+		let { txt, by_ms } = msByMs__accountNameRows[i];
 		msToAccountNameTxtMap[by_ms] = txt!;
 	}
 	let accountMsToMembershipMap: Record<number, Membership> = {};
@@ -226,8 +222,8 @@ export let _getSpaceDots = async (
 		}
 	};
 
-	for (let i = 0; i < roleCodeNumIdAtAccountIdRows.length; i++) {
-		let { ms, num, by_ms, at_ms } = roleCodeNumIdAtAccountIdRows[i];
+	for (let i = 0; i < id__accountMs_roleCodeRows.length; i++) {
+		let { ms, num, by_ms, at_ms } = id__accountMs_roleCodeRows[i];
 		accountMsToMembershipMap[at_ms] = {
 			invite: { by_ms: 0 },
 			accept: { ms: 0 },
@@ -236,27 +232,27 @@ export let _getSpaceDots = async (
 			flair: { txt: '' },
 		};
 	}
-	for (let i = 0; i < acceptMsByMsAtInviteIdRows.length; i++) {
-		let acceptMsByMsAtInviteIdRow = acceptMsByMsAtInviteIdRows[i];
-		let { ms, by_ms, at_by_ms } = acceptMsByMsAtInviteIdRow;
+	for (let i = 0; i < acceptMsByMs__inviteIdRows.length; i++) {
+		let acceptMsByMs__inviteIdRow = acceptMsByMs__inviteIdRows[i];
+		let { ms, by_ms, at_by_ms } = acceptMsByMs__inviteIdRow;
 		checkMissingAccountMsName(at_by_ms);
 		accountMsToMembershipMap[by_ms].invite.by_ms = at_by_ms;
 		accountMsToMembershipMap[by_ms].accept.ms = ms;
 	}
-	for (let i = 0; i < permissionCodeNumIdAtAccountIdRows.length; i++) {
-		let { num, ms, by_ms, at_ms } = permissionCodeNumIdAtAccountIdRows[i];
+	for (let i = 0; i < id__accountMs_permissionCodeRows.length; i++) {
+		let { num, ms, by_ms, at_ms } = id__accountMs_permissionCodeRows[i];
 		checkMissingAccountMsName(by_ms);
 		accountMsToMembershipMap[at_ms].permissionCode = { num: num!, ms, by_ms };
 	}
-	for (let i = 0; i < flairTxtIdAtAccountIdRows.length; i++) {
-		let { txt, ms, by_ms, at_ms } = flairTxtIdAtAccountIdRows[i];
+	for (let i = 0; i < id__accountMs__flairRows.length; i++) {
+		let { txt, ms, by_ms, at_ms } = id__accountMs__flairRows[i];
 		checkMissingAccountMsName(by_ms);
 		accountMsToMembershipMap[at_ms].flair = { txt: txt!, ms, by_ms };
 	}
 
 	let missingNameAccountMss = [...missingNameAccountMssSet];
 	if (missingNameAccountMss.length) {
-		let _accountNameTxtMsByMsRows = await db
+		let _msByMs__accountNameRows = await db
 			.select()
 			.from(pTable)
 			.where(
@@ -265,11 +261,11 @@ export let _getSpaceDots = async (
 					pf.ms.gt0,
 					or(...missingNameAccountMss.map((ms) => pf.by_ms.eq(ms))),
 					pf.in_ms.eq0,
-					pf.code.eq(pc.accountNameTxtMsByMs),
+					pf.code.eq(pc.msByMs__accountName),
 				),
 			);
-		for (let i = 0; i < _accountNameTxtMsByMsRows.length; i++) {
-			let { txt, by_ms } = _accountNameTxtMsByMsRows[i];
+		for (let i = 0; i < _msByMs__accountNameRows.length; i++) {
+			let { txt, by_ms } = _msByMs__accountNameRows[i];
 			msToAccountNameTxtMap[by_ms] = txt!;
 		}
 	}

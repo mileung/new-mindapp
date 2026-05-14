@@ -31,8 +31,8 @@ export let _createAccount = async (
 	});
 	if (res.strike || res.expiredOtp) return res;
 	let {
-		[pc.accountEmailTxtMsByMs]: accountEmailTxtMsByMsRows = [],
-		[pc.signedInEmailRulesTxtId]: signedInEmailRulesTxtIdRows = [],
+		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
+		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -44,14 +44,14 @@ export let _createAccount = async (
 						pf.ms.gt0,
 						pf.by_ms.gt0,
 						pf.in_ms.eq0,
-						pf.code.eq(pc.accountEmailTxtMsByMs),
+						pf.code.eq(pc.msByMs__accountEmail),
 						pf.num.isNull,
 						pf.txt.eq(input.email),
 					),
 					and(
 						pf.noAtId,
 						pf.in_ms.eq0,
-						pf.code.eq(pc.signedInEmailRulesTxtId),
+						pf.code.eq(pc.id__signedInEmailRules),
 						pf.num.isNull,
 						pf.txt.isNotNull,
 					),
@@ -59,8 +59,8 @@ export let _createAccount = async (
 			),
 	);
 
-	throwIf(accountEmailTxtMsByMsRows.length);
-	let signedInEmailRulesTxt = assertLt2Rows(signedInEmailRulesTxtIdRows)?.txt || '';
+	throwIf(msByMs__accountEmailRows.length);
+	let signedInEmailRulesTxt = assertLt2Rows(id__signedInEmailRulesRows)?.txt || '';
 	throwIf(
 		signedInEmailRulesTxt && //
 			!rulesAllowEmail(signedInEmailRulesTxt.split('\n'), input.email),
@@ -76,7 +76,7 @@ export let _createAccount = async (
 						pf.noAtId,
 						pf.ms.gt0,
 						pf.in_ms.eq(1),
-						pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+						pf.code.eq(pc.tagId8_count_txt),
 						pf.num.gt0,
 						pf.txt.isNotNull,
 					),
@@ -92,28 +92,28 @@ export let _createAccount = async (
 			...id0,
 			ms,
 			by_ms: ms,
-			code: pc.accountEmailTxtMsByMs,
+			code: pc.msByMs__accountEmail,
 			txt: input.email,
 		},
 		{
 			...id0,
 			ms,
 			by_ms: ms,
-			code: pc.accountNameTxtMsByMs,
+			code: pc.msByMs__accountName,
 			txt: input.name,
 		},
 		{
 			...id0,
 			ms,
 			by_ms: ms,
-			code: pc.accountBioTxtMsByMs,
+			code: pc.msByMs__accountBio,
 			txt: '',
 		},
 		{
 			...id0,
 			ms,
 			by_ms: ms,
-			code: pc.accountSavedTagsTxtMsByMs,
+			code: pc.msByMs__accountSavedTags,
 			txt: JSON.stringify(top88MostUsedGlobalTags),
 		},
 	];
@@ -141,21 +141,21 @@ export let _createAccount = async (
 			...id0,
 			ms,
 			by_ms: ms,
-			code: pc.accountPwHashTxtMsByMs,
+			code: pc.msByMs__accountPwHash,
 			txt: await argon2.hash(input.password),
 		},
 		{
 			...id0,
 			at_ms: ms,
 			ms: clientIdObj.ms,
-			code: pc.clientKeyTxtMsAtAccountId,
+			code: pc.ms__accountMs__clientKey,
 			txt: clientIdObj.txt,
 		},
 		{
 			...id0,
 			at_ms: ms,
 			ms: sessionIdObj.ms,
-			code: pc.sessionKeyTxtMs_ExpiryMs_AtAccountId,
+			code: pc.ms_ExpiryMs__accountMs__sessionKey,
 			txt: sessionIdObj.txt,
 		},
 	];

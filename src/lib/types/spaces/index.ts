@@ -106,19 +106,19 @@ export let reduceMySpaceUpdateRows = (rows: PartInsert[]) => {
 	for (let i = 0; i < rows.length; i++) {
 		let part = rows[i];
 		!i && (spaceUpdates.ms = part.in_ms);
-		if (part.code === pc.spaceIsPublicBinId) {
+		if (part.code === pc.id_spaceIsPublic) {
 			spaceUpdates.isPublic = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.spaceNameTxtId) {
+		} else if (part.code === pc.id__spaceName) {
 			spaceUpdates.name = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.spacePinnedQueryTxtId) {
+		} else if (part.code === pc.id__spacePinnedQuery) {
 			spaceUpdates.pinnedQuery = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.permissionCodeNumIdAtAccountId) {
+		} else if (part.code === pc.id__accountMs_permissionCode) {
 			spaceUpdates.permissionCode = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.roleCodeNumIdAtAccountId) {
+		} else if (part.code === pc.id__accountMs_roleCode) {
 			spaceUpdates.roleCode = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.flairTxtIdAtAccountId) {
+		} else if (part.code === pc.id__accountMs__flair) {
 			spaceUpdates.flair = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.spacePriorityIdAccentCodeNumAtAccountId) {
+		} else if (part.code === pc.spacePriorityId__accountMs_accentCode) {
 			spaceUpdates.accentCode = { ms: part.ms, num: part.num! };
 		}
 	}
@@ -160,7 +160,7 @@ export let makeMyValidInvitesFilter = (callerMs: number, spaceMs: number, now = 
 		pf.ms.gt0,
 		pf.by_ms.eq(callerMs),
 		pf.in_ms.eq(spaceMs),
-		pf.code.eq(pc.inviteIdAtExpiryMs_UseCount_MaxUsesIdAndNumAsRevokedMsAndSlugEndTxt),
+		pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
 		pf.num.eq0,
 		pf.txt.isNotNull,
 	);

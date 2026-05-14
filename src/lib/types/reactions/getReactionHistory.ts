@@ -47,14 +47,14 @@ export let _getReactionHistory = async (
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 
-	let reactionIdWithEmojiTxtAtPostIdRows = await db
+	let reactionId__postId__emojiRows = await db
 		.select()
 		.from(pTable)
 		.where(
 			and(
 				pf.idAsAtId(input.postIdObj),
 				and(...input.rxnIdObjsExclude.map((t) => pf.notId(t))),
-				pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+				pf.code.eq(pc.reactionId__postId__emoji),
 				// pf.ms.lte(input.fromMs),
 				// TODO: pf.ms.lt(input.msBefore),
 			),
@@ -63,7 +63,7 @@ export let _getReactionHistory = async (
 		.limit(reactionsPerLoad);
 
 	return {
-		reactions: reactionIdWithEmojiTxtAtPostIdRows.map(
+		reactions: reactionId__postId__emojiRows.map(
 			(r) =>
 				({
 					...id0,

@@ -16,11 +16,11 @@ export let moveSpaceMemberCountBy1 = async (spaceMs: number, increment: boolean)
 			and(
 				pf.noAtId, //
 				pf.in_ms.eq(spaceMs),
-				pf.code.eq(pc.spaceDescriptionTxtIdAndMemberCountNum),
+				pf.code.eq(pc.id_memberCount_spaceDescription),
 			),
 		);
 
-export let getAnotherAdmin_roleCodeNumIdAtAccountIdRow = async (
+export let getAnotherAdmin_id__accountMs_roleCodeRow = async (
 	spaceMs: number,
 	callerMs: number,
 ): Promise<undefined | PartSelect> =>
@@ -32,14 +32,14 @@ export let getAnotherAdmin_roleCodeNumIdAtAccountIdRow = async (
 				and(
 					pf.notAtId({ at_ms: callerMs }),
 					pf.in_ms.eq(spaceMs),
-					pf.code.eq(pc.roleCodeNumIdAtAccountId),
+					pf.code.eq(pc.id__accountMs_roleCode),
 					pf.num.eq(roleCodes.admin),
 				),
 			)
 			.limit(1)
 	)[0];
 
-export let get_roleCodeNumIdAtAccountId = async (
+export let get_id__accountMs_roleCode = async (
 	spaceMs: number,
 	accountMs: number,
 ): Promise<undefined | PartSelect> =>
@@ -51,7 +51,7 @@ export let get_roleCodeNumIdAtAccountId = async (
 				and(
 					pf.atId({ at_ms: accountMs }),
 					pf.in_ms.eq(spaceMs),
-					pf.code.eq(pc.roleCodeNumIdAtAccountId),
+					pf.code.eq(pc.id__accountMs_roleCode),
 				),
 			)
 			.limit(1)

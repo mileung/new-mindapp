@@ -6,7 +6,7 @@ import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { roleCodes } from '../spaces';
-import { get_roleCodeNumIdAtAccountId } from '../spaces/db-spaces';
+import { get_id__accountMs_roleCode } from '../spaces/db-spaces';
 
 export let _setSpaceMemberFlair = async (
 	{
@@ -27,10 +27,9 @@ export let _setSpaceMemberFlair = async (
 			callerRoleCodeNum !== roleCodes.mod && //
 				callerRoleCodeNum !== roleCodes.admin,
 		);
-		let updatee_roleCodeNumIdAtAccountId = await get_roleCodeNumIdAtAccountId(spaceMs, accountMs);
+		let updatee_id__accountMs_roleCode = await get_id__accountMs_roleCode(spaceMs, accountMs);
 		throwIf(
-			!updatee_roleCodeNumIdAtAccountId ||
-				callerRoleCodeNum! <= updatee_roleCodeNumIdAtAccountId.num,
+			!updatee_id__accountMs_roleCode || callerRoleCodeNum! <= updatee_id__accountMs_roleCode.num,
 		);
 	}
 
@@ -43,11 +42,7 @@ export let _setSpaceMemberFlair = async (
 			txt: flairTxt,
 		})
 		.where(
-			and(
-				pf.atId({ at_ms: accountMs }),
-				pf.in_ms.eq(spaceMs),
-				pf.code.eq(pc.flairTxtIdAtAccountId),
-			),
+			and(pf.atId({ at_ms: accountMs }), pf.in_ms.eq(spaceMs), pf.code.eq(pc.id__accountMs__flair)),
 		);
 	return { ms };
 };

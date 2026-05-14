@@ -110,7 +110,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 					// ...byMsInMsFilters,
 					// ...excludePostIdsFilters,
-					pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+					pf.code.eq(pc.postId__parentPostId_lastVersion),
 					// pf.num.gte0,
 					// pf.txt.isNull,
 				),
@@ -121,7 +121,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 
 	let postAtBumpedPostIdObjsExclude: FullIdObj[] = [];
 	if (bumpedFirst) {
-		let postIdAtBumpedRootIdRows = await db
+		let postId__bumpedRootIdRows = await db
 			.select()
 			.from(pTable)
 			.where(
@@ -133,7 +133,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						pf.notAtId(fullIdObj),
 						pf.notId(fullIdObj),
 					]),
-					pf.code.eq(pc.postIdAtBumpedRootId),
+					pf.code.eq(pc.postId__bumpedRootId),
 					pf.num.isNull,
 					pf.txt.isNull,
 				),
@@ -141,11 +141,11 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 			.orderBy(pf.ms.desc)
 			.limit(postsPerLoad);
 
-		topLvlIdObjs = postIdAtBumpedRootIdRows.map((aio) => ({ ...id0, ...getAtIdObjAsIdObj(aio) }));
+		topLvlIdObjs = postId__bumpedRootIdRows.map((aio) => ({ ...id0, ...getAtIdObjAsIdObj(aio) }));
 
-		let lastPostIdAtBumpedRootIdObj = postIdAtBumpedRootIdRows.slice(-1)[0];
-		for (let i = postIdAtBumpedRootIdRows.length - 1; i >= 0; i--) {
-			let postIdObj = postIdAtBumpedRootIdRows[i];
+		let lastPostIdAtBumpedRootIdObj = postId__bumpedRootIdRows.slice(-1)[0];
+		for (let i = postId__bumpedRootIdRows.length - 1; i >= 0; i--) {
+			let postIdObj = postId__bumpedRootIdRows[i];
 			if (postIdObj.ms === lastPostIdAtBumpedRootIdObj!.ms) {
 				postAtBumpedPostIdObjsExclude.push(getFullIdObj(postIdObj));
 			} else break;
@@ -159,9 +159,9 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 		// to only show posts that cite the included posts from the same space.
 
 		let {
-			[pc.postIdLastVersionNumAtParentPostId]: postIdLastVersionNumAtParentPostIdRows = [],
-			[pc.childPostIdWithNumAsDepthAtRootId]: childPostIdWithNumAsDepthAtRootIdRows = [],
-			[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
+			[pc.postId__parentPostId_lastVersion]: postId__parentPostId_lastVersionRows = [],
+			[pc.childPostId__rootId_depth]: childPostId__rootId_depthRows = [],
+			[pc.postId__citedPostId]: postId__citedPostIdRows = [],
 		} = channelPartsByCode(
 			await db
 				.select()
@@ -174,9 +174,9 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 							or(
 								and(
 									pf.noAtId, //
-									pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+									pf.code.eq(pc.postId__parentPostId_lastVersion),
 								),
-								pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+								pf.code.eq(pc.childPostId__rootId_depth),
 							),
 							pf.num.gte0,
 							pf.txt.isNull,
@@ -185,29 +185,27 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 							or(...q.postIdObjsInclude.map((pio) => pf.idAsAtId(pio))),
 							pf.ms.gt0,
 							...byMsInMsFilters, // TODO: Option to show posts from outside spaces that cite the highlighted post?
-							pf.code.eq(pc.postIdAtCitedPostId),
+							pf.code.eq(pc.postId__citedPostId),
 							pf.num.isNull,
 							pf.txt.isNull,
 						),
 					),
 				)
 				.orderBy(pf.ms.desc),
-			// TODO: paginate postIdAtCitedPostIdRows and q.postIdObjsInclude
+			// TODO: paginate postId__citedPostIdRows and q.postIdObjsInclude
 			// .limit(postsPerLoad),
 		);
 
 		let rootIdObjs = [
-			...postIdLastVersionNumAtParentPostIdRows,
-			...childPostIdWithNumAsDepthAtRootIdRows,
+			...postId__parentPostId_lastVersionRows,
+			...childPostId__rootId_depthRows,
 		].map((idObj) => ({
 			...id0,
-			...(idObj.code === pc.childPostIdWithNumAsDepthAtRootId
-				? getAtIdObjAsIdObj(idObj)
-				: getIdObj(idObj)),
+			...(idObj.code === pc.childPostId__rootId_depth ? getAtIdObjAsIdObj(idObj) : getIdObj(idObj)),
 		}));
 		let {
-			[pc.postIdLastVersionNumAtParentPostId]: citingPostIdWNumAsLastVersionAtPPostId = [],
-			[pc.childPostIdWithNumAsDepthAtRootId]: descendentPostIdRows = [],
+			[pc.postId__parentPostId_lastVersion]: citingPostIdWNumAsLastVersionAtPPostId = [],
+			[pc.childPostId__rootId_depth]: descendentPostIdRows = [],
 		} = channelPartsByCode(
 			rootIdObjs.length
 				? await db
@@ -216,16 +214,16 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						.where(
 							or(
 								and(
-									or(...postIdAtCitedPostIdRows.map((pio) => pf.id(pio))),
+									or(...postId__citedPostIdRows.map((pio) => pf.id(pio))),
 									...byMsInMsFilters,
-									pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+									pf.code.eq(pc.postId__parentPostId_lastVersion),
 									pf.num.gte0,
 									pf.txt.isNull,
 								),
 								and(
 									or(...rootIdObjs.map((pio) => pf.idAsAtId(pio))),
 									...byMsInMsFilters,
-									pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+									pf.code.eq(pc.childPostId__rootId_depth),
 									pf.num.gte0,
 									pf.txt.isNull,
 								),
@@ -237,16 +235,16 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 		postsToFetchByIdObjs = [
 			...rootIdObjs,
 			...descendentPostIdRows,
-			...postIdAtCitedPostIdRows,
+			...postId__citedPostIdRows,
 			...citingPostIdWNumAsLastVersionAtPPostId.map((pi) => getAtIdObjAsIdObj(pi)),
 		];
 
 		topLvlIdObjs = [
 			...rootIdObjs,
-			...postIdAtCitedPostIdRows,
+			...postId__citedPostIdRows,
 			// TODO: idk if I should do this. This may interfere with paginating cited in posts
 			// Could just have the frontend not render cited in posts that are also a root descendent
-			// ...postIdAtCitedPostIdRows.filter(
+			// ...postId__citedPostIdRows.filter(
 			// 	(pio) => !descendentPostIdRows.find((io) => idObjMatchesIdObj(io, pio)),
 			// ),
 		];
@@ -264,7 +262,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
-						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+						pf.code.eq(pc.postId__parentPostId_lastVersion),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -281,7 +279,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						.where(
 							and(
 								or(...topLvlIdObjs.map((pio) => pf.idAsAtId(pio))),
-								pf.code.eq(pc.childPostIdWithNumAsDepthAtRootId),
+								pf.code.eq(pc.childPostId__rootId_depth),
 								pf.num.gte0,
 								pf.txt.isNull,
 							),
@@ -300,7 +298,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
 						...byMsInMsFilters,
 						...excludePostIdsFilters,
-						pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
+						pf.code.eq(pc.postId__parentPostId_lastVersion),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
@@ -327,8 +325,8 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 					and(
 						or(...postIdObs.map((idObj) => pf.id(idObj))),
 						or(
-							pf.code.eq(pc.postIdLastVersionNumAtParentPostId),
-							omitPostIdAtCitedPostId ? undefined : pf.code.eq(pc.postIdAtCitedPostId),
+							pf.code.eq(pc.postId__parentPostId_lastVersion),
+							omitPostIdAtCitedPostId ? undefined : pf.code.eq(pc.postId__citedPostId),
 						),
 						pf.txt.isNull,
 					),
@@ -337,7 +335,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						and(
 							pf.ms.gt0,
 							// pt.in_ms.eq(),
-							pf.code.eq(pc.postIdRxnEmojiTxtAndCountNum),
+							pf.code.eq(pc.postId_count_emoji),
 							pf.num.gt0,
 							pf.txt.isNotNull,
 						),
@@ -346,10 +344,10 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						or(...postIdObs.map((io) => pf.idAsAtId(io))),
 						or(
 							...[
-								pc.currentVersionNumMsAtPostId,
-								pc.currentSoftDeletedVersionNumMsAtPostId,
-								pc.currentPostTagIdWithVersionNumAtPostId,
-								pc.currentPostCoreIdWithVersionNumAtPostId,
+								pc.ms__postId_currentVersion,
+								pc.ms__postId_currentSoftDeletedVersion,
+								pc.currentPostTagId__postId_version,
+								pc.currentPostCoreId__postId_version,
 							].map((code) =>
 								and(
 									pf.code.eq(code),
@@ -361,7 +359,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 								pf.ms.gt0,
 								// pt.in_ms.eq(),
 								pf.by_ms.eq(q.callerMs),
-								pf.code.eq(pc.reactionIdWithEmojiTxtAtPostId),
+								pf.code.eq(pc.reactionId__postId__emoji),
 								pf.num.isNull,
 								pf.txt.isNotNull,
 							),
@@ -372,14 +370,14 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 	};
 
 	let {
-		[pc.postIdLastVersionNumAtParentPostId]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
-		[pc.reactionIdWithEmojiTxtAtPostId]: reactionIdWithEmojiTxtAtPostIdRows = [],
-		[pc.currentVersionNumMsAtPostId]: curVersionNumAndMsAtPostIdRows = [],
-		[pc.currentSoftDeletedVersionNumMsAtPostId]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
-		[pc.currentPostTagIdWithVersionNumAtPostId]: curPostTagIdWNumAsVersionAtPostIdRows = [],
-		[pc.currentPostCoreIdWithVersionNumAtPostId]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
-		[pc.postIdRxnEmojiTxtAndCountNum]: postIdRxnEmojiTxtAndCountNumRows = [],
+		[pc.postId__parentPostId_lastVersion]: postIdWNumAsLastVersionAtPPostIdRows = [],
+		[pc.postId__citedPostId]: postId__citedPostIdRows = [],
+		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
+		[pc.ms__postId_currentVersion]: curVersionNumAndMsAtPostIdRows = [],
+		[pc.ms__postId_currentSoftDeletedVersion]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
+		[pc.currentPostTagId__postId_version]: curPostTagIdWNumAsVersionAtPostIdRows = [],
+		[pc.currentPostCoreId__postId_version]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
+		[pc.postId_count_emoji]: postId_count_emojiRows = [],
 		// [pc.assignedRoleNumIdAtAccountId]: assignedRoleNumIdAtAccountIdRows = [],
 		// [pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
 	} = channelPartsByCode(
@@ -389,7 +387,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 	let spaceMssToFetchSet = new Set<number>();
 
 	let citedIdObjsToFetch = makePartsUniqueByAtId(
-		postIdAtCitedPostIdRows.filter((aio) => {
+		postId__citedPostIdRows.filter((aio) => {
 			spaceMssToFetchSet.add(aio.at_in_ms);
 			return !postsToFetchByIdObjs.find((fetchedIo) => atIdObjMatchesIdObj(aio, fetchedIo));
 		}),
@@ -404,8 +402,8 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 		if (spaceMssToFetchSet.size) {
 			let citedInMss = [...spaceMssToFetchSet];
 			let {
-				[pc.spaceNameTxtId]: spaceNameTxtIdWithPublicBinRows = [],
-				[pc.roleCodeNumIdAtAccountId]: roleCodeNumIdAtAccountIdRows = [],
+				[pc.id__spaceName]: id__spaceNameWithPublicBinRows = [],
+				[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
 			} = channelPartsByCode(
 				await db
 					.select()
@@ -414,12 +412,12 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 						or(
 							and(
 								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
-								pf.code.eq(pc.spaceNameTxtId), //
+								pf.code.eq(pc.id__spaceName), //
 							),
 							and(
 								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
 								pf.by_ms.eq(q.callerMs),
-								pf.code.eq(pc.roleCodeNumIdAtAccountId),
+								pf.code.eq(pc.id__accountMs_roleCode),
 							),
 						),
 					),
@@ -429,31 +427,31 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 
 	if (citedIdObjsToFetch.length) {
 		let {
-			// [pc.postIdAtCitedPostId]: postIdAtCitedPostIdRows = [],
-			[pc.postIdLastVersionNumAtParentPostId]: _postIdWNumAsLastVersionAtPPostIdRows = [],
-			[pc.reactionIdWithEmojiTxtAtPostId]: _reactionIdWithEmojiTxtAtPostIdRows = [],
-			[pc.currentVersionNumMsAtPostId]: _curVersionNumAndMsAtPostIdRows = [],
-			[pc.currentSoftDeletedVersionNumMsAtPostId]: _curSoftDeletedVersionNumAndMsAtPostIdRows = [],
-			[pc.currentPostTagIdWithVersionNumAtPostId]: _curPostTagIdWNumAsVersionAtPostIdRows = [],
-			[pc.currentPostCoreIdWithVersionNumAtPostId]: _curPostCoreIdWNumAsVersionAtPostIdRows = [],
-			[pc.postIdRxnEmojiTxtAndCountNum]: _postIdRxnEmojiTxtAndCountNumRows = [],
+			// [pc.postId__citedPostId]: postId__citedPostIdRows = [],
+			[pc.postId__parentPostId_lastVersion]: _postIdWNumAsLastVersionAtPPostIdRows = [],
+			[pc.reactionId__postId__emoji]: _reactionId__postId__emojiRows = [],
+			[pc.ms__postId_currentVersion]: _curVersionNumAndMsAtPostIdRows = [],
+			[pc.ms__postId_currentSoftDeletedVersion]: _curSoftDeletedVersionNumAndMsAtPostIdRows = [],
+			[pc.currentPostTagId__postId_version]: _curPostTagIdWNumAsVersionAtPostIdRows = [],
+			[pc.currentPostCoreId__postId_version]: _curPostCoreIdWNumAsVersionAtPostIdRows = [],
+			[pc.postId_count_emoji]: _postId_count_emojiRows = [],
 			// [pc.assignedRoleNumIdAtAccountId]: _assignedRoleNumIdAtAccountIdRows = [],
 			// [pc.nameTxtMsAtAccountId]: _nameTxtMsAtAccountIdRows = [],
 		} = channelPartsByCode(await getPostParts(citedIdObjsToFetch, true));
 		postIdWNumAsLastVersionAtPPostIdRows.push(..._postIdWNumAsLastVersionAtPPostIdRows);
-		reactionIdWithEmojiTxtAtPostIdRows.push(..._reactionIdWithEmojiTxtAtPostIdRows);
+		reactionId__postId__emojiRows.push(..._reactionId__postId__emojiRows);
 		curVersionNumAndMsAtPostIdRows.push(..._curVersionNumAndMsAtPostIdRows);
 		curSoftDeletedVersionNumAndMsAtPostIdRows.push(..._curSoftDeletedVersionNumAndMsAtPostIdRows);
 		curPostTagIdWNumAsVersionAtPostIdRows.push(..._curPostTagIdWNumAsVersionAtPostIdRows);
 		curPostCoreIdWNumAsVersionAtPostIdRows.push(..._curPostCoreIdWNumAsVersionAtPostIdRows);
-		postIdRxnEmojiTxtAndCountNumRows.push(..._postIdRxnEmojiTxtAndCountNumRows);
+		postId_count_emojiRows.push(..._postId_count_emojiRows);
 		// assignedRoleNumIdAtAccountIdRows.push(..._assignedRoleNumIdAtAccountIdRows);
 		// nameTxtMsAtAccountIdRows.push(..._nameTxtMsAtAccountIdRows);
 	}
 
 	let {
-		[pc.tagId8AndTxtWithNumAsCount]: tagId8AndTxtWithNumAsCountRows = [],
-		[pc.coreId8AndTxtWithNumAsCount]: coreId8AndTxtWithNumAsCountRows = [],
+		[pc.tagId8_count_txt]: tagId8_count_txtRows = [],
+		[pc.coreId8_count_txt]: coreId8_count_txtRows = [],
 	} = channelPartsByCode(
 		curPostTagIdWNumAsVersionAtPostIdRows.length || curPostCoreIdWNumAsVersionAtPostIdRows.length
 			? await db
@@ -468,7 +466,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 									),
 								),
 								pf.noAtId,
-								pf.code.eq(pc.tagId8AndTxtWithNumAsCount),
+								pf.code.eq(pc.tagId8_count_txt),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
@@ -479,7 +477,7 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 									),
 								),
 								pf.noAtId,
-								pf.code.eq(pc.coreId8AndTxtWithNumAsCount),
+								pf.code.eq(pc.coreId8_count_txt),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
@@ -499,34 +497,34 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 				: null,
 		};
 	}
-	let tagIdToTxtMap = reduceTxtRowsToMap(tagId8AndTxtWithNumAsCountRows);
-	let coreIdToTxtMap = reduceTxtRowsToMap(coreId8AndTxtWithNumAsCountRows);
+	let tagIdToTxtMap = reduceTxtRowsToMap(tagId8_count_txtRows);
+	let coreIdToTxtMap = reduceTxtRowsToMap(coreId8_count_txtRows);
 	let subParts = [
 		...curPostTagIdWNumAsVersionAtPostIdRows,
 		...curPostCoreIdWNumAsVersionAtPostIdRows,
 		...curVersionNumAndMsAtPostIdRows,
 		...curSoftDeletedVersionNumAndMsAtPostIdRows,
-		...postIdRxnEmojiTxtAndCountNumRows,
-		...reactionIdWithEmojiTxtAtPostIdRows,
+		...postId_count_emojiRows,
+		...reactionId__postId__emojiRows,
 	];
 	for (let i = 0; i < subParts.length; i++) {
 		let part = subParts[i];
 		let partIdStr = getIdStr(part);
 		let partAtIdStr = getAtIdStr(part);
-		if (part.code === pc.currentPostTagIdWithVersionNumAtPostId) {
+		if (part.code === pc.currentPostTagId__postId_version) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags!.push(tagIdToTxtMap[partIdStr]);
-		} else if (part.code === pc.currentPostCoreIdWithVersionNumAtPostId) {
+		} else if (part.code === pc.currentPostCoreId__postId_version) {
 			idToPostMap[partAtIdStr].history![part.num!]!.core = coreIdToTxtMap[partIdStr];
-		} else if (part.code === pc.currentVersionNumMsAtPostId) {
+		} else if (part.code === pc.ms__postId_currentVersion) {
 			idToPostMap[partAtIdStr].history![part.num!]!.ms = part.ms;
-		} else if (part.code === pc.currentSoftDeletedVersionNumMsAtPostId) {
+		} else if (part.code === pc.ms__postId_currentSoftDeletedVersion) {
 			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
-		} else if (part.code === pc.postIdRxnEmojiTxtAndCountNum) {
+		} else if (part.code === pc.postId_count_emoji) {
 			idToPostMap[partIdStr].rxnEmojiCount = {
 				...idToPostMap[partIdStr].rxnEmojiCount,
 				[part.txt!]: part.num!,
 			};
-		} else if (part.code === pc.reactionIdWithEmojiTxtAtPostId) {
+		} else if (part.code === pc.reactionId__postId__emoji) {
 			idToPostMap[partAtIdStr].myRxnEmojis = [
 				part.txt as RxnEmoji,
 				...(idToPostMap[partAtIdStr].myRxnEmojis || []),
@@ -534,8 +532,8 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 		}
 	}
 
-	postIdRxnEmojiTxtAndCountNumRows;
-	reactionIdWithEmojiTxtAtPostIdRows;
+	postId_count_emojiRows;
+	reactionId__postId__emojiRows;
 
 	// let test = or(
 	// 	and(

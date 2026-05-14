@@ -44,13 +44,13 @@ export let reduceMyAccountUpdateRows = (rows: PartInsert[]) => {
 	for (let i = 0; i < rows.length; i++) {
 		let part = rows[i];
 		!i && (account.ms = part.by_ms);
-		if (part.code === pc.accountEmailTxtMsByMs) {
+		if (part.code === pc.msByMs__accountEmail) {
 			account.email = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.accountNameTxtMsByMs) {
+		} else if (part.code === pc.msByMs__accountName) {
 			account.name = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.accountBioTxtMsByMs) {
+		} else if (part.code === pc.msByMs__accountBio) {
 			account.bio = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.accountSavedTagsTxtMsByMs) {
+		} else if (part.code === pc.msByMs__accountSavedTags) {
 			account.savedTags = { ms: part.ms, txt: part.txt! };
 		}
 	}
@@ -123,7 +123,7 @@ export let filterAccountPwHashRow = (accountMs: number) =>
 		pf.ms.gt0,
 		pf.by_ms.eq(accountMs),
 		pf.in_ms.eq0,
-		pf.code.eq(pc.accountPwHashTxtMsByMs),
+		pf.code.eq(pc.msByMs__accountPwHash),
 		pf.num.isNull,
 		pf.txt.isNotNull,
 	);

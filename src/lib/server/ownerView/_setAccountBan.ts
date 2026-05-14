@@ -16,7 +16,7 @@ export let _setAccountBan = async (
 	// let partCode = input.isSpace ? pc.banIdAtSpaceId : pc.banIdAtAccountId;
 	let banRowFilter = and(
 		pf.atId({ at_ms: input.accountMs }),
-		pf.code.eq(pc.banMsByMsAtAccountId),
+		pf.code.eq(pc.banMsByMs__accountMs),
 		pf.num.isNull,
 	);
 
@@ -28,7 +28,7 @@ export let _setAccountBan = async (
 				at_ms: input.accountMs,
 				ms,
 				by_ms: input.callerMs,
-				code: pc.banMsByMsAtAccountId,
+				code: pc.banMsByMs__accountMs,
 			});
 			await tdb
 				.delete(pTable)
@@ -38,8 +38,8 @@ export let _setAccountBan = async (
 						and(
 							pf.atId({ at_ms: input.accountMs }),
 							or(
-								pf.code.eq(pc.clientKeyTxtMsAtAccountId),
-								pf.code.eq(pc.sessionKeyTxtMs_ExpiryMs_AtAccountId),
+								pf.code.eq(pc.ms__accountMs__clientKey),
+								pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
 							),
 							pf.txt.isNotNull,
 						),
