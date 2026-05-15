@@ -65,6 +65,7 @@ export let _getCallerContext = async (
 	let isPublic: undefined | GranularNumProp;
 	let roleCode: undefined | GranularNumProp;
 	let permissionCode: undefined | GranularNumProp;
+	let inGlobal: undefined | boolean;
 
 	let {
 		spaceUpdatesFrom = [], //
@@ -79,16 +80,14 @@ export let _getCallerContext = async (
 			`Cannot use get[signedIn/isPublic/roleCode/permissionCode] and spaceUpdatesFrom/signedInAccountUpdatesFrom at the same time`,
 		);
 	if (spaceMs && (get.isPublic || get.roleCode || get.permissionCode)) {
-		if (get.isPublic) isPublic = { num: -1 };
-		if (get.roleCode) roleCode = { num: -1 };
-		if (get.permissionCode) permissionCode = { num: -1 };
 		spaceUpdatesFrom.push({
 			ms: spaceMs,
-			isPublic,
-			roleCode,
-			permissionCode,
+			isPublic: get.isPublic ? { num: -1 } : undefined,
+			roleCode: get.roleCode ? { num: -1 } : undefined,
+			permissionCode: get.permissionCode ? { num: -1 } : undefined,
 		});
 	}
+	if (get.inGlobal) spaceUpdatesFrom.push({ ms: 1 });
 
 	if (sessionIdObj && callerMs && !signedInAccountUpdatesFrom.some((a) => a.ms === callerMs))
 		signedInAccountUpdatesFrom.push({ ms: callerMs });
@@ -138,14 +137,15 @@ export let _getCallerContext = async (
 				]
 			: []),
 		...spaceUpdatesFrom.flatMap((su) => {
-			if (!su.ms || su.ms === callerMs) {
+			if (!su.ms) throw new Error(`cannot get updates from local space`);
+			if (su.ms === callerMs) {
 				su.isPublic &&
 					su.isPublic.num !== 0 &&
 					forcedSpaceUpdateRows.push({
 						...id0,
 						in_ms: su.ms,
 						code: pc.id_spaceIsPublic,
-						num: null,
+						num: 0,
 						txt: null,
 					});
 				if (su.ms === spaceMs) {
@@ -446,8 +446,8 @@ export let _getCallerContext = async (
 	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =
 		spaceMs !== undefined &&
 		!callerJoinedSpaceMs &&
-		id_spaceIsPublicRows.some((r) => r.in_ms === spaceMs)
-			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs] || [{ in_ms: spaceMs }])
+		id_spaceIsPublicRows.some((r) => r.in_ms === spaceMs && r.num)
+			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs])
 			: undefined;
 
 	if (visitingPublicSpaceUpdate) {
@@ -484,27 +484,32 @@ export let _getCallerContext = async (
 			if (get.roleCode) {
 				if (spaceMs === callerMs) roleCode = { num: roleCodes.admin };
 				else {
-					let caller_id__accountMs_roleCodeRow = id__accountMs_roleCodeRows.find(
-						(row) => row.at_ms === callerMs,
+					let id__accountMs_roleCodeRowInCallerSpace = id__accountMs_roleCodeRows.find(
+						(row) => row.in_ms === spaceMs && row.at_ms === callerMs,
 					);
-					if (caller_id__accountMs_roleCodeRow) {
-						let { ms, num } = caller_id__accountMs_roleCodeRow;
+					if (id__accountMs_roleCodeRowInCallerSpace) {
+						let { ms, num } = id__accountMs_roleCodeRowInCallerSpace;
 						roleCode = { ms, num: num! };
-					} else roleCode = undefined;
+					}
 				}
 			}
 			if (get.permissionCode) {
 				if (spaceMs === callerMs) {
 					permissionCode = { num: permissionCodes.reactAndPost };
 				} else {
-					let caller_id__accountMs_permissionCodeRow = id__accountMs_permissionCodeRows.find(
-						(row) => row.at_ms === callerMs,
+					let id__accountMs_permissionCodeRowInCallerSpace = id__accountMs_permissionCodeRows.find(
+						(row) => row.in_ms === spaceMs && row.at_ms === callerMs,
 					);
-					if (caller_id__accountMs_permissionCodeRow) {
-						let { ms, num } = caller_id__accountMs_permissionCodeRow;
+					if (id__accountMs_permissionCodeRowInCallerSpace) {
+						let { ms, num } = id__accountMs_permissionCodeRowInCallerSpace;
 						permissionCode = { ms, num: num! };
-					} else permissionCode = undefined;
+					}
 				}
+			}
+			if (get.inGlobal) {
+				inGlobal = id__accountMs_permissionCodeRows.some(
+					(row) => row.in_ms === 1 && row.at_ms === callerMs,
+				);
 			}
 		}
 		if (ms - caller_ms_ExpiryMs__accountMs__sessionKeyRow.ms > hour) {
@@ -553,12 +558,15 @@ export let _getCallerContext = async (
 
 	if (get.isPublic) {
 		if (spaceMs === 1) isPublic = { num: 1 };
+		else if (spaceMs === callerMs) isPublic = { num: 0 };
 		else {
-			let caller_id_spaceIsPublicRow = id_spaceIsPublicRows.find((row) => row.in_ms === spaceMs);
-			if (caller_id_spaceIsPublicRow) {
-				let { ms, num } = caller_id_spaceIsPublicRow;
+			let id_spaceIsPublicRowInCallerSpace = id_spaceIsPublicRows.find(
+				(row) => row.in_ms === spaceMs,
+			);
+			if (id_spaceIsPublicRowInCallerSpace) {
+				let { ms, num } = id_spaceIsPublicRowInCallerSpace;
 				isPublic = permissionCode || num ? { ms, num: num! } : undefined;
-			} else isPublic = undefined;
+			}
 		}
 	}
 
@@ -580,6 +588,7 @@ export let _getCallerContext = async (
 		roleCode,
 		permissionCode,
 		isPublic,
+		inGlobal,
 
 		visitingPublicSpaceUpdate,
 		removedSpaceMss: removedSpaceMss.length ? removedSpaceMss : undefined,

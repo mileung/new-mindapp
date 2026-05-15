@@ -87,6 +87,8 @@ export let GetCallerContextGetArgSchema = z.strictObject({
 	roleCode: z.boolean().optional(),
 	permissionCode: z.boolean().optional(),
 	//
+	inGlobal: z.boolean().optional(),
+	//
 	allJoinedSpaces: z.boolean().optional(),
 	spaceUpdatesFrom: z.array(MySpaceUpdateFromSchema).optional(), // TODO: enforce .max(8) on backend
 	signedInAccountUpdatesFrom: z.array(MyAccountUpdatesSchema).optional(), // TODO: enforce .max(888) on backend (paginate past 888 joined spaces later?)
@@ -96,9 +98,9 @@ export type GetCallerContextGetArg = z.infer<typeof GetCallerContextGetArgSchema
 export let CallerContextSchema = z.strictObject({
 	signedIn: z.boolean().optional(),
 	isPublic: GranularNumPropSchema.optional(),
-	pinnedQuery: GranularTxtPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
 	permissionCode: GranularNumPropSchema.optional(),
+	inGlobal: z.boolean().optional(),
 
 	visitingPublicSpaceUpdate: MySpaceUpdateSchema.optional(),
 	removedSpaceMss: z.array(z.number()).optional(),

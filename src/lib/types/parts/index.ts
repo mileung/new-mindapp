@@ -11,12 +11,14 @@ export let GranularNumPropSchema = z.strictObject({
 	num: z.number(),
 });
 export type GranularNumProp = z.infer<typeof GranularNumPropSchema>;
-export let getGranularNumProp = (part: PartInsert) =>
-	({
+export let getGranularNumProp = (part: PartInsert) => {
+	if (part.num === undefined) throw new Error(`missing part.num`);
+	return {
 		ms: part.ms,
 		by_ms: part.by_ms,
 		num: part.num!,
-	}) satisfies GranularNumProp;
+	} satisfies GranularNumProp;
+};
 export let sameGranularNum = (a?: GranularNumProp, b?: GranularNumProp) =>
 	a?.ms === b?.ms && a?.by_ms === b?.by_ms && a?.num === b?.num;
 
@@ -26,28 +28,14 @@ export let GranularTxtPropSchema = z.strictObject({
 	txt: z.string(),
 });
 export type GranularTxtProp = z.infer<typeof GranularTxtPropSchema>;
-export let getGranularTxtProp = (part: PartInsert) =>
-	({
+export let getGranularTxtProp = (part: PartInsert) => {
+	if (part.txt === undefined) throw new Error(`missing part.txt`);
+	return {
 		ms: part.ms,
 		by_ms: part.by_ms,
 		txt: part.txt!,
-	}) satisfies GranularTxtProp;
-
-export let GranularNumTxtPropSchema = z.strictObject({
-	ms: z.number().optional(),
-	by_ms: z.number().optional(),
-	num: z.number(),
-	txt: z.string(),
-});
-
-export type GranularNumTxtProp = z.infer<typeof GranularNumTxtPropSchema>;
-export let getGranularNumTxtProp = (part: PartInsert) =>
-	({
-		ms: part.ms,
-		by_ms: part.by_ms,
-		num: part.num!,
-		txt: part.txt!,
-	}) satisfies GranularNumTxtProp;
+	} satisfies GranularTxtProp;
+};
 
 export let WhoObjSchema = z.strictObject({
 	callerMs: z.number().gte(0),

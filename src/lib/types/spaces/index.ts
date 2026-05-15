@@ -85,8 +85,8 @@ export let MySpaceUpdateSchema = z.strictObject({
 	name: GranularTxtPropSchema.optional(),
 	pinnedQuery: GranularTxtPropSchema.optional(),
 	// If caller was remove from a public space, the above is still fetched, the below is nulled
-	permissionCode: GranularNumPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
+	permissionCode: GranularNumPropSchema.optional(),
 	flair: GranularTxtPropSchema.optional(),
 	accentCode: GranularNumPropSchema.optional(),
 });

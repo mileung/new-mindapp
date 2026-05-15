@@ -80,27 +80,27 @@ let normalizingEmailSchema = z
 
 let t = initTRPC.context<Context>().create();
 
-let generalProcedure = t.procedure.use(async ({ ctx, next }) => {
-	await generalLimiter.ping(ctx);
-	return next();
-});
+let makeProcedure = (
+	rateLimiter: {
+		ping: (ctx: Context) => Promise<void>;
+	} = generalLimiter,
+) =>
+	t.procedure.use(async ({ ctx, next }) => {
+		await rateLimiter.ping(ctx);
+		return next();
+	});
 
 let inputIsOwner = (i: { callerMs: number }) => ownerMsSet.has(i.callerMs);
-let assertInputIsOwner = (i: { callerMs: number }) => {
-	throwIf(!inputIsOwner(i));
-};
+let assertInputIsOwner = (i: { callerMs: number }) => throwIf(!inputIsOwner(i));
 
 let test = 0;
 let testLimiter = makeLimiter(3, 1 / 6);
 export let router = t.router({
-	test: generalProcedure.query(async ({ ctx }) => {
-		await testLimiter.ping(ctx);
-		test++;
-		return { test };
-	}),
-	scrape: generalProcedure
+	test: makeProcedure(testLimiter).query(() => ({ test: ++test })),
+	scrape: makeProcedure()
 		.input(z.strictObject({ url: z.string().url() }).strict())
 		.query(async ({ input }) => {
+			if (1) return;
 			// TODO: paste a url in mindapp url as a search or maybe under /parse/[text].
 			// fetch the page and scrape it as if using the extension shortcut.
 			// Useful for environments where the Mindapp browser extension can't be used
@@ -111,7 +111,7 @@ export let router = t.router({
 				throw new Error(`Fetch error: ${error}`);
 			}
 		}),
-	sendOtp: generalProcedure
+	sendOtp: makeProcedure(emailLimiter)
 		.input(
 			z.strictObject({
 				email: normalizingEmailSchema,
@@ -122,11 +122,8 @@ export let router = t.router({
 				}),
 			}),
 		)
-		.mutation(async ({ ctx, input }) => {
-			await emailLimiter.ping(ctx);
-			return _sendOtp(input);
-		}),
-	checkOtp: generalProcedure
+		.mutation(({ input }) => _sendOtp(input)),
+	checkOtp: makeProcedure()
 		.input(
 			z.strictObject({
 				otpMs: z.number(),
@@ -134,8 +131,8 @@ export let router = t.router({
 				email: normalizingEmailSchema,
 			}),
 		)
-		.mutation(({ input }) => _checkOtp(input)),
-	createAccount: generalProcedure
+		.mutation(async ({ input }) => _checkOtp(input)),
+	createAccount: makeProcedure()
 		.input(
 			z.strictObject({
 				name: normalizingNameSchema,
@@ -145,8 +142,8 @@ export let router = t.router({
 				password: passwordSchema,
 			}),
 		)
-		.mutation(({ ctx, input }) => _createAccount(ctx, input)),
-	signIn: generalProcedure
+		.mutation(async ({ ctx, input }) => _createAccount(ctx, input)),
+	signIn: makeProcedure(signInLimiter)
 		.input(
 			z.strictObject({
 				otpMs: z.number().optional(),
@@ -156,11 +153,8 @@ export let router = t.router({
 				resetPassword: z.boolean().optional(),
 			}),
 		)
-		.mutation(async ({ ctx, input }) => {
-			await signInLimiter.ping(ctx);
-			return _signIn(ctx, input);
-		}),
-	getPublicProfile: generalProcedure
+		.mutation(({ ctx, input }) => _signIn(ctx, input)),
+	getPublicProfile: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				profileMs: z.number(),
@@ -175,15 +169,15 @@ export let router = t.router({
 			}
 			return _getPublicProfile(input, ownerCalled);
 		}),
-	getCallerContext: generalProcedure
+	getCallerContext: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
-				spaceMs: z.number().optional(), // this is the only api function that can be called when lastSeenInMs = 0
+				spaceMs: z.number().optional(), // this is the only api function that can be called when urlInMs = 0
 				get: GetCallerContextGetArgSchema,
 			}).strict(),
 		)
 		.query(async ({ ctx, input }) => _getCallerContext(ctx, input, input.get)),
-	resetPasswordSignedIn: generalProcedure
+	resetPasswordSignedIn: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				oldPassword: passwordSchema,
@@ -196,14 +190,14 @@ export let router = t.router({
 			throwIf(!c.signedIn);
 			return _resetPasswordSignedIn(input);
 		}),
-	signOut: generalProcedure
+	signOut: makeProcedure()
 		.input(WhoObjSchema.extend({ everywhere: z.boolean() }).strict())
 		.mutation(async ({ ctx, input }) => {
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _signOut(ctx, input);
 		}),
-	updateSavedTags: generalProcedure
+	updateSavedTags: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				savedTags: z.array(z.string().max(88)).max(8888),
@@ -211,11 +205,13 @@ export let router = t.router({
 		)
 		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
-			let c = await _getCallerContext(ctx, input, { signedIn: true });
+			let ownerCalled = inputIsOwner(input);
+			let c = await _getCallerContext(ctx, input, { signedIn: true, inGlobal: !ownerCalled });
 			throwIf(!c.signedIn);
+			!ownerCalled && throwIf(!c.inGlobal);
 			return _updateSavedTags(input);
 		}),
-	checkInvite: generalProcedure
+	checkInvite: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				inviteMs: z.number(),
@@ -230,7 +226,7 @@ export let router = t.router({
 			}
 			return _checkInvite(input);
 		}),
-	changeMyAccountAttributes: generalProcedure
+	changeMyAccountAttributes: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				nameTxt: normalizingNameSchema.optional(),
@@ -239,11 +235,12 @@ export let router = t.router({
 		)
 		.mutation(async ({ ctx, input }) => {
 			throwIf(input.nameTxt === undefined && input.bioTxt === undefined);
-			let c = await _getCallerContext(ctx, input, { signedIn: true });
-			throwIf(!c.signedIn);
+			let ownerCalled = inputIsOwner(input);
+			let c = await _getCallerContext(ctx, input, { signedIn: true, inGlobal: !ownerCalled });
+			throwIf(!c.signedIn || (!ownerCalled && !c.inGlobal));
 			return _changeMyAccountAttributes(input);
 		}),
-	createSpace: generalProcedure
+	createSpace: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
 				spaceNameTxt: normalizingNameSchema,
@@ -257,28 +254,35 @@ export let router = t.router({
 			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
-			let c = await _getCallerContext(ctx, input, { signedIn: true });
-			throwIf(!c.signedIn);
+			let ownerCalled = inputIsOwner(input);
+			let c = await _getCallerContext(ctx, input, { signedIn: true, inGlobal: !ownerCalled });
+			throwIf(!c.signedIn || (!ownerCalled && !c.inGlobal));
 			return _createSpace(input);
 		}),
-	removeSpaceMember: generalProcedure
+	removeSpaceMember: makeProcedure()
 		.input(WhoWhereObjSchema.extend({ accountMs: z.number() }).strict())
 		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
+			});
 			throwIf(!c.signedIn);
-			!ownerCalled &&
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
 				throwIf(
 					!c.roleCode ||
 						(input.accountMs !== input.callerMs && //
 							c.roleCode.num !== roleCodes.admin),
 				);
+			}
 			return _removeSpaceMember(
 				{ ...input, callerRoleCodeNum: c.roleCode?.num },
 				ownerCalled, //
 			);
 		}),
-	setSpaceMemberFlair: generalProcedure
+	setSpaceMemberFlair: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				accountMs: z.number(),
@@ -287,15 +291,19 @@ export let router = t.router({
 		)
 		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
+			});
 			throwIf(!c.signedIn);
-			!ownerCalled && throwIf(!c.roleCode);
+			!ownerCalled && throwIf(!c.inGlobal || !c.roleCode);
 			return _setSpaceMemberFlair(
 				{ ...input, callerRoleCodeNum: c.roleCode?.num },
 				ownerCalled, //
 			);
 		}),
-	setSpaceMemberPermission: generalProcedure
+	setSpaceMemberPermission: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				accountMs: z.number(),
@@ -308,15 +316,19 @@ export let router = t.router({
 		)
 		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
+			});
 			throwIf(!c.signedIn);
-			!ownerCalled && throwIf(!c.roleCode);
+			!ownerCalled && throwIf(!c.inGlobal || !c.roleCode);
 			return _setSpaceMemberPermission(
 				{ ...input, callerRoleCodeNum: c.roleCode?.num },
 				ownerCalled,
 			);
 		}),
-	setSpaceMemberRole: generalProcedure
+	setSpaceMemberRole: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				accountMs: z.number(),
@@ -328,12 +340,16 @@ export let router = t.router({
 		)
 		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
+			});
 			throwIf(!c.signedIn);
-			!ownerCalled && throwIf(!c.roleCode);
+			!ownerCalled && throwIf(!c.inGlobal || !c.roleCode);
 			return _setSpaceMemberRole({ ...input, callerRoleCodeNum: c.roleCode?.num }, ownerCalled);
 		}),
-	changeSpaceAttributes: generalProcedure
+	changeSpaceAttributes: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				nameTxt: normalizingNameSchema.optional(),
@@ -356,15 +372,21 @@ export let router = t.router({
 					input.newMemberPermissionCodeNum === undefined,
 			);
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
+			});
 			throwIf(!c.signedIn);
-			!ownerCalled && throwIf(c.roleCode?.num !== roleCodes.admin);
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
+				throwIf(c.roleCode?.num !== roleCodes.admin);
+			}
 			return _changeSpaceAttributes(input);
 		}),
-	addPost: generalProcedure
+	addPost: makeProcedure(postLimiter)
 		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
-		.mutation(async ({ input, ctx }) => {
-			await postLimiter.ping(ctx);
+		.mutation(async ({ ctx, input }) => {
 			let { post } = input;
 			// TODO: allow non zero ms if the caller is an admin of the space (useful for importing old posts)
 			if (post.ms) throw new Error('post ms must be 0');
@@ -377,42 +399,46 @@ export let router = t.router({
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,
 				permissionCode: !ownerCalled,
+				inGlobal: !ownerCalled,
 			});
 			throwIf(!c.signedIn);
-			!ownerCalled &&
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
 				throwIf(
 					c.permissionCode?.num !== permissionCodes.postOnly &&
 						c.permissionCode?.num !== permissionCodes.reactAndPost,
 				);
+			}
 			return _addPost(tdb, post);
 		}),
-	editPost: generalProcedure
+	editPost: makeProcedure(postLimiter)
 		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
-		.mutation(async ({ input, ctx }) => {
-			await postLimiter.ping(ctx);
+		.mutation(async ({ ctx, input }) => {
 			let { post } = input;
 			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
 			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
+			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,
 				permissionCode: true,
+				inGlobal: !ownerCalled,
 			});
+			throwIf(!c.signedIn);
 			throwIf(
-				!c.signedIn ||
-					(c.permissionCode?.num !== permissionCodes.postOnly &&
-						c.permissionCode?.num !== permissionCodes.reactAndPost),
+				c.permissionCode?.num !== permissionCodes.postOnly &&
+					c.permissionCode?.num !== permissionCodes.reactAndPost,
 			);
+			!ownerCalled && throwIf(!c.inGlobal);
 			return _editPost(tdb, post);
 		}),
-	deletePost: generalProcedure
+	deletePost: makeProcedure(postLimiter)
 		.input(
 			WhoObjSchema.extend({
 				fullPostIdObj: FullIdObjSchema,
 				version: z.number().gte(0).nullable(),
 			}).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
-			await postLimiter.ping(ctx);
+		.mutation(async ({ ctx, input }) => {
 			let { fullPostIdObj, callerMs } = input;
 			let ownerCalled = inputIsOwner(input);
 			if (!ownerCalled) {
@@ -423,15 +449,14 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.roleCode);
 			return _deletePost(tdb, fullPostIdObj, input.version);
 		}),
-	addReaction: generalProcedure
+	addReaction: makeProcedure(reactionLimiter)
 		.input(
 			WhoObjSchema.extend({
 				postIdObj: IdObjSchema,
 				emoji: EmojiStringSchema,
 			}).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
-			await reactionLimiter.ping(ctx);
+		.mutation(async ({ ctx, input }) => {
 			throwIf(!input.callerMs || !input.postIdObj.in_ms || !input.postIdObj.by_ms);
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(
@@ -440,25 +465,27 @@ export let router = t.router({
 				{
 					signedIn: true,
 					permissionCode: !ownerCalled,
+					inGlobal: !ownerCalled,
 				},
 			);
 			throwIf(!c.signedIn);
-			!ownerCalled &&
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
 				throwIf(
 					c.permissionCode?.num !== permissionCodes.reactOnly &&
 						c.permissionCode?.num !== permissionCodes.reactAndPost,
 				);
+			}
 			return _addReaction(tdb, input, false);
 		}),
-	removeReaction: generalProcedure
+	removeReaction: makeProcedure(reactionLimiter)
 		.input(
 			WhoObjSchema.extend({
 				postIdObj: IdObjSchema,
 				emoji: EmojiStringSchema,
 			}).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
-			await reactionLimiter.ping(ctx);
+		.mutation(async ({ ctx, input }) => {
 			throwIf(!input.callerMs || !input.postIdObj.in_ms || !input.postIdObj.by_ms);
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(
@@ -473,7 +500,7 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.permissionCode);
 			return _removeReaction(tdb, input, false);
 		}),
-	getSpaceDots: generalProcedure
+	getSpaceDots: makeProcedure(postLimiter)
 		.input(
 			WhoWhereObjSchema.extend({
 				memberCount: z.number().optional(),
@@ -485,7 +512,7 @@ export let router = t.router({
 				lastMemberListRoleCodeNum: z.number().optional(),
 			}).strict(),
 		)
-		.query(async ({ input, ctx }) => {
+		.query(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,
@@ -496,33 +523,36 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.isPublic?.num && !c.roleCode);
 			return _getSpaceDots(tdb, { ...input, callerRoleCodeNum: c.roleCode?.num }, ownerCalled);
 		}),
-	createInviteLink: generalProcedure
+	createInviteLink: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				validFor: z.number().min(0).max(week),
 				maxUses: z.number().min(0).max(99999999),
 			}).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
+		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,
 				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
 			});
 			throwIf(!c.signedIn);
-			!ownerCalled &&
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
 				throwIf(c.roleCode?.num !== roleCodes.mod && c.roleCode?.num !== roleCodes.admin);
+			}
 			return _createInviteLink(input);
 		}),
-	revokeInviteLink: generalProcedure
+	revokeInviteLink: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				inviteMs: z.number(),
 				slugEnd: z.string(),
 			}).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
+		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
@@ -533,7 +563,7 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.roleCode);
 			return _revokeInviteLink(input);
 		}),
-	getPostHistory: generalProcedure
+	getPostHistory: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				postIdObj: IdObjSchema,
@@ -553,7 +583,7 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.isPublic && c.permissionCode === undefined);
 			return _getPostHistory(tdb, input.postIdObj, input.version);
 		}),
-	getReactionHistory: generalProcedure
+	getReactionHistory: makeProcedure()
 		.input(
 			WhoWhereObjSchema.extend({
 				postIdObj: IdObjSchema,
@@ -561,7 +591,7 @@ export let router = t.router({
 				rxnIdObjsExclude: z.array(IdObjSchema),
 			}).strict(),
 		)
-		.query(async ({ input, ctx }) => {
+		.query(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
 			if (input.postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
 			let ownerCalled = inputIsOwner(input);
@@ -574,22 +604,18 @@ export let router = t.router({
 			!ownerCalled && throwIf(!c.isPublic && c.permissionCode === undefined);
 			return _getReactionHistory(tdb, input);
 		}),
-	getPostFeed: generalProcedure
+	getPostFeed: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(GetPostFeedArgSchema).strict())
-		.query(async ({ input, ctx }) => {
-			await feedLimiter.ping(ctx);
-			return _getPostFeed(tdb, input, true);
-		}),
-	getOwnerViewAccounts: generalProcedure
+		.query(({ input }) => _getPostFeed(tdb, input, true)),
+	getOwnerViewAccounts: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(z.object({ msBefore: z.number().optional() })).strict())
-		.query(async ({ input, ctx }) => {
+		.query(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
-			await feedLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _getOwnerViewAccounts(input);
 		}),
-	setOwnerViewAttributes: generalProcedure
+	setOwnerViewAttributes: makeProcedure()
 		.input(
 			WhoObjSchema.merge(
 				z.object({
@@ -612,14 +638,13 @@ export let router = t.router({
 				}),
 			).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
+		.mutation(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
-			await generalLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _setOwnerViewAttributes(input);
 		}),
-	setAccountBan: generalProcedure
+	setAccountBan: makeProcedure()
 		.input(
 			WhoObjSchema.merge(
 				z.object({
@@ -628,31 +653,29 @@ export let router = t.router({
 				}),
 			).strict(),
 		)
-		.mutation(async ({ input, ctx }) => {
+		.mutation(async ({ ctx, input }) => {
 			throwIf(input.accountMs === input.callerMs);
 			assertInputIsOwner(input);
-			await generalLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _setAccountBan(input);
 		}),
-	getOwnerViewSpaces: generalProcedure
+	getOwnerViewSpaces: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(z.object({ msBefore: z.number().optional() })).strict())
-		.query(async ({ input, ctx }) => {
+		.query(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
-			await feedLimiter.ping(ctx);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _getOwnerViewSpaces(input);
 		}),
-	getSpaceTags: generalProcedure
+	getSpaceTags: makeProcedure(feedLimiter)
 		.input(
 			WhoWhereObjSchema.extend({
 				fromCount: z.number(),
 				excludeTags: z.array(z.string()),
 			}).strict(),
 		)
-		.query(async ({ input, ctx }) => {
+		.query(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,

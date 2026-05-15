@@ -1,5 +1,14 @@
 import { uniqueMapVals } from '$lib/js';
 
+// part code naming schema: <id>__<at_id>_<num>_<txt>
+// <id> schema: <ms>_<by_ms>_<in_ms>
+// <at_id> schema: <at_ms>_<at_by_ms>_<at_in_ms>
+// <id> and <at_id> may have their values repurposed for efficiency
+// omit __<at_id> if no at id
+// omit _<num>_<txt> if no num or txt
+// omit <num> if no num
+// omit _<txt> if no txt
+
 export let pc = uniqueMapVals({
 	postId__parentPostId_lastVersion: 0,
 	childPostId__rootId_depth: 1,

@@ -45,7 +45,7 @@ export let _checkInvite = async (
 		slugEnd: string;
 		useIfValid: boolean;
 	},
-): Promise<{ redeemed?: true; checkedInvite?: CheckedInvite }> => {
+): Promise<{ redeemMs?: number; checkedInvite?: CheckedInvite }> => {
 	let ms = Date.now();
 
 	let checkedInvite: CheckedInvite = {
@@ -70,17 +70,23 @@ export let _checkInvite = async (
 					// broad as possible to eliminate any chance of a false negative. This check should
 					// only pass once and that's when the global space has no members
 					or(
+						pf.code.eq(pc.id_memberCount_spaceDescription),
+						pf.code.eq(pc.id__spacePinnedQuery),
+						pf.code.eq(pc.id_newMemberPermissionCode),
 						pf.code.eq(pc.id__accountMs_roleCode),
 						pf.code.eq(pc.id__accountMs_permissionCode),
+						pf.code.eq(pc.id__accountMs__flair),
+						pf.code.eq(pc.spacePriorityId__accountMs_accentCode),
 						pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
 					),
+					pf.in_ms.eq(1),
+
 					// Pretty much all other queries in this codebase are verbose and include stuff like:
 					// pf.at_ms.eq0,
 					// pf.at_by_ms.eq(1),
 					// pf.at_in_ms.eq(1),
 					// pf.ms.gt0,
 					// pf.by_ms.eq0,
-					// pf.in_ms.eq(1),
 					// pf.num.eq0,
 					// pf.txt.eq('init'),
 				),
@@ -136,7 +142,7 @@ export let _checkInvite = async (
 					txt: '',
 				},
 			]);
-			return { redeemed: true };
+			return { redeemMs: ms };
 		}
 		return { checkedInvite };
 	} else if (input.inviteMs && input.slugEnd.length === 8) {
@@ -212,7 +218,7 @@ export let _checkInvite = async (
 					.update(pTable)
 					.set({ at_by_ms: sql`${pTable.at_by_ms} + 1` })
 					.where(inviteFilter);
-				return { redeemed: true };
+				return { redeemMs: ms };
 			} else {
 				let {
 					// prettier-ignore

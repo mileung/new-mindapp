@@ -160,20 +160,21 @@ export let useCheckedInvite = async () => {
 		if (gs.accounts !== undefined && gs.checkedInvite) {
 			if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms)
 				return alert(m.cannotUseYourOwnInvite());
-			let { redeemed } = await trpc().checkInvite.mutate({
+			let { redeemMs: ms } = await trpc().checkInvite.mutate({
 				...(await getWhoObj()),
 				inviteMs: gs.checkedInvite.ms,
 				slugEnd: gs.checkedInvite.slugEnd,
 				useIfValid: true,
 			});
-			if (!redeemed) return alert(m.invalidInvite());
+			if (!ms) return alert(m.invalidInvite());
 			let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
 			updateLocalCache((lc) => {
 				lc.accounts[0].joinedSpaceContexts.unshift({
 					ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
-					accentCode: { num: accentCodes.none },
-					permissionCode: { num: permissionCodes.reactAndPost },
-					roleCode: { num: roleCodes.member },
+					roleCode: { ms, num: roleCodes.member },
+					permissionCode: { ms, num: permissionCodes.reactAndPost },
+					flair: { ms, txt: '' },
+					accentCode: { ms, num: accentCodes.none },
 				});
 				return lc;
 			});

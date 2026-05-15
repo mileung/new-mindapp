@@ -31,6 +31,12 @@ export let makeNewSpaceRows = (a: {
 			txt: a.spacePinnedQueryTxt || '',
 		},
 	];
+	if (a.spaceMs !== a.callerMs && a.spaceMs !== 1) {
+		if (a.spaceIsPublicBin === undefined) throw new Error(`Missing spaceIsPublicBin`);
+		if (a.spaceNameTxt === undefined) throw new Error(`Missing spaceNameTxt`);
+		if (a.newMemberPermissionCodeNum === undefined)
+			throw new Error(`Missing newMemberPermissionCodeNum`);
+	}
 	let supplementSpaceRows: PartInsert[] =
 		a.spaceMs === a.callerMs
 			? []
@@ -50,7 +56,7 @@ export let makeNewSpaceRows = (a: {
 							ms: a.spaceMs,
 							in_ms: a.spaceMs,
 							code: pc.id_spaceIsPublic,
-							num: a.spaceIsPublicBin!,
+							num: a.spaceIsPublicBin,
 						},
 						{
 							...id0,
@@ -64,15 +70,9 @@ export let makeNewSpaceRows = (a: {
 							ms: a.spaceMs,
 							in_ms: a.spaceMs,
 							code: pc.id_newMemberPermissionCode,
-							num: a.newMemberPermissionCodeNum!,
+							num: a.newMemberPermissionCodeNum,
 						},
 					];
-	if (a.spaceMs !== a.callerMs && a.spaceMs !== 1) {
-		if (a.spaceIsPublicBin === undefined) throw new Error(`Missing spaceIsPublicBin`);
-		if (a.spaceNameTxt === undefined) throw new Error(`Missing spaceNameTxt`);
-		if (a.newMemberPermissionCodeNum === undefined)
-			throw new Error(`Missing newMemberPermissionCodeNum`);
-	}
 	return [...essentialRows, ...supplementSpaceRows];
 };
 
