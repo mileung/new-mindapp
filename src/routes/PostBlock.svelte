@@ -142,7 +142,7 @@
 			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
-						<a href={`/__${atPost.by_ms}_`} class="fx group hover:text-fg1">
+						<a href={`/_${atPost.by_ms}_`} class="fx group hover:text-fg1">
 							<div
 								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
 							>

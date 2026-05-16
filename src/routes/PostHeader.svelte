@@ -96,7 +96,9 @@
 	};
 
 	let xMoreOptionsBtn = $state<HTMLButtonElement>();
-	let a = { onkeydown: (e: KeyboardEvent) => e.key === 'Escape' && (moreOptionsOpen = false) };
+	let moreOptionsBtnProps = {
+		onkeydown: (e: KeyboardEvent) => e.key === 'Escape' && (moreOptionsOpen = false),
+	};
 
 	let target = $derived(p.isEmbed ? '_blank' : undefined);
 </script>
@@ -246,7 +248,7 @@
 		{/if}
 		{#if moreOptionsOpen}
 			<button
-				{...a}
+				{...moreOptionsBtnProps}
 				bind:this={xMoreOptionsBtn}
 				class="xy group hover:text-fg1"
 				onclick={() => (moreOptionsOpen = false)}
@@ -255,7 +257,7 @@
 					<IconX class="w-5" />
 				</div>
 			</button>
-			<button {...a} class="fx group hover:text-fg1" onclick={p.onToggleParsed}>
+			<button {...moreOptionsBtnProps} class="fx group hover:text-fg1" onclick={p.onToggleParsed}>
 				<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					{#if p.parsed}
 						<IconCube class="h-4 w-4" />
@@ -264,7 +266,7 @@
 					{/if}
 				</div>
 			</button>
-			<button {...a} class="fx group hover:text-fg1" onclick={handleCopyClick}>
+			<button {...moreOptionsBtnProps} class="fx group hover:text-fg1" onclick={handleCopyClick}>
 				<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 					{#if copyClicked}
 						<IconCheck class="h-4.5 w-4.5" />
@@ -274,7 +276,7 @@
 				</div>
 			</button>
 			<button
-				{...a}
+				{...moreOptionsBtnProps}
 				class="fx group hover:text-fg1"
 				onclick={() => {
 					if (!navigator.share) return alert(m.webShareApiNotSupported());
@@ -297,7 +299,11 @@
 				</div>
 			</button>
 			{#if p.post.in_ms !== 0 && p.post.in_ms !== undefined}
-				<button {...a} class="fx group hover:text-fg1" onclick={toggleSavedLocally}>
+				<button
+					{...moreOptionsBtnProps}
+					class="fx group hover:text-fg1"
+					onclick={toggleSavedLocally}
+				>
 					<div class={`h-5 w-6 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
 						{#if savedLocally}
 							<IconBrowserMinus class="h-4.5 w-4.5" />
@@ -308,7 +314,7 @@
 				</button>
 			{/if}
 			<button
-				{...a}
+				{...moreOptionsBtnProps}
 				class={`${deletable ? '' : 'hidden'} fx group hover:text-fg1`}
 				onclick={async () => {
 					let ok =
@@ -355,7 +361,7 @@
 							</div>
 						</button> -->
 				<button
-					{...a}
+					{...moreOptionsBtnProps}
 					class="fx group hover:text-fg1"
 					onclick={() => {
 						gs.showReactionHistory = gs.writingNew = gs.writingTo = null;
