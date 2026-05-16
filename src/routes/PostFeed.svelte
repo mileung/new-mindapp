@@ -76,8 +76,8 @@
 	);
 
 	let postIdStr = $derived.by(() => {
-		let { feedSlug } = page.params;
-		return isIdStr(feedSlug) ? feedSlug : undefined;
+		let { idSlug } = page.params;
+		return isIdStr(idSlug) ? idSlug : undefined;
 	});
 	let urlInMs = $derived(getUrlInMs()!);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);

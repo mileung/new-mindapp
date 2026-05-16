@@ -18,7 +18,6 @@
 		getIdObj,
 		getIdStr,
 		getUrlInMs,
-		isIdStr,
 	} from '$lib/types/parts/partIds';
 	import { getLastVersion, type Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
@@ -116,7 +115,7 @@
 						!e.metaKey &&
 						!e.shiftKey &&
 						!e.ctrlKey && //
-						!isIdStr(page.params.feedSlug)
+						page.params.spaceSlug
 					)
 						gs.lastScrollY = window.scrollY;
 				}}

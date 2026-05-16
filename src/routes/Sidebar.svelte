@@ -69,7 +69,7 @@
 	});
 
 	let highlightLastSeenInMs = $derived(
-		(page.params.feedSlug || page.params.spaceSlug)?.endsWith(`_${gs.lastSeenInMs}`),
+		(page.params.idSlug || page.params.spaceSlug)?.endsWith(`_${gs.lastSeenInMs}`),
 	);
 
 	let sidebarSpaceMss = $derived<number[]>([
@@ -240,7 +240,7 @@
 						>
 							{#if spaceMs === gs.lastSeenInMs}
 								<div
-									class={`absolute left-0 h-full w-0.5 ${page.params.feedSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
+									class={`absolute left-0 h-full w-0.5 ${page.params.idSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
 							{/if}
 							<!-- {#if space.ms === gs.lastSeenInMs}
