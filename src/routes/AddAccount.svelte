@@ -31,7 +31,7 @@
 	let pwIptProps = $derived({
 		minlength: 8,
 		maxlength: 64,
-		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8',
+		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1',
 	});
 
 	$effect(() => {
@@ -227,7 +227,7 @@
 			<p class="mt-2 font-bold">{m.oneTimePin()}</p>
 			<input
 				bind:value={pin}
-				class="bg-bg4 w-full px-2 h-9 text-lg border-l-0 border-bg8"
+				class="bg-bg4 w-full px-2 h-9 text-lg"
 				required
 				maxlength={8}
 				minlength={8}
@@ -331,7 +331,7 @@
 					type="name"
 					maxlength={88}
 					autocomplete="given-name"
-					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8"
+					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
 				/>
 			{/if}
 			{#if gs.accounts ? gs.accounts?.[0].email.txt !== page.state.prefilledEmail : true}
@@ -343,7 +343,7 @@
 					minlength={6}
 					maxlength={254}
 					autocomplete="username"
-					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1 border-l-0 border-bg8"
+					class="font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1"
 				/>
 			{/if}
 			{#if p.creatingAccount || p.signingIn || (email && email === gs.accounts?.[0].email.txt && email === page.state.prefilledEmail)}

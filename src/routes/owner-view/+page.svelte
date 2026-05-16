@@ -241,7 +241,7 @@
 						<textarea
 							bind:value={draft_signedInEmailRulesTxt}
 							maxlength={88888}
-							class="h-24 mb-1 resize-y w-full px-2 py-0.5 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4 block"
+							class="h-24 mb-1 resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 						></textarea>
 					</div>
 				{:else if gs.ownerView.signedInEmailRulesTxt !== undefined}

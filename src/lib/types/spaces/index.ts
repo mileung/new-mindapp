@@ -161,6 +161,6 @@ export let makeMyValidInvitesFilter = (callerMs: number, spaceMs: number, now = 
 		pf.by_ms.eq(callerMs),
 		pf.in_ms.eq(spaceMs),
 		pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
-		pf.num.eq0,
+		pf.num.isNull,
 		pf.txt.isNotNull,
 	);

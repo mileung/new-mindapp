@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { gs, msToAccountNameTxt, resetBottomOverlay } from '$lib/global-state.svelte';
+	import {
+		getSpaceContext,
+		gs,
+		msToAccountNameTxt,
+		resetBottomOverlay,
+	} from '$lib/global-state.svelte';
 	import { getTagVal } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { hasParent } from '$lib/types/parts';
@@ -8,7 +13,14 @@
 	import { getPostHistory } from '$lib/types/posts/getPostHistory';
 	import type { RxnEmoji } from '$lib/types/reactions';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { IconChartBarPopular, IconMessage2Plus, IconMinus, IconPlus } from '@tabler/icons-svelte';
+	import { permissionCodes } from '$lib/types/spaces';
+	import {
+		IconChartBarPopular,
+		IconLibraryPlus,
+		IconMessage2Plus,
+		IconMinus,
+		IconPlus,
+	} from '@tabler/icons-svelte';
 	import CoreParser from './CoreParser.svelte';
 	import Highlight from './Highlight.svelte';
 	import Self from './PostBlock.svelte';
@@ -54,6 +66,10 @@
 			let equalsIndex = tag.indexOf('=');
 			return { tag, val, key: tag.slice(0, equalsIndex), valStr: tag.slice(equalsIndex + 1) };
 		}),
+	);
+	let inMsSpaceContext = $derived(getSpaceContext(p.post.in_ms));
+	let isViewOnly = $derived(
+		!inMsSpaceContext || inMsSpaceContext?.permissionCode.num === permissionCodes.viewOnly,
 	);
 
 	let rxnEmojiCountEntries = $derived(
@@ -144,16 +160,39 @@
 								: {atPostTxt}
 							</p>
 						</a>
-						<button
-							class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-							onclick={() => {
-								resetBottomOverlay('wt');
-								gs.writingTo =
-									gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost;
-							}}
-						>
-							<IconMessage2Plus class="w-5" />
-						</button>
+						{#if !p.cited && !p.isEmbed}
+							<button
+								class="fx group hover:text-fg1"
+								onmousedown={(e) => e.preventDefault()}
+								onclick={() => {
+									gs.writingNew = true;
+									let lastVersion = getLastVersion(p.post);
+									let tags = p.post.history?.[lastVersion]?.tags || [];
+									gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
+									gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
+								}}
+							>
+								<div
+									class={`h-5 px-1.5 xy text-fg2 hover:text-fg1 ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+								>
+									<IconLibraryPlus class="w-4 mr-1" />
+									{m.cite()}
+								</div>
+							</button>
+						{/if}
+						{#if !isViewOnly}
+							<button
+								class={`flex-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+								onclick={() => {
+									resetBottomOverlay('wt');
+									gs.writingTo =
+										gs.writingTo && getIdStr(gs.writingTo) === atPostIdStr ? null : atPost;
+								}}
+							>
+								<IconMessage2Plus class="w-4.5 mr-1" />
+								{m.reply()}
+							</button>
+						{/if}
 						<Highlight reply {evenBg} postIdStr={atPostIdStr} />
 					</div>
 				{/if}

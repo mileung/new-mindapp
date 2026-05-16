@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { textInputFocused } from '$lib/dom';
-	import { gs, resetBottomOverlay } from '$lib/global-state.svelte';
+	import { gs } from '$lib/global-state.svelte';
 	import { setSearchParams } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
@@ -73,7 +73,6 @@
 		};
 		window.addEventListener('keydown', handler);
 		return () => {
-			resetBottomOverlay();
 			window.removeEventListener('keydown', handler);
 		};
 	});
@@ -149,7 +148,7 @@
 		bind:this={searchIpt}
 		bind:value={searchVal}
 		enterkeyhint="search"
-		class="font-mono flex-1 px-2 bg-bg3 hover:bg-bg6"
+		class="font-mono flex-1 px-2 bg-bg3 hover:bg-bg5"
 		placeholder={m.search()}
 		onfocus={() => {
 			searchIptFocused = true;

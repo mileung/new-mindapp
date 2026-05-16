@@ -63,7 +63,7 @@
 			<button class="w-8 xy hover:bg-bg7 hover:text-fg3" onclick={() => resetBottomOverlay()}>
 				<IconX class="w-5" />
 			</button>
-			<Highlight noScrollTo postIdStr={getIdStr(post)} />
+			<Highlight noScrollId postIdStr={getIdStr(post)} />
 		</div>
 		{#each reactions || [] as rxn, i (getIdStr(rxn))}
 			<div class="px-1 flex">

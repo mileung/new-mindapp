@@ -168,7 +168,9 @@
 						gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
 					}}
 				>
-					<div class={`h-5 px-1.5 xy ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}>
+					<div
+						class={`h-5 px-1.5 xy text-fg2 hover:text-fg1 ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+					>
 						<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
 						{m.cite()}
 					</div>

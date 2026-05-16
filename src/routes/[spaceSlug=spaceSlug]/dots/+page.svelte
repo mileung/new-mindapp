@@ -207,7 +207,7 @@
 						<p class="text-sm font-bold">{m.validFor()}</p>
 						<select
 							name={m.validFor()}
-							class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg5 text-fg1"
+							class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg5 text-fg1"
 							bind:value={validFor}
 						>
 							<option value={0}>{m.forever()}</option>
@@ -236,7 +236,7 @@
 							inputmode="numeric"
 							autocomplete="off"
 							name={m.maxUses()}
-							class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg5 text-fg1"
+							class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg5 text-fg1"
 							bind:value={maxUsesStr}
 							minlength={1}
 							oninput={(e) => {

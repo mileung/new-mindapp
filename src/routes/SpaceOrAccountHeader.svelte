@@ -237,10 +237,7 @@
 	{#if editing}
 		{#if p.space ? p.space.ms > 1 && p.space.ms !== callerMs : true}
 			<p class="font-bold">{m.name()}</p>
-			<input
-				bind:value={draftSettings.nameTxt}
-				class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
-			/>
+			<input bind:value={draftSettings.nameTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" />
 		{:else}
 			<p class="text-xl font-bold">
 				{msToSpaceNameTxt(accountOrSpaceMs)}
@@ -249,13 +246,13 @@
 		<p class="mt-1 font-bold">{p.account ? m.bio() : m.description()}</p>
 		<textarea
 			bind:value={draftSettings.bioOrDescriptionTxt}
-			class="resize-y w-full px-2 py-0.5 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4 block"
+			class="resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 		></textarea>
 		{#if p.space}
 			<p class="font-bold">{m.pinnedQuery()}</p>
 			<input
 				bind:value={draftSettings.pinnedQueryTxt}
-				class="w-full px-2 border-l-0 border-bg8 text-lg bg-bg2 hover:bg-bg4"
+				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
 			/>
 		{/if}
 		{#if p.space && p.space.ms && p.space.ms !== callerMs}
@@ -264,7 +261,7 @@
 					<p class="text-sm font-bold">{m.visibility()}</p>
 					<select
 						name={m.visibility()}
-						class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
+						class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg4 text-fg1"
 						bind:value={draftSettings.isPublicNum}
 					>
 						<option value={0} disabled={p.space.ms === 1}>{m.private()}</option>
@@ -275,7 +272,7 @@
 					<p class="text-sm font-bold">{m.newMembers()}</p>
 					<div class="flex">
 						<select
-							class="h-9 font-normal text-lg mt-1 w-full p-2 border-l-0 border-bg8 bg-bg2 hover:bg-bg4 text-fg1"
+							class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg4 text-fg1"
 							bind:value={draftSettings.newMemberPermissionCodeNum}
 						>
 							<option value={permissionCodes.viewOnly}>{m.viewOnly()}</option>
@@ -317,9 +314,11 @@
 			{:else if p.space}
 				<p class="text-fg2">{m.nothingPinned()}</p>
 			{/if}
-			<p class="text-fg2">
-				{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}
-			</p>
+			{#if accountOrSpaceMs}
+				<p class="text-fg2">
+					{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}
+				</p>
+			{/if}
 		</div>
 		{#if visibilityAndNewMembersCan}
 			<p class="text-fg2">{visibilityAndNewMembersCan}</p>

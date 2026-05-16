@@ -31,12 +31,14 @@
 				),
 	);
 	$effect(() => {
-		if (mutualSpaceMsToJoinMsMap || publicProfile === null) return;
+		if (callerMs === undefined || mutualSpaceMsToJoinMsMap || publicProfile === null) return;
 		untrack(async () => {
 			let whoObj = await getWhoObj();
 			try {
-				if (profileMs === callerMs) {
-					publicProfile = {
+				if (!profileMs) {
+					//
+				} else if (profileMs === callerMs) {
+					gs.msToProfileMap[profileMs] = {
 						...caller!,
 						callerMsToMutualSpaceMsToJoinMsMap: {
 							...publicProfile?.callerMsToMutualSpaceMsToJoinMsMap,
@@ -53,7 +55,7 @@
 					if (res.banned) {
 						mergeMsToAccountNameTxtMap({ [res.banned.by_ms]: res.banned.bannerNameTxt });
 					}
-					publicProfile = {
+					gs.msToProfileMap[profileMs] = {
 						ms: profileMs,
 						banned: res.banned,
 						email: res.email,
@@ -66,12 +68,8 @@
 					};
 				}
 			} catch (error) {
-				publicProfile = null;
+				gs.msToProfileMap[profileMs] = null;
 			}
-			gs.msToProfileMap = {
-				...gs.msToProfileMap,
-				[profileMs]: publicProfile,
-			};
 		});
 	});
 </script>

@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import { scrollToHighlight, textInputFocused } from '$lib/dom';
 	import {
+		assertCallerIsOwnerOrInGlobal,
 		getBottomOverlayShown,
 		getCallerIsOwner,
 		getPromptSigningIn,
@@ -122,7 +123,7 @@
 	let useLocalDb = $derived(urlInMs === 0);
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
-		console.log('loadMorePosts');
+		// console.log('loadMorePosts');
 		if (
 			callerMs === undefined || promptSignIn || urlInMs === undefined
 				? !isMergedView && !callerIsOwner
@@ -258,6 +259,7 @@
 	let viewPostToastId = $state('');
 	let submitPost = async (tags: string[], core: string) => {
 		if (!gs.accounts || urlInMs === undefined) return;
+		assertCallerIsOwnerOrInGlobal();
 		await updateSavedTags(tags);
 		let post: Post;
 		if (gs.writingEdit) {
@@ -375,7 +377,7 @@
 
 				// TODO: press left/right to highlight next adjacent post
 				// TODO: press shift left/right to highlight next depth 0 post
-				if (allowTopLvlPosting && e.key === 'n') {
+				if (viewable && e.key === 'n') {
 					e.preventDefault();
 					resetBottomOverlay();
 					gs.writingNew = true;
@@ -450,29 +452,20 @@
 			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn || isMergedView || callerIsOwner ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
 		>
 			<a
-				href={makeParams('nested', sortedBy)}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
-			>
-				<IconListTree stroke={2.5} class="h-4" />{m.nested()}
-			</a>
-			<a
 				href={makeParams('flat', sortedBy)}
 				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
 			>
 				<IconList stroke={2.5} class="h-4" />{m.flat()}
 			</a>
+			<a
+				href={makeParams('nested', sortedBy)}
+				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
+			>
+				<IconListTree stroke={2.5} class="h-4" />{m.nested()}
+			</a>
 			<div class="xy mr-0.5">
 				<IconSquareFilled class="h-1.5 w-1.5" />
 			</div>
-			{#if !qSearchParam}
-				<a
-					href={makeParams(view, 'bumped')}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
-				>
-					<IconMessage2Up stroke={2.5} class="h-4" />
-					{m.bumped()}
-				</a>
-			{/if}
 			<a
 				href={makeParams(view, 'new')}
 				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
@@ -485,9 +478,28 @@
 			>
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
-			<button class="ml-auto">2020-05-13</button>
+			{#if !qSearchParam}
+				<a
+					href={makeParams(view, 'bumped')}
+					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
+				>
+					<IconMessage2Up stroke={2.5} class="h-4" />
+					{m.bumped()}
+				</a>
+			{/if}
+
+			<!-- <button
+				class="ml-auto fx pr-1.5 hover:bg-bg4 hover:text-fg1"
+				onclick={() => {
+					// TODO: TimeRangePicker for posts
+				}}
+			>
+				<IconCalendarClock stroke={2.5} class="h-4" />{'All time'}
+			</button>
+			<input type="datetime-local" /> -->
+			<!-- <button class="ml-auto">2020-05-13</button>
 			<div class="self-center mx-1">-</div>
-			<button class="">Today</button>
+			<button class="">Today</button> -->
 			<!-- <input class="ml-auto" type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" />
 			<input type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" /> -->
 		</div>
@@ -536,15 +548,6 @@
 			{/if}
 		</div>
 		<div class="flex-1"></div>
-		<div
-			class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}
-		>
-			{#if gs.showReactionHistory}
-				<ReactionHistory />
-			{:else}
-				<PostWriter onSubmit={submitPost} />
-			{/if}
-		</div>
 		{#if viewPostToastId}
 			<a
 				href={'/' + viewPostToastId}
@@ -556,3 +559,12 @@
 		{/if}
 	</div>
 {/if}
+<div
+	class={`fixed bottom-0 z-50 left-0 xs:left-[var(--w-sidebar)] right-0 h-[var(--h-post-writer)] ${getBottomOverlayShown() ? '' : 'hidden'}`}
+>
+	{#if gs.showReactionHistory}
+		<ReactionHistory />
+	{:else}
+		<PostWriter onSubmit={submitPost} />
+	{/if}
+</div>

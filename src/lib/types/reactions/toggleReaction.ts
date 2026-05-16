@@ -1,4 +1,4 @@
-import { getWhoObj, gs } from '$lib/global-state.svelte';
+import { assertCallerIsOwnerOrInGlobal, getWhoObj, gs } from '$lib/global-state.svelte';
 import { getIdStr, getUrlInMs, type IdObj } from '../parts/partIds';
 import { addReaction } from './addReaction';
 import { removeReaction } from './removeReaction';
@@ -10,6 +10,7 @@ export let toggleReaction = async (input: { postIdObj: IdObj; emoji: string }) =
 	rxnEmojiCount[input.emoji] ||= 0;
 	let adding = !myRxnEmojis.includes(input.emoji);
 	if (adding) {
+		assertCallerIsOwnerOrInGlobal();
 		myRxnEmojis = [...new Set([input.emoji, ...myRxnEmojis])];
 		rxnEmojiCount[input.emoji]++;
 	} else {

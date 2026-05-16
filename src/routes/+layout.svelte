@@ -230,7 +230,6 @@
 						signedInAccountUpdates = [],
 						visitingPublicSpaceUpdate,
 					} = callerContext;
-					console.log('callerContext', JSON.stringify(callerContext, null, 2));
 
 					gs.accountMsToSpaceMsToCheckedMap = {
 						...gs.accountMsToSpaceMsToCheckedMap,

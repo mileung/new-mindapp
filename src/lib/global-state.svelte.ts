@@ -310,6 +310,12 @@ export let getCallerIsOwner = () => {
 	return callerMs !== undefined ? ownerMsSet.has(callerMs) : false;
 };
 
+export let assertCallerIsOwnerOrInGlobal = () => {
+	if (!getCallerIsOwner() && !gs.accounts?.[0].joinedSpaceContexts.some((sc) => sc.ms === 1)) {
+		throw new Error(m.becomeAGlobalMemberToUseThisAction());
+	}
+};
+
 export let toggleAccountBan = async (accountMs: number) => {
 	let account = gs.msToProfileMap[accountMs]!;
 	if (

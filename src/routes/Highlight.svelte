@@ -7,10 +7,11 @@
 	let p: {
 		postIdStr?: string;
 		class?: string;
-		noScrollTo?: boolean;
+		noScrollId?: boolean;
 		main?: boolean;
 		reply?: boolean;
 		evenBg?: boolean;
+		red?: boolean;
 	} = $props();
 
 	let urlId = $derived.by(() => {
@@ -28,6 +29,7 @@
 	);
 
 	let [lineColor, overlayColor] = $derived.by(() => {
+		if (p.red) return ['bg-red-500', moreOpaque ? 'bg-red-500/10' : 'bg-red-500/5'];
 		if (!p.postIdStr) return ['bg-hl2', moreOpaque ? 'bg-hl2/10' : 'bg-hl2/5'];
 		let post = gs.showReactionHistory || gs.writingTo || gs.writingEdit;
 		if (post && getIdStr(post) === p.postIdStr) {
@@ -49,7 +51,7 @@
 
 {#if lineColor && overlayColor}
 	<div
-		{...p.noScrollTo
+		{...p.noScrollId
 			? {} //
 			: p.main
 				? { id: 'hl-' + p.postIdStr }
