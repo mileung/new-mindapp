@@ -342,11 +342,6 @@
 		}
 	});
 
-	let pageData = $derived(page.data as LayoutServerData);
-	$effect(() => {
-		// console.log('test:', pageData);
-	});
-
 	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
 	let title = $derived.by(() => {
 		if (urlInMs !== undefined) {
@@ -367,6 +362,7 @@
 		return `${title ? `${title} | ` : ''}Mindapp`;
 	});
 	let siteDescription = $derived('General purpose organizer');
+	let pageData = $derived(page.data as LayoutServerData);
 	let thinTopOgText = $derived(
 		pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
 	);

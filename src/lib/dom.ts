@@ -1,5 +1,4 @@
 import { dev } from '$app/environment';
-import { goto } from '$app/navigation';
 import { m } from './paraglide/messages';
 
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
@@ -18,15 +17,17 @@ export let scrollToHighlight = (id: string) => {
 	if (hlContainer && hl) {
 		let { top: hlcTop } = hlContainer.getBoundingClientRect();
 		let { height: hlHeight } = hl.getBoundingClientRect();
+		let top =
+			window.scrollY -
+			(window.innerHeight - hlcTop) +
+			hlHeight + //
+			getPostWriterHeight();
+		// console.log('top:', top);
 		window.scrollTo({
-			top:
-				window.scrollY -
-				(window.innerHeight - hlcTop) +
-				hlHeight + //
-				getPostWriterHeight(),
+			top,
 			behavior: 'smooth',
 		});
-	} else goto(`/${id}`);
+	} else console.warn('no id to scroll to');
 };
 
 export let scrape = (externalUrl: string, externalDomString: string) => {

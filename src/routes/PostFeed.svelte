@@ -75,7 +75,7 @@
 					: 'bumped',
 	);
 
-	let postIdStr = $derived.by(() => {
+	let postIdSlug = $derived.by(() => {
 		let { idSlug } = page.params;
 		return isIdStr(idSlug) ? idSlug : undefined;
 	});
@@ -102,7 +102,7 @@
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
 	let allowTopLvlPosting = $derived(
-		!postIdStr &&
+		!postIdSlug &&
 			!promptSignIn &&
 			(spaceContext?.permissionCode?.num === permissionCodes.postOnly ||
 				spaceContext?.permissionCode?.num === permissionCodes.reactAndPost),
@@ -124,6 +124,7 @@
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// console.log('loadMorePosts');
+		// if (1) return;
 		if (
 			callerMs === undefined || promptSignIn || urlInMs === undefined
 				? !isMergedView && !callerIsOwner
@@ -174,12 +175,12 @@
 		};
 
 		try {
-			if (postIdStr) {
+			if (postIdSlug) {
 				if (lastTopLvlPostIdObj?.ms) getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
 				postFeed = await getPostFeed(
 					{
 						...getPostFeedArg,
-						postIdObjsInclude: [getIdStrAsIdObj(postIdStr)],
+						postIdObjsInclude: [getIdStrAsIdObj(postIdSlug)],
 					},
 					useLocalDb,
 				);
@@ -358,8 +359,9 @@
 	let scrolledToSpotId = $state(false);
 	$effect(() => {
 		// if (postIdStr && !scrolledToSpotId && postObjFeed?.length) {
-		if (postIdStr && !scrolledToSpotId) {
-			setTimeout(() => scrollToHighlight(postIdStr!), 0);
+		if (postObjFeed.length && postIdSlug && !scrolledToSpotId) {
+			scrolledToSpotId = true;
+			setTimeout(() => scrollToHighlight(postIdSlug), 0);
 		}
 	});
 
@@ -407,7 +409,7 @@
 				<IconListSearch class="shrink-0 w-6 ml-0.5 mr-2" />
 				<p class="whitespace-pre font-bold text-xl overflow-scroll">{qSearchParam}</p>
 			</div>
-		{:else if postIdStr}
+		{:else if postIdSlug}
 			<div class="h-9 fx">
 				<IconMessage2 class="shrink-0 w-6 ml-0.5 mr-2" />
 				<p class="font-bold text-xl">{m.post()}</p>
@@ -449,7 +451,7 @@
 			</div>
 		{/if}
 		<div
-			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn || isMergedView || callerIsOwner ? 'h-8' : 'h-9'} ${postIdStr ? 'hidden' : ''}`}
+			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn || isMergedView || callerIsOwner ? 'h-8' : 'h-9'} ${postIdSlug ? 'hidden' : ''}`}
 		>
 			<a
 				href={makeParams('flat', sortedBy)}
@@ -504,13 +506,13 @@
 			<input type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" /> -->
 		</div>
 		{#each postObjFeed as post, i (getIdStr(post))}
-			{#if postIdStr && i === 1}
+			{#if postIdSlug && i === 1}
 				<div class="h-9 fx">
 					<IconLibrary class="shrink-0 w-6 ml-0.5 mr-2" />
 					<p class="font-bold text-xl">{m.citedIn()}</p>
 				</div>
 			{/if}
-			<PostBlock {post} depth={0} nested={postIdStr ? !i : nested} />
+			<PostBlock {post} depth={0} nested={postIdSlug ? !i : nested} />
 		{/each}
 		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
@@ -528,7 +530,7 @@
 		{/if}
 		<div class="z-50 flex fixed left-18 xs:left-[var(--w-sidebar)] right-0 bottom-0">
 			<SearchBar />
-			{#if postIdStr}
+			{#if postIdSlug}
 				<a
 					href={`/__${urlInMs}`}
 					onclick={() => {

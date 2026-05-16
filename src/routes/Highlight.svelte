@@ -51,11 +51,7 @@
 
 {#if lineColor && overlayColor}
 	<div
-		{...p.noScrollId
-			? {} //
-			: p.main
-				? { id: 'hl-' + p.postIdStr }
-				: {}}
+		{...!p.noScrollId && p.main ? { id: 'hl-' + p.postIdStr } : {}}
 		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-40 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}
 	>
 		<div class="w-0.5 h-full {lineColor}"></div>

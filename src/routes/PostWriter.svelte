@@ -49,7 +49,6 @@
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
 	let typedEmoji = $state('');
-	let showAllEmojis = $state(false); // TODO:
 
 	let writingToMyRxnEmojis = $derived(gs.writingTo?.myRxnEmojis || []);
 	let writingInMs = $derived((gs.writingTo || gs.writingEdit)?.in_ms || getUrlInMs()!);
@@ -250,7 +249,7 @@
 					: ''}
 		/>
 	</div>
-	<div class={`flex-1 relative flex flex-col ${showAllEmojis ? 'hidden' : ''}`}>
+	<div class="flex-1 relative flex flex-col">
 		<div
 			tabindex="-1"
 			class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${gs.writerTags.length ? '' : 'hidden'}`}
@@ -435,9 +434,7 @@
 			</div>
 		</div>
 	</div>
-	<div
-		class={`overflow-scroll w-full flex bg-bg4 ${gs.writingTo && canReact ? '' : 'hidden'} ${showAllEmojis ? 'flex-1 flex-wrap content-start' : 'h-8'}`}
-	>
+	<div class={`h-8 overflow-scroll w-full flex bg-bg4 ${gs.writingTo && canReact ? '' : 'hidden'}`}>
 		<div class="h-8 min-w-8 -mr-8 xy">
 			<IconMoodPlus class="h-4.5 w-4.5" />
 		</div>
