@@ -21,14 +21,14 @@ export let makeNewSpaceRows = (a: {
 			in_ms: a.spaceMs,
 			code: pc.id_memberCount_spaceDescription,
 			num: 1,
-			txt: a.spaceDescriptionTxt || '',
+			txt: a.spaceDescriptionTxt ?? '',
 		},
 		{
 			...id0,
 			ms: a.spaceMs,
 			in_ms: a.spaceMs,
 			code: pc.id__spacePinnedQuery,
-			txt: a.spacePinnedQueryTxt || '',
+			txt: a.spacePinnedQueryTxt ?? '',
 		},
 	];
 	if (a.spaceMs !== a.callerMs && a.spaceMs !== 1) {

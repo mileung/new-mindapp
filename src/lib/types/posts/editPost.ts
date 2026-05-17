@@ -87,7 +87,7 @@ export let _editPost = async (db: Database, post: Post) => {
 		},
 	];
 	let newPostTagStrs = post.history![newLastVersion]!.tags || [];
-	let newPostCoreStr = (post.history![newLastVersion]!.core || '').trim();
+	let newPostCoreStr = (post.history![newLastVersion]!.core ?? '').trim();
 	assertLt2Rows(currentPostCoreId__postId_versionRows);
 
 	let {

@@ -60,7 +60,7 @@ export let _createAccount = async (
 	);
 
 	throwIf(msByMs__accountEmailRows.length);
-	let signedInEmailRulesTxt = assertLt2Rows(id__signedInEmailRulesRows)?.txt || '';
+	let signedInEmailRulesTxt = assertLt2Rows(id__signedInEmailRulesRows)?.txt ?? '';
 	throwIf(
 		signedInEmailRulesTxt && //
 			!rulesAllowEmail(signedInEmailRulesTxt.split('\n'), input.email),

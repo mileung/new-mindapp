@@ -51,7 +51,7 @@
 	let typedEmoji = $state('');
 
 	let writingToMyRxnEmojis = $derived(gs.writingTo?.myRxnEmojis || []);
-	let writingInMs = $derived((gs.writingTo || gs.writingEdit)?.in_ms || getUrlInMs()!);
+	let writingInMs = $derived.by(() => (gs.writingTo || gs.writingEdit)?.in_ms ?? getUrlInMs()!);
 	let writingInSpaceName = $derived(msToSpaceNameTxt(writingInMs));
 	let writingInMsPermissionCodeNum = $derived(getSpaceContext(writingInMs)?.permissionCode.num);
 	let canReactAndPost = $derived(writingInMsPermissionCodeNum === permissionCodes.reactAndPost);
@@ -116,7 +116,7 @@
 			if (post.history !== null) {
 				let lastHistory = post.history[getLastVersion(post)!];
 				gs.writerTags = lastHistory?.tags || [];
-				gs.writerCore = lastHistory?.core || '';
+				gs.writerCore = lastHistory?.core ?? '';
 			}
 		}
 	});
@@ -202,7 +202,7 @@
 					let postIdStr = getIdStr(post);
 					getUrlInMs() !== post.in_ms
 						? goto(`/${postIdStr}`) //
-						: scrollToHighlight(postIdStr);
+						: scrollToHighlight(postIdStr, true);
 				}
 			}}
 		>
@@ -289,7 +289,7 @@
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
 			onpaste={(e) => {
-				let pastedText = e.clipboardData?.getData('text') || '';
+				let pastedText = e.clipboardData?.getData('text') ?? '';
 				let pastedTags = pastedText.split(/\r?\n/);
 				if (pastedTags.length > 1) {
 					gs.writerTags = gs.writerTags.concat(

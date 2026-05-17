@@ -63,7 +63,7 @@
 	let memberIsAdmin = $derived(membershipRoleCode?.num === roleCodes.admin);
 	let memberIsMod = $derived(membershipRoleCode?.num === roleCodes.mod);
 	let memberIsModOrAdmin = $derived(memberIsMod || memberIsAdmin);
-	let authorityOverMember = $derived(membershipRoleCode.num < (spaceContext?.roleCode?.num || 0));
+	let authorityOverMember = $derived(membershipRoleCode.num < (spaceContext?.roleCode?.num ?? 0));
 
 	let membershipFlair = $derived(p.membership.flair);
 	let roleText = $derived(

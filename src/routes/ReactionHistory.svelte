@@ -52,7 +52,7 @@
 				class="flex-1 h-8 pl-2 fx gap-1 truncate text-left"
 				onclick={() => {
 					let post = gs.showReactionHistory;
-					post && scrollToHighlight(getIdStr(post));
+					post && scrollToHighlight(getIdStr(post), true);
 				}}
 			>
 				<IconChartBarPopular class="w-5" />

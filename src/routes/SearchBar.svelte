@@ -16,7 +16,7 @@
 	let tagSuggestionsRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let unsaveTagXRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 
-	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
+	let searchVal = $state((() => page.url.searchParams.get('q') ?? '')());
 	let trimmedSearchVal = $derived(searchVal.trim());
 
 	let searchUrl = $derived(

@@ -133,7 +133,7 @@ export let _getSpaceDots = async (
 											: [
 													pf.num.notEq(input.memberCount),
 													pf.txt.notEq(input.description.txt),
-													pf.ms.notEq(input.description.ms || 0),
+													pf.ms.notEq(input.description.ms ?? 0),
 												]),
 									),
 									pf.txt.isNotNull,

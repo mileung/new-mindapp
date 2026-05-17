@@ -50,7 +50,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		at_ms: post.at_ms,
 		at_by_ms: post.at_by_ms,
 		at_in_ms: post.at_in_ms,
-		ms: post.ms || Date.now(),
+		ms: post.ms ?? Date.now(),
 		by_ms: post.by_ms,
 		in_ms: post.in_ms,
 		code: pc.postId__parentPostId_lastVersion,
@@ -86,7 +86,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		partsToInsert.push({
 			...id0,
 			...atPostIdObj,
-			ms: layer.ms || mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms,
+			ms: layer.ms ?? mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms,
 			code:
 				layer.tags === null
 					? isLastVersion

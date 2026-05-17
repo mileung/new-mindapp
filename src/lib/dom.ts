@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { goto } from '$app/navigation';
 import { m } from './paraglide/messages';
 
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
@@ -6,7 +7,7 @@ export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.acti
 export let getPostWriterHeight = () =>
 	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
 
-export let scrollToHighlight = (id: string) => {
+export let scrollToHighlight = (id: string, goToIdIfHlDne = false) => {
 	let hlContainer =
 		document.querySelector('.hlc-' + id) || //
 		document.querySelector('.flat-at-hlc-' + id) ||
@@ -15,18 +16,18 @@ export let scrollToHighlight = (id: string) => {
 		document.querySelector('#hl-' + id) || //
 		document.querySelector('.hl-' + id);
 	if (hlContainer && hl) {
-		let { top: hlcTop } = hlContainer.getBoundingClientRect();
-		let { height: hlHeight } = hl.getBoundingClientRect();
 		let top =
 			window.scrollY -
-			(window.innerHeight - hlcTop) +
-			hlHeight + //
+			(window.innerHeight - hlContainer.getBoundingClientRect().top) +
+			hl.getBoundingClientRect().height + //
 			getPostWriterHeight();
 		// console.log('top:', top);
 		window.scrollTo({
 			top,
 			behavior: 'smooth',
 		});
+	} else if (goToIdIfHlDne) {
+		goto(`/${id}`);
 	} else console.warn('no id to scroll to');
 };
 

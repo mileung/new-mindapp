@@ -67,7 +67,7 @@
 
 	let msLabel = $derived.by(() => {
 		if (p.version === null) return formatMs(p.post.ms);
-		let str = formatMs(versionMs || 0, p.version < p.lastVersion! ? 'ms' : '');
+		let str = formatMs(versionMs ?? 0, p.version < p.lastVersion! ? 'ms' : '');
 		let edited = Object.keys(p.post.history || {}).some((k) => +k > 1);
 		return `${str}${edited ? '*' : ''}`;
 	});
@@ -81,7 +81,7 @@
 
 	let copyClicked = $state(false);
 	let handleCopyClick = () => {
-		copyToClipboard(p.version === null ? '' : p.post.history?.[p.version]?.core || '');
+		copyToClipboard(p.version === null ? '' : (p.post.history?.[p.version]?.core ?? ''));
 		copyClicked = true;
 		setTimeout(() => (copyClicked = false), 1000);
 	};

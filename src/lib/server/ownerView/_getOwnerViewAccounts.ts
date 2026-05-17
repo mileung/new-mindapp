@@ -77,7 +77,7 @@ export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
 	}
 
 	return {
-		signedInEmailRulesTxt: assertLt2Rows(id__signedInEmailRulesRows)?.txt || '',
+		signedInEmailRulesTxt: assertLt2Rows(id__signedInEmailRulesRows)?.txt ?? '',
 		accounts: msByMs__accountEmailRows.map((r) => ({
 			emailTxt: r.txt!,
 			nameTxt: msToAccountNameTxtMap[r.by_ms],

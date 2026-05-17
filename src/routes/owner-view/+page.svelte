@@ -39,7 +39,7 @@
 	import SpaceIcon from '../SpaceIcon.svelte';
 
 	let editing_signedInEmailRulesTxt = $state(false);
-	let draft_signedInEmailRulesTxt = $state(gs.ownerView.signedInEmailRulesTxt || '');
+	let draft_signedInEmailRulesTxt = $state(gs.ownerView.signedInEmailRulesTxt ?? '');
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let callerIsOwner = $derived(getCallerIsOwner());
 	$effect(() => {
@@ -177,7 +177,7 @@
 								<button
 									class="w-8 xy hover:bg-bg3 text-fg2 hover:text-fg1"
 									onclick={() => {
-										draft_signedInEmailRulesTxt = gs.ownerView.signedInEmailRulesTxt || '';
+										draft_signedInEmailRulesTxt = gs.ownerView.signedInEmailRulesTxt ?? '';
 										editing_signedInEmailRulesTxt = false;
 									}}
 								>

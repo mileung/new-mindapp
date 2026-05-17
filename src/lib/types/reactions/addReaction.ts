@@ -102,7 +102,7 @@ export let _addReaction = async (
 				txt: input.emoji,
 			});
 
-	console.log('partsToInsert', JSON.stringify(partsToInsert, null, 2));
+	// console.log('partsToInsert', JSON.stringify(partsToInsert, null, 2));
 	await db.insert(pTable).values(partsToInsert);
 	return { ms };
 };

@@ -42,11 +42,11 @@
 		space?: Space;
 	} = $props();
 	let currentSettings = $derived({
-		isPublicNum: p.space?.isPublic?.num || 0,
-		nameTxt: (p.space || p.account)?.name?.txt || '',
-		bioOrDescriptionTxt: p.space?.description?.txt || p.account?.bio?.txt || '',
-		pinnedQueryTxt: p.space?.pinnedQuery?.txt || '',
-		newMemberPermissionCodeNum: p.space?.newMemberPermissionCode?.num || 0,
+		isPublicNum: p.space?.isPublic?.num ?? 0,
+		nameTxt: (p.space || p.account)?.name?.txt ?? '',
+		bioOrDescriptionTxt: p.space?.description?.txt ?? p.account?.bio?.txt ?? '',
+		pinnedQueryTxt: p.space?.pinnedQuery?.txt ?? '',
+		newMemberPermissionCodeNum: p.space?.newMemberPermissionCode?.num ?? 0,
 	});
 	let editing = $state(false);
 	let draftSettings = $state((() => deepClone(currentSettings))());

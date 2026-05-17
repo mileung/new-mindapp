@@ -13,7 +13,7 @@ export const load: LayoutServerLoad = async (event) => {
 	let thinTopOgText: undefined | string;
 	let boldBottomOgText: undefined | string;
 
-	let ua = event.request.headers.get('user-agent') || '';
+	let ua = event.request.headers.get('user-agent') ?? '';
 	let needsOG = /facebookexternalhit|Facebot|Twitterbot/.test(ua.slice(117));
 
 	if (needsOG) {

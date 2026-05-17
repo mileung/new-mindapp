@@ -60,7 +60,7 @@
 
 	let pinnedQueryTxtId = '';
 
-	let qSearchParam = $derived(page.url.searchParams.get('q') || '');
+	let qSearchParam = $derived(page.url.searchParams.get('q') ?? '');
 	let view = $derived<'flat' | 'nested'>(
 		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
 	);
@@ -119,7 +119,7 @@
 	let topLvlPostIdStrs = $derived(feed?.topLvlPostIdStrs || []);
 	let endReached = $derived(feed?.endReached);
 	let postAtBumpedPostIdObjsExclude = $derived(feed?.postAtBumpedPostIdObjsExclude || []);
-	let error = $derived(feed?.error || '');
+	let error = $derived(feed?.error ?? '');
 	let useLocalDb = $derived(urlInMs === 0);
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
@@ -148,7 +148,7 @@
 				...(callerIsOwner
 					? []
 					: isMergedView
-						? (page.url.searchParams.get('in_ms') || '').split(',').map(Number)
+						? (page.url.searchParams.get('in_ms') ?? '').split(',').map(Number)
 						: useLocalDb
 							? []
 							: [urlInMs]),
@@ -356,12 +356,11 @@
 		topLvlPostIdStrs.map((strPostId) => gs.idToPostMap[strPostId || 0]).filter((t) => !!t),
 	);
 
-	let scrolledToSpotId = $state(false);
+	let lastScrolledToPostId = $state('');
 	$effect(() => {
-		// if (postIdStr && !scrolledToSpotId && postObjFeed?.length) {
-		if (postObjFeed.length && postIdSlug && !scrolledToSpotId) {
-			scrolledToSpotId = true;
-			setTimeout(() => scrollToHighlight(postIdSlug), 0);
+		if (postObjFeed.length && postIdSlug && lastScrolledToPostId !== postIdSlug) {
+			lastScrolledToPostId = postIdSlug;
+			scrollToHighlight(postIdSlug);
 		}
 	});
 

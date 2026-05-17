@@ -20,7 +20,7 @@
 	let otpMs = $state(0);
 	let name = $state('');
 	let pin = $state('');
-	let email = $state(page.state.prefilledEmail || '');
+	let email = $state(page.state.prefilledEmail ?? '');
 	let oldPassword = $state('');
 	let password = $state('');
 	let reenteredPw = $state('');
@@ -35,7 +35,7 @@
 	});
 
 	$effect(() => {
-		email = page.state.prefilledEmail || '';
+		email = page.state.prefilledEmail ?? '';
 	});
 
 	let onAccountAuth = (account?: MyAccount) => {

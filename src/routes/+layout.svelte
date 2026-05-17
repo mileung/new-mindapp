@@ -98,9 +98,11 @@
 
 	let urlInMs = $derived(getUrlInMs());
 	$effect(() => {
-		urlInMs !== undefined &&
-			gs.lastSeenInMs !== urlInMs &&
+		if (urlInMs !== undefined && gs.lastSeenInMs !== urlInMs) {
 			updateLocalCache((lc) => ({ ...lc, lastSeenInMs: urlInMs }));
+			if (gs.writingTo || gs.writingEdit) gs.writingNew = true;
+			gs.writingTo = gs.writingEdit = gs.showReactionHistory = null;
+		}
 	});
 
 	$effect(() => {
@@ -309,7 +311,7 @@
 											accentCode: spaceUpdate?.accentCode || sc.accentCode,
 										};
 									})
-									.sort((a, b) => (b.accentCode.ms || 0) - (a.accentCode.ms || 0)),
+									.sort((a, b) => (b.accentCode.ms ?? 0) - (a.accentCode.ms ?? 0)),
 							};
 						}
 
@@ -342,7 +344,7 @@
 		}
 	});
 
-	let searchVal = $state((() => page.url.searchParams.get('q') || '')());
+	let searchVal = $state((() => page.url.searchParams.get('q') ?? '')());
 	let title = $derived.by(() => {
 		if (urlInMs !== undefined) {
 			return msToSpaceNameTxt(urlInMs);
