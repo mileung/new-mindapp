@@ -3,17 +3,10 @@ import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
 import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
 import { type Database } from '../../local-db';
-import {
-	assert1Row,
-	assertLt2Rows,
-	channelPartsByCode,
-	hasParent,
-	makePartsUniqueById,
-	type PartInsert,
-} from '../parts';
+import { assert1Row, channelPartsByCode, makePartsUniqueById, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getAtIdObj, getAtIdObjAsIdObj, getFullIdObj, type FullIdObj } from '../parts/partIds';
+import { type FullIdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let deletePost = async (
@@ -37,16 +30,9 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 		pf.code.eq(pc.postId__parentPostId_lastVersion),
 		pf.txt.isNull,
 	);
-	let postId__bumpedRootIdRowsFilter = and(
-		pf.id(fullPostIdObj),
-		pf.code.eq(pc.postId__bumpedRootId),
-		pf.num.isNull,
-		pf.txt.isNull,
-	);
 
 	let {
 		[pc.postId__parentPostId_lastVersion]: mainPIdWNumAsLastVersionAtPPIdRows = [],
-		[pc.postId__bumpedRootId]: postId__bumpedRootIdRows = [],
 		[pc.currentPostTagId__postId_version]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
 		[pc.exPostTagId__postId_version]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
 		[pc.currentPostCoreId__postId_version]: currentPostCoreId__postId_versionRowsToDelete = [],
@@ -58,7 +44,6 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			.where(
 				or(
 					mainPIdWNumAsLastVersionAtPPIdRowsFilter,
-					postId__bumpedRootIdRowsFilter,
 					and(
 						pf.idAsAtId(fullPostIdObj),
 						pf.ms.gt0,
@@ -109,7 +94,6 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 			.limit(1)
 	).length;
 
-	let postId__bumpedRootIdRow = assertLt2Rows(postId__bumpedRootIdRows);
 	let deleteFilters: (undefined | SQL)[] = [];
 
 	if (deleteAllVersions) {
@@ -143,34 +127,6 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 				pf.num.gte0,
 			),
 		);
-		if (postId__bumpedRootIdRow) {
-			deleteFilters.push(postId__bumpedRootIdRowsFilter);
-			let previousChildPostIdAtBumpRootIdObj = (
-				await db
-					.select()
-					.from(pTable)
-					.where(
-						and(
-							pf.atId(postId__bumpedRootIdRow),
-							pf.notId(fullPostIdObj),
-							pf.code.eq(pc.childPostId__rootId_depth),
-							pf.num.gte0,
-						),
-					)
-					.orderBy(pf.ms.desc)
-					.limit(1)
-			)[0];
-			hasParent(fullPostIdObj) &&
-				partsToInsert.push({
-					...(previousChildPostIdAtBumpRootIdObj
-						? getFullIdObj(previousChildPostIdAtBumpRootIdObj)
-						: {
-								...getAtIdObj(postId__bumpedRootIdRow),
-								...getAtIdObjAsIdObj(postId__bumpedRootIdRow),
-							}),
-					code: pc.postId__bumpedRootId,
-				});
-		}
 	} else {
 		// TODO: delete specific version
 		throw new Error(`cannot delete specific version yet?`);

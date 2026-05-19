@@ -43,7 +43,6 @@
 		IconListSearch,
 		IconListTree,
 		IconMessage2,
-		IconMessage2Up,
 		IconPencilPlus,
 		IconPinned,
 		IconSquareFilled,
@@ -62,18 +61,10 @@
 
 	let qSearchParam = $derived(page.url.searchParams.get('q') ?? '');
 	let view = $derived<'flat' | 'nested'>(
-		page.url.searchParams.get('flat') !== null ? 'flat' : 'nested',
+		page.url.searchParams.get('nested') !== null ? 'nested' : 'flat',
 	);
 	let nested = $derived(view === 'nested');
-	let sortedBy = $derived<'bumped' | 'new' | 'old'>(
-		page.url.searchParams.get('new') !== null
-			? 'new'
-			: page.url.searchParams.get('old') !== null
-				? 'old'
-				: qSearchParam
-					? 'new'
-					: 'bumped',
-	);
+	let sortedBy = $derived<'new' | 'old'>(page.url.searchParams.get('old') !== null ? 'old' : 'new');
 
 	let postIdSlug = $derived.by(() => {
 		let { idSlug } = page.params;
@@ -118,7 +109,6 @@
 	let feed = $derived(gs.urlToPostFeedMap[identifier]);
 	let topLvlPostIdStrs = $derived(feed?.topLvlPostIdStrs || []);
 	let endReached = $derived(feed?.endReached);
-	let postAtBumpedPostIdObjsExclude = $derived(feed?.postAtBumpedPostIdObjsExclude || []);
 	let error = $derived(feed?.error ?? '');
 	let useLocalDb = $derived(urlInMs === 0);
 
@@ -159,7 +149,6 @@
 		let getPostFeedArg: GetPostFeedArg = {
 			view,
 			sortedBy,
-			postAtBumpedPostIdObjsExclude,
 			msBefore: undefined,
 			msAfter: undefined,
 			byMssExclude: [],
@@ -186,26 +175,19 @@
 				);
 			} else {
 				if (lastTopLvlPostIdObj) {
-					if (sortedBy === 'bumped') {
-						let lastPostAtBumpedPostIdObjsExclude = postAtBumpedPostIdObjsExclude.slice(-1)[0];
-						if (lastPostAtBumpedPostIdObjsExclude) {
-							getPostFeedArg.msBefore = lastPostAtBumpedPostIdObjsExclude.ms + 1;
-						}
-					} else {
-						if (sortedBy === 'new') {
-							getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
-						} else if (sortedBy === 'old') {
-							getPostFeedArg.msAfter = lastTopLvlPostIdObj.ms - 1;
-						}
-						let lastTopLvlPostIdObjsWithSameMs: IdObj[] = [lastTopLvlPostIdObj];
-						for (let i = topLvlPostIdStrs.length - 2; i >= 0; i--) {
-							let idObj = getIdStrAsIdObj((topLvlPostIdStrs as string[])[i]);
-							if (idObj.ms === lastTopLvlPostIdObj!.ms) {
-								lastTopLvlPostIdObjsWithSameMs.push(idObj);
-							} else break;
-						}
-						getPostFeedArg.postIdObjsExclude = [...lastTopLvlPostIdObjsWithSameMs];
+					if (sortedBy === 'new') {
+						getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
+					} else if (sortedBy === 'old') {
+						getPostFeedArg.msAfter = lastTopLvlPostIdObj.ms - 1;
 					}
+					let lastTopLvlPostIdObjsWithSameMs: IdObj[] = [lastTopLvlPostIdObj];
+					for (let i = topLvlPostIdStrs.length - 2; i >= 0; i--) {
+						let idObj = getIdStrAsIdObj((topLvlPostIdStrs as string[])[i]);
+						if (idObj.ms === lastTopLvlPostIdObj!.ms) {
+							lastTopLvlPostIdObjsWithSameMs.push(idObj);
+						} else break;
+					}
+					getPostFeedArg.postIdObjsExclude = [...lastTopLvlPostIdObjsWithSameMs];
 				}
 				postFeed = await getPostFeed(getPostFeedArg, useLocalDb);
 				// console.log('postFeed:', postFeed);
@@ -243,7 +225,6 @@
 				[identifier]: {
 					endReached,
 					topLvlPostIdStrs: [...new Set([...topLvlPostIdStrs, ...newTopLvlPostIdStrs])],
-					postAtBumpedPostIdObjsExclude: postFeed.postAtBumpedPostIdObjsExclude,
 				},
 			};
 		} catch (error) {
@@ -323,32 +304,27 @@
 			gs.idToPostMap[atPostId!]!.subIds = gs.idToPostMap[atPostId!]!.subIds || [];
 			nested && gs.idToPostMap[atPostId!]!.subIds!.unshift(strPostId);
 		}
-		if (gs.writingNew && (sortedBy === 'bumped' || sortedBy === 'new')) {
+		if (gs.writingNew && sortedBy === 'new') {
 			topLvlPostIdStrs = [strPostId, ...topLvlPostIdStrs];
 		}
 		if (gs.writingNew || gs.writingTo) {
 			viewPostToastId = strPostId;
 			setTimeout(() => (viewPostToastId = ''), 3000);
 		}
-		// TODO add new posts to all feeds applicable (cited, bumped, new, etc.)
+		// TODO add new posts to all feeds applicable (merged, new, etc.)
 		resetBottomOverlay();
 	};
 
-	let makeParams = (newView: 'nested' | 'flat', newSortedBy: 'bumped' | 'new' | 'old') => {
+	let makeParams = (newView: 'flat' | 'nested', newSortedBy: 'new' | 'old') => {
 		return setSearchParams({
 			...{
-				nested: null,
 				flat: null,
-				bumped: null,
+				nested: null,
 				new: null,
 				old: null,
 			},
-			...(newView === 'nested' ? {} : { flat: undefined }),
-			...(newSortedBy === 'bumped'
-				? {}
-				: newSortedBy === 'new'
-					? { new: qSearchParam ? null : undefined }
-					: { old: undefined }),
+			...(newView === 'flat' ? {} : { nested: undefined }),
+			...(newSortedBy === 'new' ? {} : { old: undefined }),
 		});
 	};
 	// TODO: when clicking to a page with the feed already cached, it takes noticeably longer to render presumably cuz it's rendering the whole feed. Get rid of this delay without taking away the ability to command-f the whole page. Scroll height mustn't change so to maintain same scroll position when switching between space and post feeds.
@@ -367,7 +343,6 @@
 	onMount(() => {
 		let handler = (e: KeyboardEvent) => {
 			if (!textInputFocused()) {
-				// TODO: press b to sort feed by bumped
 				// TODO: press n to sort feed by new
 				// TODO: press o to sort feed by old
 				// TODO: press f to sort feed by first
@@ -488,16 +463,6 @@
 			>
 				<IconArchive stroke={2.5} class="h-4" />{m.old()}
 			</a>
-			{#if !qSearchParam}
-				<a
-					href={makeParams(view, 'bumped')}
-					class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'bumped' ? 'text-fg1' : ''}`}
-				>
-					<IconMessage2Up stroke={2.5} class="h-4" />
-					{m.bumped()}
-				</a>
-			{/if}
-
 			<!-- <button
 				class="ml-auto fx pr-1.5 hover:bg-bg4 hover:text-fg1"
 				onclick={() => {

@@ -84,10 +84,8 @@ export let pc = uniqueMapVals({
 	acceptMsByMs__inviteId: 71,
 	// TODO: acceptMs_ByMs_LastWriteMsIdAtInviteId: 71,
 
-	postId__bumpedRootId: 80,
 	// lastSpaceViewId: 81,
 	// lastSpacePostId: 82,
-	// TODO: tagIdAtBumpedRootIdWithNumAsMs: 83,
 	// lastSpacePostMsAtLastSpaceViewId: 81,
 
 	id__signedInEmailRules: 90,

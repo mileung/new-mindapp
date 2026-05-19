@@ -18,7 +18,6 @@ import {
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import {
-	FullIdObjSchema,
 	getAtIdObjAsIdObj,
 	getAtIdStr,
 	getFullIdObj,
@@ -36,9 +35,8 @@ export let postsPerLoad = 15;
 export let bracketRegex = /\[([^\[\]]+)]/g;
 
 export let GetPostFeedArgSchema = ParsedSearchSchema.extend({
-	view: z.enum(['nested', 'flat']),
-	sortedBy: z.enum(['bumped', 'new', 'old']),
-	postAtBumpedPostIdObjsExclude: z.array(FullIdObjSchema),
+	view: z.enum(['flat', 'nested']),
+	sortedBy: z.enum(['new', 'old']),
 });
 
 export type GetPostFeedArg = z.infer<typeof GetPostFeedArgSchema>;
@@ -61,7 +59,6 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 		// throwIf(input.callerMs && (!c.signedIn ));
 	}
 
-	let bumpedFirst = q.sortedBy === 'bumped';
 	let newFirst = q.sortedBy === 'new';
 	let topLvlPostIdStrs: string[] = [];
 	let postsToFetchByIdObjs: IdObj[] = [];
@@ -117,81 +114,31 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 			.limit(postsPerLoad);
 	}
 
-	let postAtBumpedPostIdObjsExclude: FullIdObj[] = [];
-	if (bumpedFirst) {
-		let postId__bumpedRootIdRows = await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					pf.at_ms.gt0,
-					pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER),
-					...byMsInMsFilters,
-					...q.postAtBumpedPostIdObjsExclude.flatMap((fullIdObj) => [
-						pf.notAtId(fullIdObj),
-						pf.notId(fullIdObj),
-					]),
-					pf.code.eq(pc.postId__bumpedRootId),
-					pf.num.isNull,
-					pf.txt.isNull,
-				),
-			)
-			.orderBy(pf.ms.desc)
-			.limit(postsPerLoad);
-
-		topLvlIdObjs = postId__bumpedRootIdRows.map((aio) => ({ ...id0, ...getAtIdObjAsIdObj(aio) }));
-
-		let lastPostIdAtBumpedRootIdObj = postId__bumpedRootIdRows.slice(-1)[0];
-		for (let i = postId__bumpedRootIdRows.length - 1; i >= 0; i--) {
-			let postIdObj = postId__bumpedRootIdRows[i];
-			if (postIdObj.ms === lastPostIdAtBumpedRootIdObj!.ms) {
-				postAtBumpedPostIdObjsExclude.push(getFullIdObj(postIdObj));
-			} else break;
-		}
-	}
-
 	if (q.postIdObjsInclude.length) {
-		// TODO: Could show all the other public spaces the included posts were cited in
-		// or just spaces the caller is a member of, but this may be a privacy concern like maybe
-		// you cited something from global in your personal space. Probably just better
-		// to only show posts that cite the included posts from the same space.
-
 		let {
 			[pc.postId__parentPostId_lastVersion]: postId__parentPostId_lastVersionRows = [],
 			[pc.childPostId__rootId_depth]: childPostId__rootId_depthRows = [],
-			[pc.postId__citedPostId]: postId__citedPostIdRows = [],
 		} = channelPartsByCode(
 			await db
 				.select()
 				.from(pTable)
 				.where(
-					or(
-						and(
-							or(...q.postIdObjsInclude.map((pio) => pf.id(pio))),
-							...byMsInMsFilters,
-							or(
-								and(
-									pf.noAtId, //
-									pf.code.eq(pc.postId__parentPostId_lastVersion),
-								),
-								pf.code.eq(pc.childPostId__rootId_depth),
+					and(
+						or(...q.postIdObjsInclude.map((pio) => pf.id(pio))),
+						...byMsInMsFilters,
+						or(
+							and(
+								pf.noAtId, //
+								pf.code.eq(pc.postId__parentPostId_lastVersion),
 							),
-							pf.num.gte0,
-							pf.txt.isNull,
+							pf.code.eq(pc.childPostId__rootId_depth),
 						),
-						and(
-							or(...q.postIdObjsInclude.map((pio) => pf.idAsAtId(pio))),
-							pf.ms.gt0,
-							...byMsInMsFilters, // TODO: Option to show posts from outside spaces that cite the highlighted post?
-							pf.code.eq(pc.postId__citedPostId),
-							pf.num.isNull,
-							pf.txt.isNull,
-						),
+						pf.num.gte0,
+						pf.txt.isNull,
 					),
 				)
-				.orderBy(pf.ms.desc),
-			// TODO: paginate postId__citedPostIdRows and q.postIdObjsInclude
-			// .limit(postsPerLoad),
+				.orderBy(pf.ms.desc)
+				.limit(1),
 		);
 
 		let rootIdObjs = [
@@ -201,73 +148,44 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 			...id0,
 			...(idObj.code === pc.childPostId__rootId_depth ? getAtIdObjAsIdObj(idObj) : getIdObj(idObj)),
 		}));
-		let {
-			[pc.postId__parentPostId_lastVersion]: citingPostIdWNumAsLastVersionAtPPostId = [],
-			[pc.childPostId__rootId_depth]: descendentPostIdRows = [],
-		} = channelPartsByCode(
-			rootIdObjs.length
-				? await db
-						.select()
-						.from(pTable)
-						.where(
-							or(
-								and(
-									or(...postId__citedPostIdRows.map((pio) => pf.id(pio))),
-									...byMsInMsFilters,
-									pf.code.eq(pc.postId__parentPostId_lastVersion),
-									pf.num.gte0,
-									pf.txt.isNull,
-								),
-								and(
-									or(...rootIdObjs.map((pio) => pf.idAsAtId(pio))),
-									...byMsInMsFilters,
-									pf.code.eq(pc.childPostId__rootId_depth),
-									pf.num.gte0,
-									pf.txt.isNull,
-								),
-							),
-						)
-				: [],
-		);
 
-		postsToFetchByIdObjs = [
-			...rootIdObjs,
-			...descendentPostIdRows,
-			...postId__citedPostIdRows,
-			...citingPostIdWNumAsLastVersionAtPPostId.map((pi) => getAtIdObjAsIdObj(pi)),
-		];
-
-		topLvlIdObjs = [
-			...rootIdObjs,
-			...postId__citedPostIdRows,
-			// TODO: idk if I should do this. This may interfere with paginating cited in posts
-			// Could just have the frontend not render cited in posts that are also a root descendent
-			// ...postId__citedPostIdRows.filter(
-			// 	(pio) => !descendentPostIdRows.find((io) => idObjMatchesIdObj(io, pio)),
-			// ),
-		];
+		let descendent_childPostId__rootId_depthRows = rootIdObjs.length
+			? await db
+					.select()
+					.from(pTable)
+					.where(
+						and(
+							or(...rootIdObjs.map((pio) => pf.idAsAtId(pio))),
+							...byMsInMsFilters,
+							pf.code.eq(pc.childPostId__rootId_depth),
+							pf.num.gte0,
+							pf.txt.isNull,
+						),
+					)
+			: [];
+		postsToFetchByIdObjs = [...rootIdObjs, ...descendent_childPostId__rootId_depthRows];
+		topLvlIdObjs = [...rootIdObjs];
 	} else if (q.view === 'nested') {
-		if (!bumpedFirst) {
-			topLvlIdObjs = await db
-				.select()
-				.from(pTable)
-				.where(
-					and(
-						pf.noAtId,
-						newFirst //
-							? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
-							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
-						// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
-						...byMsInMsFilters,
-						...excludePostIdsFilters,
-						pf.code.eq(pc.postId__parentPostId_lastVersion),
-						pf.num.gte0,
-						pf.txt.isNull,
-					),
-				)
-				.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
-				.limit(postsPerLoad);
-		}
+		topLvlIdObjs = await db
+			.select()
+			.from(pTable)
+			.where(
+				and(
+					pf.noAtId,
+					newFirst //
+						? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
+						: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
+					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
+					...byMsInMsFilters,
+					...excludePostIdsFilters,
+					pf.code.eq(pc.postId__parentPostId_lastVersion),
+					pf.num.gte0,
+					pf.txt.isNull,
+				),
+			)
+			.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
+			.limit(postsPerLoad);
+
 		postsToFetchByIdObjs = [
 			...topLvlIdObjs,
 			...(topLvlIdObjs.length
@@ -285,25 +203,24 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 				: []),
 		];
 	} else if (q.view === 'flat') {
-		if (!bumpedFirst) {
-			topLvlIdObjs = await db
-				.select()
-				.from(pTable)
-				.where(
-					and(
-						newFirst
-							? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
-							: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
-						...byMsInMsFilters,
-						...excludePostIdsFilters,
-						pf.code.eq(pc.postId__parentPostId_lastVersion),
-						pf.num.gte0,
-						pf.txt.isNull,
-					),
-				)
-				.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
-				.limit(postsPerLoad);
-		}
+		topLvlIdObjs = await db
+			.select()
+			.from(pTable)
+			.where(
+				and(
+					newFirst
+						? pf.ms.lt(q.msBefore || Number.MAX_SAFE_INTEGER)
+						: pf.ms.gt(q.msAfter || -Number.MAX_SAFE_INTEGER),
+					...byMsInMsFilters,
+					...excludePostIdsFilters,
+					pf.code.eq(pc.postId__parentPostId_lastVersion),
+					pf.num.gte0,
+					pf.txt.isNull,
+				),
+			)
+			.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
+			.limit(postsPerLoad);
+
 		postsToFetchByIdObjs = [
 			...topLvlIdObjs,
 			...topLvlIdObjs.flatMap((rio) => (hasParent(rio) ? [getAtIdObjAsIdObj(rio)] : [])),
@@ -585,7 +502,6 @@ export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLo
 	return {
 		topLvlPostIdStrs,
 		idToPostMap,
-		postAtBumpedPostIdObjsExclude,
 		msToAccountNameTxtMap,
 		msToSpaceNameTxtMap,
 		spaceMsToAccountMsToMembershipMap,

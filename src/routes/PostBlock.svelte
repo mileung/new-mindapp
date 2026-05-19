@@ -142,24 +142,26 @@
 			<div class={`z-10 bg-inherit ${p.cited ? '' : 'sticky top-0'}`}>
 				{#if open && !p.nested && !p.cited && atPost}
 					<div class="relative flex h-5 text-sm">
-						<a href={`/_${atPost.by_ms}_`} class="fx group hover:text-fg1">
-							<div
-								class={`pl-2 pr-0.5 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+						<div class="flex text-nowrap overflow-scroll">
+							<a href={`/_${atPost.by_ms}_`} class="fx group text-fg2 hover:text-fg1">
+								<div
+									class={`pl-2 pr-1 h-5 fx ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}
+								>
+									<!-- TODO: text color matches UserIcon? -->
+									<p
+										class={`font-bold ${gs.msToProfileMap[atPost.by_ms]?.name.txt ? '' : 'italic'}`}
+									>
+										{msToAccountNameTxt(atPost.by_ms)}
+									</p>
+								</div>
+							</a>
+							<a
+								href={`/${getIdStr(atPost)}`}
+								class={`fx ${atPostDeleted ? 'text-fg2 font-bold italic' : 'text-fg1 hover:text-fg3'} ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 							>
-								<!-- TODO: text color matches UserIcon? -->
-								<p class={`font-bold ${gs.msToProfileMap[atPost.by_ms]?.name.txt ? '' : 'italic'}`}>
-									{msToAccountNameTxt(atPost.by_ms)}
-								</p>
-							</div>
-						</a>
-						<a
-							href={`/${getIdStr(atPost)}`}
-							class={`fx hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-						>
-							<p class={`mr-1 ${atPostDeleted ? 'text-fg2 font-bold italic text-xs' : ''}`}>
-								: {atPostTxt}
-							</p>
-						</a>
+								{atPostTxt}
+							</a>
+						</div>
 						{#if !p.cited && !p.isEmbed}
 							<button
 								class="fx group hover:text-fg1"

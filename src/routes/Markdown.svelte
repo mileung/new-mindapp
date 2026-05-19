@@ -33,7 +33,7 @@
 	});
 </script>
 
-<p class="whitespace-pre-wrap font-medium break-words">
+<p class="whitespace-pre-wrap break-words">
 	{#each result as tag}
 		{#if typeof tag === 'string'}
 			{tag}

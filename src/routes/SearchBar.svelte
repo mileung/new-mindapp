@@ -21,9 +21,8 @@
 
 	let searchUrl = $derived(
 		setSearchParams({
-			nested: null,
 			flat: null,
-			bumped: null,
+			nested: null,
 			new: null,
 			old: null,
 			q: trimmedSearchVal,

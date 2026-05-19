@@ -65,18 +65,7 @@ export let _addPost = async (
 	let postIsChild = hasParent(post);
 	let postIdObj = getIdObj(main_postId__parentPostId_lastVersion);
 	let atPostIdObj = getIdObjAsAtIdObj(main_postId__parentPostId_lastVersion);
-	let partsToInsert: PartInsert[] = [
-		main_postId__parentPostId_lastVersion,
-		...(postIsChild
-			? []
-			: [
-					{
-						...atPostIdObj,
-						...postIdObj,
-						code: pc.postId__bumpedRootId,
-					},
-				]),
-	];
+	let partsToInsert: PartInsert[] = [main_postId__parentPostId_lastVersion];
 	let tagStrsFromAllLayers: string[] = [];
 	let coreStrsFromAllLayers: string[] = [];
 	let currentTagStrs: string[] = [];
@@ -202,27 +191,6 @@ export let _addPost = async (
 			txt: null,
 			num: (parentIsRoot ? 0 : parentRow.num!) + 1,
 		});
-		let bumpedRootRow = await db
-			.update(pTable)
-			.set({ ...postIdObj })
-			.where(
-				and(
-					pf.atId(atRootIdObj),
-					pf.ms.gt0,
-					pf.in_ms.eq(main_postId__parentPostId_lastVersion.in_ms),
-					pf.code.eq(pc.postId__bumpedRootId),
-					pf.num.isNull,
-					pf.txt.isNull,
-				),
-			)
-			.returning();
-		if (!bumpedRootRow?.length) {
-			partsToInsert.push({
-				...atRootIdObj,
-				...postIdObj,
-				code: pc.postId__bumpedRootId,
-			});
-		}
 	}
 
 	let tagTxtToRowMap = addNewTagOrCoreRows(

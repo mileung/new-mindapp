@@ -149,14 +149,14 @@
 			}}
 		>
 			{#if showAccountMenu}
-				<a href="/sign-in" class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5`}>
+				<a href="/sign-in" class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
 					{m.addAccount()}
 				</a>
 				{#each gs.accounts || [] as a, i (a.ms)}
 					<div class={`group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<button
-							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 font-medium flex-1 ${a.name ? '' : 'italic'}`}
+							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 flex-1 ${a.name ? '' : 'italic'}`}
 							onclick={() => {
 								if (a.signedIn || !a.ms) {
 									gs.urlToPostFeedMap = {};
@@ -208,7 +208,7 @@
 					<a
 						target="_blank"
 						href="https://chromewebstore.google.com/detail/mindapp/cjhokcciiimochdgkicpifkkhndegkep?authuser=0&hl=en"
-						class="flex-1 overflow-hidden h-12 fx pl-2 gap-2 font-medium leading-4.5"
+						class="flex-1 overflow-hidden h-12 fx pl-2 gap-2 leading-4.5"
 					>
 						<IconPuzzle class="shrink-0 w-6" />
 						<p class="text-nowrap overflow-scroll">{m.extension()}</p>
@@ -225,7 +225,7 @@
 				</div>
 				<a
 					href="/create-space"
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'bg-bg5' : ''}`}
+					class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/create-space' ? 'bg-bg5' : ''}`}
 				>
 					<IconSquarePlus2 class="shrink-0 w-6" />
 					<p class="text-nowrap overflow-scroll">{m.createSpace()}</p>
@@ -234,10 +234,7 @@
 					<div
 						class={`flex group/space ${highlightLastSeenInMs && spaceMs === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
 					>
-						<a
-							href={`/__${spaceMs}`}
-							class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden font-medium`}
-						>
+						<a href={`/__${spaceMs}`} class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden`}>
 							{#if spaceMs === gs.lastSeenInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.idSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
@@ -269,7 +266,7 @@
 				{#if gs.accounts}
 					<a
 						href="/merged-view"
-						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/merged-view' ? 'bg-bg5' : ''}`}
+						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/merged-view' ? 'bg-bg5' : ''}`}
 					>
 						<IconArrowMergeBoth class="shrink-0 w-6" />
 						<p class="text-nowrap overflow-scroll">{m.mergedView()}</p>
@@ -278,7 +275,7 @@
 				{#if callerIsOwner}
 					<a
 						href="/owner-view"
-						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/owner-view' ? 'bg-bg5' : ''}`}
+						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/owner-view' ? 'bg-bg5' : ''}`}
 					>
 						<IconView360 class="shrink-0 w-6" />
 						<p class="text-nowrap overflow-scroll">{m.ownerView()}</p>
@@ -290,7 +287,7 @@
 				{#if gs.accounts}
 					<a
 						href={`/_${gs.accounts[0].ms}_`}
-						class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
+						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
 					>
 						<IconUserSquare class="shrink-0 w-6" />
 						<p class="text-nowrap overflow-scroll">{m.profile()}</p>
@@ -298,14 +295,14 @@
 				{/if}
 				<a
 					href="/user-guide"
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
+					class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/user-guide' ? 'bg-bg5' : ''}`}
 				>
 					<IconBook2 class="shrink-0 w-6" />
 					<p class="text-nowrap overflow-scroll">{m.userGuide()}</p>
 				</a>
 				<a
 					href="/settings"
-					class={`fx shrink-0 h-10 px-2 gap-2 font-medium hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
+					class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === '/settings' ? 'bg-bg5' : ''}`}
 				>
 					<IconSettings class="shrink-0 w-6" />
 					<p class="text-nowrap overflow-scroll">{m.settings()}</p>

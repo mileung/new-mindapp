@@ -8,7 +8,7 @@ import { trpc } from './trpc/client';
 import { getDefaultAccount, type MyAccount, type PublicProfile } from './types/accounts';
 import { updateLocalCache } from './types/local-cache';
 import type { WhoObj, WhoWhereObj } from './types/parts';
-import { getUrlInMs, type FullIdObj } from './types/parts/partIds';
+import { getUrlInMs } from './types/parts/partIds';
 import type { Post } from './types/posts';
 import {
 	accentCodes,
@@ -112,7 +112,6 @@ class GlobalState {
 			| {
 					topLvlPostIdStrs?: string[];
 					endReached?: boolean;
-					postAtBumpedPostIdObjsExclude?: FullIdObj[];
 					error?: string;
 			  }
 		>

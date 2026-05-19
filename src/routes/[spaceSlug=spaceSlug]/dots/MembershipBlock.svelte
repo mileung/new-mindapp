@@ -221,7 +221,7 @@
 			<IconShieldFilled />
 		{/if}
 		<AccountIcon ms={accepteeMs} class="mx-1 h-6 w-6" />
-		<p class={`font-medium text-lg ${gs.msToProfileMap[accepteeMs]?.name.txt ? '' : 'italic'}`}>
+		<p class={`text-lg ${gs.msToProfileMap[accepteeMs]?.name.txt ? '' : 'italic'}`}>
 			{accepteeName}
 			{#if membershipFlair.txt}
 				<span class="text-fg2">
