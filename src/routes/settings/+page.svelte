@@ -254,7 +254,7 @@
 				console.time('adding posts');
 				for (let post of posts) {
 					try {
-						await addPost(post, true);
+						await addPost(post, true, false);
 					} catch (error) {
 						alertError(error);
 					}

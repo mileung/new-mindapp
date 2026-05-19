@@ -18,7 +18,12 @@
 
 	$effect(() => {
 		if (!page.url.searchParams.has('in_ms')) {
-			goto(`?in_ms=${cloudSpaceMss.join(',')}`);
+			goto(
+				setSearchParams({
+					in_ms: cloudSpaceMss.join(','),
+				}),
+				{ replaceState: true },
+			);
 		}
 	});
 
@@ -61,7 +66,7 @@
 			>
 				<SpaceIcon
 					ms={cloudSpaceMs}
-					class={`h-4 w-5 ${mergedMssSet.has(cloudSpaceMs) ? '' : 'grayscale-100 group-hover:grayscale-50'}`}
+					class={`h-4 w-5 ${mergedMssSet.has(cloudSpaceMs) ? '' : 'grayscale-100 group-hover:grayscale-75'}`}
 				/>{msToSpaceNameTxt(cloudSpaceMs)}
 			</a>
 		{/each}

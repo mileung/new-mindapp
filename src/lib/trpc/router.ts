@@ -444,7 +444,11 @@ export let router = t.router({
 			if (!ownerCalled) {
 				if (!callerMs || fullPostIdObj.by_ms !== callerMs) throw new Error('Invalid callerMs');
 			}
-			let c = await _getCallerContext(ctx, input, { signedIn: true, roleCode: !ownerCalled });
+			let c = await _getCallerContext(
+				ctx,
+				{ ...input, spaceMs: input.fullPostIdObj.in_ms },
+				{ signedIn: true, roleCode: !ownerCalled },
+			);
 			throwIf(!c.signedIn);
 			!ownerCalled && throwIf(!c.roleCode);
 			return _deletePost(tdb, fullPostIdObj, input.version);

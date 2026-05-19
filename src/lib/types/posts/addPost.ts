@@ -30,7 +30,7 @@ import {
 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let addPost = async (post: Post, useLocalDb?: boolean) => {
+export let addPost = async (post: Post, useLocalDb?: boolean, getIdToCitedPostMap = true) => {
 	let baseInput = await getWhoWhereObj(useLocalDb);
 	let parsedPost = PostSchema.safeParse(post);
 	if (!parsedPost.success) {
@@ -38,29 +38,35 @@ export let addPost = async (post: Post, useLocalDb?: boolean) => {
 		throw new Error(`Invalid post`);
 	}
 	return useLocalDb || !baseInput.spaceMs
-		? _addPost(await gsdb(), parsedPost.data)
+		? _addPost(await gsdb(), parsedPost.data, getIdToCitedPostMap, true)
 		: trpc().addPost.mutate({ ...baseInput, post: parsedPost.data });
 };
 
-export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = false) => {
+export let _addPost = async (
+	db: Database,
+	post: Post,
+	getIdToCitedPostMap = true,
+	allowPostMs = false,
+) => {
 	let lastVersion = getLastVersion(post);
 	let citedPostIds: string[] = [];
 	let idToCitedPostMap: Record<string, Post> = {};
-	let mainPostIdWithNumAsLastVersionAtParentPostIdObj: PartInsert = {
+	let ms = allowPostMs ? post.ms : Date.now();
+	let main_postId__parentPostId_lastVersion: PartInsert = {
 		at_ms: post.at_ms,
 		at_by_ms: post.at_by_ms,
 		at_in_ms: post.at_in_ms,
-		ms: post.ms ?? Date.now(),
+		ms,
 		by_ms: post.by_ms,
 		in_ms: post.in_ms,
 		code: pc.postId__parentPostId_lastVersion,
 		num: lastVersion,
 	};
 	let postIsChild = hasParent(post);
-	let postIdObj = getIdObj(mainPostIdWithNumAsLastVersionAtParentPostIdObj);
-	let atPostIdObj = getIdObjAsAtIdObj(mainPostIdWithNumAsLastVersionAtParentPostIdObj);
+	let postIdObj = getIdObj(main_postId__parentPostId_lastVersion);
+	let atPostIdObj = getIdObjAsAtIdObj(main_postId__parentPostId_lastVersion);
 	let partsToInsert: PartInsert[] = [
-		mainPostIdWithNumAsLastVersionAtParentPostIdObj,
+		main_postId__parentPostId_lastVersion,
 		...(postIsChild
 			? []
 			: [
@@ -86,7 +92,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		partsToInsert.push({
 			...id0,
 			...atPostIdObj,
-			ms: layer.ms ?? mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms,
+			ms: layer.ms ?? main_postId__parentPostId_lastVersion.ms,
 			code:
 				layer.tags === null
 					? isLastVersion
@@ -131,14 +137,14 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		...(postIsChild
 			? [
 					and(
-						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
+						pf.atIdAsId(main_postId__parentPostId_lastVersion),
 						pf.code.eq(pc.childPostId__rootId_depth),
 						pf.num.gte0,
 						pf.txt.isNull,
 					),
 					and(
 						pf.noAtId,
-						pf.atIdAsId(mainPostIdWithNumAsLastVersionAtParentPostIdObj),
+						pf.atIdAsId(main_postId__parentPostId_lastVersion),
 						pf.code.eq(pc.postId__parentPostId_lastVersion),
 						pf.num.gte0,
 						pf.txt.isNull,
@@ -148,7 +154,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		tagStrsFromAllLayers.length
 			? and(
 					pf.noAtId,
-					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
+					pf.in_ms.eq(main_postId__parentPostId_lastVersion.in_ms),
 					pf.code.eq(pc.tagId8_count_txt),
 					pf.num.gte0,
 					or(...tagStrsFromAllLayers.map((t) => pf.txt.eq(t))),
@@ -157,7 +163,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		coreStrsFromAllLayers.length
 			? and(
 					pf.noAtId,
-					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
+					pf.in_ms.eq(main_postId__parentPostId_lastVersion.in_ms),
 					pf.code.eq(pc.coreId8_count_txt),
 					pf.num.gte0,
 					or(...coreStrsFromAllLayers.map((t) => pf.txt.eq(t))),
@@ -186,7 +192,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 		]);
 		let parentIsRoot = !!postIdWNumAsLastVersionAtPPostIdRows.length;
 		let atRootIdObj: AtIdObj = getAtIdObj(
-			parentIsRoot ? mainPostIdWithNumAsLastVersionAtParentPostIdObj : parentRow,
+			parentIsRoot ? main_postId__parentPostId_lastVersion : parentRow,
 		);
 
 		partsToInsert.push({
@@ -203,7 +209,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 				and(
 					pf.atId(atRootIdObj),
 					pf.ms.gt0,
-					pf.in_ms.eq(mainPostIdWithNumAsLastVersionAtParentPostIdObj.in_ms),
+					pf.in_ms.eq(main_postId__parentPostId_lastVersion.in_ms),
 					pf.code.eq(pc.postId__bumpedRootId),
 					pf.num.isNull,
 					pf.txt.isNull,
@@ -220,14 +226,14 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 	}
 
 	let tagTxtToRowMap = addNewTagOrCoreRows(
-		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
+		main_postId__parentPostId_lastVersion, //
 		tagStrsFromAllLayers,
 		existingTagIdAndTxtWithNumAsCountRows,
 		true,
 		partsToInsert,
 	);
 	let coreTxtToRowMap = addNewTagOrCoreRows(
-		mainPostIdWithNumAsLastVersionAtParentPostIdObj, //
+		main_postId__parentPostId_lastVersion, //
 		coreStrsFromAllLayers,
 		existingCoreIdAndTxtWithNumAsCountRows,
 		false,
@@ -282,7 +288,7 @@ export let _addPost = async (db: Database, post: Post, getIdToCitedPostMap = fal
 
 	await db.insert(pTable).values(partsToInsert);
 
-	return { idToCitedPostMap, ms: mainPostIdWithNumAsLastVersionAtParentPostIdObj.ms };
+	return { idToCitedPostMap, ms };
 };
 
 let addNewTagOrCoreRows = (

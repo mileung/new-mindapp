@@ -51,8 +51,6 @@ export let getPostFeed = async (q: GetPostFeedArg, useLocalDb: boolean) => {
 		: trpc().getPostFeed.query(input);
 };
 
-// TODO: fetch cited posts right after submitting post
-
 export let _getPostFeed = async (db: Database, q: WhoObj & GetPostFeedArg, useLocalDb: boolean) => {
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));

@@ -412,6 +412,15 @@
 			<div class="h-9 fx">
 				<IconMessage2 class="shrink-0 w-6 ml-0.5 mr-2" />
 				<p class="font-bold text-xl">{m.post()}</p>
+				{#if postIdSlug && postObjFeed.length}
+					<a
+						href={`/merged-view?q=${postIdSlug}`}
+						class="fx px-2 text-xl text-fg2 flex-1 hover:bg-bg4 hover:text-fg1"
+					>
+						<IconLibrary class="shrink-0 w-6 ml-0.5 mr-2" />
+						{m.citedIn()}
+					</a>
+				{/if}
 			</div>
 		{:else if showViewOnly}
 			<div class="h-9 fx">
@@ -505,12 +514,6 @@
 			<input type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" /> -->
 		</div>
 		{#each postObjFeed as post, i (getIdStr(post))}
-			{#if postIdSlug && i === 1}
-				<div class="h-9 fx">
-					<IconLibrary class="shrink-0 w-6 ml-0.5 mr-2" />
-					<p class="font-bold text-xl">{m.citedIn()}</p>
-				</div>
-			{/if}
 			<PostBlock {post} depth={0} nested={postIdSlug ? !i : nested} />
 		{/each}
 		{#if viewable}
