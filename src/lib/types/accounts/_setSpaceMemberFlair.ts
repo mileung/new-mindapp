@@ -1,5 +1,5 @@
+import { throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { type WhoWhereObj } from '$lib/types/parts';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and } from 'drizzle-orm';

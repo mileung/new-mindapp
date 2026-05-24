@@ -19,6 +19,11 @@ export let ownerMsSet = (() => {
 		return new Set([]);
 	}
 })();
+export let inputIsOwner = (i: { callerMs: number }) => ownerMsSet.has(i.callerMs);
+export let throwIf = (truthy: any) => {
+	if (truthy) throw new Error(m.anErrorOccurred());
+};
+export let assertInputIsOwner = (i: { callerMs: number }) => throwIf(!inputIsOwner(i));
 
 export let isTouchScreen = browser ? 'ontouchstart' in window || !!navigator.maxTouchPoints : false;
 
@@ -230,8 +235,11 @@ export let getTagVal = (str: string) => {
 		let txtAfterEquals = str.slice(tagValEqualsIndex + 1);
 		if (!txtAfterEquals) return '';
 		let num = +txtAfterEquals;
-		// || /[^.0-9]/.test(txtAfterEquals)
 		return Number.isNaN(num) ? txtAfterEquals : num;
 	}
-	return null;
+};
+
+export let getTagNumVal = (str: string) => {
+	let val = getTagVal(str);
+	if (typeof val === 'number') return val;
 };

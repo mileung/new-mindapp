@@ -12,52 +12,18 @@ import { uniqueMapVals } from '$lib/js';
 export let pc = uniqueMapVals({
 	postId__parentPostId_lastVersion: 0,
 	childPostId__rootId_depth: 1,
-	postId__citedPostId: 2,
 	reactionId__postId__emoji: 3,
-	// TODO: Calendar events? Just make it a reserved tag?
 
-	ms__postId_currentVersion: 10,
-	ms__postId_exVersion: 11,
-	ms__postId_currentSoftDeletedVersion: 12,
-	ms__postId_exSoftDeletedVersion: 13,
+	postId__ms_sd_lastVersion__core: 10, // sd is a binary flag for softDeleted
+	postId__ms_sd_oldVersion__core: 11, // if sd=1, core should be null
 
-	currentPostTagId__postId_version: 20,
-	exPostTagId__postId_version: 21,
+	postTagId__postId_lastVersion: 20,
+	postTagId__postId_oldVersion: 21,
+	// postTagId__postMsByMs_lastVersion_val_val: 20,
+	// postTagId__postMsByMs_oldVersion_val_val: 21,
 
-	// TODO: numAtTag  AtPostId: 30,
-	// ot numAtTagId8: 30,
-	// basically attach the num field to a tag
-	// latitude:123.456789
-	// latitude
-	// 123.456789
-	// Tag Name=23423.234234
-	// TagTxtVal
-	// TagNumVal
-	// TagTxtSubVal
-	// TagNumSubVal
-	// TagSubTxt
-	// TagSubNum
-	// TagId8SubTxtAtPostIdWithInMsAsVersion
-	// TagId8SubNumAtPostIdWithInMsAsVersion
-
-	// Tag
-	// TagWithParsedNum
-	// year=2026
-	// month=1
-	// day=31
-	// hour=31
-	// TagWithParsedDate
-
-	currentPostCoreId__postId_version: 22,
-	exPostCoreId__postId_version: 23,
-
-	// prob won't do this:
-	// tagId
-	// tagTxtAtId
-	// tagCountAtSpaceId
-
-	tagId8_count_txt: 30,
-	coreId8_count_txt: 31,
+	idBy8__count_val_tag: 30, // val is only notNull if tag.endsWith(`=<number>`)
+	// idBy8__isKey_count__tag: 30,
 	postId_count_emoji: 32,
 
 	id_spaceIsPublic: 40,
@@ -67,7 +33,7 @@ export let pc = uniqueMapVals({
 	id_newMemberPermissionCode: 44,
 	id__accountMs_roleCode: 45,
 	id__accountMs_permissionCode: 46,
-	id__accountMs__flair: 47, // TODO: Indicate if the flair by_ms is a mod/admin
+	id__accountMs__flair: 47,
 	spacePriorityId__accountMs_accentCode: 48,
 
 	msByMs__accountEmail: 50,
@@ -82,7 +48,6 @@ export let pc = uniqueMapVals({
 
 	inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd: 70,
 	acceptMsByMs__inviteId: 71,
-	// TODO: acceptMs_ByMs_LastWriteMsIdAtInviteId: 71,
 
 	// lastSpaceViewId: 81,
 	// lastSpacePostId: 82,
@@ -90,5 +55,4 @@ export let pc = uniqueMapVals({
 
 	id__signedInEmailRules: 90,
 	banMsByMs__accountMs: 91,
-	// banIdAtSpaceId: 92,
 });

@@ -38,23 +38,16 @@ export let getGranularTxtProp = (part: PartInsert) => {
 };
 
 export let WhoObjSchema = z.strictObject({
-	callerMs: z.number().gte(0),
+	callerMs: z.number(),
 });
 export type WhoObj = z.infer<typeof WhoObjSchema>;
 
 export let WhoWhereObjSchema = WhoObjSchema.extend({
-	spaceMs: z.number().gte(0),
+	spaceMs: z.number(),
 });
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
 
-export let hasParent = (part: FullIdObj) => {
-	// Some partCodes repurpose part attributes but oh well
-	if (part.at_ms < 0) throw new Error(`invalid at_ms`);
-	if (part.at_by_ms < 0) throw new Error(`invalid at_by_ms`);
-	if (part.at_in_ms < 0) throw new Error(`invalid at_in_ms`);
-	return !!(part.at_ms || part.at_by_ms || part.at_in_ms);
-};
-
+export let hasParent = (part: FullIdObj) => !!(part.at_ms || part.at_by_ms || part.at_in_ms);
 export let assertLt2Rows = (parts: PartSelect[]) => {
 	if (parts.length > 1) throw new Error(`Multiple parts found`);
 	let row = parts[0];

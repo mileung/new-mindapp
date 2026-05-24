@@ -1,5 +1,5 @@
+import { throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { type WhoWhereObj } from '$lib/types/parts';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and } from 'drizzle-orm';
@@ -27,7 +27,7 @@ export let _setSpaceMemberPermission = async (
 	!ownerCalled &&
 		throwIf(
 			!updatee_id__accountMs_roleCode || //
-				callerRoleCodeNum! <= updatee_id__accountMs_roleCode.num,
+				callerRoleCodeNum! <= updatee_id__accountMs_roleCode.num!,
 		);
 
 	let ms = Date.now();

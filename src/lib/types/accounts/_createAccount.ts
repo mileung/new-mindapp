@@ -1,6 +1,5 @@
-import { ranStr, rulesAllowEmail } from '$lib/js';
+import { ranStr, rulesAllowEmail, throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { getValidAuthCookie, setCookie } from '$lib/server/sessions';
 import { type Context } from '$lib/trpc/context';
 import { MyAccountSchema, reduceMyAccountRows, type MyAccount } from '$lib/types/accounts';
@@ -76,7 +75,7 @@ export let _createAccount = async (
 						pf.noAtId,
 						pf.ms.gt0,
 						pf.in_ms.eq(1),
-						pf.code.eq(pc.tagId8_count_txt),
+						pf.code.eq(pc.idBy8__count_val_tag),
 						pf.num.gt0,
 						pf.txt.isNotNull,
 					),

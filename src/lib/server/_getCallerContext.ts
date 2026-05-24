@@ -1,5 +1,4 @@
 import { hasDefinedKeysBesidesMs, ranStr } from '$lib/js';
-import { tdb } from '$lib/server/db';
 import { getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
 import { hour, minute } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
@@ -26,10 +25,11 @@ import {
 	type MySpaceUpdate,
 } from '$lib/types/spaces';
 import { and, or } from 'drizzle-orm';
+import { tdb } from './db';
 
 // export let getCallerContext = async (get: GetCallerContextGetArg) => {
 // 	let baseInput = await getWhoWhereObj();
-// 	// TODO: use local db as a fallback when cloud db can't find a post
+// 	// TODO: use local tdb as a fallback when cloud tdb can't find a post
 // 	return baseInput.spaceMs
 // 		? trpc().getCallerContext.query({ ...baseInput, get })
 // 		: _getCallerContext(await gsdb(), null, baseInput, get);

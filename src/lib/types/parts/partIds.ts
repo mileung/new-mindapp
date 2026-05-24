@@ -21,11 +21,9 @@ export type FullIdObj = z.infer<typeof FullIdObjSchema>;
 
 export let idRegex = /^\d+_\d+_\d+$/;
 export let idsRegex = /(?<!\S)(\d+_\d+_\d+)(?!\S)/g;
-export let spaceSlugRegex = /^__\d+$/;
-export let profileSlugRegex = /^_\d+_$/;
 
-export let isSpaceSlug = (str = '') => spaceSlugRegex.test(str);
-export let isProfileSlug = (str = '') => profileSlugRegex.test(str);
+export let isSpaceSlug = (str = '') => /^__\d+$/.test(str);
+export let isProfileSlug = (str = '') => /^_\d+_$/.test(str);
 export let isIdStr = (str = '') => idRegex.test(str);
 export let getIdStr = (io: IdObj) => `${io.ms}_${io.by_ms}_${io.in_ms}`;
 export let getAtIdStr = (aio: AtIdObj) => `${aio.at_ms}_${aio.at_by_ms}_${aio.at_in_ms}`;

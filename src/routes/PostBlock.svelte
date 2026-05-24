@@ -3,6 +3,7 @@
 		getSpaceContext,
 		gs,
 		msToAccountNameTxt,
+		onCite,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 	import { getTagVal } from '$lib/js';
@@ -62,7 +63,7 @@
 	let tagObjs = $derived(
 		(layer?.tags || []).map((tag) => {
 			let val = getTagVal(tag);
-			if (val === null) return { tag };
+			if (val === undefined) return { tag };
 			let equalsIndex = tag.indexOf('=');
 			return { tag, val, key: tag.slice(0, equalsIndex), valStr: tag.slice(equalsIndex + 1) };
 		}),
@@ -166,13 +167,7 @@
 							<button
 								class="fx group hover:text-fg1"
 								onmousedown={(e) => e.preventDefault()}
-								onclick={() => {
-									gs.writingNew = true;
-									let lastVersion = getLastVersion(p.post);
-									let tags = p.post.history?.[lastVersion]?.tags || [];
-									gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
-									gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
-								}}
+								onclick={() => onCite(p.post)}
 							>
 								<div
 									class={`h-5 px-1.5 xy text-fg2 hover:text-fg1 ${evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}

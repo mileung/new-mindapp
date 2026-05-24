@@ -14,7 +14,7 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { getIdObj, getIdObjAsAtIdObj, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
-import { moveTagCoreOrRxnCountsBy1 } from '../posts';
+import { moveTagOrRxnCountsBy1 } from '../posts';
 
 export let addReaction = async (
 	input: WhoObj & {
@@ -35,9 +35,9 @@ export let _addReaction = async (
 		postIdObj: IdObj;
 		emoji: string;
 	},
-	useLocalDb: boolean,
+	dbIsLocal: boolean,
 ) => {
-	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
+	let rxnInMs = dbIsLocal ? 0 : input.postIdObj.in_ms;
 	let ms = Date.now();
 	let reactionId__postId__emojiObj: PartInsert = {
 		...getIdObjAsAtIdObj(input.postIdObj),
@@ -87,13 +87,7 @@ export let _addReaction = async (
 	if (reactionId__postId__emojiRows.length) throw new Error(`Already added this reaction`);
 	assert1Row(postId__parentPostId_lastVersionRows);
 	assertLt2Rows(postId_count_emojiRows)
-		? await moveTagCoreOrRxnCountsBy1(
-				db,
-				[],
-				[],
-				[{ ...input.postIdObj, emoji: input.emoji }],
-				true,
-			)
+		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], true)
 		: partsToInsert.push({
 				...id0,
 				...getIdObj(input.postIdObj),

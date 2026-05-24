@@ -18,21 +18,30 @@ export let pTable = sqliteTable(
 		txt: text('txt'),
 	},
 	(table) => [
-		index('post_feed_idx').on(
-			table.code,
-			table.in_ms,
-			table.ms,
-			table.by_ms,
-			table.at_in_ms,
-			table.at_ms,
-			table.at_by_ms,
-		),
+		index('post_feed_idx')
+			.on(
+				table.code,
+				table.in_ms,
+				table.ms,
+				table.by_ms,
+				table.at_in_ms,
+				table.at_ms,
+				table.at_by_ms,
+			)
+			.where(sql`${table.code} NOT IN (30, 50, 60, 61)`),
 		// Can't import pc for some reason when running bun run db:push
 		index('tag_idx')
 			.on(table.code, table.in_ms, table.txt)
-			.where(sql`${table.code} = 30`), // pc.tagId8_count_txt
+			// pc.tagId8_count_txt
+			.where(sql`${table.code} = 30`),
 		index('email_idx')
-			.on(table.code, table.txt)
-			.where(sql`${table.code} = 50`), // pc.msByMs__accountEmail
+			.on(table.code, table.txt, table.at_ms)
+			// pc.msByMs__accountEmail
+			.where(sql`${table.code} = 50`),
+		index('cookie_idx')
+			.on(table.code, table.at_ms, table.txt)
+			// pc.ms__accountMs__clientKey
+			// pc.ms_ExpiryMs__accountMs__sessionKey
+			.where(sql`${table.code} IN (60, 61)`),
 	],
 );

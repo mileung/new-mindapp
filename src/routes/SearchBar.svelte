@@ -8,7 +8,7 @@
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import { searchGuideArr } from '$lib/types/posts/parseSearchQuery';
-	import { IconSearch, IconX } from '@tabler/icons-svelte';
+	import { IconArrowsMaximize, IconSearch, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 
@@ -29,6 +29,7 @@
 		}),
 	);
 
+	let searchGuideExpanded = $state(false);
 	let searchIptFocused = $state(false);
 	let tagXFocused = $state(false);
 	let tagIndex = $state(-1);
@@ -80,7 +81,7 @@
 </script>
 
 <div
-	class={`bg-bg3 fixed max-h-38 flex flex-col ${hoveringTopDiv || searchIptFocused ? '' : 'hidden'} left-0 xs:left-[var(--w-sidebar)] right-0 bottom-9 text-nowrap overflow-scroll`}
+	class={`bg-bg3 fixed flex flex-col ${searchGuideExpanded ? 'max-h-[80vh]' : 'max-h-38'} ${searchGuideExpanded || hoveringTopDiv || searchIptFocused ? '' : 'hidden'} left-0 xs:left-[var(--w-sidebar)] right-0 bottom-9 text-nowrap overflow-scroll`}
 	onmouseenter={() => (hoveringTopDiv = true)}
 	onmouseleave={() => (hoveringTopDiv = false)}
 >
@@ -117,8 +118,22 @@
 			</div>
 		{/each}
 	{:else}
-		<div class="p-2 text-wrap space-y-2">
-			<p class="text-lg font-semibold">Search guide</p>
+		<div class="px-2 pb-2 text-wrap space-y-2">
+			<div class="-mr-2 fx justify-between sticky top-0 bg-bg3">
+				<p class="text-lg font-semibold">{m.searchGuide()}</p>
+				<button
+					class="xy h-8 w-8 hover:bg-bg6"
+					onclick={() => {
+						if (!(searchGuideExpanded = !searchGuideExpanded)) hoveringTopDiv = false;
+					}}
+				>
+					{#if searchGuideExpanded}
+						<IconX class="h-5 w-5" />
+					{:else}
+						<IconArrowsMaximize class="h-5 w-5" />
+					{/if}
+				</button>
+			</div>
 			{#each searchGuideArr as section}
 				<p class="font-semibold">{section.title}</p>
 				{#each section.syntax as [syntax, explanation]}

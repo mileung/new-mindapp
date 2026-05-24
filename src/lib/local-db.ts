@@ -34,7 +34,7 @@ export let initLocalDb = async () => {
 				at_in_ms,
 				at_ms,
 				at_by_ms
-			);
+			) WHERE code NOT IN (30, 50, 60, 61);
 
 			CREATE INDEX IF NOT EXISTS tag_idx ON parts(
 				code,

@@ -1,7 +1,7 @@
 import { dev } from '$app/environment';
+import { throwIf } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { week } from '$lib/time';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and, lt, or, sql } from 'drizzle-orm';
@@ -133,7 +133,6 @@ export let _checkInvite = async (
 					ms,
 					in_ms: 1,
 					code: pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd,
-					num: 0,
 					txt: input.slugEnd,
 				},
 				{

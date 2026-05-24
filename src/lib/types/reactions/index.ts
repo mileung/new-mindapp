@@ -8,12 +8,12 @@ export let EmojiStringSchema = z.string().refine(
 );
 export let ReactionSchema = z
 	.strictObject({
-		at_ms: z.number().gte(0),
-		at_by_ms: z.number().gte(0),
-		at_in_ms: z.number().gte(0),
-		ms: z.number().gte(0),
-		by_ms: z.number().gte(0),
-		in_ms: z.number().gte(0),
+		at_ms: z.number(),
+		at_by_ms: z.number(),
+		at_in_ms: z.number(),
+		ms: z.number(),
+		by_ms: z.number(),
+		in_ms: z.number(),
 		emoji: EmojiStringSchema,
 	})
 	.superRefine((data, ctx) => {

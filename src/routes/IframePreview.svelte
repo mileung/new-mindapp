@@ -18,7 +18,7 @@
 	let ytVidStartTime = $derived(ytVideoId ? p.uri.match(/[?&](?:t|start)=([0-9]+)/)?.[1] : 0);
 	let iframeDiv = $state<HTMLDivElement>();
 	$effect(() => {
-		open && iframeDiv?.scrollIntoView({ block: 'center' });
+		// open && iframeDiv?.scrollIntoView({ block: 'center' });
 	});
 </script>
 

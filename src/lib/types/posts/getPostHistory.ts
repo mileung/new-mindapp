@@ -19,8 +19,8 @@ export let getPostHistory = async (postIdObj: IdObj, version: number) => {
 // TODO: paginate history versions?
 export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
-		[pc.ms__postId_exVersion]: exVersionNumAndMsAtPostIdRows = [],
-		[pc.exPostTagId__postId_version]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.postId__ms_sd_oldVersion__core]: oldVersionNumAndMsAtPostIdRows = [],
+		[pc.postTagId__postId_oldVersion]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
 		[pc.exPostCoreId__postId_version]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
 		await db
@@ -31,8 +31,8 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 					pf.idAsAtId(postIdObj),
 					or(
 						...[
-							pc.ms__postId_exVersion,
-							pc.exPostTagId__postId_version,
+							pc.postId__ms_sd_oldVersion__core,
+							pc.postTagId__postId_oldVersion,
 							pc.exPostCoreId__postId_version,
 						].map((code) => pf.code.eq(code)),
 					),
@@ -41,11 +41,11 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 			),
 	);
 
-	let exVersionNumAndMsAtPostIdRow = assert1Row(exVersionNumAndMsAtPostIdRows);
+	let oldVersionNumAndMsAtPostIdRow = assert1Row(oldVersionNumAndMsAtPostIdRows);
 	assertLt2Rows(exPostCoreIdWithNumAsVersionAtPostIdRows);
 
 	let {
-		[pc.tagId8_count_txt]: tagIdAndTxtWithNumAsCountRows = [],
+		[pc.idBy8__count_val_tag]: tagIdAndTxtWithNumAsCountRows = [],
 		[pc.coreId8_count_txt]: coreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		exPostTagIdWithNumAsVersionAtPostIdRows.length ||
@@ -58,7 +58,7 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 							and(
 								pf.noAtId,
 								or(...exPostTagIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
-								pf.code.eq(pc.tagId8_count_txt),
+								pf.code.eq(pc.idBy8__count_val_tag),
 								pf.num.gte0,
 								pf.txt.isNotNull,
 							),
@@ -83,16 +83,16 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 	let tagIdToTxtMap: Record<string, string> = {};
 	let coreIdToTxtMap: Record<string, string> = {};
 	let history: Post['history'] = {
-		[version]: { ms: exVersionNumAndMsAtPostIdRow.ms, tags: [], core: '' },
+		[version]: { ms: oldVersionNumAndMsAtPostIdRow.ms, tags: [], core: '' },
 	};
 
 	for (let i = 0; i < parts.length; i++) {
 		let part = parts[i];
-		if (part.code === pc.exPostTagId__postId_version) {
+		if (part.code === pc.postTagId__postId_oldVersion) {
 			history[version]!.tags = [getIdStr(part), ...(history[version]!.tags || [])];
 		} else if (part.code === pc.exPostCoreId__postId_version) {
 			history[version]!.core = getIdStr(part);
-		} else if (part.code === pc.tagId8_count_txt) {
+		} else if (part.code === pc.idBy8__count_val_tag) {
 			tagIdToTxtMap[getIdStr(part)] = part.txt!;
 		} else if (part.code === pc.coreId8_count_txt) {
 			coreIdToTxtMap[getIdStr(part)] = part.txt!;

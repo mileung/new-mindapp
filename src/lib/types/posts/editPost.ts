@@ -2,7 +2,7 @@ import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import { ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, eq, or } from 'drizzle-orm';
-import { getLastVersion, moveTagCoreOrRxnCountsBy1, PostSchema, type Post } from '.';
+import { getLastVersion, moveTagOrRxnCountsBy1, PostSchema, type Post } from '.';
 import { type Database } from '../../local-db';
 import {
 	assert1Row,
@@ -45,7 +45,7 @@ export let _editPost = async (db: Database, post: Post) => {
 
 	let {
 		[pc.postId__parentPostId_lastVersion]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.currentPostTagId__postId_version]: currentPostTagId__postId_versionRows = [],
+		[pc.postTagId__postId_lastVersion]: currentPostTagId__postId_versionRows = [],
 		[pc.currentPostCoreId__postId_version]: currentPostCoreId__postId_versionRows = [],
 	} = channelPartsByCode(
 		await db
@@ -57,7 +57,7 @@ export let _editPost = async (db: Database, post: Post) => {
 					and(
 						pf.idAsAtId(post),
 						or(
-							...[pc.currentPostTagId__postId_version, pc.currentPostCoreId__postId_version].map(
+							...[pc.postTagId__postId_lastVersion, pc.currentPostCoreId__postId_version].map(
 								(code) => pf.code.eq(code),
 							),
 						),
@@ -82,7 +82,7 @@ export let _editPost = async (db: Database, post: Post) => {
 			...id0,
 			...getIdObjAsAtIdObj(post),
 			ms,
-			code: pc.ms__postId_currentVersion,
+			code: pc.postId__ms_sd_lastVersion__core,
 			num: newLastVersion,
 		},
 	];
@@ -91,7 +91,7 @@ export let _editPost = async (db: Database, post: Post) => {
 	assertLt2Rows(currentPostCoreId__postId_versionRows);
 
 	let {
-		[pc.tagId8_count_txt]: existingTagIdAndTxtWithNumAsCountRows = [],
+		[pc.idBy8__count_val_tag]: existingTagIdAndTxtWithNumAsCountRows = [],
 		[pc.coreId8_count_txt]: existingCoreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		currentPostTagId__postId_versionRows.length ||
@@ -109,7 +109,7 @@ export let _editPost = async (db: Database, post: Post) => {
 									...currentPostTagId__postId_versionRows.map((r) => pf.id(r)),
 									...newPostTagStrs.map((t) => pf.txt.eq(t)),
 								),
-								pf.code.eq(pc.tagId8_count_txt),
+								pf.code.eq(pc.idBy8__count_val_tag),
 								pf.num.gte0,
 							),
 							and(
@@ -160,7 +160,7 @@ export let _editPost = async (db: Database, post: Post) => {
 
 	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
 
-	await moveTagCoreOrRxnCountsBy1(
+	await moveTagOrRxnCountsBy1(
 		db,
 		tagTxtRowsToIncrementCountBy1,
 		coreTxtRowsToIncrementCountBy1,
@@ -179,7 +179,7 @@ export let _editPost = async (db: Database, post: Post) => {
 		if (coreTxtRow) coreTxtRowsToDecrementCountBy1.push(coreTxtRow);
 	}
 
-	await moveTagCoreOrRxnCountsBy1(
+	await moveTagOrRxnCountsBy1(
 		db,
 		tagTxtRowsToDecrementCountBy1,
 		coreTxtRowsToDecrementCountBy1,
@@ -188,11 +188,11 @@ export let _editPost = async (db: Database, post: Post) => {
 	);
 	await db
 		.update(pTable)
-		.set({ code: pc.exPostTagId__postId_version })
+		.set({ code: pc.postTagId__postId_oldVersion })
 		.where(
 			and(
 				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
-				pf.code.eq(pc.currentPostTagId__postId_version),
+				pf.code.eq(pc.postTagId__postId_lastVersion),
 				pf.txt.isNull,
 				eq(pTable.num, curLastVersion),
 			),
@@ -213,14 +213,14 @@ export let _editPost = async (db: Database, post: Post) => {
 		.where(mainPIdWNumAsLastVersionAtPPIdRowsFilter);
 	await db
 		.update(pTable)
-		.set({ code: pc.ms__postId_exVersion })
+		.set({ code: pc.postId__ms_sd_oldVersion__core })
 		.where(
 			and(
 				pf.idAsAtId(post),
 				pf.ms.gt0,
 				pf.by_ms.eq0,
 				pf.in_ms.eq0,
-				pf.code.eq(pc.ms__postId_currentVersion),
+				pf.code.eq(pc.postId__ms_sd_lastVersion__core),
 				pf.num.eq(curLastVersion),
 				pf.txt.isNull,
 			),
@@ -286,7 +286,7 @@ let processStuff = (
 				ms: ms + newTagOrCoresCount++,
 				by_ms: ranInt(8, 88888888),
 				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
-				code: isTag ? pc.tagId8_count_txt : pc.coreId8_count_txt,
+				code: isTag ? pc.idBy8__count_val_tag : pc.coreId8_count_txt,
 				txt: tag,
 				num: 1,
 			};
@@ -299,7 +299,7 @@ let processStuff = (
 			ms: tagTxtRow.ms,
 			by_ms: tagTxtRow.by_ms,
 			in_ms: tagTxtRow.in_ms,
-			code: isTag ? pc.currentPostTagId__postId_version : pc.currentPostCoreId__postId_version,
+			code: isTag ? pc.postTagId__postId_lastVersion : pc.currentPostCoreId__postId_version,
 			num: newLastVersion,
 		});
 	}

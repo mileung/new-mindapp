@@ -70,16 +70,18 @@
 		let { idSlug } = page.params;
 		return isIdStr(idSlug) ? idSlug : undefined;
 	});
-	let urlInMs = $derived(getUrlInMs()!);
-	let space = $derived(gs.msToSpaceMap[urlInMs]);
+	let urlInMs = $derived(getUrlInMs());
+	let space = $derived(urlInMs === undefined ? undefined : gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getSpaceContext(urlInMs));
 	let isMergedView = $derived('/merged-view' === page.url.pathname);
 	let callerIsOwner = $derived(getCallerIsOwner());
+	let isOwnerView = $derived(callerIsOwner && '/owner-view' === page.url.pathname);
 
 	let viewable = $derived(
 		!!space?.isPublic.num || //
 			!!spaceContext?.permissionCode ||
 			isMergedView ||
+			isOwnerView ||
 			callerIsOwner,
 	);
 	let showViewOnly = $derived(
@@ -114,69 +116,52 @@
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// console.log('loadMorePosts');
-		// if (1) return;
+		if (1) return;
+		if (callerMs === undefined || promptSignIn) return;
 		if (
-			callerMs === undefined || promptSignIn || urlInMs === undefined
-				? !isMergedView && !callerIsOwner
-				: !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]
+			urlInMs === undefined
+				? !isMergedView && !isOwnerView
+				: !viewable || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]
 		)
 			return;
 		// await new Promise((res) => setTimeout(res, 1000));
 		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
 		if (endReached) return e.detail.complete();
 
-		// console.log('loadMorePosts');
-
-		// TODO: Instead of set theory, implement option to save searches
 		let parsedQ = parseSearchQuery(qSearchParam);
-
-		let lastTopLvlPostIdStr = topLvlPostIdStrs.slice(-1)[0];
-		let lastTopLvlPostIdObj = lastTopLvlPostIdStr ? getIdStrAsIdObj(lastTopLvlPostIdStr) : null;
 		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
-		let inMssInclude: number[] = [
-			...new Set([
-				...(callerIsOwner
-					? []
-					: isMergedView
-						? (page.url.searchParams.get('in_ms') ?? '').split(',').map(Number)
-						: useLocalDb
-							? []
-							: [urlInMs]),
-				...parsedQ.inMssInclude,
-			]),
-		];
 
 		let getPostFeedArg: GetPostFeedArg = {
 			view,
 			sortedBy,
 			msBefore: undefined,
 			msAfter: undefined,
-			byMssExclude: [],
-			byMssInclude: [],
-			inMssExclude: [],
-			inMssInclude,
-			postIdObjsExclude: [],
-			postIdObjsInclude: [],
-			tagsExclude: [],
-			tagsInclude: [],
-			coreExcludes: [],
-			coreIncludes: [],
+			...parsedQ,
+			eitherInMss: [
+				...new Set([
+					...(isMergedView
+						? (page.url.searchParams.get('in_mss') ?? '').split(',').map(Number)
+						: useLocalDb || isOwnerView
+							? []
+							: [urlInMs!]),
+					...(parsedQ.eitherInMss || []),
+				]),
+			],
 		};
 
 		try {
 			if (postIdSlug) {
-				if (lastTopLvlPostIdObj?.ms) getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
 				postFeed = await getPostFeed(
-					{
-						...getPostFeedArg,
-						postIdObjsInclude: [getIdStrAsIdObj(postIdSlug)],
-					},
+					{ postIdObjsInclude: [getIdStrAsIdObj(postIdSlug)] },
 					useLocalDb,
 				);
 			} else {
+				let lastTopLvlPostIdStr = topLvlPostIdStrs.slice(-1)[0];
+				let lastTopLvlPostIdObj = lastTopLvlPostIdStr ? getIdStrAsIdObj(lastTopLvlPostIdStr) : null;
 				if (lastTopLvlPostIdObj) {
 					if (sortedBy === 'new') {
-						getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
+						// getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
+						// get newest descendent post of lastTopLvlPostIdObj
 					} else if (sortedBy === 'old') {
 						getPostFeedArg.msAfter = lastTopLvlPostIdObj.ms - 1;
 					}
@@ -389,7 +374,7 @@
 				<p class="font-bold text-xl">{m.post()}</p>
 				{#if postIdSlug && postObjFeed.length}
 					<a
-						href={`/merged-view?q=${postIdSlug}`}
+						href={`/merged-view?q=[${postIdSlug}]`}
 						class="fx px-2 text-xl text-fg2 flex-1 hover:bg-bg4 hover:text-fg1"
 					>
 						<IconLibrary class="shrink-0 w-6 ml-0.5 mr-2" />

@@ -17,10 +17,10 @@
 	]);
 
 	$effect(() => {
-		if (!page.url.searchParams.has('in_ms')) {
+		if (!page.url.searchParams.has('in_mss')) {
 			goto(
 				setSearchParams({
-					in_ms: cloudSpaceMss.join(','),
+					in_mss: cloudSpaceMss.join(','),
 				}),
 				{ replaceState: true },
 			);

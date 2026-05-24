@@ -6,6 +6,7 @@
 		gs,
 		msToAccountNameTxt,
 		msToSpaceNameTxt,
+		onCite,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 	import { copyToClipboard } from '$lib/js';
@@ -19,7 +20,7 @@
 		getIdStr,
 		getUrlInMs,
 	} from '$lib/types/parts/partIds';
-	import { getLastVersion, type Post } from '$lib/types/posts';
+	import { type Post } from '$lib/types/posts';
 	import { deletePost } from '$lib/types/posts/deletePost';
 	import { shortReactionList } from '$lib/types/reactions/reactionList';
 	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
@@ -159,15 +160,7 @@
 				<button
 					class="fx group hover:text-fg1"
 					onmousedown={(e) => e.preventDefault()}
-					onclick={() => {
-						// TODO: second click within 1s of first click: copy post url?
-						// TODO: third click within 1s of second click: copy whole post?
-						gs.writingNew = true;
-						let lastVersion = getLastVersion(p.post);
-						let tags = p.post.history?.[lastVersion]?.tags || [];
-						gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
-						gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
-					}}
+					onclick={() => onCite(p.post)}
 				>
 					<div
 						class={`h-5 px-1.5 xy text-fg2 hover:text-fg1 ${p.evenBg ? 'group-hover:bg-bg4' : 'group-hover:bg-bg5'}`}

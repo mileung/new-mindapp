@@ -8,7 +8,7 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
-import { moveTagCoreOrRxnCountsBy1 } from '../posts';
+import { moveTagOrRxnCountsBy1 } from '../posts';
 
 export let removeReaction = async (
 	input: WhoObj & {
@@ -29,9 +29,9 @@ export let _removeReaction = async (
 		postIdObj: IdObj;
 		emoji: string;
 	},
-	useLocalDb: boolean,
+	dbIsLocal: boolean,
 ) => {
-	let rxnInMs = useLocalDb ? 0 : input.postIdObj.in_ms;
+	let rxnInMs = dbIsLocal ? 0 : input.postIdObj.in_ms;
 	let caller_reactionId__postId__emojiFilter = and(
 		pf.idAsAtId(input.postIdObj),
 		pf.ms.gt0,
@@ -64,13 +64,7 @@ export let _removeReaction = async (
 	let deleteFilters: (undefined | SQL)[] = [caller_reactionId__postId__emojiFilter];
 	let postId_count_emojiRow = assert1Row(postId_count_emojiRows);
 	postId_count_emojiRow.num! > 1
-		? await moveTagCoreOrRxnCountsBy1(
-				db,
-				[],
-				[],
-				[{ ...input.postIdObj, emoji: input.emoji }],
-				false,
-			)
+		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], false)
 		: deleteFilters.push(
 				and(
 					pf.noAtId,

@@ -8,8 +8,8 @@ import { trpc } from './trpc/client';
 import { getDefaultAccount, type MyAccount, type PublicProfile } from './types/accounts';
 import { updateLocalCache } from './types/local-cache';
 import type { WhoObj, WhoWhereObj } from './types/parts';
-import { getUrlInMs } from './types/parts/partIds';
-import type { Post } from './types/posts';
+import { getIdStr, getUrlInMs } from './types/parts/partIds';
+import { getLastVersion, type Post } from './types/posts';
 import {
 	accentCodes,
 	getDefaultSpace,
@@ -157,7 +157,8 @@ export let getPromptSigningIn = () =>
 	!gs.accounts[0].ms &&
 	(getUrlInMs() === 8 ||
 		page.url.pathname === '/create-space' ||
-		page.url.pathname === '/merged-view');
+		page.url.pathname === '/merged-view' ||
+		page.url.pathname === '/owner-view');
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;
@@ -337,4 +338,15 @@ export let toggleAccountBan = async (accountMs: number) => {
 			alertError(error);
 		}
 	}
+};
+
+export let onCite = (post: Post) => {
+	// TODO: second click within 1s of first click: copy post url?
+	// TODO: third click within 1s of second click: copy whole post?
+	gs.writingNew = true;
+	let lastVersion = getLastVersion(post);
+	let tags = post.history?.[lastVersion]?.tags || [];
+	let postIdStr = getIdStr(post);
+	gs.writerTags = [...new Set([...gs.writerTags, ...tags, postIdStr])];
+	gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
 };

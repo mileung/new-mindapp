@@ -25,7 +25,7 @@ export let normalizeTags = (tags: string[]) =>
 	].sort((a, b) => a.localeCompare(b));
 
 let HistoryLayerSchema = z.strictObject({
-	ms: z.number().gte(0),
+	ms: z.number(),
 	tags: z
 		.array(z.string().max(88))
 		.max(888) //
@@ -33,20 +33,20 @@ let HistoryLayerSchema = z.strictObject({
 		.nullable(), // null tags means soft deleted version
 	core: z
 		.string()
+		.max(888888)
 		.transform((s) => s.trim())
-		.pipe(z.string().max(888888))
 		.optional(),
 });
 export type HistoryLayer = z.infer<typeof HistoryLayerSchema>;
 
 export let PostSchema = z.strictObject({
-	at_ms: z.number().gte(0),
-	at_by_ms: z.number().gte(0),
-	at_in_ms: z.number().gte(0),
+	at_ms: z.number(),
+	at_by_ms: z.number(),
+	at_in_ms: z.number(),
 
-	ms: z.number().gte(0),
-	by_ms: z.number().gte(0),
-	in_ms: z.number().gte(0),
+	ms: z.number(),
+	by_ms: z.number(),
+	in_ms: z.number(),
 
 	myRxnEmojis: z.array(EmojiStringSchema).optional(),
 	rxnEmojiCount: z.record(z.number()).optional(),
@@ -96,14 +96,13 @@ export let getLastVersion = (p: Post) =>
 
 export let getCitedPostIds = (s = '') => [...new Set(s.matchAll(idsRegex).map(([t]) => t))];
 
-export let moveTagCoreOrRxnCountsBy1 = async (
+export let moveTagOrRxnCountsBy1 = async (
 	db: Database,
 	tagIdObjs: IdObj[],
-	coreIdObjs: IdObj[],
 	postIdWithEmojis: (IdObj & { emoji: string })[],
 	increment: boolean,
 ) =>
-	(tagIdObjs.length || coreIdObjs.length || postIdWithEmojis.length) &&
+	(tagIdObjs.length || postIdWithEmojis.length) &&
 	(await db
 		.update(pTable)
 		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
@@ -113,16 +112,7 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 					? and(
 							pf.noAtId,
 							or(...tagIdObjs.map((tagIdObj) => pf.id(tagIdObj))),
-							pf.code.eq(pc.tagId8_count_txt),
-							pf.num.gte0,
-							pf.txt.isNotNull,
-						)
-					: undefined,
-				coreIdObjs.length
-					? and(
-							pf.noAtId,
-							or(...coreIdObjs.map((coreIdObj) => pf.id(coreIdObj))),
-							pf.code.eq(pc.coreId8_count_txt),
+							pf.code.eq(pc.idBy8__count_val_tag),
 							pf.num.gte0,
 							pf.txt.isNotNull,
 						)
@@ -144,16 +134,15 @@ export let moveTagCoreOrRxnCountsBy1 = async (
 			),
 		));
 
-export let selectTagOrCoreTxtRowsToDelete = async (
+export let selectTagTxtRowsToDelete = async (
 	db: Database,
 	postIdObj: IdObj,
-	tagOrCoreIdObjs: PartInsert[],
+	tagParts: PartInsert[],
 	deleteFilters: (undefined | SQL)[],
-	isTag: boolean,
 ) => {
-	if (tagOrCoreIdObjs.length) {
+	if (tagParts.length) {
 		let postTagOrCoreIdRowsUsing0CountTags = await Promise.all(
-			tagOrCoreIdObjs.map(
+			tagParts.map(
 				async (tagOrCoreIdObj) =>
 					(
 						await db
@@ -163,15 +152,10 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 								and(
 									pf.notIdAsAtId(postIdObj),
 									pf.id(tagOrCoreIdObj),
-									isTag
-										? or(
-												pf.code.eq(pc.currentPostTagId__postId_version),
-												pf.code.eq(pc.exPostTagId__postId_version),
-											)
-										: or(
-												pf.code.eq(pc.currentPostCoreId__postId_version),
-												pf.code.eq(pc.exPostCoreId__postId_version),
-											),
+									or(
+										pf.code.eq(pc.postTagId__postId_lastVersion),
+										pf.code.eq(pc.postTagId__postId_oldVersion),
+									),
 									pf.num.gte0,
 									pf.txt.isNull,
 								),
@@ -180,7 +164,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 					)[0] as undefined | PartSelect,
 			),
 		);
-		let tagOrCoreTxtRowsToDel = tagOrCoreIdObjs.filter(
+		let tagOrCoreTxtRowsToDel = tagParts.filter(
 			(rowToPossiblyDelete) =>
 				!postTagOrCoreIdRowsUsing0CountTags.find(
 					(r) => r && idObjMatchesIdObj(rowToPossiblyDelete, r),
@@ -198,11 +182,7 @@ export let selectTagOrCoreTxtRowsToDelete = async (
 							),
 						),
 					),
-					pf.code.eq(
-						isTag
-							? pc.tagId8_count_txt //
-							: pc.coreId8_count_txt,
-					),
+					pf.code.eq(pc.idBy8__count_val_tag),
 					pf.num.eq0,
 				),
 			);

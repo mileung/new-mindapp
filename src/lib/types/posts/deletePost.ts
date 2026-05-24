@@ -1,7 +1,7 @@
 import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or, type SQL } from 'drizzle-orm';
-import { moveTagCoreOrRxnCountsBy1, selectTagOrCoreTxtRowsToDelete } from '.';
+import { moveTagOrRxnCountsBy1, selectTagTxtRowsToDelete } from '.';
 import { type Database } from '../../local-db';
 import { assert1Row, channelPartsByCode, makePartsUniqueById, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -33,8 +33,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 
 	let {
 		[pc.postId__parentPostId_lastVersion]: mainPIdWNumAsLastVersionAtPPIdRows = [],
-		[pc.currentPostTagId__postId_version]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
-		[pc.exPostTagId__postId_version]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
+		[pc.postTagId__postId_lastVersion]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
+		[pc.postTagId__postId_oldVersion]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
 		[pc.currentPostCoreId__postId_version]: currentPostCoreId__postId_versionRowsToDelete = [],
 		[pc.exPostCoreId__postId_version]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
 	} = channelPartsByCode(
@@ -48,8 +48,8 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 						pf.idAsAtId(fullPostIdObj),
 						pf.ms.gt0,
 						or(
-							pf.code.eq(pc.currentPostTagId__postId_version),
-							pf.code.eq(pc.exPostTagId__postId_version),
+							pf.code.eq(pc.postTagId__postId_lastVersion),
+							pf.code.eq(pc.postTagId__postId_oldVersion),
 							pf.code.eq(pc.currentPostCoreId__postId_version),
 							pf.code.eq(pc.exPostCoreId__postId_version),
 						),
@@ -67,7 +67,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 	if (!lastVersion && versionIsLastVersion && !deleteAllVersions) deleteAllVersions = true;
 
 	if (deleteAllVersions || versionIsLastVersion) {
-		await moveTagCoreOrRxnCountsBy1(
+		await moveTagOrRxnCountsBy1(
 			db,
 			curPostTagIdWNumAsVersionAtPIdRowsToDelete,
 			currentPostCoreId__postId_versionRowsToDelete,
@@ -114,12 +114,12 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 				pf.idAsAtId(fullPostIdObj),
 				or(
 					...[
-						pc.ms__postId_currentVersion,
-						pc.ms__postId_exVersion,
-						pc.ms__postId_currentSoftDeletedVersion,
-						pc.ms__postId_exSoftDeletedVersion,
-						pc.currentPostTagId__postId_version,
-						pc.exPostTagId__postId_version,
+						pc.postId__ms_sd_lastVersion__core,
+						pc.postId__ms_sd_oldVersion__core,
+						pc.postId__ms_softDeletedNewestVersion,
+						pc.postId__ms_softDeletedOldVersion,
+						pc.postTagId__postId_lastVersion,
+						pc.postTagId__postId_oldVersion,
 						pc.currentPostCoreId__postId_version,
 						pc.exPostCoreId__postId_version,
 					].map((c) => pf.code.eq(c)),
@@ -139,7 +139,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 		currentPostCoreId__postId_versionRowsToDelete.length ||
 		exPostCoreIdWithNumAsVersionAtPostIdRows.length;
 	let {
-		[pc.tagId8_count_txt]: num0tagIdAndTxtWithNumAsCountRows = [],
+		[pc.idBy8__count_val_tag]: num0tagIdAndTxtWithNumAsCountRows = [],
 		[pc.coreId8_count_txt]: num0coreIdAndTxtWithNumAsCountRows = [],
 	} = channelPartsByCode(
 		checkForNum0Tags || checkForNum0Cores
@@ -158,7 +158,7 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 												...exPostTagIdWithNumAsVersionAtPostIdRows,
 											]).map((r) => pf.id(r)),
 										),
-										pf.code.eq(pc.tagId8_count_txt),
+										pf.code.eq(pc.idBy8__count_val_tag),
 										pf.num.eq0,
 										pf.txt.isNotNull,
 									)
@@ -182,19 +182,11 @@ export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version:
 					)
 			: [],
 	);
-	await selectTagOrCoreTxtRowsToDelete(
+	await selectTagTxtRowsToDelete(
 		db,
 		fullPostIdObj,
 		num0tagIdAndTxtWithNumAsCountRows,
 		deleteFilters,
-		true,
-	);
-	await selectTagOrCoreTxtRowsToDelete(
-		db,
-		fullPostIdObj,
-		num0coreIdAndTxtWithNumAsCountRows,
-		deleteFilters,
-		false,
 	);
 	deleteFilters.length && (await db.delete(pTable).where(or(...deleteFilters)));
 	partsToInsert.length && (await db.insert(pTable).values(partsToInsert));

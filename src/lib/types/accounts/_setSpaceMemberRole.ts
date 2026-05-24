@@ -1,5 +1,5 @@
+import { throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { assert1Row, type PartSelect, type WhoWhereObj } from '$lib/types/parts';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and } from 'drizzle-orm';
@@ -43,7 +43,7 @@ export let _setSpaceMemberRole = async (
 							.from(pTable)
 							.where(updateeRoleRowFilter)
 					)[0] as undefined | PartSelect
-				)?.num;
+				)?.num!;
 
 		let callerIsMod = callerRoleCodeNum === roleCodes.mod;
 		let callerIsAdmin = callerRoleCodeNum === roleCodes.admin;

@@ -1,10 +1,9 @@
 import { scrape } from '$lib/dom';
-import { atDomainRegex, emailRegex, ownerMsSet } from '$lib/js';
+import { assertInputIsOwner, atDomainRegex, emailRegex, inputIsOwner, throwIf } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { _getCallerContext } from '$lib/server/_getCallerContext';
 import { _getPublicProfile } from '$lib/server/_getPublicProfile';
 import { tdb } from '$lib/server/db';
-import { throwIf } from '$lib/server/errors';
 import { _getOwnerViewAccounts } from '$lib/server/ownerView/_getOwnerViewAccounts';
 import { _getOwnerViewSpaces } from '$lib/server/ownerView/_getOwnerViewSpaces';
 import { _setAccountBan } from '$lib/server/ownerView/_setAccountBan';
@@ -89,9 +88,6 @@ let makeProcedure = (
 		await rateLimiter.ping(ctx);
 		return next();
 	});
-
-let inputIsOwner = (i: { callerMs: number }) => ownerMsSet.has(i.callerMs);
-let assertInputIsOwner = (i: { callerMs: number }) => throwIf(!inputIsOwner(i));
 
 let test = 0;
 let testLimiter = makeLimiter(3, 1 / 6);
@@ -609,8 +605,22 @@ export let router = t.router({
 			return _getReactionHistory(tdb, input);
 		}),
 	getPostFeed: makeProcedure(feedLimiter)
-		.input(WhoObjSchema.merge(GetPostFeedArgSchema).strict())
-		.query(({ input }) => _getPostFeed(tdb, input, true)),
+		.input(
+			WhoObjSchema.extend({
+				parsedQ: GetPostFeedArgSchema,
+			}).strict(),
+		)
+		.query(async ({ ctx, input }) => {
+			let ownerCalled = inputIsOwner(input);
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				// isPublic: !ownerCalled,
+				// roleCode: !ownerCalled,
+			});
+			throwIf(input.callerMs && !c.signedIn);
+			// !ownerCalled && throwIf(!c.isPublic?.num && !c.roleCode);
+			return _getPostFeed(tdb, input, true, ownerCalled);
+		}),
 	getOwnerViewAccounts: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(z.object({ msBefore: z.number().optional() })).strict())
 		.query(async ({ ctx, input }) => {
@@ -686,11 +696,8 @@ export let router = t.router({
 				isPublic: !ownerCalled,
 				roleCode: !ownerCalled,
 			});
-			throwIf(
-				ownerCalled
-					? !c.signedIn //
-					: !c.isPublic?.num && (!c.signedIn || !c.roleCode),
-			);
+			throwIf(input.callerMs && !c.signedIn);
+			!ownerCalled && throwIf(!c.isPublic?.num && !c.roleCode);
 			return _getSpaceTags(tdb, input);
 		}),
 });
