@@ -11,46 +11,34 @@ import { pTable } from '../parts/partsTable';
 export let _signOut = async (ctx: Context, input: WhoObj & { everywhere: boolean }) => {
 	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	if (sessionIdObj) {
-		let ms = Date.now();
+		let now = Date.now();
 		await tdb
 			.delete(pTable)
 			.where(
 				or(
-					...getExpiredRowsFilters(ms),
+					...getExpiredRowsFilters(now),
 					input.everywhere
 						? or(
 								and(
-									pf.atId({ at_ms: input.callerMs }),
-									pf.ms.gt0,
-									pf.in_ms.eq0,
 									or(
-										pf.code.eq(pc.ms__accountMs__clientKey),
-										pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
+										pf.code.eq(pc._clientKey_m_accountMs),
+										pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
 									),
-									pf.num.isNull,
-									pf.txt.isNotNull,
+									pf.p2.eq(input.callerMs),
 								),
 								and(
-									pf.at_ms.gt0,
-									pf.at_by_ms.eq0,
-									pf.at_in_ms.eq0,
-									pf.ms.lt(ms - week),
-									pf.in_ms.eq0,
 									or(
-										pf.code.eq(pc.ms__accountMs__clientKey),
-										pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
+										pf.code.eq(pc._clientKey_m_accountMs),
+										pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
 									),
-									pf.num.isNull,
-									pf.txt.isNotNull,
+									pf.p1.lt(now - week),
 								),
 							)
 						: and(
-								pf.atId({ at_ms: input.callerMs }),
-								pf.ms.eq(sessionIdObj.ms),
-								pf.in_ms.eq0,
-								pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
-								pf.num.isNull,
+								pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
 								pf.txt.eq(sessionIdObj.txt),
+								pf.p1.eq(sessionIdObj.ms),
+								pf.p2.eq(input.callerMs),
 							),
 				),
 			);

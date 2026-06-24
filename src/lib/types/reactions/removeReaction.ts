@@ -31,50 +31,49 @@ export let _removeReaction = async (
 	},
 	dbIsLocal: boolean,
 ) => {
-	let rxnInMs = dbIsLocal ? 0 : input.postIdObj.in_ms;
-	let caller_reactionId__postId__emojiFilter = and(
-		pf.idAsAtId(input.postIdObj),
-		pf.ms.gt0,
-		pf.by_ms.eq(input.callerMs),
-		pf.in_ms.eq(rxnInMs),
-		pf.code.eq(pc.reactionId__postId__emoji),
-		pf.num.isNull,
+	let _emoji_postImb_reactionBmCallerFilter = and(
+		pf.code.eq(pc._emoji_postImb_reactionBm),
 		pf.txt.eq(input.emoji),
+		pf.p1.eq(input.postIdObj.in_ms),
+		pf.p2.eq(input.postIdObj.ms),
+		pf.p3.eq(input.postIdObj.by_ms),
+		pf.p4.eq(input.callerMs),
 	);
 	let {
-		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
-		[pc.postId_count_emoji]: postId_count_emojiRows = [],
+		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					caller_reactionId__postId__emojiFilter,
+					_emoji_postImb_reactionBmCallerFilter,
 					and(
-						pf.id(input.postIdObj),
-						pf.code.eq(pc.postId_count_emoji),
-						pf.num.gt0,
+						pf.code.eq(pc._emoji_postImb_count),
 						pf.txt.eq(input.emoji),
+						pf.p1.eq(input.postIdObj.in_ms),
+						pf.p2.eq(input.postIdObj.ms),
+						pf.p3.eq(input.postIdObj.by_ms),
 					),
 				),
 			),
 	);
-	if (!reactionId__postId__emojiRows.length) throw new Error(`Reaction dne`);
-	let deleteFilters: (undefined | SQL)[] = [caller_reactionId__postId__emojiFilter];
-	let postId_count_emojiRow = assert1Row(postId_count_emojiRows);
-	postId_count_emojiRow.num! > 1
+	if (!_emoji_postImb_reactionBmRows.length) return {};
+	let deleteFilters: (undefined | SQL)[] = [_emoji_postImb_reactionBmCallerFilter];
+	let _emoji_postImb_countRow = assert1Row(_emoji_postImb_countRows);
+	_emoji_postImb_countRow.p4! > 1
 		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], false)
 		: deleteFilters.push(
 				and(
-					pf.noAtId,
-					pf.id(input.postIdObj),
-					pf.code.eq(pc.postId_count_emoji),
-					pf.num.lt(2),
+					pf.code.eq(pc._emoji_postImb_count),
 					pf.txt.eq(input.emoji),
+					pf.p1.eq(input.postIdObj.in_ms),
+					pf.p2.eq(input.postIdObj.ms),
+					pf.p3.eq(input.postIdObj.by_ms),
+					pf.p4.lt(2),
 				),
 			);
-
 	await db.delete(pTable).where(or(...deleteFilters));
 	return {};
 };

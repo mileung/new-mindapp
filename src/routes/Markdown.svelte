@@ -45,7 +45,7 @@
 			>
 				{tag.text}
 			</a>
-			<IframePreview uri={tag.uri} />
+			<IframePreview url={tag.uri} />
 		{/if}
 	{/each}
 </p>

@@ -10,20 +10,8 @@ export let searchGuideArr = [
 		],
 		examples: [
 			['[Movie][Documentary]', 'Posts tagged with either "Movie" or "Documentary"'],
-			['Hello world', 'Posts with a core containing either "Hello" or "world"'],
-			['"Hello world"', 'Posts with a core containing "Hello world"'],
-		],
-	},
-	{
-		title: 'Regular',
-		syntax: [
-			['8_8_8', 'Post 8_8_8'],
-			['_8_', 'Posts by account _8_'],
-			['__8', 'Posts in space __8'],
-		],
-		examples: [
-			['0_0_0 8_8_8', 'posts 0_0_0 and 8_8_8'],
-			['_8_ __8', 'posts by _8_ in space __8 (and current space)'],
+			['"Hello" "world"', 'Posts with a core containing either "Hello" or "world"'],
+			['Hello world', 'Posts with a core containing "Hello world"'],
 		],
 	},
 	{
@@ -32,101 +20,116 @@ export let searchGuideArr = [
 			['[... ]', 'Posts with a tag starting with "..."'],
 			['[ ...]', 'Posts with a tag ending with "..."'],
 			['!', 'Requires all posts to have the preceding bracketed or quoted search'],
-			['{...}', 'Posts with tags starting with "...=" and ending with a number'],
-			[
-				'{...<888}',
-				'Posts with tags starting with "...=" and ending with a number less than 888\nSupported operators: =, <, <=, >, >=',
-			],
 		],
 		examples: [
 			[
-				'[ Music]! {Year>=1990}! {Year<2020}!',
-				'Posts with a tag ending with "Music" and has a tag starting with "Year=" and ending with a number of at least 1990 and below 2020 (spaces optional, added for legibility)',
+				'[1990s]! [ Music]!',
+				'Posts tagged with "1990s" and a tag ending with "Music" (optional space after "!" added for legibility)',
 			],
 			[
 				'[Book]! [Quote]! "Lorem ipsum" "Hello world"',
 				'Posts tagged with "Book" and "Quote" and has a core containing "Lorem ipsum" or "Hello world"',
 			],
-			[
-				'[Bicycle]! {Price}! {Weight (kg)<8}!',
-				'Posts tagged with "Bicycle", has a tag starting with "Price=" and ending with a number, and has a tag starting with "Weight (kg)=..." and ending with a number less than 8',
-			],
+		],
+	},
+	{
+		title: 'Uncommon',
+		syntax: [
+			['8_8_8', 'Post 8_8_8'],
+			['8__', 'Posts in space 8__'],
+			['__8', 'Posts by account __8'],
+			['@__8', 'Replies to posts by account __8'],
+		],
+		examples: [
+			['0_0_0 8_8_8', 'Posts 0_0_0 and 8_8_8'],
+			['__8 8__', 'Posts by account __8 in space 8__ (and current space)'],
+			['__0 @__8', 'Posts by account __0 replying to posts by account __8'],
+			// See TODO under `eitherAtByMss: [callerMs],`for why this might not work
+			// ['__8 @__8', 'Posts by account __8 or posts replying to posts by account __8'],
 		],
 	},
 ];
 
-let parseDateParts = (
-	year = 0,
-	month = 0,
-	day = 0,
-	hour = 0,
-	minute = 0,
-	second = 0,
-	millisecond = 0,
-) => {
-	let date = new Date(
-		year,
-		(month || 1) - 1, // new Date uses months 0-11, not 1-12
-		day,
-		hour,
-		minute,
-		second,
-		millisecond,
-	);
-	return isNaN(date.getTime()) ? 0 : date.getTime();
-};
+export let maxTopLvlPostLimitPerSection = 15;
 
-let NumValTagComps = z.array(
-	z.object({
-		key: z.string(),
-		rel: z.enum(['eq', 'lt', 'lte', 'gt', 'gte']),
-		val: z.number(),
-	}),
-);
+export let ParsedQSchema = z.strictObject({
+	postIdObjsInclude: z.array(IdObjSchema).max(maxTopLvlPostLimitPerSection),
+	eitherInMss: z.array(z.number()),
+	eitherByMss: z.array(z.number()),
+	eitherAtByMss: z.array(z.number()),
 
-export let ParsedSearchSchema = z
-	.strictObject({
-		postIdObjsInclude: z.array(IdObjSchema),
-		postIdObjsExclude: z.array(IdObjSchema),
-		eitherByMss: z.array(z.number()),
-		eitherInMss: z.array(z.number()),
+	requiredTags: z.array(z.string()),
+	eitherTags: z.array(z.string()),
 
-		eitherTags: z.array(z.string()),
-		requiredTags: z.array(z.string()),
+	requiredTagStarts: z.array(z.string()),
+	eitherTagStarts: z.array(z.string()),
 
-		eitherTagStarts: z.array(z.string()),
-		requiredTagStarts: z.array(z.string()),
+	requiredTagEnds: z.array(z.string()),
+	eitherTagEnds: z.array(z.string()),
 
-		eitherTagEnds: z.array(z.string()),
-		requiredTagEnds: z.array(z.string()),
+	requiredCoreIncludes: z.array(z.string()),
+	eitherCoreIncludes: z.array(z.string()),
+});
 
-		eitherValTagKeys: z.array(z.string()),
-		requiredValTagKeys: z.array(z.string()),
+export type ParsedQ = z.infer<typeof ParsedQSchema>;
 
-		eitherNumValTagComps: NumValTagComps,
-		requiredNumValTagComps: NumValTagComps,
+export let getDefaultParsedQ = (): ParsedQ => ({
+	postIdObjsInclude: [],
+	eitherByMss: [],
+	eitherAtByMss: [],
+	eitherInMss: [],
+	requiredTags: [],
+	eitherTags: [],
+	requiredTagStarts: [],
+	eitherTagStarts: [],
+	requiredTagEnds: [],
+	eitherTagEnds: [],
+	requiredCoreIncludes: [],
+	eitherCoreIncludes: [],
+});
 
-		eitherCoreIncludes: z.array(z.string()),
-		requiredCoreIncludes: z.array(z.string()),
-	})
-	.partial();
-
-export type ParsedSearch = z.infer<typeof ParsedSearchSchema>;
+export let getParsedQPaginates = (p: ParsedQ) =>
+	!p.postIdObjsInclude.length ||
+	p.eitherInMss.length ||
+	p.eitherByMss.length ||
+	p.eitherAtByMss.length ||
+	p.requiredTags.length ||
+	p.eitherTags.length ||
+	p.requiredTagStarts.length ||
+	p.eitherTagStarts.length ||
+	p.requiredTagEnds.length ||
+	p.eitherTagEnds.length ||
+	p.requiredCoreIncludes.length ||
+	p.eitherCoreIncludes.length;
 
 export let parseSearchQuery = (query = '') => {
-	let result: ParsedSearch = {};
+	let parsedQ: ParsedQ = getDefaultParsedQ();
 	query = query.trim();
+	let unquotedWords: string[] = [];
+	let flushUnquotedWords = () => {
+		if (unquotedWords.length > 0) {
+			let phrase = unquotedWords.join(' ').trim();
+			if (phrase) parsedQ.eitherCoreIncludes = [...parsedQ.eitherCoreIncludes, phrase];
+			unquotedWords = [];
+		}
+	};
 	while (query) {
+		if (query[0] === ' ') {
+			query = query.slice(1);
+			unquotedWords.push('');
+			continue;
+		}
 		query = query.trimStart();
 		if (!query) break;
 
 		// [... ]
 		let tagStartMatch = query.match(/^\[([^\]]+) \](!)?/);
 		if (tagStartMatch) {
+			flushUnquotedWords();
 			let key = tagStartMatch[1];
 			tagStartMatch[2]
-				? (result.requiredTagStarts = [...(result.requiredTagStarts ?? []), key])
-				: (result.eitherTagStarts = [...(result.eitherTagStarts ?? []), key]);
+				? (parsedQ.requiredTagStarts = [...parsedQ.requiredTagStarts, key])
+				: (parsedQ.eitherTagStarts = [...parsedQ.eitherTagStarts, key]);
 			query = query.slice(tagStartMatch[0].length);
 			continue;
 		}
@@ -134,10 +137,11 @@ export let parseSearchQuery = (query = '') => {
 		// [ ...]
 		let tagEndMatch = query.match(/^\[ ([^\]]+)\](!)?/);
 		if (tagEndMatch) {
+			flushUnquotedWords();
 			let key = tagEndMatch[1];
 			tagEndMatch[2]
-				? (result.requiredTagEnds = [...(result.requiredTagEnds ?? []), key])
-				: (result.eitherTagEnds = [...(result.eitherTagEnds ?? []), key]);
+				? (parsedQ.requiredTagEnds = [...parsedQ.requiredTagEnds, key])
+				: (parsedQ.eitherTagEnds = [...parsedQ.eitherTagEnds, key]);
 			query = query.slice(tagEndMatch[0].length);
 			continue;
 		}
@@ -145,58 +149,23 @@ export let parseSearchQuery = (query = '') => {
 		// [...]
 		let tagMatch = query.match(/^\[([^\]]+)\](!)?/);
 		if (tagMatch) {
+			flushUnquotedWords();
 			let key = tagMatch[1];
 			tagMatch[2]
-				? (result.requiredTags = [...(result.requiredTags ?? []), key])
-				: (result.eitherTags = [...(result.eitherTags ?? []), key]);
+				? (parsedQ.requiredTags = [...parsedQ.requiredTags, key])
+				: (parsedQ.eitherTags = [...parsedQ.eitherTags, key]);
 			query = query.slice(tagMatch[0].length);
-			continue;
-		}
-
-		// {} e.g. {Year>=1990} {Price} {Weight (kg)<8}
-		let numValTagCompMatch = query.match(
-			/^\{\s*([^}=<>]+?)\s*(=|<=?|>=?)\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*\}(!)?/,
-		);
-		if (numValTagCompMatch) {
-			let key = numValTagCompMatch[1];
-			let relStr = numValTagCompMatch[2];
-			let val = Number(numValTagCompMatch[3]);
-			let rel: 'eq' | 'lt' | 'lte' | 'gt' | 'gte' =
-				relStr === '='
-					? 'eq'
-					: relStr === '<'
-						? 'lt'
-						: relStr === '<='
-							? 'lte'
-							: relStr === '>'
-								? 'gt'
-								: 'gte';
-			let comp = { key, rel, val };
-			numValTagCompMatch[4]
-				? (result.requiredNumValTagComps = [...(result.requiredNumValTagComps ?? []), comp])
-				: (result.eitherNumValTagComps = [...(result.eitherNumValTagComps ?? []), comp]);
-			query = query.slice(numValTagCompMatch[0].length);
-			continue;
-		}
-
-		// {...}
-		let valTagKeyMatch = query.match(/^\{([^\}]+)\}(!)?/);
-		if (valTagKeyMatch) {
-			let key = valTagKeyMatch[1];
-			valTagKeyMatch[2]
-				? (result.requiredValTagKeys = [...(result.requiredValTagKeys ?? []), key])
-				: (result.eitherValTagKeys = [...(result.eitherValTagKeys ?? []), key]);
-			query = query.slice(valTagKeyMatch[0].length);
 			continue;
 		}
 
 		// "..."
 		let coreMatch = query.match(/^"([^"]+)"(!)?/);
 		if (coreMatch) {
+			flushUnquotedWords();
 			let phrase = coreMatch[1];
 			coreMatch[2]
-				? (result.requiredCoreIncludes = [...(result.requiredCoreIncludes ?? []), phrase])
-				: (result.eitherCoreIncludes = [...(result.eitherCoreIncludes ?? []), phrase]);
+				? (parsedQ.requiredCoreIncludes = [...parsedQ.requiredCoreIncludes, phrase])
+				: (parsedQ.eitherCoreIncludes = [...parsedQ.eitherCoreIncludes, phrase]);
 			query = query.slice(coreMatch[0].length);
 			continue;
 		}
@@ -204,48 +173,63 @@ export let parseSearchQuery = (query = '') => {
 		// 8_8_8
 		let postIdMatch = query.match(/^(\d+_\d+_\d+)/);
 		if (postIdMatch) {
+			flushUnquotedWords();
 			let idObj = getIdStrAsIdObj(postIdMatch[1]);
-			result.postIdObjsInclude = [...(result.postIdObjsInclude ?? []), idObj];
+			parsedQ.postIdObjsInclude = [...parsedQ.postIdObjsInclude, idObj];
 			query = query.slice(postIdMatch[0].length);
 			continue;
 		}
 
-		// __8
-		let inMsMatch = query.match(/^__(\d+)/);
+		// 8__
+		let inMsMatch = query.match(/^(\d+)__/);
 		if (inMsMatch) {
+			flushUnquotedWords();
 			let ms = parseInt(inMsMatch[1]);
-			result.eitherInMss = [...(result.eitherInMss ?? []), ms];
+			parsedQ.eitherInMss = [...parsedQ.eitherInMss, ms];
 			query = query.slice(inMsMatch[0].length);
 			continue;
 		}
 
-		// _8_
-		let byMsMatch = query.match(/^_(\d+)_/);
+		// @__8
+		let atByMsMatch = query.match(/^@__(\d+)/);
+		if (atByMsMatch) {
+			flushUnquotedWords();
+			let ms = parseInt(atByMsMatch[1]);
+			parsedQ.eitherAtByMss = [...parsedQ.eitherAtByMss, ms];
+			query = query.slice(atByMsMatch[0].length);
+			continue;
+		}
+
+		// __8
+		let byMsMatch = query.match(/^__(\d+)/);
 		if (byMsMatch) {
+			flushUnquotedWords();
 			let ms = parseInt(byMsMatch[1]);
-			result.eitherByMss = [...(result.eitherByMss ?? []), ms];
+			parsedQ.eitherByMss = [...parsedQ.eitherByMss, ms];
 			query = query.slice(byMsMatch[0].length);
 			continue;
 		}
 
-		// Unquoted word
+		// Unquoted word — collect for phrase assembly
 		let spaceIndex = query.indexOf(' ');
 		if (spaceIndex === -1) {
-			result.eitherCoreIncludes = [...(result.eitherCoreIncludes ?? []), query];
+			unquotedWords.push(query);
 			break;
 		}
 		let word = query.slice(0, spaceIndex);
-		if (word) result.eitherCoreIncludes = [...(result.eitherCoreIncludes ?? []), word];
+		if (word) unquotedWords.push(word);
 		query = query.slice(spaceIndex + 1);
 	}
-
-	return result;
+	flushUnquotedWords();
+	return parsedQ;
 };
 
-// console.log(parseSearchQuery(`{weight (kg) < 8.88}`));
-// console.log(parseSearchQuery(`{ year <= 2024 }`));
-console.log(
-	parseSearchQuery(
-		`1_23_456 _888_ {lat<-3.08} __8 __0 _3_ {test=test} "hello world"[Book]"wow!"! test! ing  {ms=2} {ms<12}!{ms<=123} {yo>12}! {yo>=123}`,
-	),
-);
+// console.log(
+// 	'test123:',
+// 	parseSearchQuery(`  "hello"    world ? [[test]   hey  you   [[wow]] w o w `),
+// );
+// console.log(
+// 	'test: ',
+// 	parseSearchQuery(`1_23_456 _888_ __8 __0 _3_ "hello world"[Book]"wow!"! test! ing`),
+// );
+// console.log('test: ', parseSearchQuery(''));

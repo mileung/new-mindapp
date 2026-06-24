@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { promptSum } from '$lib/dom';
-	import { exportTextAsFile } from '$lib/files';
 	import { gs, gsdb } from '$lib/global-state.svelte';
 	import { alertError, ranInt } from '$lib/js';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
@@ -9,17 +8,29 @@
 	import { day } from '$lib/time';
 	import { updateLocalCache } from '$lib/types/local-cache';
 	import { type PartInsert } from '$lib/types/parts';
-	import { pc } from '$lib/types/parts/partCodes';
-	import { pf } from '$lib/types/parts/partFilters';
-	import { getIdObjAsAtIdObj, getIdStr, id0 } from '$lib/types/parts/partIds';
-	import { pTable } from '$lib/types/parts/partsTable';
+	import { getIdStr } from '$lib/types/parts/partIds';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
 	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
-	import { and, asc } from 'drizzle-orm';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	let language = $state('en');
+
+	let resetLocalDatabase = async () => {
+		if (promptSum((a, b) => m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }))) {
+			try {
+				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
+			} catch (e) {
+				console.error('error deleteDatabaseFile:', e);
+				// deleteDatabaseFile is slow and unreliable
+				await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
+			}
+			await initLocalDb();
+			// not great to assume the new local db works after deleting the old one - same for localCache
+			gs.localDbFailed = gs.invalidLocalCache = false;
+			gs.identifierToPostFeedMap = {};
+		}
+	};
 
 	// TODO: allow user to put in domain patterns that render as iframes
 	// like if you want to render other mindapp instances hosted elsewhere,
@@ -96,7 +107,7 @@
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-sky-400 dark:border-sky-500 hover:bg-bg7 hover:text-fg3 hover:border-sky-500 dark:hover:border-sky-400"
 			onclick={async () => {
-				exportTextAsFile(
+				/*exportTextAsFile(
 					`mindapp-${Date.now()}.json`,
 					JSON.stringify({
 						parts: (
@@ -122,7 +133,7 @@
 								}) satisfies PartInsert,
 						),
 					}),
-				);
+				);*/
 			}}><IconDownload class="w-5 mr-1" />{m.downloadJsonFile()}</button
 		>
 		<button
@@ -138,6 +149,11 @@
 						let text = await file.text();
 						try {
 							let importedPosts: Post[] = JSON.parse(text);
+							// let parsedPost = PostSchema.safeParse(post);
+							// if (!parsedPost.success) {
+							// 	console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
+							// 	throw new Error(`Invalid post`);
+							// }
 							if (
 								Array.isArray(importedPosts) &&
 								importedPosts.every((item) => PostSchema.safeParse(item).success)
@@ -145,7 +161,7 @@
 								let oldToNewImportedPosts = importedPosts.sort((a, b) => b.ms - a.ms);
 								let db = await gsdb();
 								// TODO: make importing local data faster
-								let results = await Promise.all(
+								/*let results = await Promise.all(
 									oldToNewImportedPosts.map(async (post) => [
 										post,
 										!!(
@@ -155,12 +171,12 @@
 												.where(
 													and(
 														pf.id(post), //
-														pf.code.eq(pc.postId__parentPostId_lastVersion),
+														pf.code.eq(pc.postImb_parentImb_lastVersion),
 													),
 												)
 										)[0],
 									]),
-								);
+								);*/
 								let inserts: PartInsert[] = [];
 								let overwrites: PartInsert[] = [];
 								// results.forEach(([thought, exists]) =>
@@ -192,24 +208,9 @@
 	<button
 		class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
 		onclick={async () => {
-			if (
-				promptSum((a, b) => m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }))
-			) {
-				try {
-					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
-				} catch (e) {
-					console.error('error deleteDatabaseFile:', e);
-					// deleteDatabaseFile is slow and unreliable
-					await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
-				}
-				alert(m.localDatabaseDeleted());
-				await initLocalDb();
-
-				// TODO: not great to assume the new local db works after deleting the old one - same for localCache
-				gs.localDbFailed = gs.invalidLocalCache = false;
-				gs.urlToPostFeedMap = {};
-			}
-		}}><IconTrash class="w-5 mr-1" />{m.deleteLocalDatabase()}</button
+			await resetLocalDatabase();
+			alert(m.localDatabaseResetComplete());
+		}}><IconTrash class="w-5 mr-1" />{m.resetLocalDatabase()}</button
 	>
 	{#if gs.devMode}
 		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
@@ -217,36 +218,39 @@
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
 			onclick={async () => {
-				try {
-					await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
-				} catch (e) {
-					alertError(e);
-				}
-				await initLocalDb();
+				await resetLocalDatabase();
 				let testTags: string[] = [];
-				for (let i = 0; i < 188; i++) testTags.push(`tag${i + 1}`);
+				// let totalPosts = 1;
+				// let totalPosts = 88;
+				let totalPosts = 188;
+				// let totalPosts = 888;
+				// let totalPosts = 8888;
+
+				let totalPostTags = 89;
+				for (let i = 0; i < totalPostTags; i++) testTags.push(`tag${i + 1}`);
 				let beginning = new Date('1988-08-08').getTime();
 				let posts: Post[] = [];
-				for (let i = 0; i < 88; i++) {
+				for (let i = 0; i < totalPosts; i++) {
 					let ranPost = posts[ranInt(0, i * 8)];
 					let cid = ranPost ? getIdStr(ranPost) : '';
 					let ms = beginning + i * 8 * day;
 					let tagCount = ranInt(0, 8);
-					let tags = [];
+					let tagsSet = new Set<string>();
 					for (let t = 0; t < tagCount; t++) {
-						let tagIndex = ranInt(0, testTags.length - 1);
-						tags.push(testTags[tagIndex]);
+						tagsSet.add(testTags[ranInt(0, testTags.length - 1)]);
 					}
+					let atPost = posts[ranInt(0, i * 2)];
 					posts.push({
-						...getIdObjAsAtIdObj(posts[ranInt(0, i * 2)] || id0),
+						in_ms: 0,
 						ms,
 						by_ms: 0,
-						in_ms: 0,
+						at_ms: atPost?.ms,
+						at_by_ms: atPost?.by_ms,
 						history: {
 							'1': {
 								ms,
 								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
-								tags,
+								tags: [...tagsSet],
 							},
 						},
 					});
@@ -254,15 +258,15 @@
 				console.time('adding posts');
 				for (let post of posts) {
 					try {
-						await addPost(post, true, false);
+						await addPost(post, true, true, false);
 					} catch (error) {
 						alertError(error);
 					}
 					console.log('added post');
 				}
-				gs.urlToPostFeedMap = {};
+				gs.identifierToPostFeedMap = {};
 				console.timeEnd('adding posts');
-			}}><IconTrash class="w-5 mr-1" />Replace feed with test data</button
+			}}><IconTrash class="w-5 mr-1" />Replace local db with test data</button
 		>
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { getYtVideoId } from '$lib/dom';
 	import { supportsCredentiallessIframe } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-svelte';
@@ -8,14 +9,11 @@
 	// TODO: player controls in sidebar?
 	// https://developers.google.com/youtube/iframe_api_reference
 
-	let ytRegex =
-		/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
-
-	let p: { uri: string } = $props();
+	let p: { url: string } = $props();
 	let open = $state(false);
 	let toggleBtn = $state<HTMLButtonElement>();
-	let ytVideoId = $derived(p.uri.match(ytRegex)?.[1]);
-	let ytVidStartTime = $derived(ytVideoId ? p.uri.match(/[?&](?:t|start)=([0-9]+)/)?.[1] : 0);
+	let ytVideoId = $derived(getYtVideoId(p.url));
+	let ytVidStartTime = $derived(ytVideoId ? p.url.match(/[?&](?:t|start)=([0-9]+)/)?.[1] : 0);
 	let iframeDiv = $state<HTMLDivElement>();
 	$effect(() => {
 		// open && iframeDiv?.scrollIntoView({ block: 'center' });
@@ -75,7 +73,7 @@
 		{/if}
 	{:else}
 		<br />
-		<a href={p.uri} target="_blank" class="inline-block">
+		<a href={p.url} target="_blank" class="inline-block">
 			{@render thumbnail()}
 		</a>
 	{/if}

@@ -10,32 +10,31 @@ export let _checkOtp = async (input: {
 	otpMs: number;
 	pin: string;
 	email: string;
-	deleteIfCorrect?: boolean;
+	deleteIfCorrect: boolean;
 }): Promise<{ strike?: number; expiredOtp?: true }> => {
 	if (Date.now() - input.otpMs > 5 * minute) return { expiredOtp: true };
-	let otpRowsFilter = and(
-		pf.noAtId,
-		pf.ms.eq(input.otpMs),
-		pf.in_ms.lt(3),
-		pf.code.eq(pc.otpMs_pin_strikeCount__email),
-		pf.num.isNull,
+	let _email_ms_strikeCount_otpFilter = and(
+		pf.code.eq(pc._email_ms_strikeCount_pin),
 		pf.txt.eq(input.email),
+		pf.p1.eq(input.otpMs),
+		pf.p2.lt(3),
 	);
-	let otpRow = assert1Row(
+	let _email_ms_strikeCount_otpRow = assert1Row(
 		await tdb
 			.select() //
 			.from(pTable)
-			.where(otpRowsFilter)
+			.where(_email_ms_strikeCount_otpFilter)
 			.limit(1),
 	);
-	if (otpRow.by_ms !== +input.pin) {
-		let strike = otpRow.in_ms;
+	let { p3 } = _email_ms_strikeCount_otpRow;
+	if (p3! < 0 || p3 !== +input.pin) {
+		let strike = _email_ms_strikeCount_otpRow.p2!;
 		await tdb
 			.update(pTable) //
-			.set({ in_ms: ++strike })
-			.where(otpRowsFilter);
+			.set({ p2: ++strike })
+			.where(_email_ms_strikeCount_otpFilter);
 		return { strike };
 	}
-	if (input.deleteIfCorrect) await tdb.delete(pTable).where(otpRowsFilter);
+	if (input.deleteIfCorrect) await tdb.delete(pTable).where(_email_ms_strikeCount_otpFilter);
 	return {};
 };

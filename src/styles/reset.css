@@ -20,7 +20,7 @@ select {
 	@apply cursor-pointer;
 }
 
-*:focus-visible {
+*:focus-visible:not(.outline-none) {
 	@apply outline-hl1 outline-2 -outline-offset-2 outline-solid;
 }
 

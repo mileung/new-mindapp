@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import {
+		getCallerIsOwner,
 		getPromptSigningIn,
 		getSpaceContext,
 		getWhoWhereObj,
@@ -41,7 +42,8 @@
 	let identifier = $derived(callerMs + '_' + urlInMs);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getSpaceContext(urlInMs));
-	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
+	let callerIsOwner = $derived(getCallerIsOwner());
+	let viewable = $derived(callerIsOwner || space?.isPublic.num || spaceContext?.permissionCode);
 	let myDots = $derived(gs.accountMsToSpaceMsToDots[callerMs!]?.[urlInMs]);
 	let dotsFeed = $derived(gs.spaceMsToDotsFeed[urlInMs]);
 	let accountMsToMembershipMap = $derived(gs.spaceMsToAccountMsToMembershipMap[urlInMs]);
@@ -76,7 +78,6 @@
 			callerMs === undefined
 		)
 			return;
-		// console.log('dotsFeed?.endReached:', dotsFeed?.endReached);
 		if (
 			(spaceContext?.roleCode.num === roleCodes.mod ||
 				spaceContext?.roleCode.num === roleCodes.admin) &&
@@ -88,7 +89,7 @@
 			return e.detail.complete();
 		}
 
-		let lastMembership = memberships.slice(-1)[0] as undefined | Membership;
+		let lastMembership = memberships.at(-1);
 		let lastAcceptByMssWithSameRoleMs: number[] = [];
 		let lastMembershipRole = lastMembership?.roleCode;
 		if (lastMembership) {
@@ -99,9 +100,9 @@
 				if (
 					membershipRole.ms === lastMembershipRole?.ms &&
 					!lastAcceptByMssWithSameRoleMs.includes(membership.accept.by_ms!)
-				) {
+				)
 					lastAcceptByMssWithSameRoleMs.push(membership.accept.by_ms!);
-				} else break;
+				else break;
 			}
 		}
 		let excludeMemberMss = [
@@ -118,8 +119,8 @@
 					urlInMs > 0 && //
 					urlInMs !== callerMs &&
 					!gs.accountMsToSpaceMsToDots?.[callerMs]?.[urlInMs],
-				msBefore: lastMembershipRole ? lastMembershipRole.ms! + 1 : undefined,
-				excludeMemberMss: excludeMemberMss.length ? excludeMemberMss : undefined,
+				msLte: lastMembershipRole?.ms,
+				excludeMemberMss: excludeMemberMss,
 				lastMemberListRoleCodeNum: lastMembershipRole?.num,
 			});
 			let { spaceUpdate, invites = [] } = res;
@@ -178,11 +179,11 @@
 	// TODO: member search?
 </script>
 
-{#if !space || urlInMs === undefined || callerMs === undefined || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]}
+{#if urlInMs === undefined || callerMs === undefined || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]}
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
-{:else if !viewable}
+{:else if !space || !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
 	<div class="p-2 pb-0 w-full max-w-lg">
@@ -258,7 +259,7 @@
 					<div class="mt-2">
 						<div class="fx">
 							<button
-								class="flex-1 fx text-fg1 hover:text-fg3 hover:bg-bg4"
+								class="flex-1 fx text-fg1 group hover:text-fg3 hover:bg-bg4"
 								onclick={() => {
 									navigator.clipboard.writeText(
 										`${page.url.origin}/invite/${invite.ms}_${invite.slugEnd}`,
@@ -270,24 +271,25 @@
 									}, 888);
 								}}
 							>
-								<p class="">
-									{page.url.protocol}//...{invite.slugEnd}
-								</p>
 								{#if copiedInviteMs === invite.ms}
 									<IconCheck class="h-4" />
 								{:else}
 									<IconCopy class="h-4" />
 								{/if}
+								{m.copy()}
+								<p class="ml-1 text-fg2 group-hover:text-fg1">
+									{page.url.protocol}//...{invite.slugEnd}
+								</p>
 							</button>
 							<button
-								class="fx hover:text-fg3 hover:bg-bg4"
+								class="fx pr-1 hover:text-fg3 hover:bg-bg4"
 								onclick={() =>
 									navigator.share({
 										url: `${page.url.origin}/invite/${invite.ms}_${invite.slugEnd}`,
 									})}
 							>
+								<IconShare2 class="h-4" />
 								{m.share()}
-								<IconShare2 class="h-4 -mr-1.5" />
 							</button>
 						</div>
 						<div class="fx justify-between text-fg2">
@@ -326,8 +328,8 @@
 								}
 							}}
 						>
-							{m.revoke()}
 							<IconLinkMinus class="h-4 " />
+							{m.revoke()}
 						</button>
 					</div>
 				{/each}

@@ -1,12 +1,10 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { textInputFocused } from '$lib/dom';
+	import { gotoIfNeeded, textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { setSearchParams } from '$lib/js';
+	import { getAlteredSearchParams } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
-	import { bracketRegex } from '$lib/types/posts/getPostFeed';
 	import { searchGuideArr } from '$lib/types/posts/parseSearchQuery';
 	import { IconArrowsMaximize, IconSearch, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
@@ -20,7 +18,7 @@
 	let trimmedSearchVal = $derived(searchVal.trim());
 
 	let searchUrl = $derived(
-		setSearchParams({
+		getAlteredSearchParams({
 			flat: null,
 			nested: null,
 			new: null,
@@ -34,7 +32,10 @@
 	let tagXFocused = $state(false);
 	let tagIndex = $state(-1);
 	let tagFilter = $derived(
-		trimmedSearchVal.replace(bracketRegex, '').replace(/\s\s+/g, ' ').trim(),
+		trimmedSearchVal
+			.replace(/\[([^\[\]]+)]!?/g, '')
+			.replace(/\s\s+/g, ' ')
+			.trim(),
 	);
 	let savedTagsSet = $derived(
 		new Set(
@@ -176,7 +177,7 @@
 				if (tagXFocused) updateSavedTags([tag], true);
 				else if (tag) addTagToSearchInput(tag);
 				else if (trimmedSearchVal) {
-					e.metaKey ? open(searchUrl, '_blank') : goto(searchUrl);
+					e.metaKey ? open(searchUrl, '_blank') : gotoIfNeeded(searchUrl);
 				}
 			}
 			if (e.key === 'Tab' && !tagFilter) return;

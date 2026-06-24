@@ -1,8 +1,7 @@
-import { and } from 'drizzle-orm';
+import { throwIf } from '$lib/js';
 import { z } from 'zod';
 import { GranularNumPropSchema, GranularTxtPropSchema, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
-import { pf } from '../parts/partFilters';
 import { MySpaceUpdateFromSchema, MySpaceUpdateSchema, SpaceContextSchema } from '../spaces';
 
 export let MyAccountSchema = z.strictObject({
@@ -39,27 +38,27 @@ export let MyAccountUpdatesSchema = MyAccountSchema.pick({
 	.extend({ ms: z.number() });
 export type MyAccountUpdates = z.infer<typeof MyAccountUpdatesSchema>;
 
-export let reduceMyAccountUpdateRows = (rows: PartInsert[]) => {
-	let account: MyAccountUpdates = { ms: 0 };
+export let reduceMyAccountUpdateRows = (rows: PartInsert[] = [], accountMs: number) => {
+	let account: MyAccountUpdates = { ms: accountMs };
 	for (let i = 0; i < rows.length; i++) {
-		let part = rows[i];
-		!i && (account.ms = part.by_ms);
-		if (part.code === pc.msByMs__accountEmail) {
-			account.email = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.msByMs__accountName) {
-			account.name = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.msByMs__accountBio) {
-			account.bio = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.msByMs__accountSavedTags) {
-			account.savedTags = { ms: part.ms, txt: part.txt! };
+		let { code, txt, p1, p2 } = rows[i];
+		throwIf(p1 !== accountMs);
+		if (code === pc._accountEmail_bm) {
+			account.email = { ms: p2!, txt: txt! };
+		} else if (code === pc._accountName_bm) {
+			account.name = { ms: p2!, txt: txt! };
+		} else if (code === pc._accountBio_bm) {
+			account.bio = { ms: p2!, txt: txt! };
+		} else if (code === pc._accountSavedTags_bm) {
+			account.savedTags = { ms: p2!, txt: txt! };
 		}
 	}
 	return account;
 };
-export let reduceMyAccountRows = (rows: PartInsert[]) =>
+export let reduceMyAccountRows = (rows: PartInsert[] = [], accountMs: number) =>
 	({
 		...getDefaultAccount(), //
-		...reduceMyAccountUpdateRows(rows),
+		...reduceMyAccountUpdateRows(rows, accountMs),
 	}) satisfies MyAccount;
 
 export let PublicProfileSchema = z.strictObject({
@@ -118,14 +117,3 @@ export let getDefaultCallerContext = (): CallerContext => ({
 });
 
 export let passwordRegexStr = '(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z]).{8,64}';
-
-export let filterAccountPwHashRow = (accountMs: number) =>
-	and(
-		pf.noAtId,
-		pf.ms.gt0,
-		pf.by_ms.eq(accountMs),
-		pf.in_ms.eq0,
-		pf.code.eq(pc.msByMs__accountPwHash),
-		pf.num.isNull,
-		pf.txt.isNotNull,
-	);

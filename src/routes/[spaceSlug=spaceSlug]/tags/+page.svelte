@@ -1,5 +1,6 @@
 <script lang="ts">
 	import {
+		getCallerIsOwner,
 		getPromptSigningIn,
 		getSpaceContext,
 		gs,
@@ -22,7 +23,8 @@
 	let urlInMs = $derived(getUrlInMs()!);
 	let space = $derived(gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getSpaceContext(urlInMs));
-	let viewable = $derived(space?.isPublic.num || spaceContext?.permissionCode);
+	let callerIsOwner = $derived(getCallerIsOwner());
+	let viewable = $derived(callerIsOwner || space?.isPublic.num || spaceContext?.permissionCode);
 	let tagsData = $derived(gs.spaceMsToTagsMap[urlInMs]);
 	let tags = $derived(tagsData?.tags || []);
 
@@ -32,7 +34,7 @@
 			tags.length && e.detail.loaded();
 			return e.detail.complete();
 		}
-		let lastCount = tags.slice(-1)[0]?.num || Number.MAX_SAFE_INTEGER;
+		let lastCount = tags.at(-1)?.num || Number.MAX_SAFE_INTEGER;
 		let lastTagsWithSameCount: string[] = [];
 		for (let i = tags.length - 1; i >= 0; i--) {
 			let tag = tags[i];
@@ -44,7 +46,6 @@
 		res.tags.length && e.detail.loaded();
 		let endReached = res.tags.length < tagsPerLoad;
 		endReached && e.detail.complete();
-
 		gs.spaceMsToTagsMap = {
 			...gs.spaceMsToTagsMap,
 			[urlInMs]: {
@@ -53,7 +54,6 @@
 			},
 		};
 	};
-
 	let savedTagsSet = $derived(
 		new Set(
 			gs.accounts //
@@ -101,7 +101,7 @@
 				<div class="flex text-lg">
 					<a
 						class="fx px-1 group hover:bg-bg3 text-nowrap overflow-scroll"
-						href={`/__${urlInMs}?q=${`[${tag.txt}]${!urlInMs && tag.in_ms ? ` in_ms:${tag.in_ms}` : ''}`}`}
+						href={`/${urlInMs}__?q=${`[${tag.txt}]${!urlInMs && tag.in_ms ? ` in_ms:${tag.in_ms}` : ''}`}`}
 					>
 						{tag.num} -
 						<span class="ml-1.5 font-bold group-hover:underline">

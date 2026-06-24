@@ -56,7 +56,7 @@
 		<p class="">
 			{m.thisInviteLinkMayHave___()}
 		</p>
-		<a href={`/__${gs.lastSeenInMs}`} class={actionButtonClass}>
+		<a href={`/${gs.lastSeenInMs}__`} class={actionButtonClass}>
 			{m.continue()}
 			<IconChevronRight class="h-5" stroke={3} />
 		</a>

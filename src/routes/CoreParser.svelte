@@ -25,9 +25,6 @@
 		return result.map((s) => s.trim());
 	};
 	let coreSegs = $derived(separateCites(p.core));
-	// $effect(() => {
-	// 	console.log(coreSegs);
-	// });
 </script>
 
 {#each coreSegs as str, i}
@@ -37,7 +34,9 @@
 		{:else if gs.idToPostMap[str]}
 			<CitedPost {...p} post={gs.idToPostMap[str]} depth={p.depth + 1} />
 		{:else}
-			<div class={`bg-bg1 text-sm font-bold text-fg2`}>{m.idNotFound({ id: str })}</div>
+			<div class={`border-l-2 border-bg8 pl-2 bg-bg1 text-sm font-bold text-fg2`}>
+				{(console.warn(m.idNotFound({ id: str })), m.idNotFound({ id: str }))}
+			</div>
 		{/if}
 	{:else if isStringifiedRecord(str)}
 		<pre>{JSON.stringify(JSON.parse(str), null, 2)}</pre>

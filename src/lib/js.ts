@@ -202,16 +202,16 @@ export let splitUntil = (str: string, delimiter: string, limit: number): string[
 export let hasDefinedKeysBesidesMs = (obj: Object) =>
 	Object.entries(obj).some(([k, v]) => k !== 'ms' && v !== undefined);
 
-export let setSearchParams = (
+export let getAlteredSearchParams = (
 	obj: Record<string, string | number | boolean | null | undefined>,
 ) => {
 	let url = new URL(page.url);
-	let sp = new URLSearchParams(url.search);
+	let searchParams = new URLSearchParams(url.search);
 	for (let [key, value] of Object.entries(obj)) {
-		if (value === null) sp.delete(key);
-		else sp.set(key, String(value));
+		if (value === null) searchParams.delete(key);
+		else searchParams.set(key, String(value));
 	}
-	let newSearch = sp
+	let newSearch = searchParams
 		.toString()
 		.replace(/%2C/g, ',')
 		.replace(/=&/g, '&')
@@ -228,18 +228,3 @@ let r = String.raw;
 let base = r`\p{Emoji}(?:\p{EMod}|[\u{E0020}-\u{E007E}]+\u{E007F}|\uFE0F?\u20E3?)`;
 let emojiRegex = new RegExp(r`\p{RI}{2}|(?![#*\d](?!\uFE0F?\u20E3))${base}(?:\u200D${base})*`, 'u');
 export let is1Emoji = (s: string) => countGraphemes(s) === 1 && emojiRegex.test(s);
-
-export let getTagVal = (str: string) => {
-	let tagValEqualsIndex = str.indexOf('=');
-	if (tagValEqualsIndex >= 0) {
-		let txtAfterEquals = str.slice(tagValEqualsIndex + 1);
-		if (!txtAfterEquals) return '';
-		let num = +txtAfterEquals;
-		return Number.isNaN(num) ? txtAfterEquals : num;
-	}
-};
-
-export let getTagNumVal = (str: string) => {
-	let val = getTagVal(str);
-	if (typeof val === 'number') return val;
-};

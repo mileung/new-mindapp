@@ -1,12 +1,12 @@
 import { dev } from '$app/environment';
-import { goto } from '$app/navigation';
+import { gotoIfNeeded } from '$lib/dom';
 import { alertError } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { z } from 'zod';
 import { getWhoObj, gs } from '../global-state.svelte';
 import { m } from '../paraglide/messages';
 import { getDefaultAccount, MyAccountSchema } from './accounts';
-import { normalizeTags } from './posts';
+import { cleanTags } from './posts';
 import { accentCodes, getDefaultSpace, permissionCodes, roleCodes, SpaceSchema } from './spaces';
 
 let localCacheLocalStorageKey = 'mindappLocalCache';
@@ -101,7 +101,7 @@ export let updateSavedTags = async (usedTags: string[], remove = false) => {
 	let savedTags = JSON.parse(gs.accounts![0].savedTags.txt) as string[];
 	savedTags = remove
 		? savedTags.filter((t) => !usedTags.includes(t))
-		: normalizeTags([...savedTags, ...usedTags]);
+		: cleanTags([...savedTags, ...usedTags], true);
 	try {
 		let ms = gs.accounts?.[0].ms
 			? (
@@ -149,9 +149,9 @@ export let signOut = async (callerMs: number, everywhere = false) => {
 		return lc;
 	});
 	if (callerMs === gs.accounts?.[0].ms) {
-		gs.urlToPostFeedMap = {};
+		gs.identifierToPostFeedMap = {};
 		delete gs.accountMsToSpaceMsToCheckedMap[callerMs];
-		goto(`/__${gs.lastSeenInMs}`);
+		gotoIfNeeded(`/${gs.lastSeenInMs}__`);
 	}
 };
 
@@ -160,21 +160,22 @@ export let useCheckedInvite = async () => {
 		if (gs.accounts !== undefined && gs.checkedInvite) {
 			if (gs.accounts[0].ms === gs.checkedInvite.inviter.ms)
 				return alert(m.cannotUseYourOwnInvite());
-			let { redeemMs: ms } = await trpc().checkInvite.mutate({
+			let { redeemMs } = await trpc().checkInvite.mutate({
 				...(await getWhoObj()),
 				inviteMs: gs.checkedInvite.ms,
 				slugEnd: gs.checkedInvite.slugEnd,
 				useIfValid: true,
 			});
-			if (!ms) return alert(m.invalidInvite());
+			if (!redeemMs) return alert(m.invalidInvite());
 			let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
 			updateLocalCache((lc) => {
 				lc.accounts[0].joinedSpaceContexts.unshift({
 					ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
-					roleCode: { ms, num: roleCodes.member },
-					permissionCode: { ms, num: permissionCodes.reactAndPost },
-					flair: { ms, txt: '' },
-					accentCode: { ms, num: accentCodes.none },
+					roleCode: { ms: redeemMs, num: roleCodes.member },
+					permissionCode: { ms: redeemMs, num: permissionCodes.reactAndPost },
+					flair: { ms: redeemMs, txt: '' },
+					accentCode: accentCodes.none,
+					sidePriority: redeemMs,
 				});
 				return lc;
 			});
@@ -186,7 +187,7 @@ export let useCheckedInvite = async () => {
 				},
 			};
 			gs.checkedInvite = undefined;
-			goto(`/__${joinedSpaceMs}`);
+			gotoIfNeeded(`/${joinedSpaceMs}__`);
 		}
 	} catch (error) {
 		alertError(error);

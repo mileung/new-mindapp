@@ -11,8 +11,6 @@ import {
 import {
 	assertLt2Rows,
 	channelPartsByCode,
-	getGranularNumProp,
-	getGranularTxtProp,
 	type GranularNumProp,
 	type GranularTxtProp,
 	type WhoWhereObj,
@@ -31,7 +29,7 @@ export let _getSpaceDots = async (
 		description?: GranularTxtProp;
 		newMemberPermissionCode?: GranularNumProp;
 		getCallerMembership?: boolean;
-		msBefore?: number;
+		msLte?: number;
 		excludeMemberMss?: number[];
 		lastMemberListRoleCodeNum?: number;
 	},
@@ -42,60 +40,55 @@ export let _getSpaceDots = async (
 		spaceMs,
 		callerMs,
 		getCallerMembership,
-		msBefore,
+		msLte,
 		excludeMemberMss = [],
 		lastMemberListRoleCodeNum = roleCodes.admin,
 	} = input;
 	let spaceUpdate: undefined | SpaceDotsUpdate;
 	let invites: undefined | Invite[];
 
-	let firstLoad = msBefore === undefined;
+	let firstLoad = msLte === undefined;
 	let isLocal = !spaceMs;
 	let isPersonal = !isLocal && callerMs === spaceMs;
 	let isLocalOrPersonal = isLocal || isPersonal;
 
-	let id__accountMs_roleCodeRows = isLocalOrPersonal
+	let i_accountMs_roleCode_mbRows = isLocalOrPersonal
 		? []
 		: await db
 				.select()
 				.from(pTable)
 				.where(
 					and(
-						pf.at_ms.gt0,
-						...excludeMemberMss.map((at_ms) => pf.at_ms.notEq(at_ms)),
+						pf.code.eq(pc.i_accountMs_roleCode_mb),
+						pf.p1.eq(spaceMs),
+						...excludeMemberMss.map((memberMs) => pf.p2.notEq(memberMs)),
 						or(
-							getCallerMembership ? pf.at_ms.eq(callerMs) : undefined,
-							and(
-								pf.num.eq(lastMemberListRoleCodeNum),
-								pf.ms.lt(msBefore || Number.MAX_SAFE_INTEGER),
-							),
-							pf.num.lt(lastMemberListRoleCodeNum),
+							getCallerMembership ? pf.p2.eq(callerMs) : undefined,
+							pf.p3.lt(lastMemberListRoleCodeNum),
+							and(pf.p3.eq(lastMemberListRoleCodeNum), pf.p4.lte(msLte || Number.MAX_SAFE_INTEGER)),
 						),
-						pf.in_ms.eq(spaceMs),
-						pf.code.eq(pc.id__accountMs_roleCode),
-						pf.txt.isNull,
 					),
 				)
 				.orderBy(
 					...(getCallerMembership
-						? [sql`CASE WHEN ${pTable.at_ms} = ${callerMs} THEN 0 ELSE 1 END`]
+						? [sql`CASE WHEN ${pTable.p2} = ${callerMs} THEN 0 ELSE 1 END`]
 						: []),
-					pf.num.desc,
-					pf.ms.desc,
+					pf.p3.desc,
+					pf.p4.desc,
 				)
 				.limit(membersPerLoad);
 
 	// TODO: sort all admins and mods to the top
 
 	let {
-		[pc.id_memberCount_spaceDescription]: id_memberCount_spaceDescriptionRows = [],
-		[pc.id_newMemberPermissionCode]: id_newMemberPermissionCodeRows = [],
 		// prettier-ignore
-		[pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd]: inviteId__expiryMs_useCount_maxUses_revokedMs_slugEndRows = [],
-		[pc.id__accountMs_permissionCode]: id__accountMs_permissionCodeRows = [],
-		[pc.acceptMsByMs__inviteId]: acceptMsByMs__inviteIdRows = [],
-		[pc.id__accountMs__flair]: id__accountMs__flairRows = [],
-		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
+		[pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs]: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRows = [],
+		[pc._spaceDescription_imb_memberCount]: _spaceDescription_imb_memberCountRows = [],
+		[pc.imb_newMemberPermissionCode]: imb_newMemberPermissionCodeRows = [],
+		[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows = [],
+		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
+		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc._accountName_bm]: _accountName_bmRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -114,69 +107,51 @@ export let _getSpaceDots = async (
 								isLocalOrPersonal
 									? undefined
 									: and(
-											pf.noAtId,
-											pf.ms.gt0,
-											pf.in_ms.eq(spaceMs),
+											pf.code.eq(pc.imb_newMemberPermissionCode),
+											pf.p1.eq(spaceMs),
 											input.newMemberPermissionCode &&
-												pf.notGranularNum(input.newMemberPermissionCode),
-											pf.code.eq(pc.id_newMemberPermissionCode),
-											pf.txt.isNull,
+												or(
+													pf.p2.notEq(input.newMemberPermissionCode.ms ?? 0),
+													pf.p4.notEq(input.newMemberPermissionCode.num),
+												),
 										),
 								and(
-									pf.noAtId,
-									pf.ms.gt0,
-									pf.in_ms.eq(spaceMs),
-									pf.code.eq(pc.id_memberCount_spaceDescription),
+									pf.code.eq(pc._spaceDescription_imb_memberCount),
+									pf.p1.eq(spaceMs),
 									or(
 										...(input.memberCount === undefined || input.description === undefined
 											? []
 											: [
-													pf.num.notEq(input.memberCount),
 													pf.txt.notEq(input.description.txt),
-													pf.ms.notEq(input.description.ms ?? 0),
+													pf.p2.notEq(input.description.ms ?? 0),
+													pf.p4.notEq(input.memberCount),
 												]),
 									),
-									pf.txt.isNotNull,
 								),
 							)
 						: undefined,
-					...(id__accountMs_roleCodeRows.length
+					...(i_accountMs_roleCode_mbRows.length
 						? [
 								and(
-									pf.noAtId,
-									pf.ms.gt0,
+									pf.code.eq(pc._accountName_bm),
 									or(
-										...[
-											...new Set(id__accountMs_roleCodeRows.flatMap((r) => [r.by_ms, r.at_ms])),
-										].map((accountMs) => pf.by_ms.eq(accountMs)),
-									),
-									pf.in_ms.eq0,
-									pf.code.eq(pc.msByMs__accountName),
-								),
-								and(
-									pf.at_in_ms.eq(spaceMs),
-									pf.ms.gt0,
-									or(...id__accountMs_roleCodeRows.map((r) => pf.by_ms.eq(r.at_ms))),
-									pf.in_ms.eq0,
-									pf.code.eq(pc.acceptMsByMs__inviteId),
-								),
-								and(
-									or(...id__accountMs_roleCodeRows.map((r) => pf.atId({ at_ms: r.at_ms }))),
-									pf.ms.gt0,
-									pf.in_ms.eq(spaceMs),
-									or(
-										and(
-											pf.code.eq(pc.id__accountMs_permissionCode),
-											pf.num.gte0, //
-											pf.txt.isNull,
-										),
-										and(
-											pf.code.eq(pc.id__accountMs__flair),
-											pf.num.isNull,
-											pf.txt.isNotNull,
-											pf.txt.notEq(''),
+										...[...new Set(i_accountMs_roleCode_mbRows.flatMap((r) => [r.p2!, r.p5!]))].map(
+											(accountMs) => pf.p1.eq(accountMs),
 										),
 									),
+								),
+								and(
+									pf.code.eq(pc.acceptBm_inviteIbm),
+									pf.p3.eq(spaceMs),
+									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p2.eq(r.p2!))),
+								),
+								and(
+									or(
+										pf.code.eq(pc.i_accountMs_permCode_mb),
+										pf.code.eq(pc._flair_i_accountMs_mb), //
+									),
+									pf.p1.eq(spaceMs),
+									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p2.eq(r.p2!))),
 								),
 							]
 						: []),
@@ -186,33 +161,41 @@ export let _getSpaceDots = async (
 
 	if (firstLoad) {
 		spaceUpdate = { ms: spaceMs };
-		let id_memberCount_spaceDescriptionRow = assertLt2Rows(id_memberCount_spaceDescriptionRows);
-		if (id_memberCount_spaceDescriptionRow) {
-			spaceUpdate.memberCount = id_memberCount_spaceDescriptionRow.num!;
-			spaceUpdate.description = getGranularTxtProp(id_memberCount_spaceDescriptionRow);
+		let _spaceDescription_imb_memberCountRow = assertLt2Rows(_spaceDescription_imb_memberCountRows);
+		if (_spaceDescription_imb_memberCountRow) {
+			spaceUpdate.memberCount = _spaceDescription_imb_memberCountRow.p4!;
+			spaceUpdate.description = {
+				ms: _spaceDescription_imb_memberCountRow.p2!,
+				by_ms: _spaceDescription_imb_memberCountRow.p3!,
+				txt: _spaceDescription_imb_memberCountRow.txt!,
+			};
 		}
-		let id_newMemberPermissionCodeRow = assertLt2Rows(id_newMemberPermissionCodeRows);
-		if (id_newMemberPermissionCodeRow) {
-			spaceUpdate.newMemberPermissionCode = getGranularNumProp(id_newMemberPermissionCodeRow);
+		let imb_newMemberPermissionCodeRow = assertLt2Rows(imb_newMemberPermissionCodeRows);
+		if (imb_newMemberPermissionCodeRow) {
+			spaceUpdate.newMemberPermissionCode = {
+				ms: imb_newMemberPermissionCodeRow.p2!,
+				by_ms: imb_newMemberPermissionCodeRow.p3!,
+				num: imb_newMemberPermissionCodeRow.p4!,
+			};
 		}
 
 		if (!hasDefinedKeysBesidesMs(spaceUpdate)) spaceUpdate = undefined;
 
-		invites = inviteId__expiryMs_useCount_maxUses_revokedMs_slugEndRows.map((row) => ({
-			ms: row.ms,
-			by_ms: row.by_ms,
-			in_ms: row.in_ms,
-			expiryMs: row.at_ms,
-			maxUses: row.at_in_ms,
-			useCount: row.at_by_ms,
+		invites = _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRows.map((row) => ({
+			in_ms: row.p1!,
+			by_ms: row.p2!,
+			ms: row.p3!,
+			expiryMs: row.p4!,
+			useCount: row.p5!,
+			maxUses: row.p6!,
 			slugEnd: row.txt!,
 		}));
 	}
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
-		let { txt, by_ms } = msByMs__accountNameRows[i];
-		msToAccountNameTxtMap[by_ms] = txt!;
+	for (let i = 0; i < _accountName_bmRows.length; i++) {
+		let { txt, p1 } = _accountName_bmRows[i];
+		msToAccountNameTxtMap[p1!] = txt!;
 	}
 	let accountMsToMembershipMap: Record<number, Membership> = {};
 	let missingNameAccountMssSet: Set<number> = new Set();
@@ -222,51 +205,48 @@ export let _getSpaceDots = async (
 		}
 	};
 
-	for (let i = 0; i < id__accountMs_roleCodeRows.length; i++) {
-		let { ms, num, by_ms, at_ms } = id__accountMs_roleCodeRows[i];
-		accountMsToMembershipMap[at_ms] = {
+	for (let i = 0; i < i_accountMs_roleCode_mbRows.length; i++) {
+		let { p2, p3, p4, p5 } = i_accountMs_roleCode_mbRows[i];
+		accountMsToMembershipMap[p2!] = {
 			invite: { by_ms: 0 },
 			accept: { ms: 0 },
-			roleCode: { num: num!, ms, by_ms },
+			roleCode: { num: p3!!, ms: p4!, by_ms: p5! },
 			permissionCode: { num: 0, ms: 0, by_ms: 0 },
 			flair: { txt: '' },
 		};
 	}
-	for (let i = 0; i < acceptMsByMs__inviteIdRows.length; i++) {
-		let acceptMsByMs__inviteIdRow = acceptMsByMs__inviteIdRows[i];
-		let { ms, by_ms, at_by_ms } = acceptMsByMs__inviteIdRow;
-		checkMissingAccountMsName(at_by_ms);
-		accountMsToMembershipMap[by_ms].invite.by_ms = at_by_ms;
-		accountMsToMembershipMap[by_ms].accept.ms = ms;
+	for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
+		let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
+		let { p1, p2, p4 } = acceptBm_inviteIbmRow;
+		checkMissingAccountMsName(p4!);
+		accountMsToMembershipMap[p1!].invite.by_ms = p4!;
+		accountMsToMembershipMap[p1!].accept.ms = p2!;
 	}
-	for (let i = 0; i < id__accountMs_permissionCodeRows.length; i++) {
-		let { num, ms, by_ms, at_ms } = id__accountMs_permissionCodeRows[i];
-		checkMissingAccountMsName(by_ms);
-		accountMsToMembershipMap[at_ms].permissionCode = { num: num!, ms, by_ms };
+	for (let i = 0; i < i_accountMs_permCode_mbRows.length; i++) {
+		let { p2, p3, p4, p5 } = i_accountMs_permCode_mbRows[i];
+		checkMissingAccountMsName(p5!);
+		accountMsToMembershipMap[p2!].permissionCode = { num: p3!, ms: p4!, by_ms: p5! };
 	}
-	for (let i = 0; i < id__accountMs__flairRows.length; i++) {
-		let { txt, ms, by_ms, at_ms } = id__accountMs__flairRows[i];
-		checkMissingAccountMsName(by_ms);
-		accountMsToMembershipMap[at_ms].flair = { txt: txt!, ms, by_ms };
+	for (let i = 0; i < _flair_i_accountMs_mbRows.length; i++) {
+		let { txt, p2, p3, p4 } = _flair_i_accountMs_mbRows[i];
+		checkMissingAccountMsName(p4!);
+		accountMsToMembershipMap[p2!].flair = { txt: txt!, ms: p3!, by_ms: p4! };
 	}
 
 	let missingNameAccountMss = [...missingNameAccountMssSet];
 	if (missingNameAccountMss.length) {
-		let _msByMs__accountNameRows = await db
+		let __accountName_bmRows = await db
 			.select()
 			.from(pTable)
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					or(...missingNameAccountMss.map((ms) => pf.by_ms.eq(ms))),
-					pf.in_ms.eq0,
-					pf.code.eq(pc.msByMs__accountName),
+					pf.code.eq(pc._accountName_bm), //
+					or(...missingNameAccountMss.map((ms) => pf.p1.eq(ms))),
 				),
 			);
-		for (let i = 0; i < _msByMs__accountNameRows.length; i++) {
-			let { txt, by_ms } = _msByMs__accountNameRows[i];
-			msToAccountNameTxtMap[by_ms] = txt!;
+		for (let i = 0; i < __accountName_bmRows.length; i++) {
+			let { txt, p1 } = __accountName_bmRows[i];
+			msToAccountNameTxtMap[p1!] = txt!;
 		}
 	}
 

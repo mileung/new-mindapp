@@ -1,17 +1,17 @@
 import { ranStr, rulesAllowEmail, throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
 import { getValidAuthCookie, setCookie } from '$lib/server/sessions';
+import { week } from '$lib/time';
 import { type Context } from '$lib/trpc/context';
 import { MyAccountSchema, reduceMyAccountRows, type MyAccount } from '$lib/types/accounts';
 import { pc } from '$lib/types/parts/partCodes';
-import { id0 } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
 import * as argon2 from 'argon2';
 import { and, or } from 'drizzle-orm';
 import { _checkOtp } from '../otp/_checkOtp';
 import { assertLt2Rows, channelPartsByCode, type PartInsert } from '../parts';
 import { pf } from '../parts/partFilters';
-import { normalizeTags } from '../posts';
+import { cleanTags } from '../posts';
 import { makeNewSpaceRows } from '../spaces/_createSpace';
 
 export let _createAccount = async (
@@ -28,134 +28,113 @@ export let _createAccount = async (
 		...input,
 		deleteIfCorrect: true,
 	});
+	console.log('res:', res);
 	if (res.strike || res.expiredOtp) return res;
 	let {
-		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
-		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
+		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
+		[pc._signedInEmailRules_mb]: _signedInEmailRules_mbRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
 				or(
+					pf.code.eq(pc._signedInEmailRules_mb),
 					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.by_ms.gt0,
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountEmail),
-						pf.num.isNull,
-						pf.txt.eq(input.email),
-					),
-					and(
-						pf.noAtId,
-						pf.in_ms.eq0,
-						pf.code.eq(pc.id__signedInEmailRules),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+						pf.code.eq(pc._accountEmail_bm),
+						pf.txt.eq(input.email), //
 					),
 				),
 			),
 	);
-
-	throwIf(msByMs__accountEmailRows.length);
-	let signedInEmailRulesTxt = assertLt2Rows(id__signedInEmailRulesRows)?.txt ?? '';
+	throwIf(_accountEmail_bmRows.length);
+	let signedInEmailRulesTxt = assertLt2Rows(_signedInEmailRules_mbRows)?.txt ?? '';
 	throwIf(
 		signedInEmailRulesTxt && //
 			!rulesAllowEmail(signedInEmailRulesTxt.split('\n'), input.email),
 	);
 
-	let top88MostUsedGlobalTags = normalizeTags(
+	let top88MostUsedGlobalTags = cleanTags(
 		(
 			await tdb
 				.select()
 				.from(pTable)
 				.where(
 					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.in_ms.eq(1),
-						pf.code.eq(pc.idBy8__count_val_tag),
-						pf.num.gt0,
-						pf.txt.isNotNull,
+						pf.code.eq(pc._tag_imBy8_count),
+						pf.p1.eq(1), //
 					),
 				)
-				.orderBy(pf.num.desc, pf.ms.desc)
+				.orderBy(pf.p4.desc, pf.p2.desc)
 				.limit(88)
-		).map((r) => r.txt!),
+		).map((r) => r.txt!, true),
 	);
 
-	let ms = Date.now();
+	let now = Date.now();
 	let myAccountRows: PartInsert[] = [
 		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.msByMs__accountEmail,
+			code: pc._accountEmail_bm,
 			txt: input.email,
+			p1: now,
+			p2: now,
 		},
 		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.msByMs__accountName,
+			code: pc._accountName_bm,
 			txt: input.name,
+			p1: now,
+			p2: now,
 		},
 		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.msByMs__accountBio,
+			code: pc._accountBio_bm,
 			txt: '',
+			p1: now,
+			p2: now,
 		},
 		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.msByMs__accountSavedTags,
+			code: pc._accountSavedTags_bm,
 			txt: JSON.stringify(top88MostUsedGlobalTags),
+			p1: now,
+			p2: now,
 		},
 	];
-	let account = reduceMyAccountRows(myAccountRows);
+	let account = reduceMyAccountRows(myAccountRows, now);
 	if (!MyAccountSchema.safeParse(account).success) throw new Error('Invalid account');
 
 	let clientIdObj = getValidAuthCookie(ctx, 'ms_clientKey');
 	if (!clientIdObj) {
-		clientIdObj = { ms, txt: ranStr() };
+		clientIdObj = { ms: now, txt: ranStr() };
 		setCookie(ctx, 'ms_clientKey', clientIdObj);
 	}
 	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 	if (!sessionIdObj) {
-		sessionIdObj = { ms, txt: ranStr() };
+		sessionIdObj = { ms: now, txt: ranStr() };
 		setCookie(ctx, 'ms_sessionKey', sessionIdObj);
 	}
 
 	let partsToInsert: PartInsert[] = [
 		...myAccountRows,
 		...makeNewSpaceRows({
-			spaceMs: ms,
-			callerMs: ms,
+			spaceMs: now,
+			callerMs: now,
 		}),
 		{
-			...id0,
-			ms,
-			by_ms: ms,
-			code: pc.msByMs__accountPwHash,
+			code: pc._accountPwHash_bm,
 			txt: await argon2.hash(input.password),
+			p1: now,
+			p2: now,
 		},
 		{
-			...id0,
-			at_ms: ms,
-			ms: clientIdObj.ms,
-			code: pc.ms__accountMs__clientKey,
+			code: pc._clientKey_m_accountMs,
 			txt: clientIdObj.txt,
+			p1: clientIdObj.ms,
+			p2: now,
 		},
 		{
-			...id0,
-			at_ms: ms,
-			ms: sessionIdObj.ms,
-			code: pc.ms_ExpiryMs__accountMs__sessionKey,
+			code: pc._sessionKey_m_accountMs_expiryMs,
 			txt: sessionIdObj.txt,
+			p1: sessionIdObj.ms,
+			p2: now,
+			p3: now + week,
 		},
 	];
 	await tdb.insert(pTable).values(partsToInsert);

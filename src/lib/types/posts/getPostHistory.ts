@@ -1,15 +1,17 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
-import { and, eq, or } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { type Post } from '.';
 import { type Database } from '../../local-db';
-import { assert1Row, assertLt2Rows, channelPartsByCode } from '../parts';
+import { assert1Row, channelPartsByCode } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getIdStr, type IdObj } from '../parts/partIds';
+import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let getPostHistory = async (postIdObj: IdObj, version: number) => {
+	// console.log('postIdObj:', postIdObj);
+	// console.log('version:', version);
 	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
 		? trpc().getPostHistory.query({ ...baseInput, postIdObj, version })
@@ -19,83 +21,64 @@ export let getPostHistory = async (postIdObj: IdObj, version: number) => {
 // TODO: paginate history versions?
 export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
-		[pc.postId__ms_sd_oldVersion__core]: oldVersionNumAndMsAtPostIdRows = [],
-		[pc.postTagId__postId_oldVersion]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
-		[pc.exPostCoreId__postId_version]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
+		[pc._core_postImb_oldVersion_m]: _core_postImb_oldVersion_mRows = [],
+		[pc.tagImb_postMb_oldVersion]: tagImb_postMb_oldVersionRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				and(
-					pf.idAsAtId(postIdObj),
-					or(
-						...[
-							pc.postId__ms_sd_oldVersion__core,
-							pc.postTagId__postId_oldVersion,
-							pc.exPostCoreId__postId_version,
-						].map((code) => pf.code.eq(code)),
-					),
-					eq(pTable.num, version),
+					or(pf.code.eq(pc._core_postImb_oldVersion_m), pf.code.eq(pc.tagImb_postMb_oldVersion)),
+					pf.p1.eq(postIdObj.in_ms),
+					pf.p2.eq(postIdObj.ms),
+					pf.p3.eq(postIdObj.by_ms),
+					pf.p4.eq(version),
 				),
 			),
 	);
 
-	let oldVersionNumAndMsAtPostIdRow = assert1Row(oldVersionNumAndMsAtPostIdRows);
-	assertLt2Rows(exPostCoreIdWithNumAsVersionAtPostIdRows);
+	let _core_postImb_oldVersion_mRow = assert1Row(_core_postImb_oldVersion_mRows);
 
-	let {
-		[pc.idBy8__count_val_tag]: tagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8_count_txt]: coreIdAndTxtWithNumAsCountRows = [],
-	} = channelPartsByCode(
-		exPostTagIdWithNumAsVersionAtPostIdRows.length ||
-			exPostCoreIdWithNumAsVersionAtPostIdRows.length
-			? await db
-					.select()
-					.from(pTable)
-					.where(
-						or(
-							and(
-								pf.noAtId,
-								or(...exPostTagIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
-								pf.code.eq(pc.idBy8__count_val_tag),
-								pf.num.gte0,
-								pf.txt.isNotNull,
-							),
-							and(
-								pf.noAtId,
-								or(...exPostCoreIdWithNumAsVersionAtPostIdRows.map((row) => pf.id(row))),
-								pf.code.eq(pc.coreId8_count_txt),
-								pf.num.gte0,
-								pf.txt.isNotNull,
+	let _tag_imBy8_countRows = tagImb_postMb_oldVersionRows.length
+		? await db
+				.select()
+				.from(pTable)
+				.where(
+					or(
+						and(
+							pf.code.eq(pc._tag_imBy8_count),
+							or(
+								...tagImb_postMb_oldVersionRows.map((r) =>
+									and(
+										pf.p1.eq(r.p1!), //
+										pf.p2.eq(r.p2!),
+										pf.p3.eq(r.p3!),
+									),
+								),
 							),
 						),
-					)
-			: [],
-	);
+					),
+				)
+		: [];
 
-	let parts = [
-		...exPostTagIdWithNumAsVersionAtPostIdRows,
-		...exPostCoreIdWithNumAsVersionAtPostIdRows,
-		...tagIdAndTxtWithNumAsCountRows,
-		...coreIdAndTxtWithNumAsCountRows,
-	];
+	let parts = [...tagImb_postMb_oldVersionRows, ..._tag_imBy8_countRows];
 	let tagIdToTxtMap: Record<string, string> = {};
-	let coreIdToTxtMap: Record<string, string> = {};
 	let history: Post['history'] = {
-		[version]: { ms: oldVersionNumAndMsAtPostIdRow.ms, tags: [], core: '' },
+		[version]: {
+			ms: _core_postImb_oldVersion_mRow.p5!,
+			tags: [],
+			core: _core_postImb_oldVersion_mRow.txt!,
+		},
 	};
 
 	for (let i = 0; i < parts.length; i++) {
-		let part = parts[i];
-		if (part.code === pc.postTagId__postId_oldVersion) {
-			history[version]!.tags = [getIdStr(part), ...(history[version]!.tags || [])];
-		} else if (part.code === pc.exPostCoreId__postId_version) {
-			history[version]!.core = getIdStr(part);
-		} else if (part.code === pc.idBy8__count_val_tag) {
-			tagIdToTxtMap[getIdStr(part)] = part.txt!;
-		} else if (part.code === pc.coreId8_count_txt) {
-			coreIdToTxtMap[getIdStr(part)] = part.txt!;
+		let { code, txt, p1, p2, p3 } = parts[i];
+		let idStr = `${p1}_${p2}_${p3}`;
+		if (code === pc.tagImb_postMb_oldVersion) {
+			history[version]!.tags = [idStr, ...(history[version]!.tags || [])];
+		} else if (code === pc._tag_imBy8_count) {
+			tagIdToTxtMap[idStr] = txt!;
 		}
 	}
 
@@ -103,9 +86,6 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 		for (let i = 0; i < history[version].tags.length; i++) {
 			history[version].tags[i] = tagIdToTxtMap[history[version].tags[i]];
 		}
-	}
-	if (history[version]?.core) {
-		history[version].core = coreIdToTxtMap[history[version].core];
 	}
 
 	return { history };

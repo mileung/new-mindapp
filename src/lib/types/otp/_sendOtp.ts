@@ -1,9 +1,9 @@
 import { dev } from '$app/environment';
-import { throwIf } from '$lib/js';
-import { _getEmailRow } from '$lib/server/_getEmailRow';
 import { tdb } from '$lib/server/db';
+import { and } from 'drizzle-orm';
+import { assertLt2Rows } from '../parts';
 import { pc } from '../parts/partCodes';
-import { id0 } from '../parts/partIds';
+import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 export let _sendOtp = async (input: {
@@ -18,16 +18,32 @@ export let _sendOtp = async (input: {
 	fail?: true;
 }> => {
 	let { email, will } = input;
-	if (!will.signIn) {
+	let sendOtp = true;
+	if (will.signIn) {
 		// _signIn already checks for email row
-		let emailRow = await _getEmailRow(email);
-		throwIf(will.createAccount ? emailRow : !emailRow);
+	} else {
+		let _accountEmail_bmRow = assertLt2Rows(
+			await tdb
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc._accountEmail_bm),
+						pf.txt.eq(email), //
+					),
+				),
+		);
+		if (
+			(will.createAccount && _accountEmail_bmRow) ||
+			(will.resetPassword && !_accountEmail_bmRow) //
+		)
+			sendOtp = false;
 	}
 
-	let pin = +('' + Math.random()).slice(-8);
-	if (dev) {
-		pin = 0;
-	} else {
+	let pin = -1;
+	let now = Date.now();
+	if (sendOtp) {
+		pin = dev ? 0 : +('' + Math.random()).slice(-8);
 		// await sendEmail({
 		// 	from: 'noreply@yourdomain.com',
 		// 	to: email,
@@ -35,13 +51,12 @@ export let _sendOtp = async (input: {
 		// 	html: `${otp}`,
 		// });
 	}
-	let ms = Date.now();
 	await tdb.insert(pTable).values({
-		...id0,
-		ms,
-		by_ms: pin,
-		code: pc.otpMs_pin_strikeCount__email,
+		code: pc._email_ms_strikeCount_pin,
 		txt: email,
+		p1: now,
+		p2: 0,
+		p3: pin,
 	});
-	return { otpMs: ms };
+	return { otpMs: now };
 };

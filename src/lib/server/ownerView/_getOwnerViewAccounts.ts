@@ -1,88 +1,61 @@
 import { ownerViewItemsPerLoad } from '$lib/js';
 import { tdb } from '$lib/server/db';
-import { and, desc, or } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { assertLt2Rows, channelPartsByCode } from '../../types/parts';
 import { pc } from '../../types/parts/partCodes';
 import { pf } from '../../types/parts/partFilters';
 import { pTable } from '../../types/parts/partsTable';
 
-export let _getOwnerViewAccounts = async (input: { msBefore?: number }) => {
-	let msByMs__accountEmailRows = await tdb
+export let _getOwnerViewAccounts = async (input: { msLt?: number }) => {
+	let _accountEmail_bmRows = await tdb
 		.select()
 		.from(pTable)
-		.where(
-			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				pf.ms.lt(input.msBefore || Number.MAX_SAFE_INTEGER),
-				pf.by_ms.gt0,
-				pf.in_ms.eq0,
-				pf.code.eq(pc.msByMs__accountEmail),
-				pf.num.isNull,
-				pf.txt.isNotNull,
-			),
-		)
-		.orderBy(desc(pTable.by_ms))
+		.where(and(pf.code.eq(pc._accountEmail_bm), pf.p2.lt(input.msLt || Number.MAX_SAFE_INTEGER)))
+		.orderBy(pf.p2.desc)
 		.limit(ownerViewItemsPerLoad);
 
 	let {
-		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
-		[pc.banMsByMs__accountMs]: banMsByMs__accountMsRows = [],
-		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
+		[pc._signedInEmailRules_mb]: _signedInEmailRules_mbRows = [],
+		[pc._accountName_bm]: _accountName_bmRows = [],
+		[pc.accountMs_banMb]: accountMs_banMbRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
 				or(
+					pf.code.eq(pc._signedInEmailRules_mb),
 					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						or(...msByMs__accountEmailRows.map((r) => pf.by_ms.eq(r.by_ms))),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountName),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+						pf.code.eq(pc._accountName_bm),
+						or(..._accountEmail_bmRows.map((r) => pf.p1.eq(r.p1!))),
 					),
 					and(
-						or(...msByMs__accountEmailRows.map((r) => pf.atId({ at_ms: r.by_ms }))),
-						pf.ms.gt0,
-						pf.by_ms.gt0,
-						pf.in_ms.eq0,
-						pf.code.eq(pc.banMsByMs__accountMs),
-						pf.num.isNull,
-						pf.txt.isNull,
-					),
-					and(
-						pf.noAtId,
-						pf.in_ms.eq0,
-						pf.code.eq(pc.id__signedInEmailRules),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+						pf.code.eq(pc.accountMs_banMb),
+						or(..._accountEmail_bmRows.map((r) => pf.p1.eq(r.p1!))),
 					),
 				),
 			),
 	);
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
-		let { txt, by_ms } = msByMs__accountNameRows[i];
-		msToAccountNameTxtMap[by_ms] = txt!;
+	for (let i = 0; i < _accountName_bmRows.length; i++) {
+		let { txt, p1 } = _accountName_bmRows[i];
+		msToAccountNameTxtMap[p1!] = txt!;
 	}
 
-	let accountMsToBannedMap: Record<number, undefined | { ms: number }> = {};
-	for (let i = 0; i < banMsByMs__accountMsRows.length; i++) {
-		let { ms, at_ms } = banMsByMs__accountMsRows[i];
-		accountMsToBannedMap[at_ms] = { ms };
+	let accountMsToBanMsMap: Record<number, undefined | number> = {};
+	for (let i = 0; i < accountMs_banMbRows.length; i++) {
+		let { p1, p2 } = accountMs_banMbRows[i];
+		accountMsToBanMsMap[p1!] = p2!;
 	}
 
 	return {
-		signedInEmailRulesTxt: assertLt2Rows(id__signedInEmailRulesRows)?.txt ?? '',
-		accounts: msByMs__accountEmailRows.map((r) => ({
+		signedInEmailRulesTxt: assertLt2Rows(_signedInEmailRules_mbRows)?.txt ?? '',
+		accounts: _accountEmail_bmRows.map((r) => ({
 			emailTxt: r.txt!,
-			nameTxt: msToAccountNameTxtMap[r.by_ms],
-			ms: r.by_ms,
-			banned: accountMsToBannedMap[r.by_ms],
+			nameTxt: msToAccountNameTxtMap[r.p1!],
+			ms: r.p2!,
+			banMs: accountMsToBanMsMap[r.p2!],
 		})),
 	};
 };

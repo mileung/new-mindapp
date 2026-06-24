@@ -1,16 +1,18 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { textInputFocused } from '$lib/dom';
+	import { gotoIfNeeded, textInputFocused } from '$lib/dom';
 	import {
 		getBottomOverlayShown,
 		getCallerIsOwner,
 		gs,
+		msToAccountItalic,
 		msToAccountNameTxt,
+		msToSpaceItalic,
 		msToSpaceNameTxt,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { identikana, isTouchScreen } from '$lib/js';
+	import { isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { signOut, unsaveAccount, updateLocalCache } from '$lib/types/local-cache';
 	import {
@@ -35,16 +37,21 @@
 	let showAccountMenu = $state(false);
 	let hideExtensionLink = $state(isTouchScreen);
 	let showSpaceMenu = $state(false);
+	let isEmbed = $derived(page.url.pathname.startsWith('/embed'));
 
 	onMount(() => {
+		if (isEmbed) return;
 		let handler = (e: KeyboardEvent) => {
 			if (!textInputFocused() && gs.lastSeenInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
-				e.key === 'h' && goto(`/__${gs.lastSeenInMs}`);
-				e.key === 's' && goto(`/settings`);
-				(e.key === 'u' || e.key === '?') && goto(`/user-guide`);
+				e.key === 'h' && gotoIfNeeded(`/${gs.lastSeenInMs}__`);
+				e.key === 'd' && gotoIfNeeded(`/${gs.lastSeenInMs}__/dots`);
+				e.key === 't' && gotoIfNeeded(`/${gs.lastSeenInMs}__/tags`);
+				e.key === 'p' && gotoIfNeeded(`/__${callerMs}`);
+				(e.key === 'u' || e.key === '?') && gotoIfNeeded(`/user-guide`);
+				e.key === 's' && gotoIfNeeded(`/settings`);
 
 				// TODO: e.key === 'r' to refresh/empty cache for current page
 
@@ -60,7 +67,7 @@
 					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 					if (newSpaceMsIndex >= sidebarSpaceMss.length)
 						newSpaceMsIndex = sidebarSpaceMss.length - 1;
-					goto(`/__${sidebarSpaceMss[newSpaceMsIndex]}`);
+					goto(`/${sidebarSpaceMss[newSpaceMsIndex]}__`);
 				}
 			}
 		};
@@ -69,23 +76,24 @@
 	});
 
 	let highlightLastSeenInMs = $derived(
-		(page.params.idSlug || page.params.spaceSlug)?.endsWith(`_${gs.lastSeenInMs}`),
+		(page.params.idSlug || page.params.spaceSlug)?.startsWith(`${gs.lastSeenInMs}_`),
 	);
-
+	let caller = $derived(gs.accounts?.[0]);
+	let callerMs = $derived(caller?.ms);
 	let sidebarSpaceMss = $derived<number[]>([
 		// local space ms - everything private in OPFS
 		0,
 		// personal space ms placeholder - everything private in cloud
-		gs.accounts?.[0].ms || 8,
+		callerMs || 8,
 		// global space ms - everything public in cloud
 		1,
-		...(gs.accounts?.[0].joinedSpaceContexts || []).map((s) => s.ms).filter((ms) => ms !== 1),
+		...(caller?.joinedSpaceContexts || []).map((s) => s.ms).filter((ms) => ms !== 1),
 	]);
 </script>
 
 <!-- TODO: remember PostDrop states (open, parsed, etc) when switching spaces -->
 
-<aside class="z-50 bottom-0 fixed w-screen xs:h-screen xs:w-[var(--w-sidebar)] bg-bg2">
+<aside class="z-50 xs:z-0 bottom-0 fixed w-screen xs:h-screen xs:w-[var(--w-sidebar)] bg-bg2">
 	<!-- <div
 		class="hidden xs:block z-50 absolute right-0 h-screen cursor-col-resize w-0.5 hover:w-4"
 		onmousedown={() => {
@@ -115,10 +123,8 @@
 						<AccountIcon isUser ms={gs.accounts[0]?.ms} class="h-6 w-6" />
 					</div>
 					<div class="hidden xs:block flex-1 pr-2">
-						<p
-							class={`text-left ${gs.msToProfileMap[gs.accounts[0]?.ms]?.name.txt ? '' : 'italic'}`}
-						>
-							{msToAccountNameTxt(gs.accounts[0]?.ms)}
+						<p class={`text-left ${msToAccountItalic(gs.accounts[0].ms)}`}>
+							{msToAccountNameTxt(gs.accounts[0].ms)}
 						</p>
 					</div>
 				{/if}
@@ -156,10 +162,10 @@
 				{#each gs.accounts || [] as a, i (a.ms)}
 					<div class={`group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<button
-							class={`max-w-full flex shrink-0 h-10 px-2 gap-2 flex-1 ${a.name ? '' : 'italic'}`}
+							class="max-w-full flex shrink-0 h-10 px-2 gap-2 flex-1"
 							onclick={() => {
 								if (a.signedIn || !a.ms) {
-									gs.urlToPostFeedMap = {};
+									gs.identifierToPostFeedMap = {};
 									delete gs.accountMsToSpaceMsToCheckedMap[a.ms];
 									updateLocalCache((lc) => ({
 										...lc,
@@ -174,8 +180,10 @@
 							<div class="self-center xy h-6 w-6">
 								<AccountIcon isUser ms={a.ms} class="h-6 w-6" />
 							</div>
-							<div class="flex-1 text-nowrap overflow-scroll fx justify-start">
-								{a.ms === 0 ? m.anon() : a.name.txt || identikana(a.ms)}
+							<div
+								class={`flex-1 text-nowrap overflow-scroll fx justify-start ${msToAccountItalic(a.ms)}`}
+							>
+								{msToAccountNameTxt(a.ms)}
 							</div>
 							{#if a.ms && !a.signedIn}
 								<p class="group-hover:hidden text-nowrap text-fg2 self-center text-sm">
@@ -234,7 +242,7 @@
 					<div
 						class={`flex group/space ${highlightLastSeenInMs && spaceMs === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
 					>
-						<a href={`/__${spaceMs}`} class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden`}>
+						<a href={`/${spaceMs}__`} class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden`}>
 							{#if spaceMs === gs.lastSeenInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.idSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
@@ -244,20 +252,19 @@
 								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
 							{/if} -->
 							<SpaceIcon ms={spaceMs} class="shrink-0 w-6" />
-							<p class="text-nowrap overflow-scroll">
+							<p class={`text-nowrap overflow-scroll ${msToSpaceItalic(spaceMs)}`}>
 								{msToSpaceNameTxt(spaceMs)}
 							</p>
 						</a>
-						<!-- TODO: IconCalendar -->
 						<a
-							href={`/__${spaceMs}/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${spaceMs}/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							href={`/${spaceMs}__/tags`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
-							href={`/__${spaceMs}/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/__${spaceMs}/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							href={`/${spaceMs}__/dots`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>
@@ -286,8 +293,8 @@
 			<div class={`${showAccountMenu ? '' : 'hidden xs:block'}`}>
 				{#if gs.accounts}
 					<a
-						href={`/_${gs.accounts[0].ms}_`}
-						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === `/_${gs.accounts?.[0].ms}_` ? 'bg-bg5' : ''}`}
+						href={`/__${gs.accounts[0].ms}`}
+						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === `/__${callerMs}` ? 'bg-bg5' : ''}`}
 					>
 						<IconUserSquare class="shrink-0 w-6" />
 						<p class="text-nowrap overflow-scroll">{m.profile()}</p>

@@ -1,529 +1,1001 @@
 import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { throwIf } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
-import { and, or } from 'drizzle-orm';
+import { and, not, or } from 'drizzle-orm';
 import { z } from 'zod';
-import { type Post } from '.';
+import { getCitedPostIds, type Post } from '.';
 import { type Database } from '../../local-db';
-import {
-	atIdObjMatchesIdObj,
-	channelPartsByCode,
-	hasParent,
-	makePartsUniqueByAtId,
-	makePartsUniqueById,
-	reduceTxtRowsToMap,
-	type GranularNumProp,
-	type GranularTxtProp,
-} from '../parts';
+import { channelPartsByCode, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import {
-	getAtIdObjAsIdObj,
-	getAtIdStr,
-	getFullIdObj,
-	getIdObj,
-	getIdStr,
-	id0,
-	type FullIdObj,
-	type IdObj,
-} from '../parts/partIds';
+import { getIdStr, getIdStrAsIdObj, IdObjSchema, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
-import type { RxnEmoji } from '../reactions';
-import { ParsedSearchSchema } from './parseSearchQuery';
+import {
+	getDefaultParsedQ,
+	getParsedQPaginates,
+	maxTopLvlPostLimitPerSection,
+	ParsedQSchema,
+} from './parseSearchQuery';
 
-export let postsPerLoad = 15;
-export let bracketRegex = /\[([^\[\]]+)]/g;
+export let PostFeedSectionSchema = ParsedQSchema.extend({
+	flatView: z.boolean(),
+	newFirst: z.boolean(),
+	msGte: z.number().optional(),
+	msLte: z.number().optional(),
+	postIdObjsExclude: z.array(IdObjSchema),
+	topLvlPostLimit: z.number().gt(0).lte(maxTopLvlPostLimitPerSection),
+});
 
-export let GetPostFeedArgSchema = ParsedSearchSchema.extend({
-	view: z.enum(['flat', 'nested']),
-	sortedBy: z.enum(['new', 'old']),
-	msBefore: z.number(),
-	msAfter: z.number(),
-}).partial();
+export type PostFeedSection = z.infer<typeof PostFeedSectionSchema>;
+export let getDefaultSection = (): PostFeedSection => ({
+	...getDefaultParsedQ(),
+	flatView: true,
+	newFirst: true,
+	msGte: undefined,
+	msLte: undefined,
+	postIdObjsExclude: [],
+	topLvlPostLimit: maxTopLvlPostLimitPerSection,
+});
 
-export type GetPostFeedArg = z.infer<typeof GetPostFeedArgSchema>;
-
-export let getPostFeed = async (parsedQ: GetPostFeedArg, useLocalDb: boolean) => {
-	let input = { ...(await getWhoObj()), parsedQ };
-	// TODO: use local db as a fallback when cloud db can't find a post
+export let getPostFeed = async (
+	sections: PostFeedSection[],
+	useLocalDb: boolean,
+	setLastViewMsInMs?: number,
+) => {
+	let input = {
+		...(await getWhoObj()),
+		sections, //
+		setLastViewMsInMs,
+	};
 	return useLocalDb //
-		? _getPostFeed(await gsdb(), input, false)
+		? _getPostFeed(await gsdb(), input, true, true)
 		: trpc().getPostFeed.query(input);
 };
 
+type PartialMembership = Record<
+	number,
+	{
+		roleCode?: { num: number };
+		flair?: { txt: string };
+	}
+>;
 export let _getPostFeed = async (
 	db: Database,
 	input: {
 		callerMs: number;
-		parsedQ: GetPostFeedArg;
+		sections: PostFeedSection[];
+		setLastViewMsInMs?: number;
 	},
+	ownerCalled: boolean,
 	dbIsLocal: boolean,
-	ownerCalled?: boolean,
-) => {
-	let { callerMs, parsedQ } = input;
-
-	// parsedQ.eitherInMss
-
+): Promise<{
+	topLvlPostIdStrsSections?: string[][];
+	idToPostMap?: Record<string, Post>;
+	msToAccountNameTxtMap?: Record<string, string>;
+	msToSpaceNameTxtMap?: Record<string, string>;
+	spaceMsToAccountMsToMembershipMap?: Record<string, PartialMembership>;
+}> => {
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
 	// console.log('_getPostFeed q:', q);
+	let { callerMs, sections } = input;
+	// console.log('input:', input);
 
-	let newFirst = parsedQ.sortedBy !== 'old';
-	let topLvlPostIdStrs: string[] = [];
-	let postsToFetchByIdObjs: IdObj[] = [];
-
-	let excludePostIdsFilters = parsedQ.postIdObjsExclude?.map((pio) => pf.notId(pio));
-	let byMsInMsFilters = [
-		parsedQ.eitherByMss?.length
-			? or(...parsedQ.eitherByMss.map((ms) => pf.by_ms.eq(ms)))
-			: undefined,
-		parsedQ.eitherInMss?.length
-			? or(...parsedQ.eitherInMss.map((ms) => pf.in_ms.eq(ms)))
-			: undefined,
-	];
-
-	let topLvlIdObjs: FullIdObj[] = [];
-
-	if (
-		parsedQ.eitherCoreIncludes || //
-		parsedQ.requiredCoreIncludes || //
-		parsedQ.eith || //
-		parsedQ.tagsInclude
-	) {
-		// let searchConditions = q.baseInput.spaceMs? [pf.by_ms.gt0, pf.in_ms.gt0] : undefined;
-
-		// or(
-		// 	...(q.tagsExclude || []).map((tag) => notLike(pTable.tag, `%"${tag}"%`)),
-		// 	...(q.tagsInclude || []).map((tag) => like(pTable.tag, `%"${tag}"%`)),
-		// );
-
-		parsedQ.tagsInclude;
-		parsedQ.coreIncludes;
-
-		// let coreFilter =
-		// 	q.coreExcludes?.length || q.coreIncludes?.length
-		// 		? or(
-		// 				...(q.coreExcludes || []).map((term) => pf.txt.notLike(`%${term}%`)),
-		// 				...(q.coreIncludes || []).map((term) => pf.txt.like(`%${term}%`)),
-		// 			)
-		// 		: undefined;
-
-		topLvlIdObjs = await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					// pf.noParent,
-					// newFirst //
-					// 	? pf.ms.lt(q.fromMs || Number.MAX_SAFE_INTEGER)
-					// 	: pf.ms.gt(q.fromMs || -Number.MAX_SAFE_INTEGER),
-					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
-					// ...byMsInMsFilters,
-					// ...excludePostIdsFilters,
-					pf.code.eq(pc.postId__parentPostId_lastVersion),
-					// pf.num.gte0,
-					// pf.txt.isNull,
+	// let allSectionPostIdStrsInclude= new Set<string>()
+	let inMssSetBySection: Set<number>[] = [];
+	let allSectionInMssSet = new Set(
+		sections.flatMap((section, i) => {
+			let sectionInMss = section.eitherInMss.concat(
+				section.postIdObjsInclude.map(
+					(o) => o.in_ms, //
 				),
-			)
-			.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
-			.limit(postsPerLoad);
-	}
-
-	if (parsedQ.postIdObjsInclude.length) {
-		let {
-			[pc.postId__parentPostId_lastVersion]: postId__parentPostId_lastVersionRows = [],
-			[pc.childPostId__rootId_depth]: childPostId__rootId_depthRows = [],
-		} = channelPartsByCode(
-			await db
-				.select()
-				.from(pTable)
-				.where(
-					and(
-						or(...parsedQ.postIdObjsInclude.map((pio) => pf.id(pio))),
-						...byMsInMsFilters,
-						or(
-							and(
-								pf.noAtId, //
-								pf.code.eq(pc.postId__parentPostId_lastVersion),
-							),
-							pf.code.eq(pc.childPostId__rootId_depth),
-						),
-						pf.num.gte0,
-						pf.txt.isNull,
-					),
-				)
-				.orderBy(pf.ms.desc)
-				.limit(1),
-		);
-
-		let rootIdObjs = [
-			...postId__parentPostId_lastVersionRows,
-			...childPostId__rootId_depthRows,
-		].map((idObj) => ({
-			...id0,
-			...(idObj.code === pc.childPostId__rootId_depth ? getAtIdObjAsIdObj(idObj) : getIdObj(idObj)),
-		}));
-
-		let descendent_childPostId__rootId_depthRows = rootIdObjs.length
+			);
+			inMssSetBySection[i] = new Set(sectionInMss);
+			return sectionInMss;
+		}),
+	);
+	let allSectionInMss = [...allSectionInMssSet];
+	throwIf(!allSectionInMss.length && !ownerCalled);
+	let {
+		[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows = [],
+		[pc.imb_spaceIsPublic]: imb_spaceIsPublicRows = [],
+	} = channelPartsByCode(
+		allSectionInMss.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
-						and(
-							or(...rootIdObjs.map((pio) => pf.idAsAtId(pio))),
-							...byMsInMsFilters,
-							pf.code.eq(pc.childPostId__rootId_depth),
-							pf.num.gte0,
-							pf.txt.isNull,
+						or(
+							...allSectionInMss.flatMap((inMs) => [
+								and(
+									pf.code.eq(pc.i_accountMs_permCode_mb),
+									pf.p1.eq(inMs), //
+									pf.p2.eq(callerMs),
+								),
+								and(
+									pf.code.eq(pc.imb_spaceIsPublic),
+									pf.p1.eq(inMs),
+									pf.p4.eq(1), //
+								),
+							]),
 						),
 					)
-			: [];
-		postsToFetchByIdObjs = [...rootIdObjs, ...descendent_childPostId__rootId_depthRows];
-		topLvlIdObjs = [...rootIdObjs];
-	} else if (parsedQ.view === 'nested') {
-		topLvlIdObjs = await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					pf.noAtId,
-					newFirst //
-						? pf.ms.lt(parsedQ.msBefore || Number.MAX_SAFE_INTEGER)
-						: pf.ms.gt(parsedQ.msAfter || -Number.MAX_SAFE_INTEGER),
-					// ...(q.spaceMs ? [pf.by_ms.gt0, pf.in_ms.gt0] : []),
-					...byMsInMsFilters,
-					...excludePostIdsFilters,
-					pf.code.eq(pc.postId__parentPostId_lastVersion),
-					pf.num.gte0,
-					pf.txt.isNull,
-				),
-			)
-			.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
-			.limit(postsPerLoad);
+			: [],
+	);
+	let viewableSpaceMssSet = new Set(
+		[...i_accountMs_permCode_mbRows, ...imb_spaceIsPublicRows].map((r) => r.p1!),
+	);
+	if (dbIsLocal && allSectionInMssSet.has(0)) viewableSpaceMssSet.add(0);
+	if (callerMs > 0 && allSectionInMssSet.has(callerMs)) viewableSpaceMssSet.add(callerMs);
+	let viewableSpaceMss = [...viewableSpaceMssSet];
+	if (!viewableSpaceMss.length && !ownerCalled) return {};
 
-		postsToFetchByIdObjs = [
-			...topLvlIdObjs,
-			...(topLvlIdObjs.length
+	let tagIdToTxtMap: Record<string, string> = {};
+	let _tag_imBy8_countRequiredRows: PartInsert[] = [];
+	let _tag_imBy8_countEitherRows: PartInsert[] = [];
+	let postIdToAncestryMap: Record<
+		string,
+		undefined | ReturnType<typeof parseAncestry4postImb_parentMb_rootMb_childCount>
+	> = {};
+	let parseAncestry4postImb_parentMb_rootMb_childCount = (r: PartInsert) => {
+		let { p1, p2, p3, p4, p5, p6, p7, p8 } = r;
+		let postIdObj = { in_ms: p1!, ms: p2!, by_ms: p3! };
+		let hasParent = Number.isInteger(p4) && Number.isInteger(p5);
+		let postIdStr = getIdStr(postIdObj);
+		let ancestry = {
+			postIdObj,
+			postIdStr,
+			parentIdObj: hasParent ? { in_ms: p1!, ms: p4!, by_ms: p5! } : null,
+			rootIdObj: hasParent ? { in_ms: p1!, ms: p6!, by_ms: p7! } : null,
+			childCount: p8!,
+		};
+		postIdToAncestryMap[postIdStr] = ancestry;
+		return ancestry;
+	};
+	let allSectionTags = [...new Set(sections.flatMap((s) => [...s.eitherTags, ...s.requiredTags]))];
+	let allSectionTagStarts = [
+		...new Set(sections.flatMap((s) => [...s.eitherTagStarts, ...s.requiredTagStarts])),
+	];
+	let allSectionTagEnds = [
+		...new Set(sections.flatMap((s) => [...s.eitherTagEnds, ...s.requiredTagEnds])),
+	];
+	let anySectionHasTags =
+		allSectionTags.length || allSectionTagStarts.length || allSectionTagEnds.length;
+	let {
+		// [pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountIncludeRows = [],
+		[pc._tag_imBy8_count]: _tag_imBy8_countRowsFromInput = [],
+	} = channelPartsByCode(
+		anySectionHasTags
+			? await db
+					.select()
+					.from(pTable)
+					.where(
+						or(
+							anySectionHasTags
+								? and(
+										pf.code.eq(pc._tag_imBy8_count),
+										// eitherInMss
+										or(...viewableSpaceMss.map((ms) => pf.p1.eq(ms))),
+										or(...allSectionTags.map((t) => pf.txt.eq(t))),
+										or(...allSectionTagStarts.map((t) => pf.txt.like(`${t}%`))),
+										or(...allSectionTagEnds.map((t) => pf.txt.like(`%${t}`))),
+									)
+								: undefined,
+						),
+					)
+			: [],
+	);
+	let postIdsToSendSet = new Set<string>();
+	let topLvlPostIdStrsSections: string[][] = [];
+	for (let i = 0; i < sections.length; i++) {
+		let section = sections[i];
+		// console.log('section:', section);
+		// console.log('section.postIdObjsExclude:', section.postIdObjsExclude);
+		let { newFirst, msGte, msLte } = section;
+		throwIf(!dbIsLocal && !callerMs && (msGte !== undefined || msLte !== undefined));
+		let sectionTopLvlPostsLeft = section.topLvlPostLimit;
+		let resultingPostIdObjsForSection: IdObj[] = [];
+		let topLvlPostIdStrsForSection: string[] = [];
+		let sectionInMss = [...inMssSetBySection[i]];
+		let sectionInMssToCheck = ownerCalled
+			? sectionInMss //
+			: sectionInMss.filter((ms) => viewableSpaceMssSet.has(ms));
+		if (!dbIsLocal && !ownerCalled && !sectionInMssToCheck.length) {
+			topLvlPostIdStrsSections.push(topLvlPostIdStrsForSection);
+			continue;
+		}
+		if (section.postIdObjsInclude.length) {
+			let postImb_parentMb_rootMb_childCountIncludeRows = await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+						or(...viewableSpaceMss.map((ms) => pf.p1.eq(ms))),
+						...section.postIdObjsExclude.map((o) =>
+							not(
+								and(
+									pf.p1.eq(o.in_ms),
+									pf.p2.eq(o.ms), //
+									pf.p3.eq(o.by_ms),
+								)!,
+							),
+						),
+						or(
+							...section.postIdObjsInclude.map((o) =>
+								and(
+									pf.p1.eq(o.in_ms),
+									pf.p2.eq(o.ms), //
+									pf.p3.eq(o.by_ms),
+								),
+							),
+						),
+					),
+				)
+				.orderBy(newFirst ? pf.p4.desc : pf.p4.asc)
+				.limit(section.topLvlPostLimit);
+			resultingPostIdObjsForSection.push(
+				...postImb_parentMb_rootMb_childCountIncludeRows.map(
+					(r) => parseAncestry4postImb_parentMb_rootMb_childCount(r).postIdObj,
+				),
+			);
+			topLvlPostIdStrsForSection.push(
+				...new Set(
+					section.postIdObjsInclude
+						.map((o) => {
+							let s = getIdStr(o);
+							let ancestry = postIdToAncestryMap[s];
+							if (!ancestry) return '';
+							return !section.flatView && ancestry?.rootIdObj
+								? getIdStr(ancestry.rootIdObj) //
+								: s;
+						})
+						.filter((s) => s),
+				),
+			);
+			sectionTopLvlPostsLeft -= topLvlPostIdStrsForSection.length;
+		}
+		let getMissingAncestryForPostIdStrs = async (postIdStrs: string[]) => {
+			let postIdStrsWithoutAncestry = postIdStrs.filter((s) => !postIdToAncestryMap[s]);
+			let postImb_parentMb_rootMb_childCountOtherRows = postIdStrsWithoutAncestry.length
 				? await db
 						.select()
 						.from(pTable)
 						.where(
 							and(
-								or(...topLvlIdObjs.map((pio) => pf.idAsAtId(pio))),
-								pf.code.eq(pc.childPostId__rootId_depth),
-								pf.num.gte0,
-								pf.txt.isNull,
-							),
-						)
-				: []),
-		];
-	} else if (parsedQ.view === 'flat') {
-		topLvlIdObjs = await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					newFirst
-						? pf.ms.lt(parsedQ.msBefore || Number.MAX_SAFE_INTEGER)
-						: pf.ms.gt(parsedQ.msAfter || -Number.MAX_SAFE_INTEGER),
-					...byMsInMsFilters,
-					...excludePostIdsFilters,
-					pf.code.eq(pc.postId__parentPostId_lastVersion),
-					pf.num.gte0,
-					pf.txt.isNull,
-				),
-			)
-			.orderBy(newFirst ? pf.ms.desc : pf.ms.asc)
-			.limit(postsPerLoad);
-
-		postsToFetchByIdObjs = [
-			...topLvlIdObjs,
-			...topLvlIdObjs.flatMap((rio) => (hasParent(rio) ? [getAtIdObjAsIdObj(rio)] : [])),
-		];
-	}
-	topLvlPostIdStrs = topLvlIdObjs.map((pio) => getIdStr(pio));
-
-	let getPostParts = async (postIdObs: IdObj[], omitPostIdAtCitedPostId = false) => {
-		// let accountMss = [...new Set(postIdObs.map((idObj)=>idObj.by_ms))];
-		// let accountIdObjs
-		// TODO: pf.txt.notEq('') for getting account/space names
-		return await db
-			.select()
-			.from(pTable)
-			.where(
-				or(
-					and(
-						or(...postIdObs.map((idObj) => pf.id(idObj))),
-						or(
-							pf.code.eq(pc.postId__parentPostId_lastVersion),
-							omitPostIdAtCitedPostId ? undefined : pf.code.eq(pc.postId__citedPostId),
-						),
-						pf.txt.isNull,
-					),
-					and(
-						or(...postIdObs.map((io) => pf.id(io))),
-						and(
-							pf.ms.gt0,
-							// pt.in_ms.eq(),
-							pf.code.eq(pc.postId_count_emoji),
-							pf.num.gt0,
-							pf.txt.isNotNull,
-						),
-					),
-					and(
-						or(...postIdObs.map((io) => pf.idAsAtId(io))),
-						or(
-							...[
-								pc.postId__ms_sd_lastVersion__core,
-								pc.postId__ms_softDeletedNewestVersion,
-								pc.postTagId__postId_lastVersion,
-								pc.currentPostCoreId__postId_version,
-							].map((code) =>
-								and(
-									pf.code.eq(code),
-									pf.num.gte0,
-									pf.txt.isNull, //
+								pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+								or(
+									...postIdStrsWithoutAncestry.map((s) => {
+										let o = getIdStrAsIdObj(s);
+										return and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										);
+									}),
 								),
 							),
-							and(
-								pf.ms.gt0,
-								// pt.in_ms.eq(),
-								pf.by_ms.eq(parsedQ.callerMs),
-								pf.code.eq(pc.reactionId__postId__emoji),
-								pf.num.isNull,
-								pf.txt.isNotNull,
-							),
-						),
+						)
+				: [];
+			for (let r of postImb_parentMb_rootMb_childCountOtherRows) {
+				parseAncestry4postImb_parentMb_rootMb_childCount(r);
+			}
+		};
+		if (getParsedQPaginates(section) && sectionTopLvlPostsLeft > 0) {
+			let sectionHasRequiredTags = !!(
+				section.requiredTags.length ||
+				section.requiredTagStarts.length ||
+				section.requiredTagEnds.length
+			);
+			let sectionHasEitherTags = !!(
+				section.eitherTags.length ||
+				section.eitherTagStarts.length ||
+				section.eitherTagEnds.length
+			);
+			let sectionHasTags = sectionHasRequiredTags || sectionHasEitherTags;
+			let sectionHasCores =
+				section.requiredCoreIncludes.length || section.eitherCoreIncludes.length;
+			if (sectionHasTags) {
+				for (let _tag_imBy8_countRow of _tag_imBy8_countRowsFromInput) {
+					let { txt, p1, p2, p3 } = _tag_imBy8_countRow;
+					txt = txt!;
+					tagIdToTxtMap[`${p1}_${p2}_${p3}`] = txt;
+					let isRequired =
+						section.requiredTags.some((tag) => txt === tag) ||
+						section.requiredTagStarts.some((tagStart) => txt.startsWith(tagStart)) ||
+						section.requiredTagEnds.some((tagEnd) => txt.endsWith(tagEnd));
+					let isEither =
+						section.eitherTags.some((tag) => txt === tag) ||
+						section.eitherTagStarts.some((tagStart) => txt.startsWith(tagStart)) ||
+						section.eitherTagEnds.some((tagEnd) => txt.endsWith(tagEnd));
+					if (isRequired) _tag_imBy8_countRequiredRows.push(_tag_imBy8_countRow);
+					if (isEither) _tag_imBy8_countEitherRows.push(_tag_imBy8_countRow);
+				}
+			}
+			let possibleResultingPostIdObjsForSection: IdObj[] = [];
+			let notResultingPostIdObjsForSection: IdObj[] = [];
+			let lastLoopForSection = false;
+			let getPostIdObjsNotToFetchMoreStuffFor = () => [
+				...notResultingPostIdObjsForSection,
+				...resultingPostIdObjsForSection,
+				...section.postIdObjsExclude,
+			];
+			let tagImb_postMb_lastVersionGetFilters = () => [
+				or(...sectionInMssToCheck.map((inMs) => pf.p1.eq(inMs))),
+				msGte === undefined ? undefined : pf.p4.gte(msGte),
+				msLte === undefined ? undefined : pf.p4.lte(msLte),
+				or(...section.eitherByMss.map((byMs) => pf.p5.eq(byMs))),
+				...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
+					not(
+						and(
+							pf.p1.eq(o.in_ms),
+							pf.p4.eq(o.ms), //
+							pf.p5.eq(o.by_ms),
+						)!,
 					),
 				),
-			);
-	};
-
-	let {
-		[pc.postId__parentPostId_lastVersion]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.postId__citedPostId]: postId__citedPostIdRows = [],
-		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
-		[pc.postId__ms_sd_lastVersion__core]: curVersionNumAndMsAtPostIdRows = [],
-		[pc.postId__ms_softDeletedNewestVersion]: curSoftDeletedVersionNumAndMsAtPostIdRows = [],
-		[pc.postTagId__postId_lastVersion]: curPostTagIdWNumAsVersionAtPostIdRows = [],
-		[pc.currentPostCoreId__postId_version]: curPostCoreIdWNumAsVersionAtPostIdRows = [],
-		[pc.postId_count_emoji]: postId_count_emojiRows = [],
-		// [pc.assignedRoleNumIdAtAccountId]: assignedRoleNumIdAtAccountIdRows = [],
-		// [pc.nameTxtMsAtAccountId]: nameTxtMsAtAccountIdRows = [],
-	} = channelPartsByCode(
-		postsToFetchByIdObjs.length ? await getPostParts(postsToFetchByIdObjs) : [],
-	);
-
-	let spaceMssToFetchSet = new Set<number>();
-
-	let citedIdObjsToFetch = makePartsUniqueByAtId(
-		postId__citedPostIdRows.filter((aio) => {
-			spaceMssToFetchSet.add(aio.at_in_ms);
-			return !postsToFetchByIdObjs.find((fetchedIo) => atIdObjMatchesIdObj(aio, fetchedIo));
-		}),
-	).map((aio) => getAtIdObjAsIdObj(aio));
-
-	if (parsedQ.callerMs) {
-		if (parsedQ.eitherInMss.length) {
-			for (let i = 0; i < parsedQ.eitherInMss.length; i++) {
-				spaceMssToFetchSet.delete(parsedQ.eitherInMss[i]);
+			];
+			let loops = 0;
+			while (
+				!lastLoopForSection &&
+				sectionTopLvlPostsLeft > 0 &&
+				topLvlPostIdStrsForSection.length < section.topLvlPostLimit
+			) {
+				if (++loops > 8) {
+					console.warn('loops:', loops);
+					// I mean... if a user searches for replies to an account with a certain core,
+					// it could go on until the last possibleResultingPostIdObjsForSection
+					// is found, so in theory several loops may legitimately be needed.
+					// Like if I want posts replying to account __0 whose core includes " ",
+					// that'll hit the limit easily.
+					break;
+					// TODO: indicate on frontend that they query hit the loop limit.
+					// They need to change the time range
+				}
+				let tagImb_postMb_lastVersionRowsForThisLoop: PartInsert[] = [];
+				let postIdObjsWithAllRequiredTags: IdObj[] = [];
+				let postIdObjsWithRequiredTagsAndEitherTags: IdObj[] = [];
+				if (sectionHasRequiredTags) {
+					if (_tag_imBy8_countRequiredRows.length) {
+						let tagImb_postMb_lastVersionRequiredRows = await db
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pf.code.eq(pc.tagImb_postMb_lastVersion),
+									...tagImb_postMb_lastVersionGetFilters(),
+									...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
+										not(
+											and(
+												pf.p1.eq(o.in_ms),
+												pf.p4.eq(o.ms), //
+												pf.p5.eq(o.by_ms),
+											)!,
+										),
+									),
+									or(
+										..._tag_imBy8_countRequiredRows.map((row) =>
+											and(
+												pf.p1.eq(row.p1!), //
+												pf.p2.eq(row.p2!),
+												pf.p3.eq(row.p3!),
+											),
+										),
+									),
+								),
+							)
+							.orderBy(newFirst ? pf.p4.desc : pf.p4.asc)
+							.limit(_tag_imBy8_countRequiredRows.length * section.topLvlPostLimit);
+						let postIdStrToRequiredTagsMap: Record<string, string[]> = {};
+						for (let i = 0; i < tagImb_postMb_lastVersionRequiredRows.length; i++) {
+							let { p1, p2, p3, p4, p5 } = tagImb_postMb_lastVersionRequiredRows[i];
+							let postIdStr = `${p1}_${p4}_${p5}`;
+							postIdStrToRequiredTagsMap[postIdStr] ??= [];
+							postIdStrToRequiredTagsMap[postIdStr].push(tagIdToTxtMap[`${p1}_${p2}_${p3}`]);
+						}
+						let notResultingPostIdSetForThisLoop = new Set<string>();
+						postIdObjsWithAllRequiredTags = Object.entries(postIdStrToRequiredTagsMap)
+							.filter(([postIdStr, postTags]) => {
+								if (!notResultingPostIdSetForThisLoop.has(postIdStr)) {
+									let postHasAllRequiredTags =
+										!section.requiredTags.length ||
+										section.requiredTags.every((tag) => postTags.some((t) => t === tag));
+									let postHasAllRequiredTagStarts =
+										!section.requiredTagStarts.length ||
+										section.requiredTagStarts.every((tagStart) =>
+											postTags.some((t) => t.startsWith(tagStart)),
+										);
+									let postHasAllRequiredTagEnds =
+										!section.requiredTagEnds.length ||
+										section.requiredTagEnds.every((tagEnd) =>
+											postTags.some((t) => t.endsWith(tagEnd)),
+										);
+									return (
+										postHasAllRequiredTags &&
+										postHasAllRequiredTagStarts &&
+										postHasAllRequiredTagEnds
+									);
+								}
+								notResultingPostIdSetForThisLoop.add(postIdStr);
+							})
+							.map(([strId]) => getIdStrAsIdObj(strId));
+						notResultingPostIdObjsForSection.push(
+							...[...notResultingPostIdSetForThisLoop].map((s) => getIdStrAsIdObj(s)),
+						);
+						if (!sectionHasEitherTags) {
+							tagImb_postMb_lastVersionRowsForThisLoop = tagImb_postMb_lastVersionRequiredRows;
+							postIdObjsWithRequiredTagsAndEitherTags = postIdObjsWithAllRequiredTags;
+						}
+						lastLoopForSection = postIdObjsWithAllRequiredTags.length < section.topLvlPostLimit;
+					} else lastLoopForSection = true;
+				}
+				if (sectionHasEitherTags) {
+					if (
+						_tag_imBy8_countEitherRows.length &&
+						(!sectionHasRequiredTags || postIdObjsWithAllRequiredTags.length)
+					) {
+						tagImb_postMb_lastVersionRowsForThisLoop = await db
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pf.code.eq(pc.tagImb_postMb_lastVersion),
+									...tagImb_postMb_lastVersionGetFilters(),
+									...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
+										not(
+											and(
+												pf.p1.eq(o.in_ms),
+												pf.p4.eq(o.ms), //
+												pf.p5.eq(o.by_ms),
+											)!,
+										),
+									),
+									sectionHasRequiredTags
+										? or(
+												..._tag_imBy8_countEitherRows.flatMap((_tag_imBy8_countEitherRow) =>
+													postIdObjsWithAllRequiredTags.map((postIdObj) =>
+														and(
+															pf.p1.eq(_tag_imBy8_countEitherRow.p1!),
+															pf.p2.eq(_tag_imBy8_countEitherRow.p2!),
+															pf.p3.eq(_tag_imBy8_countEitherRow.p3!),
+															pf.p4.eq(postIdObj.ms),
+															pf.p5.eq(postIdObj.by_ms),
+														),
+													),
+												),
+											)
+										: or(
+												..._tag_imBy8_countEitherRows.map((_tag_imBy8_countEitherRow) =>
+													and(
+														pf.p1.eq(_tag_imBy8_countEitherRow.p1!),
+														pf.p2.eq(_tag_imBy8_countEitherRow.p2!),
+														pf.p3.eq(_tag_imBy8_countEitherRow.p3!),
+													),
+												),
+											),
+								),
+							)
+							.orderBy(newFirst ? pf.p4.desc : pf.p4.asc)
+							.limit(_tag_imBy8_countEitherRows.length * section.topLvlPostLimit);
+						let postIdStrToHasEitherTagsSet = new Set<string>();
+						for (let i = 0; i < tagImb_postMb_lastVersionRowsForThisLoop.length; i++) {
+							let { p1, p4, p5 } = tagImb_postMb_lastVersionRowsForThisLoop[i];
+							postIdStrToHasEitherTagsSet.add(`${p1}_${p4}_${p5}`);
+						}
+						postIdObjsWithRequiredTagsAndEitherTags = [...postIdStrToHasEitherTagsSet].map((s) =>
+							getIdStrAsIdObj(s),
+						);
+						if (!tagImb_postMb_lastVersionRowsForThisLoop.length) lastLoopForSection = true;
+					} else lastLoopForSection = true;
+				}
+				if (sectionHasCores) {
+					let _core_postImb_lastVersion_mRows = await db
+						.select()
+						.from(pTable)
+						.where(
+							and(
+								pf.code.eq(pc._core_postImb_lastVersion_m),
+								or(...sectionInMssToCheck.map((inMs) => pf.p1.eq(inMs))),
+								...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
+									not(
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										)!,
+									),
+								),
+								...section.requiredCoreIncludes.map((coreIncludes) =>
+									pf.txt.like(`%${coreIncludes}%`),
+								),
+								or(
+									...section.eitherCoreIncludes.map((coreIncludes) =>
+										pf.txt.like(`%${coreIncludes}%`),
+									),
+								),
+								or(
+									...postIdObjsWithRequiredTagsAndEitherTags.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										),
+									),
+								),
+							),
+						)
+						.orderBy(newFirst ? pf.p2.desc : pf.p2.asc)
+						.limit(section.topLvlPostLimit);
+					if (_core_postImb_lastVersion_mRows.length) {
+						for (let i = 0; i < _core_postImb_lastVersion_mRows.length; i++) {
+							let { p1, p2, p3 } = _core_postImb_lastVersion_mRows[i];
+							possibleResultingPostIdObjsForSection.push({
+								in_ms: p1!,
+								ms: p2!,
+								by_ms: p3!,
+							});
+						}
+					} else lastLoopForSection = true;
+				} else {
+					possibleResultingPostIdObjsForSection.push(...postIdObjsWithRequiredTagsAndEitherTags);
+				}
+				if (!sectionHasTags && !sectionHasCores) {
+					let postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch = await db
+						.select()
+						.from(pTable)
+						.where(
+							and(
+								pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+								...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
+									not(
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										)!,
+									),
+								),
+								or(...sectionInMssToCheck.map((ms) => pf.p1.eq(ms))),
+								msGte === undefined ? undefined : pf.p2.gte(msGte),
+								msLte === undefined ? undefined : pf.p2.lte(msLte),
+								or(...section.eitherByMss.map((byMs) => pf.p3.eq(byMs))),
+								or(...section.eitherAtByMss.map((byMs) => pf.p5.eq(byMs))),
+							),
+						)
+						.orderBy(newFirst ? pf.p2.desc : pf.p2.asc)
+						.limit(section.topLvlPostLimit);
+					possibleResultingPostIdObjsForSection.push(
+						...postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch.map(
+							(r) => parseAncestry4postImb_parentMb_rootMb_childCount(r).postIdObj,
+						),
+					);
+					if (!postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch.length)
+						lastLoopForSection = true;
+				}
+				let resultingPostIdObjsForSectionForThisLoop: IdObj[] = [];
+				if (!section.eitherAtByMss.length) {
+					resultingPostIdObjsForSectionForThisLoop.push(...possibleResultingPostIdObjsForSection);
+					possibleResultingPostIdObjsForSection = [];
+				} else if (possibleResultingPostIdObjsForSection.length) {
+					let postImb_parentMb_rootMb_childCountNoAncestryRows = await db
+						.select()
+						.from(pTable)
+						.where(
+							and(
+								pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+								or(
+									...possibleResultingPostIdObjsForSection.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										),
+									),
+								),
+								or(...section.eitherAtByMss.map((byMs) => pf.p5.eq(byMs))),
+							),
+						);
+					for (let r of postImb_parentMb_rootMb_childCountNoAncestryRows) {
+						parseAncestry4postImb_parentMb_rootMb_childCount(r);
+					}
+					resultingPostIdObjsForSectionForThisLoop.push(
+						...possibleResultingPostIdObjsForSection.filter((o) => {
+							let ancestry = postIdToAncestryMap[getIdStr(o)];
+							if (ancestry) return true;
+							notResultingPostIdObjsForSection.push(o);
+						}),
+					);
+				}
+				if (section.flatView) {
+					topLvlPostIdStrsForSection.push(
+						...resultingPostIdObjsForSectionForThisLoop.map((o) => getIdStr(o)),
+					);
+					sectionTopLvlPostsLeft -= resultingPostIdObjsForSectionForThisLoop.length;
+				} else {
+					let prevTopLvlPostIdStrsForSectionLength = topLvlPostIdStrsForSection.length;
+					await getMissingAncestryForPostIdStrs(
+						resultingPostIdObjsForSectionForThisLoop.map((o) => getIdStr(o)),
+					);
+					topLvlPostIdStrsForSection = [
+						...new Set([
+							...topLvlPostIdStrsForSection,
+							...resultingPostIdObjsForSectionForThisLoop.map((o) => {
+								let { rootIdObj, postIdObj } = postIdToAncestryMap[getIdStr(o)]!;
+								return getIdStr(rootIdObj ? rootIdObj : postIdObj);
+							}),
+						]),
+					];
+					sectionTopLvlPostsLeft -=
+						topLvlPostIdStrsForSection.length - prevTopLvlPostIdStrsForSectionLength;
+				}
+				resultingPostIdObjsForSection.push(...resultingPostIdObjsForSectionForThisLoop);
 			}
 		}
-		if (spaceMssToFetchSet.size) {
-			let citedInMss = [...spaceMssToFetchSet];
-			let {
-				[pc.id__spaceName]: id__spaceNameWithPublicBinRows = [],
-				[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
-			} = channelPartsByCode(
-				await db
-					.select()
-					.from(pTable)
-					.where(
-						or(
-							and(
-								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
-								pf.code.eq(pc.id__spaceName), //
-							),
-							and(
-								or(...citedInMss.map((ms) => pf.in_ms.eq(ms))),
-								pf.by_ms.eq(parsedQ.callerMs),
-								pf.code.eq(pc.id__accountMs_roleCode),
-							),
-						),
-					),
+		topLvlPostIdStrsForSection = topLvlPostIdStrsForSection.slice(0, section.topLvlPostLimit);
+		if (section.flatView) {
+			await getMissingAncestryForPostIdStrs(topLvlPostIdStrsForSection);
+			topLvlPostIdStrsForSection
+				.flatMap((s) => {
+					let ancestry = postIdToAncestryMap[s];
+					return ancestry
+						? ancestry.parentIdObj
+							? [s, getIdStr(ancestry.parentIdObj)]
+							: [s] //
+						: [];
+				})
+				.forEach((s) => postIdsToSendSet.add(s));
+		} else {
+			let topLvlPostIdStrsWithChildren = topLvlPostIdStrsForSection.filter(
+				(s) => postIdToAncestryMap[s]?.childCount,
 			);
+			let topLvlPostIdStrsWithoutAncestry = topLvlPostIdStrsForSection.filter(
+				(s) => !postIdToAncestryMap[s],
+			);
+			let postImb_parentMb_rootMb_childCountDescendentRows =
+				topLvlPostIdStrsWithChildren.length || topLvlPostIdStrsWithoutAncestry.length
+					? await db
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+									or(
+										...topLvlPostIdStrsWithoutAncestry.map((s) => {
+											let o = getIdStrAsIdObj(s);
+											return and(
+												pf.p1.eq(o.in_ms),
+												pf.p2.eq(o.ms), //
+												pf.p3.eq(o.by_ms),
+											);
+										}),
+										...[...topLvlPostIdStrsWithChildren, ...topLvlPostIdStrsWithoutAncestry].map(
+											(s) => {
+												let o = getIdStrAsIdObj(s);
+												return and(
+													pf.p1.eq(o.in_ms),
+													pf.p6.eq(o.ms), //
+													pf.p7.eq(o.by_ms),
+												);
+											},
+										),
+									),
+								),
+							)
+					: [];
+			[
+				...topLvlPostIdStrsForSection,
+				...postImb_parentMb_rootMb_childCountDescendentRows.map(
+					(r) => parseAncestry4postImb_parentMb_rootMb_childCount(r).postIdStr,
+				),
+			].forEach((s) => postIdsToSendSet.add(s));
 		}
+		topLvlPostIdStrsSections.push(topLvlPostIdStrsForSection);
 	}
-
-	if (citedIdObjsToFetch.length) {
-		let {
-			// [pc.postId__citedPostId]: postId__citedPostIdRows = [],
-			[pc.postId__parentPostId_lastVersion]: _postIdWNumAsLastVersionAtPPostIdRows = [],
-			[pc.reactionId__postId__emoji]: _reactionId__postId__emojiRows = [],
-			[pc.postId__ms_sd_lastVersion__core]: _curVersionNumAndMsAtPostIdRows = [],
-			[pc.postId__ms_softDeletedNewestVersion]: _curSoftDeletedVersionNumAndMsAtPostIdRows = [],
-			[pc.postTagId__postId_lastVersion]: _curPostTagIdWNumAsVersionAtPostIdRows = [],
-			[pc.currentPostCoreId__postId_version]: _curPostCoreIdWNumAsVersionAtPostIdRows = [],
-			[pc.postId_count_emoji]: _postId_count_emojiRows = [],
-			// [pc.assignedRoleNumIdAtAccountId]: _assignedRoleNumIdAtAccountIdRows = [],
-			// [pc.nameTxtMsAtAccountId]: _nameTxtMsAtAccountIdRows = [],
-		} = channelPartsByCode(await getPostParts(citedIdObjsToFetch, true));
-		postIdWNumAsLastVersionAtPPostIdRows.push(..._postIdWNumAsLastVersionAtPPostIdRows);
-		reactionId__postId__emojiRows.push(..._reactionId__postId__emojiRows);
-		curVersionNumAndMsAtPostIdRows.push(..._curVersionNumAndMsAtPostIdRows);
-		curSoftDeletedVersionNumAndMsAtPostIdRows.push(..._curSoftDeletedVersionNumAndMsAtPostIdRows);
-		curPostTagIdWNumAsVersionAtPostIdRows.push(..._curPostTagIdWNumAsVersionAtPostIdRows);
-		curPostCoreIdWNumAsVersionAtPostIdRows.push(..._curPostCoreIdWNumAsVersionAtPostIdRows);
-		postId_count_emojiRows.push(..._postId_count_emojiRows);
-		// assignedRoleNumIdAtAccountIdRows.push(..._assignedRoleNumIdAtAccountIdRows);
-		// nameTxtMsAtAccountIdRows.push(..._nameTxtMsAtAccountIdRows);
-	}
-
-	let {
-		[pc.idBy8__count_val_tag]: tagId8_count_txtRows = [],
-		[pc.coreId8_count_txt]: coreId8_count_txtRows = [],
-	} = channelPartsByCode(
-		curPostTagIdWNumAsVersionAtPostIdRows.length || curPostCoreIdWNumAsVersionAtPostIdRows.length
+	let getPostParts = async (postIdObjs: IdObj[], forCitedPosts = false) => {
+		let inMssSet = new Set<number>();
+		let byMssSet = new Set<number>();
+		let inMsToByMssMap: Record<number, Set<number>> = {};
+		for (let { by_ms, in_ms } of postIdObjs) {
+			inMssSet.add(in_ms);
+			byMssSet.add(by_ms);
+			inMsToByMssMap[in_ms] ??= new Set();
+			inMsToByMssMap[in_ms].add(by_ms);
+		}
+		let inMss = [...inMssSet];
+		let byMss = [...byMssSet];
+		let spaceMssToCheckViewable: number[] = [];
+		if (forCitedPosts) {
+			let notViewableSpaceMssSet = new Set(
+				allSectionInMss.filter((ms) => !viewableSpaceMssSet.has(ms)),
+			);
+			postIdObjs = postIdObjs.filter((o) => !notViewableSpaceMssSet.has(o.in_ms));
+			spaceMssToCheckViewable = inMss.filter((ms) => !notViewableSpaceMssSet.has(ms));
+		}
+		let postIdObjsWithoutAncestry = postIdObjs.filter((o) => !postIdToAncestryMap[getIdStr(o)]);
+		let postParts = postIdObjs.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						or(
-							and(
-								or(
-									...makePartsUniqueById(curPostTagIdWNumAsVersionAtPostIdRows).map((row) =>
-										pf.id(row),
-									),
+							...spaceMssToCheckViewable.flatMap((inMs) => [
+								and(
+									pf.code.eq(pc.i_accountMs_permCode_mb),
+									pf.p1.eq(inMs), //
+									pf.p2.eq(callerMs),
 								),
-								pf.noAtId,
-								pf.code.eq(pc.idBy8__count_val_tag),
-								pf.num.gte0,
-								pf.txt.isNotNull,
+								and(
+									pf.code.eq(pc.imb_spaceIsPublic),
+									pf.p1.eq(inMs),
+									pf.p4.eq(1), //
+								),
+							]),
+							and(
+								pf.code.eq(pc._spaceName_imb), //
+								or(...inMss.map((ms) => pf.p1.eq(ms))),
+							),
+							and(
+								pf.code.eq(pc._accountName_bm), //
+								or(...byMss.map((ms) => pf.p1.eq(ms))),
 							),
 							and(
 								or(
-									...makePartsUniqueById(curPostCoreIdWNumAsVersionAtPostIdRows).map((row) =>
-										pf.id(row),
+									pf.code.eq(pc._flair_i_accountMs_mb), //
+									pf.code.eq(pc.i_accountMs_roleCode_mb),
+								),
+								pf.txt.notEq(''),
+								or(
+									...inMss.map((inMs) =>
+										and(
+											pf.p1.eq(inMs),
+											or(...[...inMsToByMssMap[inMs]].map((byMs) => pf.p2.eq(byMs))),
+										),
 									),
 								),
-								pf.noAtId,
-								pf.code.eq(pc.coreId8_count_txt),
-								pf.num.gte0,
-								pf.txt.isNotNull,
+							),
+							postIdObjsWithoutAncestry.length
+								? and(
+										pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+										or(
+											...postIdObjsWithoutAncestry.map((o) =>
+												and(
+													pf.p1.eq(o.in_ms),
+													pf.p2.eq(o.ms), //
+													pf.p3.eq(o.by_ms),
+												),
+											),
+										),
+									)
+								: undefined,
+							and(
+								pf.code.eq(pc.tagImb_postMb_lastVersion),
+								or(
+									...postIdObjs.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p4.eq(o.ms), //
+											pf.p5.eq(o.by_ms),
+										),
+									),
+								),
+							),
+							and(
+								or(
+									pf.code.eq(pc._core_postImb_lastVersion_m),
+									pf.code.eq(pc._emoji_postImb_count), //
+								),
+								or(
+									...postIdObjs.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+										),
+									),
+								),
+							),
+							and(
+								pf.code.eq(pc._emoji_postImb_reactionBm),
+								or(
+									...postIdObjs.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p2.eq(o.ms), //
+											pf.p3.eq(o.by_ms),
+											pf.p4.eq(callerMs),
+										),
+									),
+								),
 							),
 						),
 					)
-			: [],
-	);
+			: [];
+		// console.log('postParts:', postParts);
+		return postParts;
+	};
+	let postIdObjsToSend: IdObj[] = [...postIdsToSendSet].map((s) => getIdStrAsIdObj(s));
+	let {
+		[pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountRows = [],
+		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
+		[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows = [],
+		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
+		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
+		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
+		[pc._accountName_bm]: _accountName_bmRows = [],
+		[pc._spaceName_imb]: _spaceName_imbRows = [],
+	} = channelPartsByCode(postIdObjsToSend.length ? await getPostParts(postIdObjsToSend) : []);
+	let citedIdObjsToFetch = [
+		...new Set(
+			_core_postImb_lastVersion_mRows
+				.flatMap((r) => getCitedPostIds(r.txt!))
+				.filter((s) => !postIdsToSendSet.has(s))
+				.slice(0, 88), // Limit how many cited posts can be fetched
+		),
+	].map((s) => getIdStrAsIdObj(s));
+	if (citedIdObjsToFetch.length) {
+		let {
+			[pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountRows2 = [],
+			[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows2 = [],
+			[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows2 = [],
+			[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows2 = [],
+			[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows2 = [],
+			[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows2 = [],
+			[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows2 = [],
+			[pc._emoji_postImb_count]: _emoji_postImb_countRows2 = [],
+			[pc._accountName_bm]: _accountName_bmRows2 = [],
+			[pc.imb_spaceIsPublic]: imb_spaceIsPublicRows2 = [],
+			[pc._spaceName_imb]: _spaceName_imbRows2 = [],
+		} = channelPartsByCode(await getPostParts(citedIdObjsToFetch, true));
+		[...i_accountMs_permCode_mbRows2, ...imb_spaceIsPublicRows2].forEach((r) =>
+			viewableSpaceMssSet.add(r.p1!),
+		);
+		_accountName_bmRows.push(..._accountName_bmRows2);
+		viewableSpaceMss = [...viewableSpaceMssSet];
+		let keepViewable = (rows: PartInsert[]) =>
+			ownerCalled ? rows : rows.filter((r) => viewableSpaceMssSet.has(r.p1!));
+		for (let i = 0; i < citedIdObjsToFetch.length; i++) {
+			let idObj = citedIdObjsToFetch[i];
+			if (ownerCalled || viewableSpaceMssSet.has(idObj.in_ms)) {
+				let idStr = getIdStr(idObj);
+				if (!postIdsToSendSet.has(idStr)) {
+					postIdsToSendSet.add(idStr); // This ain't really necessary but for consistency's sake
+					postIdObjsToSend.push(idObj);
+				}
+			}
+		}
 
+		// prettier-ignore
+		postImb_parentMb_rootMb_childCountRows.push(...keepViewable(postImb_parentMb_rootMb_childCountRows2));
+		_core_postImb_lastVersion_mRows.push(...keepViewable(_core_postImb_lastVersion_mRows2));
+		tagImb_postMb_lastVersionRows.push(...keepViewable(tagImb_postMb_lastVersionRows2));
+		_emoji_postImb_reactionBmRows.push(...keepViewable(_emoji_postImb_reactionBmRows2));
+		i_accountMs_roleCode_mbRows.push(...keepViewable(i_accountMs_roleCode_mbRows2));
+		_flair_i_accountMs_mbRows.push(...keepViewable(_flair_i_accountMs_mbRows2));
+		_emoji_postImb_countRows.push(...keepViewable(_emoji_postImb_countRows2));
+		_accountName_bmRows.push(..._accountName_bmRows2);
+		_spaceName_imbRows.push(...keepViewable(_spaceName_imbRows2));
+	}
+	for (let r of postImb_parentMb_rootMb_childCountRows) {
+		parseAncestry4postImb_parentMb_rootMb_childCount(r);
+	}
+
+	let alreadyFetchedTagIdStrSet = new Set(
+		_tag_imBy8_countRowsFromInput.map((r) => `${r.p1}_${r.p2}_${r.p3}`),
+	);
+	let tagIdStrsToFetch = [
+		...new Set(
+			tagImb_postMb_lastVersionRows
+				.map((r) => `${r.p1}_${r.p2}_${r.p3}`)
+				.filter((s) => !alreadyFetchedTagIdStrSet.has(s)),
+		),
+	];
+	let _tag_imBy8_countRowsForFetchedPosts = tagIdStrsToFetch.length
+		? await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc._tag_imBy8_count),
+						or(
+							...tagIdStrsToFetch.map((s) => {
+								let o = getIdStrAsIdObj(s);
+								return and(
+									pf.p1.eq(o.in_ms),
+									pf.p2.eq(o.ms), //
+									pf.p3.eq(o.by_ms),
+								);
+							}),
+						),
+					),
+				)
+		: [];
+	for (let i = 0; i < _tag_imBy8_countRowsForFetchedPosts.length; i++) {
+		let { txt, p1, p2, p3 } = _tag_imBy8_countRowsForFetchedPosts[i];
+		tagIdToTxtMap[`${p1}_${p2}_${p3}`] = txt!;
+	}
 	let idToPostMap: Record<string, Post> = {};
-	for (let i = 0; i < postIdWNumAsLastVersionAtPPostIdRows.length; i++) {
-		let mainPartObj = postIdWNumAsLastVersionAtPPostIdRows[i];
-		let partIdStr = getIdStr(mainPartObj);
-		idToPostMap[partIdStr] = {
-			...getFullIdObj(mainPartObj),
-			history: mainPartObj.num //
-				? { [mainPartObj.num]: { ms: 0, tags: [] } }
-				: null,
+	for (let i = 0; i < postIdObjsToSend.length; i++) {
+		let idStr = getIdStr(postIdObjsToSend[i]);
+		let { postIdObj, parentIdObj, childCount } = postIdToAncestryMap[idStr]!;
+		idToPostMap[idStr] = {
+			...postIdObj,
+			childCount,
+			at_ms: parentIdObj?.ms ?? undefined,
+			at_by_ms: parentIdObj?.by_ms ?? undefined,
+			history: null,
 		};
 	}
-	let tagIdToTxtMap = reduceTxtRowsToMap(tagId8_count_txtRows);
-	let coreIdToTxtMap = reduceTxtRowsToMap(coreId8_count_txtRows);
 	let subParts = [
-		...curPostTagIdWNumAsVersionAtPostIdRows,
-		...curPostCoreIdWNumAsVersionAtPostIdRows,
-		...curVersionNumAndMsAtPostIdRows,
-		...curSoftDeletedVersionNumAndMsAtPostIdRows,
-		...postId_count_emojiRows,
-		...reactionId__postId__emojiRows,
+		..._core_postImb_lastVersion_mRows,
+		...tagImb_postMb_lastVersionRows,
+		..._emoji_postImb_reactionBmRows,
+		...i_accountMs_roleCode_mbRows,
+		..._flair_i_accountMs_mbRows,
+		..._emoji_postImb_countRows,
+		..._accountName_bmRows,
+		..._spaceName_imbRows,
 	];
+	let msToAccountNameTxtMap: Record<number, string> = {};
+	let msToSpaceNameTxtMap: Record<number, string> = {};
+	let spaceMsToAccountMsToMembershipMap: Record<number, PartialMembership> = {};
 	for (let i = 0; i < subParts.length; i++) {
 		let part = subParts[i];
-		let partIdStr = getIdStr(part);
-		let partAtIdStr = getAtIdStr(part);
-		if (part.code === pc.postTagId__postId_lastVersion) {
-			idToPostMap[partAtIdStr].history![part.num!]!.tags!.push(tagIdToTxtMap[partIdStr]);
-		} else if (part.code === pc.currentPostCoreId__postId_version) {
-			idToPostMap[partAtIdStr].history![part.num!]!.core = coreIdToTxtMap[partIdStr];
-		} else if (part.code === pc.postId__ms_sd_lastVersion__core) {
-			idToPostMap[partAtIdStr].history![part.num!]!.ms = part.ms;
-		} else if (part.code === pc.postId__ms_softDeletedNewestVersion) {
-			idToPostMap[partAtIdStr].history![part.num!]!.tags = null;
-		} else if (part.code === pc.postId_count_emoji) {
-			idToPostMap[partIdStr].rxnEmojiCount = {
-				...idToPostMap[partIdStr].rxnEmojiCount,
-				[part.txt!]: part.num!,
+		let { code, txt, p1, p2, p3, p4, p5, p6 } = part;
+		if (code === pc._core_postImb_lastVersion_m) {
+			let postIdStr = `${p1}_${p2}_${p3}`;
+			idToPostMap[postIdStr].history ??= {};
+			idToPostMap[postIdStr].history[p4!] = {
+				ms: p5!,
+				tags: [],
+				core: txt!,
 			};
-		} else if (part.code === pc.reactionId__postId__emoji) {
-			idToPostMap[partAtIdStr].myRxnEmojis = [
-				part.txt as RxnEmoji,
-				...(idToPostMap[partAtIdStr].myRxnEmojis || []),
-			];
+		} else if (code === pc.tagImb_postMb_lastVersion) {
+			let tagIdStr = `${p1}_${p2}_${p3}`;
+			let postIdStr = `${p1}_${p4}_${p5}`;
+			idToPostMap[postIdStr].history ??= {};
+			idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdToTxtMap[tagIdStr]);
+		} else if (code === pc._emoji_postImb_reactionBm) {
+			(idToPostMap[`${p1}_${p2}_${p3}`].myRxnEmojis ??= []).push(txt!);
+		} else if (code === pc.i_accountMs_roleCode_mb) {
+			((spaceMsToAccountMsToMembershipMap[p1!] ??= {})[p2!] ??= {}).roleCode = { num: p3! };
+		} else if (code === pc._flair_i_accountMs_mb) {
+			((spaceMsToAccountMsToMembershipMap[p1!] ??= {})[p2!] ??= {}).flair = { txt: txt! };
+		} else if (code === pc._emoji_postImb_count) {
+			(idToPostMap[`${p1}_${p2}_${p3}`].rxnEmojiCount ??= {})[txt!] = p4!;
+		} else if (code === pc._accountName_bm) {
+			msToAccountNameTxtMap[p1!] = txt!;
+		} else if (code === pc._spaceName_imb) {
+			msToSpaceNameTxtMap[p1!] = txt!;
 		}
 	}
-
-	postId_count_emojiRows;
-	reactionId__postId__emojiRows;
-
-	// let test = or(
-	// 	and(
-	// 		or(
-	// 			...postIdObs.map((idObj) =>
-	// 				and(pf.atId({at_ms:idObj.by_ms), pf.ms.gt0, pf.in_ms.eq(idObj.in_ms)),
-	// 			),
-	// 		),
-	// 		pf.code.eq(pc.assignedRoleNumIdAtAccountId),
-	// 	),
-	// 	and(
-	// 		// TODO: idk if filtering down arrays to be unique is worth it here. Same for querying promos
-	// 		// or(...postIdObs.map((idObj) => pf.atId({at_ms:idObj.by_ms))),
-	// 		or(...[...new Set(postIdObs.map((idObj) => idObj.by_ms))].map((byMs) => pf.atId({at_ms:byMs))),
-	// 		pf.by_ms.eq0,
-	// 		pf.in_ms.eq0,
-	// 		pf.code.eq(pc.nameTxtMsAtAccountId),
-	// 	),
-	// );
-
-	let msToAccountNameTxtMap: Record<number, string> = {};
-	// for (let i = 0; i < nameTxtMsAtAccountIdRows.length; i++) {
-	// 	let { txt, at_ms } = nameTxtMsAtAccountIdRows[i];
-	// 	msToAccountNameTxtMap[at_ms] = txt!;
-	// }
-
-	let msToSpaceNameTxtMap: Record<number, string> = {};
-	// for (let i = 0; i < nameTxtMsAtAccountIdRows.length; i++) {
-	// 	let { txt, at_ms } = nameTxtMsAtAccountIdRows[i];
-	// 	// msToSpaceNameTxtMap[at_ms] = txt!;
-	// }
-
-	let spaceMsToAccountMsToMembershipMap: Record<
-		number,
-		Record<
-			number,
-			{
-				role?: GranularNumProp;
-				flair?: GranularTxtProp; // TODO: Indicate if the flair by_ms is a mod/admin
-			}
-		>
-	> = {};
-	// for (let i = 0; i < assignedRoleNumIdAtAccountIdRows.length; i++) {
-	// 	let { in_ms, at_ms } = assignedRoleNumIdAtAccountIdRows[i];
-	// 	if (!spaceMsToAccountMsToMembershipMap[in_ms]) spaceMsToAccountMsToMembershipMap[in_ms] = {};
-	// 	spaceMsToAccountMsToMembershipMap[in_ms]![at_ms] = true;
-	// }
-
-	// TODO: delete any posts in idToPostMap that are deleted (null history) and have no non-deleted descendants
-	// console.log('getPostFeed:', topLvlPostIdStrs, idToPostMap);
-
-	if (!dbIsLocal) {
-		if (!ownerCalled) {
-			throwIf(false);
-		}
+	if (
+		input.setLastViewMsInMs !== undefined &&
+		viewableSpaceMssSet.has(input.setLastViewMsInMs) &&
+		!dbIsLocal &&
+		callerMs
+	) {
+		let now = Date.now();
+		await db
+			.update(pTable)
+			.set({ p3: now })
+			.where(
+				and(
+					pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+					pf.p1.eq(callerMs), //
+					pf.p2.eq(callerMs),
+				),
+			);
 	}
-	parsedQ.eitherInMss;
-
+	// let allPostsInMapHaveUniqueTags = Object.entries(idToPostMap).every(([k, v]) => {
+	// 	let lastVersion = getLastVersion(v);
+	// 	return (
+	// 		v.history![lastVersion]!.tags.length === [...new Set(v.history![lastVersion]!.tags)].length
+	// 	);
+	// });
+	// console.log('allPostsInMapHaveUniqueTags:', allPostsInMapHaveUniqueTags);
 	return {
-		topLvlPostIdStrs,
+		topLvlPostIdStrsSections,
 		idToPostMap,
 		msToAccountNameTxtMap,
 		msToSpaceNameTxtMap,

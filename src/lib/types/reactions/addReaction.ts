@@ -12,7 +12,7 @@ import {
 } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getIdObj, getIdObjAsAtIdObj, id0, type IdObj } from '../parts/partIds';
+import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { moveTagOrRxnCountsBy1 } from '../posts';
 
@@ -37,22 +37,27 @@ export let _addReaction = async (
 	},
 	dbIsLocal: boolean,
 ) => {
-	let rxnInMs = dbIsLocal ? 0 : input.postIdObj.in_ms;
-	let ms = Date.now();
-	let reactionId__postId__emojiObj: PartInsert = {
-		...getIdObjAsAtIdObj(input.postIdObj),
-		ms,
-		by_ms: input.callerMs,
-		in_ms: rxnInMs,
-		code: pc.reactionId__postId__emoji,
+	let now = Date.now();
+	let _emoji_postImb_reactionBmRow: PartInsert = {
+		code: pc._emoji_postImb_reactionBm,
 		txt: input.emoji,
+		p1: input.postIdObj.in_ms,
+		p2: input.postIdObj.ms,
+		p3: input.postIdObj.by_ms,
+		p4: input.callerMs,
+		p5: now,
 	};
-	let partsToInsert: PartInsert[] = [reactionId__postId__emojiObj];
-
+	let partsToInsert: PartInsert[] = [
+		_emoji_postImb_reactionBmRow,
+		// ...[...Array(88)].map((_, i) => ({ // for testing
+		// 	..._emoji_postImb_reactionBmRow,
+		// 	p5: _emoji_postImb_reactionBmRow.p5! + (i + 1) * 88888888,
+		// })),
+	];
 	let {
-		[pc.postId__parentPostId_lastVersion]: postId__parentPostId_lastVersionRows = [],
-		[pc.reactionId__postId__emoji]: reactionId__postId__emojiRows = [],
-		[pc.postId_count_emoji]: postId_count_emojiRows = [],
+		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
+		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
@@ -60,43 +65,43 @@ export let _addReaction = async (
 			.where(
 				or(
 					and(
-						pf.id(input.postIdObj),
-						pf.code.eq(pc.postId__parentPostId_lastVersion),
-						pf.num.gte0,
-						pf.txt.isNull,
+						pf.code.eq(pc._core_postImb_lastVersion_m),
+						pf.p1.eq(input.postIdObj.in_ms),
+						pf.p2.eq(input.postIdObj.ms),
+						pf.p3.eq(input.postIdObj.by_ms),
 					),
 					and(
-						pf.idAsAtId(input.postIdObj),
-						pf.ms.gt0,
-						pf.by_ms.eq(input.callerMs),
-						pf.in_ms.eq(rxnInMs),
-						pf.code.eq(pc.reactionId__postId__emoji),
-						pf.num.isNull,
+						pf.code.eq(pc._emoji_postImb_reactionBm),
 						pf.txt.eq(input.emoji),
+						pf.p1.eq(input.postIdObj.in_ms),
+						pf.p2.eq(input.postIdObj.ms),
+						pf.p3.eq(input.postIdObj.by_ms),
+						pf.p4.eq(input.callerMs),
 					),
 					and(
-						pf.noAtId,
-						pf.id(input.postIdObj),
-						pf.code.eq(pc.postId_count_emoji),
-						pf.num.gt0,
+						pf.code.eq(pc._emoji_postImb_count),
 						pf.txt.eq(input.emoji),
+						pf.p1.eq(input.postIdObj.in_ms),
+						pf.p2.eq(input.postIdObj.ms),
+						pf.p3.eq(input.postIdObj.by_ms),
 					),
 				),
 			),
 	);
-	if (reactionId__postId__emojiRows.length) throw new Error(`Already added this reaction`);
-	assert1Row(postId__parentPostId_lastVersionRows);
-	assertLt2Rows(postId_count_emojiRows)
+	if (_emoji_postImb_reactionBmRows.length) throw new Error(`Already added this reaction`);
+	assert1Row(_core_postImb_lastVersion_mRows);
+	assertLt2Rows(_emoji_postImb_countRows)
 		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], true)
 		: partsToInsert.push({
-				...id0,
-				...getIdObj(input.postIdObj),
-				code: pc.postId_count_emoji,
-				num: 1,
+				code: pc._emoji_postImb_count,
 				txt: input.emoji,
+				p1: input.postIdObj.in_ms,
+				p2: input.postIdObj.ms,
+				p3: input.postIdObj.by_ms,
+				p4: 1,
 			});
 
 	// console.log('partsToInsert', JSON.stringify(partsToInsert, null, 2));
 	await db.insert(pTable).values(partsToInsert);
-	return { ms };
+	return { ms: now };
 };

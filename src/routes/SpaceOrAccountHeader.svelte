@@ -5,7 +5,9 @@
 		getWhoObj,
 		getWhoWhereObj,
 		gs,
+		msToAccountItalic,
 		msToAccountNameTxt,
+		msToSpaceItalic,
 		msToSpaceNameTxt,
 		toggleAccountBan,
 	} from '$lib/global-state.svelte';
@@ -154,31 +156,54 @@
 										: 0;
 								updateLocalCache((lc) => {
 									if (p.account) {
-										if (changes.nameTxt !== undefined)
-											lc.accounts[0].name = { ms, txt: changes.nameTxt };
-										if (changes.bioTxt !== undefined)
-											lc.accounts[0].bio = { ms, txt: changes.bioTxt };
+										if (changes.nameTxt !== undefined) {
+											lc.accounts[0].name = {
+												ms,
+												txt: changes.nameTxt,
+											};
+											gs.msToProfileMap[accountOrSpaceMs]!.name = lc.accounts[0].name;
+										}
+										if (changes.bioTxt !== undefined) {
+											lc.accounts[0].bio = {
+												ms,
+												txt: changes.bioTxt,
+											};
+											gs.msToProfileMap[accountOrSpaceMs]!.bio = lc.accounts[0].bio;
+										}
 									}
 									if (p.space) {
-										if (changes.nameTxt !== undefined)
+										if (changes.nameTxt !== undefined) {
 											lc.msToSpaceMap[p.space.ms]!.name = { ms, txt: changes.nameTxt };
-										if (changes.descriptionTxt !== undefined)
+											gs.msToSpaceMap[accountOrSpaceMs]!.name = lc.msToSpaceMap[p.space.ms]!.name;
+										}
+										if (changes.descriptionTxt !== undefined) {
 											lc.msToSpaceMap[p.space.ms]!.description = {
 												ms,
 												txt: changes.descriptionTxt,
 											};
-										if (changes.pinnedQueryTxt !== undefined)
+											gs.msToSpaceMap[accountOrSpaceMs]!.description =
+												lc.msToSpaceMap[p.space.ms]!.description;
+										}
+										if (changes.pinnedQueryTxt !== undefined) {
 											lc.msToSpaceMap[p.space.ms]!.pinnedQuery = {
 												ms,
 												txt: changes.pinnedQueryTxt,
 											};
-										if (changes.isPublicNum !== undefined)
+											gs.msToSpaceMap[accountOrSpaceMs]!.pinnedQuery =
+												lc.msToSpaceMap[p.space.ms]!.pinnedQuery;
+										}
+										if (changes.isPublicNum !== undefined) {
 											lc.msToSpaceMap[p.space.ms]!.isPublic = { ms, num: changes.isPublicNum };
+											gs.msToSpaceMap[accountOrSpaceMs]!.isPublic =
+												lc.msToSpaceMap[p.space.ms]!.isPublic;
+										}
 										if (changes.newMemberPermissionCodeNum !== undefined) {
 											lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode = {
 												ms,
 												num: changes.newMemberPermissionCodeNum,
 											};
+											gs.msToSpaceMap[accountOrSpaceMs]!.newMemberPermissionCode =
+												lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode;
 										}
 									}
 									return lc;
@@ -286,7 +311,9 @@
 		{/if}
 	{:else}
 		<div class="flex">
-			<p class="text-xl font-bold">
+			<p
+				class={`text-xl font-bold ${(p.account ? msToAccountItalic : msToSpaceItalic)(accountOrSpaceMs)}`}
+			>
 				{(p.account ? msToAccountNameTxt : msToSpaceNameTxt)(accountOrSpaceMs)}
 			</p>
 			{#if draftSettings.nameTxt}
@@ -304,7 +331,7 @@
 			{#if draftSettings.pinnedQueryTxt}
 				<a
 					class="flex-1 fx overflow-hidden text-fg1 hover:text-fg3 underline decoration-fg1 hover:bg-bg4 hover:decoration-fg3"
-					href={`/__${accountOrSpaceMs}?q=${draftSettings.pinnedQueryTxt}`}
+					href={`/${accountOrSpaceMs}__?q=${draftSettings.pinnedQueryTxt}`}
 				>
 					<IconPin class="shrink-0 w-4 mr-1" />
 					<div class="flex-1 overflow-scroll">
@@ -312,7 +339,7 @@
 					</div>
 				</a>
 			{:else if p.space}
-				<p class="text-fg2">{m.nothingPinned()}</p>
+				<p class="flex-1 text-fg2">{m.nothingPinned()}</p>
 			{/if}
 			{#if accountOrSpaceMs}
 				<p class="text-fg2">

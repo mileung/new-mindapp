@@ -1,6 +1,5 @@
 import { scrape } from '$lib/dom';
 import { assertInputIsOwner, atDomainRegex, emailRegex, inputIsOwner, throwIf } from '$lib/js';
-import { m } from '$lib/paraglide/messages';
 import { _getCallerContext } from '$lib/server/_getCallerContext';
 import { _getPublicProfile } from '$lib/server/_getPublicProfile';
 import { tdb } from '$lib/server/db';
@@ -30,12 +29,12 @@ import {
 	WhoObjSchema,
 	WhoWhereObjSchema,
 } from '$lib/types/parts';
-import { FullIdObjSchema, IdObjSchema } from '$lib/types/parts/partIds';
+import { IdObjSchema } from '$lib/types/parts/partIds';
 import { PostSchema } from '$lib/types/posts';
 import { _addPost } from '$lib/types/posts/addPost';
 import { _deletePost } from '$lib/types/posts/deletePost';
 import { _editPost } from '$lib/types/posts/editPost';
-import { _getPostFeed, GetPostFeedArgSchema } from '$lib/types/posts/getPostFeed';
+import { _getPostFeed, PostFeedSectionSchema } from '$lib/types/posts/getPostFeed';
 import { _getPostHistory } from '$lib/types/posts/getPostHistory';
 import { EmojiStringSchema } from '$lib/types/reactions';
 import { _addReaction } from '$lib/types/reactions/addReaction';
@@ -127,7 +126,7 @@ export let router = t.router({
 				email: normalizingEmailSchema,
 			}),
 		)
-		.mutation(async ({ input }) => _checkOtp(input)),
+		.mutation(async ({ input }) => _checkOtp({ ...input, deleteIfCorrect: false })),
 	createAccount: makeProcedure()
 		.input(
 			z.strictObject({
@@ -181,7 +180,7 @@ export let router = t.router({
 			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
-			if (!input.callerMs) throw new Error(m.placeholderError());
+			throwIf(!input.callerMs);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
 			return _resetPasswordSignedIn(input);
@@ -405,7 +404,7 @@ export let router = t.router({
 						c.permissionCode?.num !== permissionCodes.reactAndPost,
 				);
 			}
-			return _addPost(tdb, post);
+			return _addPost(tdb, post, false, false, true);
 		}),
 	editPost: makeProcedure(postLimiter)
 		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
@@ -425,29 +424,26 @@ export let router = t.router({
 					c.permissionCode?.num !== permissionCodes.reactAndPost,
 			);
 			!ownerCalled && throwIf(!c.inGlobal);
-			return _editPost(tdb, post);
+			return _editPost(tdb, post, false);
 		}),
 	deletePost: makeProcedure(postLimiter)
 		.input(
 			WhoObjSchema.extend({
-				fullPostIdObj: FullIdObjSchema,
-				version: z.number().gte(0).nullable(),
+				postIdObj: IdObjSchema,
 			}).strict(),
 		)
 		.mutation(async ({ ctx, input }) => {
-			let { fullPostIdObj, callerMs } = input;
+			let { postIdObj, callerMs } = input;
 			let ownerCalled = inputIsOwner(input);
-			if (!ownerCalled) {
-				if (!callerMs || fullPostIdObj.by_ms !== callerMs) throw new Error('Invalid callerMs');
-			}
+			throwIf(!callerMs || (postIdObj.by_ms !== callerMs && !ownerCalled));
 			let c = await _getCallerContext(
 				ctx,
-				{ ...input, spaceMs: input.fullPostIdObj.in_ms },
+				{ ...input, spaceMs: input.postIdObj.in_ms },
 				{ signedIn: true, roleCode: !ownerCalled },
 			);
 			throwIf(!c.signedIn);
 			!ownerCalled && throwIf(!c.roleCode);
-			return _deletePost(tdb, fullPostIdObj, input.version);
+			return _deletePost(tdb, postIdObj);
 		}),
 	addReaction: makeProcedure(reactionLimiter)
 		.input(
@@ -507,7 +503,7 @@ export let router = t.router({
 				description: GranularTxtPropSchema.optional(),
 				newMemberPermissionCode: GranularNumPropSchema.optional(),
 				getCallerMembership: z.boolean().optional(),
-				msBefore: z.number().optional(),
+				msLte: z.number().optional(),
 				excludeMemberMss: z.array(z.number()).optional(),
 				lastMemberListRoleCodeNum: z.number().optional(),
 			}).strict(),
@@ -587,8 +583,8 @@ export let router = t.router({
 		.input(
 			WhoWhereObjSchema.extend({
 				postIdObj: IdObjSchema,
-				msBefore: z.number(),
-				rxnIdObjsExclude: z.array(IdObjSchema),
+				msLte: z.number(),
+				rxnMsByMssExclude: z.array(IdObjSchema.omit({ in_ms: true })),
 			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {
@@ -607,22 +603,18 @@ export let router = t.router({
 	getPostFeed: makeProcedure(feedLimiter)
 		.input(
 			WhoObjSchema.extend({
-				parsedQ: GetPostFeedArgSchema,
+				sections: z.array(PostFeedSectionSchema).max(3),
+				setLastViewMsInMs: z.number().optional(),
 			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, {
-				signedIn: true,
-				// isPublic: !ownerCalled,
-				// roleCode: !ownerCalled,
-			});
+			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(input.callerMs && !c.signedIn);
-			// !ownerCalled && throwIf(!c.isPublic?.num && !c.roleCode);
-			return _getPostFeed(tdb, input, true, ownerCalled);
+			return _getPostFeed(tdb, input, ownerCalled, false);
 		}),
 	getOwnerViewAccounts: makeProcedure(feedLimiter)
-		.input(WhoObjSchema.merge(z.object({ msBefore: z.number().optional() })).strict())
+		.input(WhoObjSchema.merge(z.object({ msLt: z.number().optional() })).strict())
 		.query(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
@@ -675,7 +667,7 @@ export let router = t.router({
 			return _setAccountBan(input);
 		}),
 	getOwnerViewSpaces: makeProcedure(feedLimiter)
-		.input(WhoObjSchema.merge(z.object({ msBefore: z.number().optional() })).strict())
+		.input(WhoObjSchema.merge(z.object({ msLt: z.number().optional() })).strict())
 		.query(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });

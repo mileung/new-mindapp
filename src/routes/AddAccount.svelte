@@ -47,11 +47,11 @@
 					...lc.accounts.filter((a) => a.ms !== account.ms),
 				],
 			}));
-			gs.urlToPostFeedMap = {};
+			gs.identifierToPostFeedMap = {};
 			delete gs.accountMsToSpaceMsToCheckedMap[account.ms];
 			gs.checkedInvite //
 				? useCheckedInvite()
-				: goto(`/__${gs.lastSeenInMs}`);
+				: goto(`/${gs.lastSeenInMs}__`);
 		}
 	};
 </script>
@@ -153,7 +153,6 @@
 				e.preventDefault();
 				try {
 					let res = await trpc().signIn.mutate({
-						...(await getWhoObj()),
 						otpMs,
 						pin,
 						email,
@@ -171,7 +170,7 @@
 		</form>
 	{:else if otpMs}
 		<p class="text-xl font-black">{m.checkYourInbox()}</p>
-		<p class="mt-2 text-lg">{m.enterTheOneTimePinSentTo()}</p>
+		<p class="mt-2 text-lg">{m.ifAuthorizedAOneTimePinWillBeSentTo()}</p>
 		<p class="font-bold break-all">{email}</p>
 		<form
 			class="mt-2"
@@ -216,7 +215,9 @@
 					if (strike) {
 						if (strike > 2) {
 							alert(m.tooManyFailedAttempts());
-							email = pin = '';
+							otpMs = 0;
+							name = pin = email = oldPassword = password = reenteredPw = '';
+							showingOldPw = showingPw = showingRePw = false;
 						} else alert(m.incorrectOneTimePin());
 					}
 				} catch (error) {
@@ -276,7 +277,7 @@
 							});
 							if (res.success) {
 								alert(m.passwordSuccessfullyChanged());
-								goto(`/_${gs.accounts[0].ms}_`);
+								goto(`/__${gs.accounts[0].ms}`);
 							}
 						}
 					} else if (p.signingIn) {
@@ -291,7 +292,7 @@
 									...lc.accounts.filter((a) => a.ms !== signedInAccount.ms),
 								],
 							}));
-							return goto(`/__${gs.lastSeenInMs}`);
+							return goto(`/${gs.lastSeenInMs}__`);
 						}
 						let res = await trpc().signIn.mutate({
 							email: normalizedEmail,

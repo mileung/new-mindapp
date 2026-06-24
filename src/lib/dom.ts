@@ -7,18 +7,21 @@ export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.acti
 export let getPostWriterHeight = () =>
 	parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--h-post-writer'));
 
+export let gotoIfNeeded = (target: string) => {
+	let currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+	let urlObj = new URL(target, window.location.origin);
+	let nextUrl = `${urlObj.pathname}${urlObj.search}${urlObj.hash}`;
+	if (currentUrl !== nextUrl) goto(target);
+};
+
 export let scrollToHighlight = (id: string, goToIdIfHlDne = false) => {
-	let hlContainer =
-		document.querySelector('.hlc-' + id) || //
-		document.querySelector('.flat-at-hlc-' + id) ||
-		document.querySelector('.cited-hlc-' + id);
 	let hl =
 		document.querySelector('#hl-' + id) || //
 		document.querySelector('.hl-' + id);
-	if (hlContainer && hl) {
+	if (hl) {
 		let top =
 			window.scrollY -
-			(window.innerHeight - hlContainer.getBoundingClientRect().top) +
+			(window.innerHeight - hl.getBoundingClientRect().top) +
 			hl.getBoundingClientRect().height + //
 			getPostWriterHeight();
 		// console.log('top:', top);
@@ -27,16 +30,26 @@ export let scrollToHighlight = (id: string, goToIdIfHlDne = false) => {
 			behavior: 'smooth',
 		});
 	} else if (goToIdIfHlDne) {
-		goto(`/${id}`);
+		gotoIfNeeded(`/${id}`);
 	} else console.warn('no id to scroll to');
 };
+
+let ytRegex =
+	/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+export let getYtVideoId = (url: string) => url.match(ytRegex)?.[1];
 
 export let scrape = (externalUrl: string, externalDomString: string) => {
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
 
 	let urlScrapers: Record<
 		string,
-		undefined | (() => { headline?: string; tags?: string[]; url?: string })
+		| undefined
+		| (() => {
+				extensionSearchQ?: string;
+				tags?: string[];
+				headline?: string;
+				url?: string; //
+		  })
 	> = {
 		// TODO: IMDB for Movie genres https://www.imdb.com/title/tt1877832/
 		'www.perplexity.ai': () => {
@@ -66,7 +79,9 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 				url = url.replace('&list=WL', '');
 				url = url.replace(/&index=\d+/, '');
 			}
+			let ytVideoId = getYtVideoId(url);
 			return {
+				extensionSearchQ: `[?v=${ytVideoId}]`,
 				headline: title,
 				tags: [author],
 				url,
@@ -145,6 +160,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 	let scraped = (urlScrapers[urlObj.host + urlObj.pathname] || urlScrapers[urlObj.host])?.();
 
 	return {
+		extensionSearchQ: scraped?.extensionSearchQ || '',
 		tags: scraped?.tags || [],
 		// getSelectionAsMarkdown() ||
 		headline: (

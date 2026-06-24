@@ -6,7 +6,7 @@ import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { permissionCodes, roleCodes } from '../spaces';
-import { getAnotherAdmin_id__accountMs_roleCodeRow } from '../spaces/db-spaces';
+import { getAnotherAdminRow4i_accountMs_roleCode_mbRow } from '../spaces/db-spaces';
 
 export let _setSpaceMemberRole = async (
 	{
@@ -22,11 +22,10 @@ export let _setSpaceMemberRole = async (
 	},
 	ownerCalled: boolean,
 ) => {
-	let updateeRoleRowFilter = and(
-		pf.atId({ at_ms: accountMs }),
-		pf.ms.gt0,
-		pf.in_ms.eq(spaceMs),
-		pf.code.eq(pc.id__accountMs_roleCode),
+	let i_accountMs_roleCode_mbFilter = and(
+		pf.code.eq(pc.i_accountMs_roleCode_mb),
+		pf.p1.eq(spaceMs),
+		pf.p2.eq(accountMs),
 	);
 	let toMember = newRoleCodeNum === roleCodes.member;
 	let toMod = newRoleCodeNum === roleCodes.mod;
@@ -41,9 +40,9 @@ export let _setSpaceMemberRole = async (
 						await tdb //
 							.select()
 							.from(pTable)
-							.where(updateeRoleRowFilter)
+							.where(i_accountMs_roleCode_mbFilter)
 					)[0] as undefined | PartSelect
-				)?.num!;
+				)?.p3!;
 
 		let callerIsMod = callerRoleCodeNum === roleCodes.mod;
 		let callerIsAdmin = callerRoleCodeNum === roleCodes.admin;
@@ -61,11 +60,9 @@ export let _setSpaceMemberRole = async (
 		if (updatingSelf) {
 			if (callerIsMod && toMember) ok = true;
 			if (callerIsAdmin && toMod) {
-				let another_id__accountMs_roleCodeRow = await getAnotherAdmin_id__accountMs_roleCodeRow(
-					spaceMs,
-					callerMs,
-				);
-				ok = !!another_id__accountMs_roleCodeRow;
+				let another_i_accountMs_roleCode_mbRow =
+					await getAnotherAdminRow4i_accountMs_roleCode_mbRow(spaceMs, callerMs);
+				ok = !!another_i_accountMs_roleCode_mbRow;
 			}
 		} else if (callerIsAdmin) {
 			if (updateeIsMod && (toMember || toAdmin)) ok = true;
@@ -74,41 +71,40 @@ export let _setSpaceMemberRole = async (
 		throwIf(!ok);
 	}
 
-	let ms = Date.now();
+	let now = Date.now();
 	await tdb
 		.update(pTable)
 		.set({
-			ms,
-			by_ms: callerMs,
-			num: newRoleCodeNum,
+			p3: newRoleCodeNum,
+			p4: now,
+			p5: callerMs,
 		})
-		.where(updateeRoleRowFilter);
+		.where(i_accountMs_roleCode_mbFilter);
 
 	let reactAndPostSetBySystem: undefined | true;
 	if (toAdmin) {
-		let updateePermissionRowFilter = and(
-			pf.atId({ at_ms: accountMs }),
-			pf.ms.gt0,
-			pf.in_ms.eq(spaceMs),
-			pf.code.eq(pc.id__accountMs_permissionCode),
+		let i_accountMs_permCode_mbFilter = and(
+			pf.code.eq(pc.i_accountMs_permCode_mb),
+			pf.p1.eq(spaceMs),
+			pf.p2.eq(accountMs),
 		);
-		let updateePermissionRow = assert1Row(
+		let i_accountMs_permCode_mbFilterUpdateeRow = assert1Row(
 			await tdb //
 				.select()
 				.from(pTable)
-				.where(updateePermissionRowFilter),
+				.where(i_accountMs_permCode_mbFilter),
 		);
-		if (updateePermissionRow.num !== permissionCodes.reactAndPost) {
+		if (i_accountMs_permCode_mbFilterUpdateeRow.p3 !== permissionCodes.reactAndPost) {
 			reactAndPostSetBySystem = true;
 			await tdb
 				.update(pTable)
 				.set({
-					ms,
-					by_ms: 0,
-					num: permissionCodes.reactAndPost,
+					p3: permissionCodes.reactAndPost,
+					p4: now,
+					p5: 0,
 				})
-				.where(updateePermissionRowFilter);
+				.where(i_accountMs_permCode_mbFilter);
 		}
 	}
-	return { ms, reactAndPostSetBySystem };
+	return { ms: now, reactAndPostSetBySystem };
 };

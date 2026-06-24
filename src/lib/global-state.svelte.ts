@@ -34,7 +34,7 @@ class GlobalState {
 	devMode = $state(dev);
 	lastSeenInMs = $state<number>();
 	accounts = $state<undefined | MyAccount[]>();
-	visitedSpaceMsSet = $state(new Set<number>());
+	postIdToLocallySavedMap = $state<Record<string, true>>({});
 	msToSpaceMap = $state<Record<number | string, undefined | Space>>({
 		1: {
 			...getDefaultSpace(),
@@ -53,6 +53,18 @@ class GlobalState {
 
 	msToProfileMap = $state<Record<number, undefined | null | PublicProfile>>({});
 	idToPostMap = $state<Record<string, undefined | null | Post>>({});
+	postIdToRxnsMap = $state<
+		Record<
+			string,
+			| undefined
+			| {
+					ms: number;
+					by_ms: number;
+					emoji: string;
+			  }[]
+		>
+	>({});
+	postIdToSubIdsMap = $state<Record<string, undefined | string[]>>({});
 	spaceMsToTagsMap = $state<
 		Record<
 			number,
@@ -105,12 +117,16 @@ class GlobalState {
 		>
 	>({});
 
-	urlToPostFeedMap = $state<
+	identifierToPostFeedMap = $state<
 		Record<
 			string,
 			| undefined
 			| {
-					topLvlPostIdStrs?: string[];
+					sectionObjs?: {
+						heading: '' | 'post' | 'search' | 'extSearch' | 'forYou' | 'pinned' | 'nextUp';
+						secondaryTxt?: string;
+						topLvlPostIdStrs: string[];
+					}[];
 					endReached?: boolean;
 					error?: string;
 			  }
@@ -129,10 +145,11 @@ class GlobalState {
 		spacesError?: string;
 	}>({});
 
-	writingNew = $state<null | true>(null);
-	writingEdit = $state<null | Post>(null);
-	writingTo = $state<null | Post>(null);
+	postingNew = $state<null | true>(null);
+	postingEdit = $state<null | Post>(null);
+	postingTo = $state<null | Post>(null);
 	showReactionHistory = $state<null | Post>(null);
+	extensionSearchQ = $state('');
 	writerTags = $state<string[]>([]);
 	writerTagVal = $state('');
 	writerCore = $state('');
@@ -161,15 +178,16 @@ export let getPromptSigningIn = () =>
 		page.url.pathname === '/owner-view');
 
 export let getBottomOverlayShown = () =>
-	gs.showReactionHistory || gs.writingNew || gs.writingTo || gs.writingEdit;
+	gs.showReactionHistory || gs.postingNew || gs.postingTo || gs.postingEdit;
 
 export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
 	except !== 'rh' && (gs.showReactionHistory = null);
-	except !== 'wn' && (gs.writingNew = null);
-	except !== 'we' && (gs.writingEdit = null);
-	except !== 'wt' && (gs.writingTo = null);
+	except !== 'wn' && (gs.postingNew = null);
+	except !== 'we' && (gs.postingEdit = null);
+	except !== 'wt' && (gs.postingTo = null);
 };
 
+export let msToSpaceItalic = (ms: number) => (gs.msToSpaceMap[ms]?.name.txt ? '' : 'italic');
 export let msToSpaceNameTxt = (ms: number) => {
 	return ms === 8 || (ms && ms === gs.accounts?.[0].ms)
 		? m.personal()
@@ -180,6 +198,7 @@ export let msToSpaceNameTxt = (ms: number) => {
 				: m.local();
 };
 
+export let msToAccountItalic = (ms: number) => (gs.msToProfileMap[ms]?.name.txt ? '' : 'italic');
 export let msToAccountNameTxt = (ms: number, isSystem = false) => {
 	return !ms
 		? isSystem
@@ -300,9 +319,18 @@ export let getSpaceContext = (spaceMs?: number): undefined | SpaceContext => {
 				roleCode: { num: roleCodes.admin },
 				permissionCode: { num: permissionCodes.reactAndPost },
 				flair: { txt: '' },
-				accentCode: { num: accentCodes.none },
+				accentCode: accentCodes.none,
+				sidePriority: 0,
 			}
 		: caller.joinedSpaceContexts.find((c) => c.ms === spaceMs);
+};
+
+export let getSpacePermissions = (spaceMs?: number) => {
+	let permCodeNum = getSpaceContext(spaceMs)?.permissionCode.num;
+	let canReactAndPost = permCodeNum === permissionCodes.reactAndPost;
+	let canPost = canReactAndPost || permCodeNum === permissionCodes.postOnly;
+	let canReact = canReactAndPost || permCodeNum === permissionCodes.reactOnly;
+	return { canPost, canReact };
 };
 
 export let getCallerIsOwner = () => {
@@ -343,10 +371,12 @@ export let toggleAccountBan = async (accountMs: number) => {
 export let onCite = (post: Post) => {
 	// TODO: second click within 1s of first click: copy post url?
 	// TODO: third click within 1s of second click: copy whole post?
-	gs.writingNew = true;
+	gs.postingNew = true;
 	let lastVersion = getLastVersion(post);
-	let tags = post.history?.[lastVersion]?.tags || [];
-	let postIdStr = getIdStr(post);
-	gs.writerTags = [...new Set([...gs.writerTags, ...tags, postIdStr])];
-	gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
+	if (lastVersion !== null) {
+		let tags = post.history?.[lastVersion]?.tags || [];
+		let postIdStr = getIdStr(post);
+		gs.writerTags = [...new Set([...gs.writerTags, ...tags, postIdStr])];
+		gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
+	}
 };

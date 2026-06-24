@@ -12,52 +12,45 @@ export let _revokeInviteLink = async (
 		slugEnd: string;
 	},
 ) => {
-	let ms = Date.now();
+	let now = Date.now();
 	let updatedInviteRows = await tdb
 		.update(pTable)
-		.set({ num: ms })
+		.set({ p7: now })
 		.where(
 			and(
-				or(
-					pf.at_ms.eq0, //
-					pf.at_ms.gt(ms),
-				),
-				pf.at_by_ms.gt0,
-				pf.ms.eq(input.inviteMs),
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq(input.spaceMs),
-				pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
-				pf.num.eq0,
+				pf.code.eq(pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs),
 				pf.txt.eq(input.slugEnd),
+				pf.p1.eq(input.spaceMs),
+				pf.p2.eq(input.callerMs),
+				pf.p3.eq(input.inviteMs),
+				or(
+					pf.p4.eq0, //
+					pf.p4.gt(now),
+				),
+				pf.p5.gt0,
+				pf.p7.eq0,
 			),
 		)
 		.returning();
 
-	console.log('updated revoked license');
 	if (!updatedInviteRows.length) {
-		console.log('deleting');
 		await tdb
 			.delete(pTable)
 			.where(
 				or(
-					...getExpiredRowsFilters(ms),
+					...getExpiredRowsFilters(now),
 					and(
+						pf.code.eq(pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs),
+						pf.txt.eq(input.slugEnd),
+						pf.p1.eq(input.spaceMs),
+						pf.p2.eq(input.callerMs),
+						pf.p3.eq(input.inviteMs),
 						or(
-							and(
-								pf.at_ms.gt0, //
-								pf.at_ms.lt(ms),
-							),
-							and(
-								pf.ms.eq(input.inviteMs), //
-								pf.txt.eq(input.slugEnd),
-							),
+							pf.p4.eq0, //
+							pf.p4.gt(now),
 						),
-						pf.at_by_ms.eq0,
-						pf.by_ms.gt0,
-						pf.in_ms.gt0,
-						pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
-						pf.num.eq0,
-						pf.txt.isNotNull,
+						pf.p5.eq0,
+						pf.p7.eq0,
 					),
 				),
 			)

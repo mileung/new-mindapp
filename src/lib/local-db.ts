@@ -15,33 +15,60 @@ export let initLocalDb = async () => {
 			PRAGMA journal_mode=WAL;
 
 			CREATE TABLE IF NOT EXISTS parts (
-				at_ms INTEGER NOT NULL,
-				at_by_ms INTEGER NOT NULL,
-				at_in_ms INTEGER NOT NULL,
-				ms INTEGER NOT NULL,
-				by_ms INTEGER NOT NULL,
-				in_ms INTEGER NOT NULL,
 				code INTEGER NOT NULL,
-				num REAL,
-				txt TEXT
+				txt TEXT,
+				p1 INTEGER,
+				p2 INTEGER,
+				p3 INTEGER,
+				p4 INTEGER,
+				p5 INTEGER,
+				p6 INTEGER,
+				p7 INTEGER,
+				p8 INTEGER
 			);
 
-			CREATE INDEX IF NOT EXISTS post_feed_idx ON parts(
-				code,
-				in_ms,
-				ms,
-				by_ms,
-				at_in_ms,
-				at_ms,
-				at_by_ms
-			) WHERE code NOT IN (30, 50, 60, 61);
+			CREATE INDEX IF NOT EXISTS idx_code ON parts(code)
+			WHERE code IN (29);
 
-			CREATE INDEX IF NOT EXISTS tag_idx ON parts(
-				code,
-				in_ms,
-				txt
-			) WHERE code = 30;
-	`;
+			CREATE INDEX IF NOT EXISTS idx_code_p1 ON parts(code, p1)
+			WHERE code IN (8, 9, 10, 11, 12, 15, 16, 17, 18, 19, 20, 21, 22, 23, 28);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p2 ON parts(code, p1, p2)
+			WHERE code IN (14, 24, 25, 26, 27);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p3_p2 ON parts(code, p1, p3, p2)
+			WHERE code IN (0);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p3_p4 ON parts(code, p1, p3, p4)
+			WHERE code IN (13, 26, 27);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p4_p5_p6 ON parts(code, p1, p4, p5, p6)
+			WHERE code IN (1, 3, 4);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p5_p2 ON parts(code, p1, p5, p2)
+			WHERE code IN (0);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_p6_p7 ON parts(code, p1, p6, p7)
+			WHERE code IN (0);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_to_p3 ON parts(code, p1, p2, p3)
+			WHERE code IN (0, 1, 2, 3, 6);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_to_p4 ON parts(code, p1, p2, p3, p4)
+			WHERE code IN (5, 7);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p1_txt ON parts(code, p1, txt)
+			WHERE code IN (3);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p2 ON parts(code, p2)
+			WHERE code IN (21, 22);
+
+			CREATE INDEX IF NOT EXISTS idx_code_p3 ON parts(code, p3)
+			WHERE code IN (14);
+
+			CREATE INDEX IF NOT EXISTS idx_code_txt ON parts(code, txt)
+			WHERE code IN (19);`;
+		// console.log('res:', res);
 	} catch (error) {
 		// console.error(error);
 		alertError(error);

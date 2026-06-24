@@ -13,12 +13,10 @@ import {
 	assertLt2Rows,
 	channelPartsByCode,
 	type PartInsert,
-	type PartSelect,
 	type WhoObj,
 } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { id0 } from '../parts/partIds';
 import { makeNewSpaceRows, makeRowsForJoiningSpace } from './_createSpace';
 import { moveSpaceMemberCountBy1 } from './db-spaces';
 
@@ -46,8 +44,7 @@ export let _checkInvite = async (
 		useIfValid: boolean;
 	},
 ): Promise<{ redeemMs?: number; checkedInvite?: CheckedInvite }> => {
-	let ms = Date.now();
-
+	let now = Date.now();
 	let checkedInvite: CheckedInvite = {
 		ms: 0,
 		slugEnd: '',
@@ -70,16 +67,16 @@ export let _checkInvite = async (
 					// broad as possible to eliminate any chance of a false negative. This check should
 					// only pass once and that's when the global space has no members
 					or(
-						pf.code.eq(pc.id_memberCount_spaceDescription),
-						pf.code.eq(pc.id__spacePinnedQuery),
-						pf.code.eq(pc.id_newMemberPermissionCode),
-						pf.code.eq(pc.id__accountMs_roleCode),
-						pf.code.eq(pc.id__accountMs_permissionCode),
-						pf.code.eq(pc.id__accountMs__flair),
-						pf.code.eq(pc.spacePriorityId__accountMs_accentCode),
-						pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
+						pf.code.eq(pc._spaceDescription_imb_memberCount),
+						pf.code.eq(pc._spacePinnedQuery_imb),
+						pf.code.eq(pc.imb_newMemberPermissionCode),
+						pf.code.eq(pc.i_accountMs_roleCode_mb),
+						pf.code.eq(pc.i_accountMs_permCode_mb),
+						pf.code.eq(pc._flair_i_accountMs_mb),
+						pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+						pf.code.eq(pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs),
 					),
-					pf.in_ms.eq(1),
+					pf.p1.eq(1),
 
 					// Pretty much all other queries in this codebase are verbose and include stuff like:
 					// pf.at_ms.eq0,
@@ -97,13 +94,13 @@ export let _checkInvite = async (
 		if (input.useIfValid) {
 			let testMembers: PartInsert[] = [];
 			let addTestMembers = false;
-			addTestMembers = true;
+			// addTestMembers = true;
 			if (dev && addTestMembers) {
 				for (let i = 0; i < 88; i++) {
 					testMembers.push(
 						...makeRowsForJoiningSpace({
 							// ms: 888,
-							ms: 888 + i * week,
+							now: 888 + i * week,
 							callerMs: 1 + i,
 							inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 							permissionCodeNum: 0,
@@ -120,51 +117,60 @@ export let _checkInvite = async (
 				}),
 				...testMembers,
 				...makeRowsForJoiningSpace({
-					ms,
+					now: now,
 					callerMs: input.callerMs,
 					inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 					permissionCodeNum: permissionCodes.reactAndPost,
 					roleCodeNum: roleCodes.admin,
 				}),
 				{
-					...id0,
-					at_by_ms: 1,
-					at_in_ms: 1,
-					ms,
-					in_ms: 1,
-					code: pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd,
+					code: pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs,
 					txt: input.slugEnd,
+					p1: 1,
+					p2: 0,
+					p3: now,
+					p4: 0,
+					p5: 1,
+					p6: 1,
+					p7: 0,
 				},
 				{
-					...id0,
-					code: pc.id__signedInEmailRules,
+					code: pc._signedInEmailRules_mb,
 					txt: '',
 				},
 			]);
-			return { redeemMs: ms };
+			return { redeemMs: now };
 		}
 		return { checkedInvite };
 	} else if (input.inviteMs && input.slugEnd.length === 8) {
 		// TODO: check for stuff in space that may count as awaiting response?
-
-		let inviteFilter = and(
-			or(pf.at_ms.eq0, pf.at_ms.gt(ms)),
-			or(pf.at_in_ms.eq0, lt(pTable.at_by_ms, pTable.at_in_ms)),
-			pf.ms.eq(input.inviteMs),
-			pf.by_ms.gt0,
-			pf.in_ms.gt0,
-			pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
-			pf.num.isNull,
+		let _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsFilter = and(
+			pf.code.eq(pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs),
 			pf.txt.eq(input.slugEnd),
+			pf.p3.eq(input.inviteMs),
+			or(
+				pf.p4.gt(now),
+				pf.p4.eq0, //
+			),
+			or(
+				lt(pTable.p5, pTable.p6),
+				pf.p6.eq0, //
+			),
 		);
-		let inviteRows = await tdb.select().from(pTable).where(inviteFilter);
-		let inviteRow = assertLt2Rows(inviteRows);
-		if (inviteRow) {
+		let _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRows = await tdb
+			.select()
+			.from(pTable)
+			.where(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsFilter);
+		let _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow = assertLt2Rows(
+			_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRows,
+		);
+		if (_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow) {
 			if (input.useIfValid) {
-				if (input.callerMs === inviteRow.by_ms) throw new Error(m.cannotUseYourOwnInvite());
+				if (input.callerMs === _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2)
+					throw new Error(m.cannotUseYourOwnInvite());
 				let {
-					[pc.id_newMemberPermissionCode]: id_newMemberPermissionCodeRows = [],
-					[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
+					[pc.imb_newMemberPermissionCode]: imb_newMemberPermissionCodeRows = [],
+					[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
 				} = channelPartsByCode(
 					await tdb
 						.select()
@@ -172,59 +178,61 @@ export let _checkInvite = async (
 						.where(
 							or(
 								and(
-									pf.noAtId,
-									pf.in_ms.eq(inviteRow.in_ms),
-									pf.code.eq(pc.id_newMemberPermissionCode),
-									pf.num.gte0,
-									pf.txt.isNull,
+									pf.code.eq(pc.imb_newMemberPermissionCode),
+									pf.p1.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!),
 								),
 								and(
+									pf.code.eq(pc.i_accountMs_roleCode_mb),
+									pf.p1.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!),
 									or(
-										pf.at_ms.eq(input.callerMs), //
-										pf.at_ms.eq(inviteRow.by_ms),
+										pf.p2.eq(input.callerMs), //
+										pf.p2.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!),
 									),
-									pf.ms.gt0,
-									pf.in_ms.eq(inviteRow.in_ms),
-									pf.code.eq(pc.id__accountMs_roleCode),
-									pf.txt.isNull,
 								),
 							),
 						),
 				);
-				let caller_id__accountMs_roleCodeRow: undefined | PartSelect;
-				let inviter_id__accountMs_roleCodeRow: undefined | PartSelect;
-				for (let i = 0; i < id__accountMs_roleCodeRows.length; i++) {
-					let row = id__accountMs_roleCodeRows[i];
-					if (row.at_ms === input.callerMs) caller_id__accountMs_roleCodeRow = row;
-					if (row.at_ms === inviteRow.by_ms) inviter_id__accountMs_roleCodeRow = row;
+				let i_accountMs_roleCode_mbCallerRow: undefined | PartInsert;
+				let i_accountMs_roleCode_mbInviterRow: undefined | PartInsert;
+				for (let i = 0; i < i_accountMs_roleCode_mbRows.length; i++) {
+					let row = i_accountMs_roleCode_mbRows[i];
+					if (row.p2 === input.callerMs) i_accountMs_roleCode_mbCallerRow = row;
+					if (row.p2 === _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2)
+						i_accountMs_roleCode_mbInviterRow = row;
 				}
-				if (caller_id__accountMs_roleCodeRow) throw new Error(m.alreadyJoinedThisSpace());
-				let inviterRoleCodeNum = inviter_id__accountMs_roleCodeRow!.num;
+				if (i_accountMs_roleCode_mbCallerRow) throw new Error(m.alreadyJoinedThisSpace());
+				let inviterRoleCodeNum = i_accountMs_roleCode_mbInviterRow!.p3!;
 				throwIf(inviterRoleCodeNum !== roleCodes.admin && inviterRoleCodeNum !== roleCodes.mod);
-
-				let id_newMemberPermissionCodeRow = assert1Row(id_newMemberPermissionCodeRows);
+				let imb_newMemberPermissionCodeRow = assert1Row(imb_newMemberPermissionCodeRows);
 				await tdb.insert(pTable).values(
 					makeRowsForJoiningSpace({
-						ms,
-						inviteIdObj: inviteRow,
+						now: now,
+						inviteIdObj: {
+							in_ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!,
+							ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!,
+							by_ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p3!,
+						},
 						callerMs: input.callerMs,
-						permissionCodeNum: id_newMemberPermissionCodeRow.num!,
+						permissionCodeNum: imb_newMemberPermissionCodeRow.p4!,
 						roleCodeNum: roleCodes.member,
 					}),
 				);
-				await moveSpaceMemberCountBy1(inviteRow.in_ms, true);
+				await moveSpaceMemberCountBy1(
+					_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!,
+					true,
+				);
 				await tdb
 					.update(pTable)
-					.set({ at_by_ms: sql`${pTable.at_by_ms} + 1` })
-					.where(inviteFilter);
-				return { redeemMs: ms };
+					.set({ p5: sql`${pTable.p5} + 1` })
+					.where(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsFilter);
+				return { redeemMs: now };
 			} else {
 				let {
 					// prettier-ignore
-					[pc.id_memberCount_spaceDescription]: id_memberCount_spaceDescriptionRows = [],
-					[pc.id__spaceName]: id__spaceNameRows = [],
-					[pc.msByMs__accountName]: msByMs__accountNameRows = [],
-					[pc.id__accountMs_roleCode]: inviter_id__accountMs_roleCodeRows = [],
+					[pc._spaceDescription_imb_memberCount]: _spaceDescription_imb_memberCountRows = [],
+					[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbInviterRows = [],
+					[pc._accountName_bm]: _accountName_bmRows = [],
+					[pc._spaceName_imb]: _spaceName_imbRows = [],
 				} = channelPartsByCode(
 					await tdb
 						.select()
@@ -232,48 +240,43 @@ export let _checkInvite = async (
 						.where(
 							or(
 								and(
-									pf.noAtId,
-									pf.ms.gt0,
-									pf.in_ms.eq(inviteRow.in_ms),
 									or(
-										inviteRow.in_ms > 1 ? pf.code.eq(pc.id__spaceName) : undefined,
-										pf.code.eq(pc.id_memberCount_spaceDescription),
+										_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1! > 1
+											? pf.code.eq(pc._spaceName_imb)
+											: undefined,
+										pf.code.eq(pc._spaceDescription_imb_memberCount),
 									),
-									pf.txt.isNotNull,
+									pf.p1.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!),
 								),
 								and(
-									pf.noAtId,
-									pf.by_ms.eq(inviteRow.by_ms),
-									pf.code.eq(pc.msByMs__accountName),
-									pf.num.isNull,
-									pf.txt.isNotNull,
+									pf.code.eq(pc._accountName_bm), //
+									pf.p1.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!),
 								),
 								and(
-									pf.at_ms.eq(inviteRow.by_ms),
-									pf.ms.gt0,
-									pf.in_ms.eq(inviteRow.in_ms),
-									pf.code.eq(pc.id__accountMs_roleCode),
-									pf.txt.isNull,
+									pf.code.eq(pc.i_accountMs_roleCode_mb),
+									pf.p1.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!),
+									pf.p2.eq(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!),
 								),
 							),
 						),
 				);
 
-				let inviter_id__accountMs_roleCodeRow = assertLt2Rows(inviter_id__accountMs_roleCodeRows);
-				let inviterRoleCodeNum = inviter_id__accountMs_roleCodeRow?.num;
+				let i_accountMs_roleCode_mbInviterRow = assertLt2Rows(i_accountMs_roleCode_mbInviterRows);
+				let inviterRoleCodeNum = i_accountMs_roleCode_mbInviterRow?.p3;
 				if (inviterRoleCodeNum !== roleCodes.admin && inviterRoleCodeNum !== roleCodes.mod)
 					return {};
-
-				let id__spaceNameRow = assertLt2Rows(id__spaceNameRows);
-				let id_memberCount_spaceDescriptionRow = assert1Row(id_memberCount_spaceDescriptionRows);
-				checkedInvite.partialSpace.ms = inviteRow.in_ms;
-				checkedInvite.partialSpace.name.txt = id__spaceNameRow?.txt ?? '';
-				checkedInvite.partialSpace.memberCount = id_memberCount_spaceDescriptionRow.num!;
-				checkedInvite.partialSpace.description.txt = id_memberCount_spaceDescriptionRow.txt!;
-				let msByMs__accountNameRow = assert1Row(msByMs__accountNameRows);
-				checkedInvite.inviter.ms = msByMs__accountNameRow.by_ms;
-				checkedInvite.inviter.name.txt = msByMs__accountNameRow.txt!;
-
+				let _spaceName_imbRow = assertLt2Rows(_spaceName_imbRows);
+				let _spaceDescription_imb_memberCountRow = assert1Row(
+					_spaceDescription_imb_memberCountRows,
+				);
+				checkedInvite.partialSpace.ms =
+					_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!;
+				checkedInvite.partialSpace.name.txt = _spaceName_imbRow?.txt ?? '';
+				checkedInvite.partialSpace.memberCount = _spaceDescription_imb_memberCountRow.p4!;
+				checkedInvite.partialSpace.description.txt = _spaceDescription_imb_memberCountRow.txt!;
+				let _accountName_bmRow = assert1Row(_accountName_bmRows);
+				checkedInvite.inviter.ms = _accountName_bmRow.p1!;
+				checkedInvite.inviter.name.txt = _accountName_bmRow.txt!;
 				return { checkedInvite };
 			}
 		}

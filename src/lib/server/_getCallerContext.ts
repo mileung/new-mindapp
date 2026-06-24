@@ -1,6 +1,6 @@
 import { hasDefinedKeysBesidesMs, ranStr } from '$lib/js';
 import { getValidAuthCookie, setCookie, type CookieObj } from '$lib/server/sessions';
-import { hour, minute } from '$lib/time';
+import { hour, minute, week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import {
 	reduceMyAccountUpdateRows,
@@ -12,11 +12,10 @@ import {
 	channelPartsByCode,
 	sameGranularNum,
 	type GranularNumProp,
-	type PartSelect,
+	type PartInsert,
 } from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
 import { pf } from '$lib/types/parts/partFilters';
-import { id0 } from '$lib/types/parts/partIds';
 import { pTable } from '$lib/types/parts/partsTable';
 import {
 	permissionCodes,
@@ -58,7 +57,7 @@ export let _getCallerContext = async (
 	// if (!get.roleCode && get.permissionCode)
 	// 	throw new Error('must get roleCode to get permissionCode');
 
-	let ms = Date.now();
+	let now = Date.now();
 	let sessionIdObj = getValidAuthCookie(ctx, 'ms_sessionKey');
 
 	let signedIn: undefined | boolean;
@@ -104,36 +103,29 @@ export let _getCallerContext = async (
 	// )
 	// 	throw new Error(`duplicate accounts in signedInAccountUpdatesFrom`);
 
-	let forcedSpaceUpdateRows: PartSelect[] = [];
+	let forcedSpaceUpdateRows: PartInsert[] = [];
 
 	let filters = [
 		...(sessionIdObj
 			? [
 					signedInAccountUpdatesFrom.length
 						? and(
-								or(...signedInAccountUpdatesFrom.map((a) => pf.atId({ at_ms: a.ms }))),
-								pf.id({ ms: sessionIdObj.ms }),
-								pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
-								pf.num.isNull,
+								pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
 								pf.txt.eq(sessionIdObj.txt),
+								pf.p1.eq(sessionIdObj.ms),
+								or(...signedInAccountUpdatesFrom.map((a) => pf.p2.eq(a.ms))),
+								pf.p3.gt(now),
 							)
 						: undefined,
 					callerMs && get.allJoinedSpaces
 						? and(
-								pf.atId({ at_ms: callerMs }),
-								pf.ms.gt0,
-								pf.in_ms.notEq(callerMs),
-								...spaceUpdatesFrom.map((su) => pf.in_ms.notEq(su.ms)),
-								pf.in_ms.gt0,
-								or(
-									pf.code.eq(pc.id__accountMs_permissionCode),
-									pf.code.eq(pc.id__accountMs_roleCode),
-									pf.code.eq(pc.spacePriorityId__accountMs_accentCode),
-								),
-								pf.num.gte0,
-								pf.txt.isNull,
+								pf.code.eq(pc.acceptBm_inviteIbm),
+								pf.p1.notEq(callerMs),
+								...spaceUpdatesFrom.map((su) => pf.p1.notEq(su.ms)),
+								pf.p1.eq(callerMs),
 							)
 						: undefined,
+					// pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
 				]
 			: []),
 		...spaceUpdatesFrom.flatMap((su) => {
@@ -142,123 +134,120 @@ export let _getCallerContext = async (
 				su.isPublic &&
 					su.isPublic.num !== 0 &&
 					forcedSpaceUpdateRows.push({
-						...id0,
-						in_ms: su.ms,
-						code: pc.id_spaceIsPublic,
-						num: 0,
-						txt: null,
+						code: pc.imb_spaceIsPublic,
+						p1: su.ms,
+						p2: 0,
+						p3: 0,
+						p4: 0,
 					});
 				if (su.ms === spaceMs) {
 					forcedSpaceUpdateRows.push({
-						...id0,
-						at_ms: callerMs,
-						ms: callerMs,
-						in_ms: callerMs,
-						code: pc.id__accountMs_permissionCode,
-						num: permissionCodes.reactAndPost,
-						txt: null,
+						code: pc.i_accountMs_permCode_mb,
+						p1: callerMs,
+						p2: callerMs,
+						p3: permissionCodes.reactAndPost,
+						p4: callerMs,
 					});
 					su.roleCode &&
 						su.roleCode.num !== roleCodes.admin &&
 						forcedSpaceUpdateRows.push({
-							...id0,
-							at_ms: callerMs,
-							ms: callerMs,
-							in_ms: callerMs,
-							code: pc.id__accountMs_roleCode,
-							num: roleCodes.admin,
-							txt: null,
+							code: pc.i_accountMs_roleCode_mb,
+							p1: callerMs,
+							p2: callerMs,
+							p3: roleCodes.admin,
+							p4: callerMs,
+							p5: 0,
 						});
 				}
 				// su.accentCode?.num &&
 				// 	forcedSpaceUpdateRows.push({
-				// 		...id0,
+				//
 				// 		code: pc.spacePriorityId__accountMs_accentCode,
 				// 		num: accentCodes.none,
-				// 		txt: null,
+				//
 				// 	});
 			}
 
 			if (su.ms === 1 && su.isPublic && su.isPublic.num !== 1)
 				forcedSpaceUpdateRows.push({
-					...id0,
-					in_ms: 1,
-					code: pc.id_spaceIsPublic,
-					num: 1,
-					txt: null,
+					code: pc.imb_spaceIsPublic,
+					p1: 1,
+					p2: 0,
+					p3: 0,
+					p4: 1,
 				});
 			return [
-				su.ms && su.ms !== callerMs
-					? su.accentCode &&
-						and(
-							pf.atId({ at_ms: callerMs }),
-							pf.notGranularNum(su.accentCode),
-							pf.in_ms.eq(su.ms),
-							pf.code.eq(pc.spacePriorityId__accountMs_accentCode),
-							pf.num.gte0,
-							pf.txt.isNull,
-						)
-					: undefined,
+				// su.ms && su.ms !== callerMs
+				// 	? su.accentCode &&
+				// 		and(
+				// 			pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+				// 			pf.p1.eq(callerMs),
+				// 			// pf.in_ms.eq(su.ms),
+				// 			or(
+				// 				pf.p2.notEq(su.accentCode.ms ?? 0),
+				// 				pf.num.notEq(su.accentCode.num), //
+				// 			),
+				// 		)
+				// 	: undefined,
 				su.ms === spaceMs && su.pinnedQuery
 					? and(
-							pf.noAtId,
-							pf.notGranularTxt(su.pinnedQuery),
-							pf.in_ms.eq(su.ms),
-							pf.code.eq(pc.id__spacePinnedQuery),
-							pf.num.isNull,
-							pf.txt.isNotNull,
+							pf.code.eq(pc._spacePinnedQuery_imb),
+							pf.p1.eq(su.ms),
+							or(
+								pf.p2.notEq(su.pinnedQuery.ms ?? 0),
+								pf.txt.notEq(su.pinnedQuery.txt), //
+							),
 						)
 					: undefined,
 				...(su.ms && su.ms !== callerMs
 					? [
 							and(
-								pf.atId({ at_ms: callerMs }),
-								pf.ms.gt0,
-								pf.in_ms.eq(su.ms),
-								pf.code.eq(pc.id__accountMs_permissionCode),
-								pf.num.gte0,
-								pf.txt.isNull,
+								pf.code.eq(pc.i_accountMs_permCode_mb),
+								pf.p1.eq(su.ms), //
+								pf.p2.eq(callerMs),
 							),
 							su.ms > 1 && su.name
 								? and(
-										pf.noAtId,
-										pf.notGranularTxt(su.name),
-										pf.in_ms.eq(su.ms),
-										pf.code.eq(pc.id__spaceName),
-										pf.num.isNull,
-										pf.txt.isNotNull,
+										pf.code.eq(pc._spaceName_imb),
+										pf.p1.eq(su.ms),
+										or(
+											pf.p2.notEq(su.name.ms ?? 0),
+											pf.txt.notEq(su.name.txt), //
+										),
 									)
 								: undefined,
 							...(su.ms === spaceMs
 								? [
 										su.ms > 1 && su.isPublic
 											? and(
-													pf.noAtId,
-													pf.notGranularNum(su.isPublic),
-													pf.in_ms.eq(su.ms),
-													pf.code.eq(pc.id_spaceIsPublic),
-													pf.num.gte0,
-													pf.txt.isNull,
+													pf.code.eq(pc.imb_spaceIsPublic),
+													pf.p1.eq(su.ms),
+													or(
+														pf.p2.notEq(su.isPublic.ms ?? 0),
+														pf.p4.notEq(su.isPublic.num), //
+													),
 												)
 											: undefined,
 										su.roleCode
 											? and(
-													pf.atId({ at_ms: callerMs }),
-													pf.notGranularNum(su.roleCode),
-													pf.in_ms.eq(su.ms),
-													pf.code.eq(pc.id__accountMs_roleCode),
-													pf.num.gte0,
-													pf.txt.isNull,
+													pf.code.eq(pc.i_accountMs_roleCode_mb),
+													pf.p1.eq(su.ms),
+													pf.p2.eq(callerMs),
+													or(
+														pf.p3.notEq(su.roleCode.num), //
+														pf.p4.notEq(su.roleCode.ms ?? 0),
+													),
 												)
 											: undefined,
 										su.flair
 											? and(
-													pf.atId({ at_ms: callerMs }),
-													pf.notGranularTxt(su.flair),
-													pf.in_ms.eq(su.ms),
-													pf.code.eq(pc.id__accountMs__flair),
-													pf.num.isNull,
-													pf.txt.isNotNull,
+													pf.code.eq(pc._flair_i_accountMs_mb),
+													pf.p1.eq(su.ms),
+													pf.p2.eq(callerMs),
+													or(
+														pf.p3.notEq(su.flair.ms ?? 0),
+														pf.txt.notEq(su.flair.txt), //
+													),
 												)
 											: undefined,
 									]
@@ -267,67 +256,60 @@ export let _getCallerContext = async (
 					: []),
 			];
 		}),
-		...signedInAccountUpdatesFrom.flatMap((signedInAccountUpdate) => {
-			return [
-				signedInAccountUpdate.email &&
-					and(
-						pf.noAtId,
-						pf.notGranularTxt(signedInAccountUpdate.email),
-						pf.by_ms.eq(signedInAccountUpdate.ms),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountEmail),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+		...signedInAccountUpdatesFrom.flatMap((signedInAccountUpdate) => [
+			signedInAccountUpdate.email &&
+				and(
+					pf.code.eq(pc._accountEmail_bm),
+					pf.p1.eq(signedInAccountUpdate.ms),
+					or(
+						pf.p2.notEq(signedInAccountUpdate.email.ms ?? 0),
+						pf.txt.notEq(signedInAccountUpdate.email.txt), //
 					),
-				signedInAccountUpdate.name &&
-					and(
-						pf.noAtId,
-						pf.notGranularTxt(signedInAccountUpdate.name),
-						pf.by_ms.eq(signedInAccountUpdate.ms),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountName),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+				),
+			signedInAccountUpdate.name &&
+				and(
+					pf.code.eq(pc._accountName_bm),
+					pf.p1.eq(signedInAccountUpdate.ms),
+					or(
+						pf.p2.notEq(signedInAccountUpdate.name.ms ?? 0),
+						pf.txt.notEq(signedInAccountUpdate.name.txt), //
 					),
-				signedInAccountUpdate.bio &&
-					and(
-						pf.noAtId,
-						pf.notGranularTxt(signedInAccountUpdate.bio),
-						pf.by_ms.eq(signedInAccountUpdate.ms),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountBio),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+				),
+			signedInAccountUpdate.bio &&
+				and(
+					pf.code.eq(pc._accountBio_bm),
+					pf.p1.eq(signedInAccountUpdate.ms),
+					or(
+						pf.p2.notEq(signedInAccountUpdate.bio.ms ?? 0),
+						pf.txt.notEq(signedInAccountUpdate.bio.txt), //
 					),
-				signedInAccountUpdate.savedTags &&
-					and(
-						pf.noAtId,
-						pf.notGranularTxt(signedInAccountUpdate.savedTags),
-						pf.by_ms.eq(signedInAccountUpdate.ms),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountSavedTags),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+				),
+			signedInAccountUpdate.savedTags &&
+				and(
+					pf.code.eq(pc._accountSavedTags_bm),
+					pf.p1.eq(signedInAccountUpdate.ms),
+					or(
+						pf.p2.notEq(signedInAccountUpdate.savedTags.ms ?? 0),
+						pf.txt.notEq(signedInAccountUpdate.savedTags.txt), //
 					),
-			];
-		}),
+				),
+		]),
 	];
-
 	let {
-		[pc.ms_ExpiryMs__accountMs__sessionKey]: ms_ExpiryMs__accountMs__sessionKeyRows = [],
-
-		[pc.id_spaceIsPublic]: id_spaceIsPublicRows = [],
-		[pc.id__spaceName]: id__spaceNameRows = [],
-		[pc.id__spacePinnedQuery]: id__spacePinnedQueryRows = [],
-		[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
-		[pc.id__accountMs_permissionCode]: id__accountMs_permissionCodeRows = [],
-		[pc.id__accountMs__flair]: id__accountMs__flairRows = [],
-		[pc.spacePriorityId__accountMs_accentCode]: spacePriorityId__accountMs_accentCodeRows = [],
-
-		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
-		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
-		[pc.msByMs__accountBio]: msByMs__accountBioRows = [],
-		[pc.msByMs__accountSavedTags]: msByMs__accountSavedTagsRows = [],
+		[pc.i_accountMs_accentCode_lastViewMs_sidePriority]:
+			i_accountMs_accentCode_lastViewMs_sidePriorityRows = [],
+		[pc._sessionKey_m_accountMs_expiryMs]: _sessionKey_m_accountMs_expiryMsRows = [],
+		[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
+		[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows = [],
+		[pc._spacePinnedQuery_imb]: _spacePinnedQuery_imbRows = [],
+		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
+		[pc._accountSavedTags_bm]: _accountSavedTags_bmRows = [],
+		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc.imb_spaceIsPublic]: imb_spaceIsPublicRows = [],
+		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
+		[pc._accountName_bm]: _accountName_bmRows = [],
+		[pc._spaceName_imb]: _spaceName_imbRows = [],
+		[pc._accountBio_bm]: _accountBio_bmRows = [],
 	} = channelPartsByCode([
 		...(filters.some((f) => f)
 			? await tdb
@@ -339,102 +321,97 @@ export let _getCallerContext = async (
 	]);
 
 	if (
-		id__accountMs_roleCodeRows.some(
-			({ num }) =>
-				num !== roleCodes.member &&
-				num !== roleCodes.mod && //
-				num !== roleCodes.admin,
+		i_accountMs_roleCode_mbRows.some(
+			({ p3 }) =>
+				p3 !== roleCodes.member &&
+				p3 !== roleCodes.mod && //
+				p3 !== roleCodes.admin,
 		)
 	)
 		throw new Error(`invalid roleCode num`);
 	if (
-		id__accountMs_permissionCodeRows.some(
-			({ num }) =>
-				num !== permissionCodes.viewOnly &&
-				num !== permissionCodes.reactOnly &&
-				num !== permissionCodes.postOnly &&
-				num !== permissionCodes.reactAndPost,
+		i_accountMs_permCode_mbRows.some(
+			({ p3 }) =>
+				p3 !== permissionCodes.viewOnly &&
+				p3 !== permissionCodes.reactOnly &&
+				p3 !== permissionCodes.postOnly &&
+				p3 !== permissionCodes.reactAndPost,
 		)
 	)
 		throw new Error(`invalid permissionCode num`);
 
-	let caller_ms_ExpiryMs__accountMs__sessionKeyRow = ms_ExpiryMs__accountMs__sessionKeyRows.find(
-		(row) => row.at_ms === callerMs,
+	let _sessionKey_m_accountMs_expiryMsCallerRow = _sessionKey_m_accountMs_expiryMsRows.find(
+		(row) => row.p2 === callerMs,
 	);
-
 	let msToSpaceUpdatesFrom: Record<number, undefined | MySpaceUpdate> = {};
 	for (let i = 0; i < spaceUpdatesFrom.length; i++) {
 		let u = spaceUpdatesFrom[i];
 		msToSpaceUpdatesFrom[u.ms] = u;
 	}
-	if (get.allJoinedSpaces && caller_ms_ExpiryMs__accountMs__sessionKeyRow) {
+	if (get.allJoinedSpaces && _sessionKey_m_accountMs_expiryMsCallerRow) {
 		let unfetchedSpaceMss: number[] = [];
-		for (let i = 0; i < id__accountMs_permissionCodeRows.length; i++) {
-			let row = id__accountMs_permissionCodeRows[i];
-			if (!msToSpaceUpdatesFrom[row.in_ms]) unfetchedSpaceMss.push(row.in_ms);
+		for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
+			let row = acceptBm_inviteIbmRows[i];
+			if (!msToSpaceUpdatesFrom[row.p3!]) unfetchedSpaceMss.push(row.p3!);
 		}
 		if (unfetchedSpaceMss.length) {
 			let {
-				[pc.id_spaceIsPublic]: _id_spaceIsPublicRows = [],
-				[pc.id__spaceName]: _id__spaceNameRows = [],
-				[pc.id__spacePinnedQuery]: _id__spacePinnedQueryRows = [],
+				[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows_ = [],
+				[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows_ = [],
+				[pc._spacePinnedQuery_imb]: _spacePinnedQuery_imbRows_ = [],
+				[pc.imb_spaceIsPublic]: imb_spaceIsPublicRows_ = [],
+				[pc._spaceName_imb]: _spaceName_imbRows_ = [],
 			} = channelPartsByCode(
 				await tdb
 					.select()
 					.from(pTable)
 					.where(
-						and(
-							pf.noAtId,
-							or(...unfetchedSpaceMss.map((ms) => pf.in_ms.eq(ms))),
-							or(
-								and(
-									pf.code.eq(pc.id_spaceIsPublic),
-									pf.num.gte0, //
-									pf.num.lte(1),
-									pf.txt.isNull,
-								),
-								and(
-									or(
-										pf.code.eq(pc.id__spaceName), //
-										pf.code.eq(pc.id__spacePinnedQuery),
-									),
-									pf.num.isNull,
-									pf.txt.isNotNull,
+						or(
+							and(
+								or(...unfetchedSpaceMss.map((ms) => pf.p1.eq(ms))),
+								or(
+									pf.code.eq(pc.i_accountMs_roleCode_mb),
+									pf.code.eq(pc.i_accountMs_permCode_mb),
+									pf.code.eq(pc._spacePinnedQuery_imb),
+									pf.code.eq(pc.imb_spaceIsPublic),
+									pf.code.eq(pc._spaceName_imb),
 								),
 							),
 						),
 					),
 			);
-			id_spaceIsPublicRows.push(..._id_spaceIsPublicRows);
-			id__spaceNameRows.push(..._id__spaceNameRows);
-			id__spacePinnedQueryRows.push(..._id__spacePinnedQueryRows);
+			i_accountMs_roleCode_mbRows.push(...i_accountMs_roleCode_mbRows_);
+			i_accountMs_permCode_mbRows.push(...i_accountMs_permCode_mbRows_);
+			_spacePinnedQuery_imbRows.push(..._spacePinnedQuery_imbRows_);
+			imb_spaceIsPublicRows.push(...imb_spaceIsPublicRows_);
+			_spaceName_imbRows.push(..._spaceName_imbRows_);
 		}
 	}
 
 	let spaceUpdatedRows = [
-		...id_spaceIsPublicRows,
-		...id__spaceNameRows,
-		...id__spacePinnedQueryRows,
-		...id__accountMs_permissionCodeRows,
-		...id__accountMs_roleCodeRows,
-		...id__accountMs__flairRows,
-		...spacePriorityId__accountMs_accentCodeRows,
+		...i_accountMs_accentCode_lastViewMs_sidePriorityRows,
+		...i_accountMs_permCode_mbRows,
+		...i_accountMs_roleCode_mbRows,
+		..._spacePinnedQuery_imbRows,
+		..._flair_i_accountMs_mbRows,
+		...imb_spaceIsPublicRows,
+		..._spaceName_imbRows,
 	];
-	let spaceMsToRowsMap: Record<number, PartSelect[]> = {};
+	let spaceMsToRowsMap: Record<number, PartInsert[]> = {};
 	for (let i = 0; i < spaceUpdatedRows.length; i++) {
 		let row = spaceUpdatedRows[i];
-		spaceMsToRowsMap[row.in_ms] ??= [];
-		spaceMsToRowsMap[row.in_ms].push(row);
+		spaceMsToRowsMap[row.p1!] ??= [];
+		spaceMsToRowsMap[row.p1!].push(row);
 	}
-	let SpaceMssWithPermission = caller_ms_ExpiryMs__accountMs__sessionKeyRow
-		? id__accountMs_permissionCodeRows.map((r) => r.in_ms)
+	let SpaceMssWithPermission = _sessionKey_m_accountMs_expiryMsCallerRow
+		? i_accountMs_permCode_mbRows.map((r) => r.p1!)
 		: [];
 	let callerJoinedSpaceMs = false;
 	let spaceUpdates: MySpaceUpdate[] = SpaceMssWithPermission.map((ms) => {
 		if (ms === spaceMs) callerJoinedSpaceMs = true;
-		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms] || [{ in_ms: ms }]);
+		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms], ms);
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[ms];
-		// Need this if statement since permissionCode doesn't use notGranularNum
+		// Need this if statement since i_accountMs_permCode_mb is fetched every time `su.ms && su.ms !== callerMs`
 		if (
 			!spaceUpdateFrom?.permissionCode ||
 			su.ms === callerMs ||
@@ -446,8 +423,8 @@ export let _getCallerContext = async (
 	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =
 		spaceMs !== undefined &&
 		!callerJoinedSpaceMs &&
-		id_spaceIsPublicRows.some((r) => r.in_ms === spaceMs && r.num)
-			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs])
+		imb_spaceIsPublicRows.some((r) => r.p1 === spaceMs && r.p4)
+			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs], spaceMs)
 			: undefined;
 
 	if (visitingPublicSpaceUpdate) {
@@ -463,33 +440,33 @@ export let _getCallerContext = async (
 	}
 
 	let accountUpdatedRows = [
-		...msByMs__accountEmailRows,
-		...msByMs__accountNameRows,
-		...msByMs__accountBioRows,
-		...msByMs__accountSavedTagsRows,
+		..._accountSavedTags_bmRows,
+		..._accountEmail_bmRows,
+		..._accountName_bmRows,
+		..._accountBio_bmRows,
 	];
-	let accountMsToRowsMap: Record<number, PartSelect[]> = {};
+	let accountMsToRowsMap: Record<number, PartInsert[]> = {};
 	for (let i = 0; i < accountUpdatedRows.length; i++) {
 		let row = accountUpdatedRows[i];
-		accountMsToRowsMap[row.by_ms] ??= [];
-		accountMsToRowsMap[row.by_ms].push(row);
+		accountMsToRowsMap[row.p1!] ??= [];
+		accountMsToRowsMap[row.p1!].push(row);
 	}
-	let signedInAccountUpdates: MyAccountUpdates[] = ms_ExpiryMs__accountMs__sessionKeyRows.map(
-		({ at_ms }) => reduceMyAccountUpdateRows(accountMsToRowsMap[at_ms] || [{ by_ms: at_ms }]),
+	let signedInAccountUpdates: MyAccountUpdates[] = _sessionKey_m_accountMs_expiryMsRows.map(
+		({ p2 }) => reduceMyAccountUpdateRows(accountMsToRowsMap[p2!], p2!),
 	);
 
-	if (caller_ms_ExpiryMs__accountMs__sessionKeyRow) {
+	if (_sessionKey_m_accountMs_expiryMsCallerRow) {
 		if (get.signedIn) {
 			signedIn = true;
 			if (get.roleCode) {
 				if (spaceMs === callerMs) roleCode = { num: roleCodes.admin };
 				else {
-					let id__accountMs_roleCodeRowInCallerSpace = id__accountMs_roleCodeRows.find(
-						(row) => row.in_ms === spaceMs && row.at_ms === callerMs,
+					let i_accountMs_roleCode_mbRowInCallerSpace = i_accountMs_roleCode_mbRows.find(
+						(row) => row.p1 === spaceMs && row.p2 === callerMs,
 					);
-					if (id__accountMs_roleCodeRowInCallerSpace) {
-						let { ms, num } = id__accountMs_roleCodeRowInCallerSpace;
-						roleCode = { ms, num: num! };
+					if (i_accountMs_roleCode_mbRowInCallerSpace) {
+						let { p4, p3 } = i_accountMs_roleCode_mbRowInCallerSpace;
+						roleCode = { ms: p4!, num: p3! };
 					}
 				}
 			}
@@ -497,75 +474,69 @@ export let _getCallerContext = async (
 				if (spaceMs === callerMs) {
 					permissionCode = { num: permissionCodes.reactAndPost };
 				} else {
-					let id__accountMs_permissionCodeRowInCallerSpace = id__accountMs_permissionCodeRows.find(
-						(row) => row.in_ms === spaceMs && row.at_ms === callerMs,
+					let i_accountMs_permCode_mbRowInCallerSpace = i_accountMs_permCode_mbRows.find(
+						(row) => row.p1 === spaceMs && row.p2 === callerMs,
 					);
-					if (id__accountMs_permissionCodeRowInCallerSpace) {
-						let { ms, num } = id__accountMs_permissionCodeRowInCallerSpace;
-						permissionCode = { ms, num: num! };
+					if (i_accountMs_permCode_mbRowInCallerSpace) {
+						let { p4, p3 } = i_accountMs_permCode_mbRowInCallerSpace;
+						permissionCode = { ms: p4!, num: p3! };
 					}
 				}
 			}
 			if (get.inGlobal) {
-				inGlobal = id__accountMs_permissionCodeRows.some(
-					(row) => row.in_ms === 1 && row.at_ms === callerMs,
-				);
+				inGlobal = i_accountMs_permCode_mbRows.some((row) => row.p1 === 1 && row.p2 === callerMs);
 			}
 		}
-		if (ms - caller_ms_ExpiryMs__accountMs__sessionKeyRow.ms > hour) {
-			let newSessionObj: CookieObj = { ms, txt: ranStr() };
+		if (now - _sessionKey_m_accountMs_expiryMsCallerRow.p1! > hour) {
+			let newSessionObj: CookieObj = { ms: now, txt: ranStr() };
 			setCookie(ctx, 'ms_sessionKey', newSessionObj);
 			await tdb.insert(pTable).values({
-				...id0,
-				at_ms: callerMs,
-				code: pc.ms_ExpiryMs__accountMs__sessionKey,
-				...newSessionObj,
+				code: pc._sessionKey_m_accountMs_expiryMs,
+				txt: newSessionObj.txt,
+				p1: newSessionObj.ms,
+				p2: callerMs,
+				p3: now + week,
 			});
-			if (!caller_ms_ExpiryMs__accountMs__sessionKeyRow.num) {
-				let oldCookiePartialFilter = [
-					pf.at_by_ms.eq0,
-					pf.at_in_ms.eq0,
-					pf.ms.eq(caller_ms_ExpiryMs__accountMs__sessionKeyRow.ms),
-					pf.in_ms.eq0,
-					pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
-					pf.num.isNull,
-					pf.txt.eq(caller_ms_ExpiryMs__accountMs__sessionKeyRow.txt!),
-				];
-				await tdb
-					.update(pTable)
-					.set({ num: ms + minute })
-					.where(
-						and(
-							pf.at_ms.eq(callerMs), //
-							...oldCookiePartialFilter,
-						),
-					);
-				await tdb
-					.update(pTable)
-					.set(newSessionObj)
-					.where(
-						and(
-							pf.at_ms.gt0, //
-							pf.at_ms.notEq(callerMs),
-							...oldCookiePartialFilter,
-						),
-					);
-			}
+			let _sessionKey_m_accountMs_expiryMsPartialFilter = [
+				pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
+				pf.txt.eq(_sessionKey_m_accountMs_expiryMsCallerRow.txt!),
+				pf.p1.eq(_sessionKey_m_accountMs_expiryMsCallerRow.p1!),
+			];
+			await tdb
+				.update(pTable)
+				.set({ p3: now + minute })
+				.where(
+					and(
+						..._sessionKey_m_accountMs_expiryMsPartialFilter,
+						pf.p2.eq(callerMs), //
+					),
+				);
+			await tdb
+				.update(pTable)
+				.set({
+					txt: newSessionObj.txt,
+					p1: newSessionObj.ms,
+					p3: now + week,
+				})
+				.where(
+					and(
+						..._sessionKey_m_accountMs_expiryMsPartialFilter,
+						pf.p2.notEq(callerMs), //
+					),
+				);
 		}
-	} else if (callerMs) {
-		spaceUpdates = [];
-	}
+	} else if (callerMs) spaceUpdates = [];
 
 	if (get.isPublic) {
 		if (spaceMs === 1) isPublic = { num: 1 };
 		else if (spaceMs === callerMs) isPublic = { num: 0 };
 		else {
-			let id_spaceIsPublicRowInCallerSpace = id_spaceIsPublicRows.find(
-				(row) => row.in_ms === spaceMs,
+			let imb_spaceIsPublicRowInCallerSpace = imb_spaceIsPublicRows.find(
+				(row) => row.p1 === spaceMs,
 			);
-			if (id_spaceIsPublicRowInCallerSpace) {
-				let { ms, num } = id_spaceIsPublicRowInCallerSpace;
-				isPublic = permissionCode || num ? { ms, num: num! } : undefined;
+			if (imb_spaceIsPublicRowInCallerSpace) {
+				let { p2, p4 } = imb_spaceIsPublicRowInCallerSpace;
+				isPublic = permissionCode || p4 ? { ms: p2!, num: p4! } : undefined;
 			}
 		}
 	}

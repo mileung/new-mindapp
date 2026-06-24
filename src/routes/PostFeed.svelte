@@ -1,52 +1,52 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { scrollToHighlight, textInputFocused } from '$lib/dom';
+	import { gotoIfNeeded, scrollToHighlight, textInputFocused } from '$lib/dom';
 	import {
 		assertCallerIsOwnerOrInGlobal,
 		getBottomOverlayShown,
 		getCallerIsOwner,
 		getPromptSigningIn,
 		getSpaceContext,
+		getSpacePermissions,
 		gs,
 		mergeMsToAccountNameTxtMap,
 		mergeMsToSpaceNameTxtMap,
 		mergeSpaceMsToAccountMsToMembershipMap,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { alertError, makeErrorReadable, setSearchParams } from '$lib/js';
+	import { alertError, getAlteredSearchParams, makeErrorReadable } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
 	import {
 		getAtIdStr,
+		getIdObj,
 		getIdStr,
 		getIdStrAsIdObj,
 		getUrlInMs,
-		id0,
-		isIdStr,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTags, type Post } from '$lib/types/posts';
+	import { cleanTags, getLastVersion, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
 	import { editPost } from '$lib/types/posts/editPost';
-	import { getPostFeed, postsPerLoad, type GetPostFeedArg } from '$lib/types/posts/getPostFeed';
-	import { parseSearchQuery } from '$lib/types/posts/parseSearchQuery';
-	import { permissionCodes } from '$lib/types/spaces';
+	import {
+		getDefaultSection,
+		getPostFeed,
+		type PostFeedSection,
+	} from '$lib/types/posts/getPostFeed';
+	import {
+		getParsedQPaginates,
+		parseSearchQuery,
+		type ParsedQ,
+	} from '$lib/types/posts/parseSearchQuery';
 	import {
 		IconArchive,
 		IconChevronRight,
 		IconClockUp,
-		IconEye,
-		IconInbox,
-		IconLibrary,
 		IconList,
-		IconListSearch,
 		IconListTree,
-		IconMessage2,
 		IconPencilPlus,
-		IconPinned,
 		IconSquareFilled,
-		IconStack2,
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
@@ -56,165 +56,328 @@
 	import PromptSignIn from './PromptSignIn.svelte';
 	import ReactionHistory from './ReactionHistory.svelte';
 	import SearchBar from './SearchBar.svelte';
-
-	let pinnedQueryTxtId = '';
+	import TimeRangePicker from './TimeRangePicker.svelte';
 
 	let qSearchParam = $derived(page.url.searchParams.get('q') ?? '');
-	let view = $derived<'flat' | 'nested'>(
-		page.url.searchParams.get('nested') !== null ? 'nested' : 'flat',
-	);
-	let nested = $derived(view === 'nested');
-	let sortedBy = $derived<'new' | 'old'>(page.url.searchParams.get('old') !== null ? 'old' : 'new');
-
-	let postIdSlug = $derived.by(() => {
-		let { idSlug } = page.params;
-		return isIdStr(idSlug) ? idSlug : undefined;
-	});
+	let { idSlug } = $derived(page.params);
+	let flatView = $derived(idSlug ? false : page.url.searchParams.get('nested') === null);
+	let newFirst = $derived(page.url.searchParams.get('old') === null);
+	let parseIntParam = (paramKey: string) => {
+		let v = page.url.searchParams.get(paramKey);
+		return v !== null && Number.isInteger(+v)
+			? +v //
+			: undefined;
+	};
+	// TODO: rename to msFrom and msTo? Would have to fix the offset by 1 ms
+	let msGte = $derived(parseIntParam('msGte'));
+	let msLte = $derived(parseIntParam('msLte'));
 	let urlInMs = $derived(getUrlInMs());
+	let { canPost } = $derived(getSpacePermissions(urlInMs));
 	let space = $derived(urlInMs === undefined ? undefined : gs.msToSpaceMap[urlInMs]);
 	let spaceContext = $derived(getSpaceContext(urlInMs));
-	let isMergedView = $derived('/merged-view' === page.url.pathname);
+	let isMergedView = $derived(page.url.pathname === '/merged-view');
 	let callerIsOwner = $derived(getCallerIsOwner());
-	let isOwnerView = $derived(callerIsOwner && '/owner-view' === page.url.pathname);
+	let isOwnerView = $derived(callerIsOwner && page.url.pathname === '/owner-view');
 
 	let viewable = $derived(
-		!!space?.isPublic.num || //
+		callerIsOwner ||
+			!!space?.isPublic.num || //
 			!!spaceContext?.permissionCode ||
 			isMergedView ||
-			isOwnerView ||
-			callerIsOwner,
-	);
-	let showViewOnly = $derived(
-		viewable && //
-			spaceContext?.permissionCode
-			? spaceContext?.permissionCode.num === permissionCodes.viewOnly
-			: !isMergedView && !callerIsOwner,
-	);
-	let showYourTurn = $derived(
-		urlInMs && urlInMs !== gs.accounts?.[0].ms && spaceContext?.permissionCode,
+			isOwnerView,
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
-	let allowTopLvlPosting = $derived(
-		!postIdSlug &&
-			!promptSignIn &&
-			(spaceContext?.permissionCode?.num === permissionCodes.postOnly ||
-				spaceContext?.permissionCode?.num === permissionCodes.reactAndPost),
-	);
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let identifier = $derived(
 		JSON.stringify({
 			viewable,
-			ms: callerMs,
+			callerMs,
 			href: page.url.href,
 		}),
 	);
-	let feed = $derived(gs.urlToPostFeedMap[identifier]);
-	let topLvlPostIdStrs = $derived(feed?.topLvlPostIdStrs || []);
-	let endReached = $derived(feed?.endReached);
-	let error = $derived(feed?.error ?? '');
+	let postFeed = $derived(gs.identifierToPostFeedMap[identifier]);
+	let sectionObjs = $derived(postFeed?.sectionObjs || []);
+	let endReached = $derived(postFeed?.endReached);
+	let error = $derived(postFeed?.error ?? '');
 	let useLocalDb = $derived(urlInMs === 0);
+	let hasAnyPosts = $derived(
+		sectionObjs.some((o) => o.topLvlPostIdStrs.some((s) => gs.idToPostMap[s])),
+	);
 
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// console.log('loadMorePosts');
-		if (1) return;
-		if (callerMs === undefined || promptSignIn) return;
+		// if (1) return;
 		if (
-			urlInMs === undefined
+			callerMs === undefined ||
+			promptSignIn ||
+			(urlInMs === undefined
 				? !isMergedView && !isOwnerView
-				: !viewable || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]
+				: !viewable || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs])
 		)
 			return;
 		// await new Promise((res) => setTimeout(res, 1000));
-		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or interacts with the feed. This is to reduce unnecessary requests when the user just wants to add a post via the extension
+		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or
+		// interacts with the feed. This is to reduce unnecessary requests when the user just wants
+		// to add a post via the extension
 		if (endReached) return e.detail.complete();
-
-		let parsedQ = parseSearchQuery(qSearchParam);
-		let postFeed: Awaited<ReturnType<typeof getPostFeed>>;
-
-		let getPostFeedArg: GetPostFeedArg = {
-			view,
-			sortedBy,
-			msBefore: undefined,
-			msAfter: undefined,
-			...parsedQ,
-			eitherInMss: [
-				...new Set([
-					...(isMergedView
-						? (page.url.searchParams.get('in_mss') ?? '').split(',').map(Number)
-						: useLocalDb || isOwnerView
-							? []
-							: [urlInMs!]),
-					...(parsedQ.eitherInMss || []),
-				]),
-			],
-		};
-
 		try {
-			if (postIdSlug) {
-				postFeed = await getPostFeed(
-					{ postIdObjsInclude: [getIdStrAsIdObj(postIdSlug)] },
-					useLocalDb,
-				);
+			let firstLoad = !sectionObjs.length;
+			let sectionHeadings: {
+				heading: (typeof sectionObjs)['0']['heading'];
+				secondaryTxt?: string;
+			}[] = [];
+			let extensionSearchPostFeedSection: undefined | PostFeedSection;
+			let forYouPostFeedSection: undefined | PostFeedSection;
+			let pinnedPostFeedSection: undefined | PostFeedSection;
+			let mainPostFeedSection: undefined | PostFeedSection;
+			let getMinTopLvlPostLimit = (topLvlPostLimit: number, p: ParsedQ) =>
+				getParsedQPaginates(p)
+					? topLvlPostLimit
+					: Math.min(topLvlPostLimit, p.postIdObjsInclude.length);
+			if (idSlug) {
+				sectionHeadings.push({ heading: 'post' });
+				mainPostFeedSection = {
+					...getDefaultSection(),
+					postIdObjsInclude: [getIdStrAsIdObj(idSlug)],
+					flatView: false,
+					topLvlPostLimit: 1,
+				};
 			} else {
-				let lastTopLvlPostIdStr = topLvlPostIdStrs.slice(-1)[0];
+				if (firstLoad && flatView && newFirst && !isMergedView && !isOwnerView && !qSearchParam) {
+					if (gs.extensionSearchQ) {
+						sectionHeadings.push({ heading: 'extSearch', secondaryTxt: gs.extensionSearchQ });
+						let parsedExtSearchQ = parseSearchQuery(gs.extensionSearchQ);
+						extensionSearchPostFeedSection = {
+							...getDefaultSection(),
+							...parsedExtSearchQ,
+							topLvlPostLimit: getMinTopLvlPostLimit(3, parsedExtSearchQ),
+						};
+					}
+					if (urlInMs && callerMs && urlInMs !== callerMs && spaceContext?.permissionCode) {
+						sectionHeadings.push({ heading: 'forYou' });
+						forYouPostFeedSection = {
+							...getDefaultSection(),
+							eitherAtByMss: [callerMs],
+							// eitherTags: ['__' + callerMs], // TODO: merge posts with account tag and eitherAtByMss
+							// This may require a rewrite to the parser (using an AST, parentheses, and pipes "|") due
+							// to the ambiguity of `@__8 [__8]`
+							// Unclear if this should search for posts tagged with __8 at account __8 or
+							// posts at account __8 or posts tagged with __8
+							// TODO: Would also have to make an api for searching current space members.
+							// Would be used in dots page to search for members and PostWriter for tagging account ids
+							topLvlPostLimit: 3,
+						};
+					}
+					if (space?.pinnedQuery.txt) {
+						sectionHeadings.push({ heading: 'pinned', secondaryTxt: space?.pinnedQuery.txt });
+						let parsedPinnedQueryTxt = parseSearchQuery(space?.pinnedQuery.txt);
+						pinnedPostFeedSection = {
+							...getDefaultSection(),
+							...parsedPinnedQueryTxt,
+							topLvlPostLimit: getMinTopLvlPostLimit(3, parsedPinnedQueryTxt),
+						};
+					}
+				}
+				sectionHeadings.push({
+					heading: qSearchParam ? 'search' : sectionHeadings.length ? 'nextUp' : '',
+					secondaryTxt: qSearchParam,
+				});
+				let parsedQ = parseSearchQuery(qSearchParam);
+				mainPostFeedSection = {
+					...getDefaultSection(),
+					flatView,
+					newFirst,
+					msGte,
+					msLte,
+					...parsedQ,
+					topLvlPostLimit: getMinTopLvlPostLimit(15, parsedQ),
+					eitherInMss: [
+						...new Set([
+							...(isMergedView
+								? (page.url.searchParams.get('inMss') ?? '').split(',').map(Number)
+								: useLocalDb || isOwnerView
+									? []
+									: [urlInMs!]),
+							...(parsedQ.eitherInMss || []),
+						]),
+					],
+				};
+				let lastSectionTopLvlPostIdStrs = sectionObjs.at(-1)?.topLvlPostIdStrs;
+				let lastTopLvlPostIdStr = lastSectionTopLvlPostIdStrs?.at(-1);
 				let lastTopLvlPostIdObj = lastTopLvlPostIdStr ? getIdStrAsIdObj(lastTopLvlPostIdStr) : null;
-				if (lastTopLvlPostIdObj) {
-					if (sortedBy === 'new') {
-						// getPostFeedArg.msBefore = lastTopLvlPostIdObj.ms + 1;
-						// get newest descendent post of lastTopLvlPostIdObj
-					} else if (sortedBy === 'old') {
-						getPostFeedArg.msAfter = lastTopLvlPostIdObj.ms - 1;
+				if (lastTopLvlPostIdObj && getParsedQPaginates(parsedQ)) {
+					if (flatView) {
+						mainPostFeedSection[newFirst ? 'msLte' : 'msGte'] = lastTopLvlPostIdObj.ms;
+						let lastTopLvlPostIdObjsWithSameMs: IdObj[] = [lastTopLvlPostIdObj];
+						for (let i = lastSectionTopLvlPostIdStrs!.length - 2; i >= 0; i--) {
+							let postIdStr = lastSectionTopLvlPostIdStrs![i];
+							let o = getIdStrAsIdObj(postIdStr);
+							if (o.ms === lastTopLvlPostIdObj.ms) lastTopLvlPostIdObjsWithSameMs.push(o);
+							else break;
+						}
+						mainPostFeedSection.postIdObjsExclude = [...lastTopLvlPostIdObjsWithSameMs];
+					} else {
+						let getAllIdsInNest = (parentIdStr: string): string[] => {
+							let result = new Set<string>();
+							result.add(parentIdStr);
+							let subIds = gs.postIdToSubIdsMap[parentIdStr] || [];
+							for (let subId of subIds) {
+								let childDescendants = getAllIdsInNest(subId);
+								childDescendants.forEach((id) => result.add(id));
+							}
+							return [...result];
+						};
+						let getLastPostInNestToSatisfyQuery = (topLvlPostIdObj: IdObj) =>
+							getAllIdsInNest(getIdStr(topLvlPostIdObj))
+								.map((s) => getIdStrAsIdObj(s))
+								.sort((a, b) => (newFirst ? b.ms - a.ms : a.ms - b.ms))
+								.find((o) => {
+									let s = getIdStr(o);
+									let post = gs.idToPostMap[s];
+									let lastHistoryLayer = post?.history?.[getLastVersion(post)!];
+									if (!post || !lastHistoryLayer) return false;
+									return (
+										(!parsedQ.eitherByMss.length ||
+											parsedQ.eitherByMss.some((byMs) => post.by_ms === byMs)) &&
+										(!parsedQ.eitherAtByMss.length ||
+											parsedQ.eitherAtByMss.some((atByMs) => post.at_by_ms === atByMs)) &&
+										(!parsedQ.requiredTags.length ||
+											parsedQ.requiredTags.every((requiredTag) =>
+												(lastHistoryLayer.tags || []).includes(requiredTag),
+											)) &&
+										(!parsedQ.eitherTags.length ||
+											parsedQ.eitherTags.some((eitherTag) =>
+												(lastHistoryLayer.tags || []).includes(eitherTag),
+											)) &&
+										(!parsedQ.requiredTagStarts.length ||
+											parsedQ.requiredTagStarts.every((requiredTagStart) =>
+												(lastHistoryLayer.tags || []).find((tag) =>
+													tag.toLowerCase().startsWith(requiredTagStart.toLowerCase()),
+												),
+											)) &&
+										(!parsedQ.eitherTagStarts.length ||
+											parsedQ.eitherTagStarts.some((eitherTagStart) =>
+												(lastHistoryLayer.tags || []).find((tag) =>
+													tag.toLowerCase().startsWith(eitherTagStart.toLowerCase()),
+												),
+											)) &&
+										(!parsedQ.requiredTagEnds.length ||
+											parsedQ.requiredTagEnds.every((requiredTagEnd) =>
+												(lastHistoryLayer.tags || []).find((tag) =>
+													tag.toLowerCase().endsWith(requiredTagEnd.toLowerCase()),
+												),
+											)) &&
+										(!parsedQ.eitherTagEnds.length ||
+											parsedQ.eitherTagEnds.some((eitherTagEnd) =>
+												(lastHistoryLayer.tags || []).find((tag) =>
+													tag.toLowerCase().endsWith(eitherTagEnd.toLowerCase()),
+												),
+											)) &&
+										(!parsedQ.requiredCoreIncludes.length ||
+											parsedQ.requiredCoreIncludes.every((requiredCoreInclude) =>
+												lastHistoryLayer.core
+													?.toLowerCase()
+													.includes(requiredCoreInclude.toLowerCase()),
+											)) &&
+										(!parsedQ.eitherCoreIncludes.length ||
+											parsedQ.eitherCoreIncludes.some((eitherCoreInclude) =>
+												lastHistoryLayer.core
+													?.toLowerCase()
+													.includes(eitherCoreInclude.toLowerCase()),
+											))
+									);
+								})!;
+						let lastPostInLastNestToSatisfyQuery =
+							getLastPostInNestToSatisfyQuery(lastTopLvlPostIdObj);
+						mainPostFeedSection[newFirst ? 'msLte' : 'msGte'] = lastPostInLastNestToSatisfyQuery.ms;
+						mainPostFeedSection.postIdObjsExclude = (lastSectionTopLvlPostIdStrs || [])
+							.flatMap((s) => getAllIdsInNest(s))
+							.map((s) => getIdStrAsIdObj(s))
+							.filter((o) =>
+								newFirst
+									? o.ms <= lastPostInLastNestToSatisfyQuery.ms
+									: o.ms >= lastPostInLastNestToSatisfyQuery.ms,
+							);
 					}
-					let lastTopLvlPostIdObjsWithSameMs: IdObj[] = [lastTopLvlPostIdObj];
-					for (let i = topLvlPostIdStrs.length - 2; i >= 0; i--) {
-						let idObj = getIdStrAsIdObj((topLvlPostIdStrs as string[])[i]);
-						if (idObj.ms === lastTopLvlPostIdObj!.ms) {
-							lastTopLvlPostIdObjsWithSameMs.push(idObj);
-						} else break;
-					}
-					getPostFeedArg.postIdObjsExclude = [...lastTopLvlPostIdObjsWithSameMs];
+					// console.log('mainPostFeedSection.msGte:', mainPostFeedSection.msGte);
 				}
-				postFeed = await getPostFeed(getPostFeedArg, useLocalDb);
-				// console.log('postFeed:', postFeed);
 			}
-			let { topLvlPostIdStrs: newTopLvlPostIdStrs, idToPostMap: newIdToPostMap } = postFeed;
+			// console.log('mainPostFeedSection:', mainPostFeedSection);
+			let postFeedUpdate = await getPostFeed(
+				[
+					extensionSearchPostFeedSection,
+					forYouPostFeedSection,
+					pinnedPostFeedSection,
+					mainPostFeedSection,
+				].filter((s) => !!s),
+				useLocalDb,
+				callerMs && page.params.spaceSlug && !qSearchParam && !postFeed
+					? urlInMs //
+					: undefined,
+			);
+			let {
+				topLvlPostIdStrsSections: newTopLvlPostIdStrsSections = [],
+				idToPostMap: newIdToPostMap = {},
+			} = postFeedUpdate;
+			// console.log('postFeedUpdate:', postFeedUpdate);
 			// TODO: add account and space names to to local db using msToAccountNameTxtMap and msToSpaceNameTxtMap
-
-			mergeMsToAccountNameTxtMap(postFeed.msToAccountNameTxtMap);
-			mergeMsToSpaceNameTxtMap(postFeed.msToSpaceNameTxtMap);
-			mergeSpaceMsToAccountMsToMembershipMap(postFeed.spaceMsToAccountMsToMembershipMap);
-
+			mergeMsToAccountNameTxtMap(postFeedUpdate.msToAccountNameTxtMap || {});
+			mergeMsToSpaceNameTxtMap(postFeedUpdate.msToSpaceNameTxtMap || {});
+			mergeSpaceMsToAccountMsToMembershipMap(
+				postFeedUpdate.spaceMsToAccountMsToMembershipMap || {},
+			);
 			Object.entries(newIdToPostMap).forEach(([id, post]) => {
-				let lastVersion = getLastVersion(newIdToPostMap[id]);
-				if (newIdToPostMap[id].history?.[lastVersion]) {
-					(newIdToPostMap[id].history[lastVersion].tags ??= []).sort();
-				}
+				let lastVersion = getLastVersion(post);
+				if (lastVersion !== null && post.history?.[lastVersion])
+					(post.history[lastVersion].tags ??= []).sort();
+				// if (!gs.idToPostMap[id]) {
+				// 	gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...post };
+				// }
+				gs.idToPostMap[id] = post;
 				if (hasParent(post)) {
-					let strAtId = getAtIdStr(post);
-					if (!gs.idToPostMap[strAtId]) gs.idToPostMap[strAtId] = { ...id0, history: {} };
-					gs.idToPostMap[strAtId].subIds = [
-						...new Set([...(gs.idToPostMap[strAtId]?.subIds || []), id]),
-					];
-					gs.idToPostMap[strAtId].subIds.sort(
+					let atIdStr = getAtIdStr(post);
+					gs.postIdToSubIdsMap[atIdStr] = [
+						...new Set([...(gs.postIdToSubIdsMap[atIdStr] || []), id]),
+					].sort(
+						// TODO: sort reply posts by reactions and atPost author?
 						(a, b) => getIdStrAsIdObj(b).ms - getIdStrAsIdObj(a).ms,
 					);
 				}
-				gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...newIdToPostMap[id] };
 			});
-
-			newTopLvlPostIdStrs.length && e.detail.loaded();
-			let endReached = newTopLvlPostIdStrs.length < postsPerLoad;
+			let lastSectionTopLvlPostIdStrs = newTopLvlPostIdStrsSections?.at(-1) || [];
+			lastSectionTopLvlPostIdStrs.length && e.detail.loaded();
+			let endReached =
+				!getParsedQPaginates(mainPostFeedSection) ||
+				lastSectionTopLvlPostIdStrs.length < mainPostFeedSection.topLvlPostLimit;
 			endReached && e.detail.complete();
-			gs.urlToPostFeedMap = {
-				...gs.urlToPostFeedMap,
+			// console.log('endReached:', endReached);
+
+			//
+
+			// console.log('newTopLvlPostIdStrsSections:', newTopLvlPostIdStrsSections);
+			let newSectionObjs: typeof sectionObjs = [];
+			if (firstLoad) {
+				newSectionObjs = newTopLvlPostIdStrsSections.map((newTopLvlPostIdStrsSection, i) => {
+					return {
+						...sectionHeadings[i],
+						topLvlPostIdStrs: newTopLvlPostIdStrsSection,
+					};
+				});
+			} else {
+				newSectionObjs = [...sectionObjs];
+				newSectionObjs.at(-1)!.topLvlPostIdStrs.push(...newTopLvlPostIdStrsSections[0]);
+			}
+			gs.identifierToPostFeedMap = {
+				...gs.identifierToPostFeedMap,
 				[identifier]: {
 					endReached,
-					topLvlPostIdStrs: [...new Set([...topLvlPostIdStrs, ...newTopLvlPostIdStrs])],
+					sectionObjs: newSectionObjs,
 				},
 			};
 		} catch (error) {
-			gs.urlToPostFeedMap = {
-				...gs.urlToPostFeedMap,
+			console.error(error);
+			gs.identifierToPostFeedMap = {
+				...gs.identifierToPostFeedMap,
 				[identifier]: {
 					error: makeErrorReadable(error),
 				},
@@ -223,105 +386,113 @@
 		}
 	};
 
+	// TODO: go through fetched idToPostMap and hydrate any posts with history === null with locally saved posts
+	let getLocallySavedPost = async (postIdObj: IdObj) =>
+		(
+			await getPostFeed(
+				[{ ...getDefaultSection(), postIdObjsInclude: [getIdObj(postIdObj)] }],
+				true,
+			)
+		).idToPostMap?.[getIdStr(postIdObj)];
+
 	let viewPostToastId = $state('');
 	let submitPost = async (tags: string[], core: string) => {
 		if (!gs.accounts || urlInMs === undefined) return;
-		assertCallerIsOwnerOrInGlobal();
-		await updateSavedTags(tags);
-		let post: Post;
-		if (gs.writingEdit) {
-			let postBeingEdited = gs.idToPostMap[getIdStr(gs.writingEdit)]!;
-			let newLastVersion = getLastVersion(postBeingEdited)! + 1;
-			post = {
-				...postBeingEdited,
-				history: {
-					...postBeingEdited.history,
-					[newLastVersion]: {
-						ms: 0,
-						tags,
-						core,
+		try {
+			assertCallerIsOwnerOrInGlobal();
+			await updateSavedTags(tags);
+			let post: Post;
+			if (gs.postingEdit) {
+				let postBeingEdited = gs.idToPostMap[getIdStr(gs.postingEdit)]!;
+				let newLastVersion = getLastVersion(postBeingEdited)! + 1;
+				post = {
+					...postBeingEdited,
+					history: {
+						...postBeingEdited.history,
+						[newLastVersion]: {
+							ms: 0,
+							tags,
+							core,
+						},
 					},
-				},
-			};
-			// let updateInCloud = async () => {
-			// 	post.tags = await editPost(post, true);
-			// 	await overwriteLocalPost(post);
-			// };
-			// if (!inMs) {
-			// 	Number.isInteger(post.in_ms) ? updateInCloud() : (post.tags = await editPost(post, false));
-			// } else updateInCloud();
-			post.history![newLastVersion]!.ms = (await editPost(post)).ms;
-		} else {
-			post = {
-				...id0,
-				...(gs.writingTo
-					? {
-							at_ms: gs.writingTo.ms,
-							at_by_ms: gs.writingTo.by_ms,
-							at_in_ms: gs.writingTo.in_ms,
-						}
-					: {}),
-				by_ms: gs.accounts[0].ms,
-				in_ms: urlInMs,
-				history: {
-					1: {
-						ms: 0,
-						tags: normalizeTags(tags),
-						core,
+				};
+				post.history![newLastVersion]!.ms = (await editPost(post, false, false)).ms;
+				if (!useLocalDb) {
+					let locallySavedPost = getLocallySavedPost(post);
+					if (!locallySavedPost) await addPost(post, true, true, false);
+					await editPost(post, true, true);
+				}
+			} else {
+				post = {
+					in_ms: urlInMs,
+					ms: 0,
+					by_ms: gs.accounts[0].ms,
+					...(gs.postingTo
+						? {
+								at_ms: gs.postingTo.ms,
+								at_by_ms: gs.postingTo.by_ms,
+							}
+						: {}),
+					childCount: 0,
+					history: {
+						1: {
+							ms: 0,
+							tags: cleanTags(tags),
+							core,
+						},
 					},
-				},
-			};
-			try {
+				};
 				// TODO: fetch cited posts if not already in feed
-				post.ms = (await addPost(post)).ms;
+				let { ms } = await addPost(post, useLocalDb, false, true);
+				post.ms = ms;
 				post.history![1]!.ms = post.ms;
-				post.subIds = [];
-				urlInMs && (await addPost(post, true));
-			} catch (error) {
-				return alertError(error);
+				!useLocalDb && (await addPost(post, true, true, false));
 			}
+			gs.writerTags = [];
+			gs.writerTagVal = '';
+			gs.writerCore = '';
+			let strPostId = getIdStr(post);
+			gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
+			if (gs.postingTo) {
+				let atPostId = getAtIdStr(post);
+				gs.idToPostMap[atPostId]!.childCount!++;
+				gs.postIdToSubIdsMap[atPostId] ??= [];
+				gs.postIdToSubIdsMap[atPostId].unshift(strPostId);
+			}
+			if (gs.postingNew && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
+			if (gs.postingNew || gs.postingTo) {
+				viewPostToastId = strPostId;
+				setTimeout(() => (viewPostToastId = ''), 3000);
+			}
+			// TODO add new posts to all feeds applicable (merged, new, etc.)?
+			resetBottomOverlay();
+		} catch (error) {
+			return alertError(error);
 		}
-
-		let strPostId = getIdStr(post);
-		gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
-		if (gs.writingTo) {
-			let atPostId = getAtIdStr(post);
-			gs.idToPostMap[atPostId!]!.subIds = gs.idToPostMap[atPostId!]!.subIds || [];
-			nested && gs.idToPostMap[atPostId!]!.subIds!.unshift(strPostId);
-		}
-		if (gs.writingNew && sortedBy === 'new') {
-			topLvlPostIdStrs = [strPostId, ...topLvlPostIdStrs];
-		}
-		if (gs.writingNew || gs.writingTo) {
-			viewPostToastId = strPostId;
-			setTimeout(() => (viewPostToastId = ''), 3000);
-		}
-		// TODO add new posts to all feeds applicable (merged, new, etc.)
-		resetBottomOverlay();
 	};
 
-	let makeParams = (newView: 'flat' | 'nested', newSortedBy: 'new' | 'old') => {
-		return setSearchParams({
+	let makeParams = (willBeFlatView: boolean, willBeNewFirst: boolean) => {
+		return getAlteredSearchParams({
 			...{
 				flat: null,
 				nested: null,
 				new: null,
 				old: null,
 			},
-			...(newView === 'flat' ? {} : { nested: undefined }),
-			...(newSortedBy === 'new' ? {} : { old: undefined }),
+			...(willBeFlatView ? {} : { nested: undefined }),
+			...(willBeNewFirst ? {} : { old: undefined }),
 		});
 	};
-	// TODO: when clicking to a page with the feed already cached, it takes noticeably longer to render presumably cuz it's rendering the whole feed. Get rid of this delay without taking away the ability to command-f the whole page. Scroll height mustn't change so to maintain same scroll position when switching between space and post feeds.
-	let postObjFeed = $derived(
-		topLvlPostIdStrs.map((strPostId) => gs.idToPostMap[strPostId || 0]).filter((t) => !!t),
-	);
-
+	// TODO: when clicking to a page with the feed already cached, it takes noticeably
+	// longer to render presumably cuz it's rendering the whole feed. Get rid of this
+	// delay without taking away the ability to command-f the whole page. Scroll height
+	// mustn't change so to maintain same scroll position when switching between space and post feeds.
+	let topLvlPostCount = $derived(sectionObjs.flatMap((o) => o.topLvlPostIdStrs).length);
 	let lastScrolledToPostId = $state('');
 	$effect(() => {
-		if (postObjFeed.length && postIdSlug && lastScrolledToPostId !== postIdSlug) {
-			lastScrolledToPostId = postIdSlug;
-			scrollToHighlight(postIdSlug);
+		if (topLvlPostCount && idSlug && lastScrolledToPostId !== idSlug) {
+			lastScrolledToPostId = idSlug;
+			scrollToHighlight(idSlug);
 		}
 	});
 
@@ -338,10 +509,10 @@
 
 				// TODO: press left/right to highlight next adjacent post
 				// TODO: press shift left/right to highlight next depth 0 post
-				if (viewable && e.key === 'n') {
+				if (canPost && e.key === 'n') {
 					e.preventDefault();
 					resetBottomOverlay();
-					gs.writingNew = true;
+					gs.postingNew = true;
 				}
 			}
 		};
@@ -351,6 +522,18 @@
 			window.removeEventListener('keydown', handler);
 		};
 	});
+	let ownerViewingPosts = $derived(
+		isOwnerView &&
+			page.url.searchParams.get('accounts') === null &&
+			page.url.searchParams.get('spaces') === null,
+	);
+	let endingPanelClass = $derived(
+		`text-lg text-fg2 ${
+			isMergedView || ownerViewingPosts
+				? 'h-[calc(100vh-32px-36px)] xs:h-[calc(100vh-32px-32px)]'
+				: 'h-[calc(100vh-32px-36px)] xs:h-[calc(100vh-32px)]'
+		}`,
+	);
 </script>
 
 {#if callerMs === undefined || (urlInMs === undefined ? !viewable : !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs])}
@@ -362,129 +545,129 @@
 		{m.spaceNotFound()}
 	</p>
 {:else}
-	<div class="z-50 flex flex-col">
-		{#if qSearchParam}
-			<div class="h-9 fx">
-				<IconListSearch class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="whitespace-pre font-bold text-xl overflow-scroll">{qSearchParam}</p>
-			</div>
-		{:else if postIdSlug}
-			<div class="h-9 fx">
-				<IconMessage2 class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl">{m.post()}</p>
-				{#if postIdSlug && postObjFeed.length}
+	<div class="flex flex-col">
+		<div class={isMergedView || (isOwnerView && ownerViewingPosts) ? 'pt-16' : 'pt-8'}>
+			<div
+				class={`z-50 fixed ${isMergedView || isOwnerView ? 'top-8' : 'top-0'} bg-bg1 flex w-full xs:w-[calc(100vw-var(--w-sidebar))] text-fg2 shrink-0 h-8 ${idSlug ? 'hidden' : ''}`}
+			>
+				<div class="flex overflow-x-scroll">
 					<a
-						href={`/merged-view?q=[${postIdSlug}]`}
-						class="fx px-2 text-xl text-fg2 flex-1 hover:bg-bg4 hover:text-fg1"
+						href={makeParams(true, newFirst)}
+						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${flatView ? 'text-fg1' : ''}`}
 					>
-						<IconLibrary class="shrink-0 w-6 ml-0.5 mr-2" />
-						{m.citedIn()}
+						<IconList stroke={2.5} class="h-4" />{m.flat()}
 					</a>
-				{/if}
-			</div>
-		{:else if showViewOnly}
-			<div class="h-9 fx">
-				<IconEye class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl">{m.viewOnly()}</p>
-			</div>
-		{:else if showYourTurn}
-			<div class="h-9 fx">
-				<IconInbox class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl">
-					{spaceContext?.permissionCode?.num === permissionCodes.reactOnly
-						? m.yourTurnReactOnly()
-						: spaceContext?.permissionCode?.num === permissionCodes.postOnly
-							? m.yourTurnPostOnly()
-							: m.yourTurn()}
-				</p>
-			</div>
-			{#if gs.accounts}
-				{#if gs.accounts[0].ms}
-					<p class="ml-1.5 text-fg2">{m.noPostsAwaitingYourResponse()}</p>
-				{:else}
-					<p class="ml-1.5">
-						{@html m.signInToSeePostsAwaitingYourResponse()}
-					</p>
-				{/if}
-			{/if}
-			{#if pinnedQueryTxtId}
-				<div class="mt-2 fx">
-					<IconPinned class="shrink-0 w-6 ml-0.5 mr-2" />
-					<p class="font-bold text-xl leading-4">{m.pinned()}</p>
+					<a
+						href={makeParams(false, newFirst)}
+						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${flatView ? '' : 'text-fg1'}`}
+					>
+						<IconListTree stroke={2.5} class="h-4" />{m.nested()}
+					</a>
+					<div class="xy mr-0.5">
+						<IconSquareFilled class="h-1.5 w-1.5" />
+					</div>
+					<a
+						href={makeParams(flatView, true)}
+						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${newFirst ? 'text-fg1' : ''}`}
+					>
+						<IconClockUp stroke={2.5} class="h-4" />{m.new()}
+					</a>
+					<a
+						href={makeParams(flatView, false)}
+						class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${newFirst ? '' : 'text-fg1'}`}
+					>
+						<IconArchive stroke={2.5} class="h-4" />{m.old()}
+					</a>
 				</div>
-			{/if}
-			<div class="mt-2 fx">
-				<IconStack2 class="shrink-0 w-6 ml-0.5 mr-2" />
-				<p class="font-bold text-xl leading-4">{m.nextUp()}</p>
+				<TimeRangePicker
+					{msGte}
+					{msLte}
+					onChange={(newMsGte, newMsLte) => {
+						gotoIfNeeded(
+							getAlteredSearchParams({
+								msGte: newMsGte,
+								msLte: newMsLte,
+							}),
+						);
+					}}
+				/>
 			</div>
-		{/if}
-		<div
-			class={`flex w-full text-fg2 overflow-scroll shrink-0 ${showYourTurn || isMergedView || callerIsOwner ? 'h-8' : 'h-9'} ${postIdSlug ? 'hidden' : ''}`}
-		>
-			<a
-				href={makeParams('flat', sortedBy)}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'flat' ? 'text-fg1' : ''}`}
-			>
-				<IconList stroke={2.5} class="h-4" />{m.flat()}
-			</a>
-			<a
-				href={makeParams('nested', sortedBy)}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'nested' ? 'text-fg1' : ''}`}
-			>
-				<IconListTree stroke={2.5} class="h-4" />{m.nested()}
-			</a>
-			<div class="xy mr-0.5">
-				<IconSquareFilled class="h-1.5 w-1.5" />
-			</div>
-			<a
-				href={makeParams(view, 'new')}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'new' ? 'text-fg1' : ''}`}
-			>
-				<IconClockUp stroke={2.5} class="h-4" />{m.new()}
-			</a>
-			<a
-				href={makeParams(view, 'old')}
-				class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${sortedBy === 'old' ? 'text-fg1' : ''}`}
-			>
-				<IconArchive stroke={2.5} class="h-4" />{m.old()}
-			</a>
-			<!-- <button
-				class="ml-auto fx pr-1.5 hover:bg-bg4 hover:text-fg1"
-				onclick={() => {
-					// TODO: TimeRangePicker for posts
-				}}
-			>
-				<IconCalendarClock stroke={2.5} class="h-4" />{'All time'}
-			</button>
-			<input type="datetime-local" /> -->
-			<!-- <button class="ml-auto">2020-05-13</button>
-			<div class="self-center mx-1">-</div>
-			<button class="">Today</button> -->
-			<!-- <input class="ml-auto" type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" />
-			<input type="date" value="2018-07-22" min="2018-01-01" max="2018-12-31" /> -->
+			{#each sectionObjs as sectionObj, i (i)}
+				<div>
+					{#if sectionObj.heading}
+						<div
+							class={`h-8 flex w-full pl-2 font-semibold fx bg-bg1 ${sectionObj.heading === 'post' ? 'z-50 fixed top-0' : ''}`}
+						>
+							{#if sectionObj.heading === 'post'}
+								{m.post()}
+								<a
+									class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
+									href={`/merged-view?q=[${idSlug}]`}
+								>
+									{m.citedIn()}
+									<IconChevronRight />
+								</a>
+							{:else if sectionObj.heading === 'search'}
+								{m.search()}
+								<p class="font-medium pl-2 h-full flex-1 fx text-fg2">
+									{sectionObj.secondaryTxt}
+								</p>
+							{:else if sectionObj.heading === 'extSearch'}
+								{m.extensionSearch()}
+							{:else if sectionObj.heading === 'forYou'}
+								{m.forYou()}
+							{:else if sectionObj.heading === 'pinned'}
+								{m.pinned()}
+								<a
+									class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
+									href={`?q=${sectionObj.secondaryTxt}`}
+								>
+									{sectionObj.secondaryTxt}
+									<IconChevronRight />
+								</a>
+							{:else if sectionObj.heading === 'nextUp'}
+								{m.nextUp()}
+							{/if}
+						</div>
+						{#if !sectionObj.topLvlPostIdStrs.length}
+							<p class="pl-2 text-fg2">{m.nothingFound()}</p>
+						{/if}
+					{/if}
+					{#each sectionObj.topLvlPostIdStrs as s (s)}
+						{#if gs.idToPostMap[s]}
+							<PostBlock
+								post={gs.idToPostMap[s]}
+								depth={0}
+								nested={!flatView && i === sectionObjs.length - 1}
+							/>
+						{:else if gs.idToPostMap[s] === undefined}
+							<div class="text-sm font-bold text-fg2">
+								{(console.warn(m.idNotFound({ id: s })), m.idNotFound({ id: s }))}
+							</div>
+						{/if}
+					{/each}
+				</div>
+			{/each}
 		</div>
-		{#each postObjFeed as post, i (getIdStr(post))}
-			<PostBlock {post} depth={0} nested={postIdSlug ? !i : nested} />
-		{/each}
 		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMorePosts}>
-				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
-				<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
-					<p class="m-2 text-lg text-fg2">
-						<!-- noResults slot shows even after adding the first post -->
-						{postObjFeed?.length ? m.theEnd() : m.noPostsFound()}
-					</p>
+				<div slot="error" class={endingPanelClass}>
+					{error}
 				</div>
-				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
-					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+				<div slot="noResults" class={endingPanelClass}>
+					<!-- noResults slot shows even after adding the first post -->
+					{hasAnyPosts ? m.theEnd() : m.noPostsFound()}
+				</div>
+				<div slot="noMore" class={endingPanelClass}>
+					{m.theEnd()}
 				</div>
 			</InfiniteLoading>
 		{/if}
 		<div class="z-50 flex fixed left-18 xs:left-[var(--w-sidebar)] right-0 bottom-0">
 			<SearchBar />
-			{#if postIdSlug}
+			{#if idSlug}
 				<a
-					href={`/__${urlInMs}`}
+					href={`/${urlInMs}__`}
 					onclick={() => {
 						gs.lastScrollY && setTimeout(() => window.scrollTo({ top: gs.lastScrollY }), 1);
 					}}
@@ -492,10 +675,10 @@
 				>
 					<IconX class="w-8" />
 				</a>
-			{:else if allowTopLvlPosting}
+			{:else if canPost}
 				<button
 					class="xy h-9 w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
-					onclick={() => (gs.writingNew = true)}
+					onclick={() => (gs.postingNew = true)}
 				>
 					<IconPencilPlus class="h-8 xs:h-9" />
 				</button>

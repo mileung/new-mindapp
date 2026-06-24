@@ -95,12 +95,13 @@
 							roleCode: { ms, by_ms: 0, num: roleCodes.admin },
 							permissionCode: { ms, by_ms: 0, num: permissionCodes.reactAndPost },
 							flair: { ms, by_ms: 0, txt: '' },
-							accentCode: { ms, by_ms: 0, num: accentCodes.none },
+							accentCode: accentCodes.none,
+							sidePriority: Date.now(),
 						});
 						return lc;
 					});
 
-					goto(`/__${ms}`);
+					goto(`/${ms}__`);
 				} catch (error) {
 					console.error(error);
 					alert(error);
@@ -114,8 +115,8 @@
 				bind:value={spaceDescriptionTxt}
 				class="resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 			></textarea>
-			<p class="font-bold">{m.pinnedQuery()}</p>
-			<input bind:value={spacePinnedQueryTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" />
+			<!-- <p class="font-bold">{m.pinnedQuery()}</p>
+			<input bind:value={spacePinnedQueryTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" /> -->
 			<div class="mt-2 flex">
 				<div class="flex-1">
 					<p class="text-sm font-bold">{m.visibility()}</p>

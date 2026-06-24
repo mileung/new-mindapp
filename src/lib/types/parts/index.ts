@@ -1,5 +1,6 @@
+import { throwIf } from '$lib/js';
 import { z } from 'zod';
-import { getAtIdStr, getIdStr, type AtIdObj, type FullIdObj, type IdObj } from './partIds';
+import { type FullIdObj } from './partIds';
 import { pTable } from './partsTable';
 
 export type PartInsert = typeof pTable.$inferInsert;
@@ -11,14 +12,7 @@ export let GranularNumPropSchema = z.strictObject({
 	num: z.number(),
 });
 export type GranularNumProp = z.infer<typeof GranularNumPropSchema>;
-export let getGranularNumProp = (part: PartInsert) => {
-	if (part.num === undefined) throw new Error(`missing part.num`);
-	return {
-		ms: part.ms,
-		by_ms: part.by_ms,
-		num: part.num!,
-	} satisfies GranularNumProp;
-};
+
 export let sameGranularNum = (a?: GranularNumProp, b?: GranularNumProp) =>
 	a?.ms === b?.ms && a?.by_ms === b?.by_ms && a?.num === b?.num;
 
@@ -28,14 +22,6 @@ export let GranularTxtPropSchema = z.strictObject({
 	txt: z.string(),
 });
 export type GranularTxtProp = z.infer<typeof GranularTxtPropSchema>;
-export let getGranularTxtProp = (part: PartInsert) => {
-	if (part.txt === undefined) throw new Error(`missing part.txt`);
-	return {
-		ms: part.ms,
-		by_ms: part.by_ms,
-		txt: part.txt!,
-	} satisfies GranularTxtProp;
-};
 
 export let WhoObjSchema = z.strictObject({
 	callerMs: z.number(),
@@ -47,21 +33,22 @@ export let WhoWhereObjSchema = WhoObjSchema.extend({
 });
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
 
-export let hasParent = (part: FullIdObj) => !!(part.at_ms || part.at_by_ms || part.at_in_ms);
-export let assertLt2Rows = (parts: PartSelect[]) => {
-	if (parts.length > 1) throw new Error(`Multiple parts found`);
+export let hasParent = (part: FullIdObj) =>
+	Number.isInteger(part.in_ms) && Number.isInteger(part.at_ms) && Number.isInteger(part.at_by_ms);
+export let assertLt2Rows = (parts: PartInsert[]) => {
+	throwIf(parts.length > 1);
 	let row = parts[0];
 	return row as undefined | PartSelect;
 };
 
-export let assert1Row = (parts: PartSelect[]) => {
+export let assert1Row = (parts: PartInsert[]) => {
 	let row = assertLt2Rows(parts);
-	if (!row) throw new Error(`row dne`);
-	return row;
+	throwIf(!row);
+	return row!;
 };
 
-export let channelPartsByCode = (parts: PartSelect[]) => {
-	let partCodeToRowMap: Record<number, PartSelect[]> = {};
+export let channelPartsByCode = (parts: PartInsert[]) => {
+	let partCodeToRowMap: Record<number, PartInsert[]> = {};
 	for (let i = 0; i < parts.length; i++) {
 		let part = parts[i];
 		partCodeToRowMap[part.code] = partCodeToRowMap[part.code] || [];
@@ -69,50 +56,3 @@ export let channelPartsByCode = (parts: PartSelect[]) => {
 	}
 	return partCodeToRowMap;
 };
-
-export let makePartsUniqueById = (parts: PartSelect[]) => {
-	let idSet = new Set<string>();
-	let uniqueParts: PartSelect[] = [];
-	for (let i = 0; i < parts.length; i++) {
-		let part = parts[i];
-		let partIdStr = getIdStr(part);
-		if (!idSet.has(partIdStr)) {
-			idSet.add(partIdStr);
-			uniqueParts.push(part);
-		}
-	}
-	return uniqueParts;
-};
-
-export let makePartsUniqueByAtId = (parts: PartSelect[]) => {
-	let atIdSet = new Set<string>();
-	let uniqueParts: PartSelect[] = [];
-	for (let i = 0; i < parts.length; i++) {
-		let part = parts[i];
-		let partAtIdStr = getAtIdStr(part);
-		if (!atIdSet.has(partAtIdStr)) {
-			atIdSet.add(partAtIdStr);
-			uniqueParts.push(part);
-		}
-	}
-	return uniqueParts;
-};
-
-export let reduceTxtRowsToMap = (tagOrCoreTxtRows: PartSelect[]) => {
-	let idToTxtMap: Record<string, string> = {};
-	for (let i = 0; i < tagOrCoreTxtRows.length; i++) {
-		let tagTxtRow = tagOrCoreTxtRows[i];
-		idToTxtMap[getIdStr(tagTxtRow)] = tagTxtRow.txt!;
-	}
-	return idToTxtMap;
-};
-
-export let idObjMatchesIdObj = (io1: IdObj, io2: IdObj) =>
-	io1.ms === io2.ms && //
-	io1.by_ms === io2.by_ms &&
-	io1.in_ms === io2.in_ms;
-
-export let atIdObjMatchesIdObj = (aio: AtIdObj, io: IdObj) =>
-	aio.at_ms === io.ms && //
-	aio.at_by_ms === io.by_ms &&
-	aio.at_in_ms === io.in_ms;

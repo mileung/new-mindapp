@@ -49,7 +49,7 @@ export let handle: Handle = sequence(
 				// 	stack: error.stack,
 				// });
 				// TODO: y dis print the wrong line number?
-				console.log('tRPC error.stack:', error.stack);
+				console.trace('tRPC error.stack:', error.stack);
 			}
 		},
 	}),

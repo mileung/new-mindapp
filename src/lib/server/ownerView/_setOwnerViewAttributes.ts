@@ -1,7 +1,6 @@
-import { ownerMsSet, rulesAllowEmail } from '$lib/js';
+import { ownerMsSet, rulesAllowEmail, throwIf } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { id0 } from '$lib/types/parts/partIds';
 import { and, or } from 'drizzle-orm';
 import { channelPartsByCode, type WhoObj } from '../../types/parts';
 import { pc } from '../../types/parts/partCodes';
@@ -10,81 +9,58 @@ import { pTable } from '../../types/parts/partsTable';
 
 export let _setOwnerViewAttributes = async (
 	input: WhoObj & {
-		//
 		signedInEmailRules: string[];
 	},
 ) => {
-	let id__signedInEmailRulesRowsFilter = and(
-		pf.noAtId,
-		pf.in_ms.eq0,
-		pf.code.eq(pc.id__signedInEmailRules),
-		pf.num.isNull,
-		pf.txt.isNotNull,
-	);
 	let {
-		[pc.id__signedInEmailRules]: id__signedInEmailRulesRows = [],
-		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
+		[pc._signedInEmailRules_mb]: _signedInEmailRules_mbRows = [],
+		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					id__signedInEmailRulesRowsFilter, //
+					pf.code.eq(pc._signedInEmailRules_mb),
 					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						or(...[...ownerMsSet].map((ms) => pf.by_ms.eq(ms))),
-						pf.in_ms.eq0,
-						pf.code.eq(pc.msByMs__accountEmail),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+						pf.code.eq(pc._accountEmail_bm), //
+						or(...[...ownerMsSet].map((ms) => pf.p1.eq(ms))),
 					),
 				),
 			),
 	);
-
-	if (!msByMs__accountEmailRows.length) throw new Error(`No owner email founds`);
-	if (msByMs__accountEmailRows.some((r) => !rulesAllowEmail(input.signedInEmailRules, r.txt!)))
+	throwIf(!_accountEmail_bmRows.length);
+	if (_accountEmail_bmRows.some((r) => !rulesAllowEmail(input.signedInEmailRules, r.txt!)))
 		throw new Error(m.rulesMustAllowAllOwnerEmails());
 
-	let ms = Date.now();
+	let now = Date.now();
 	let txt = input.signedInEmailRules.join('\n');
-	if (!id__signedInEmailRulesRows.length) {
+	if (!_signedInEmailRules_mbRows.length) {
 		await tdb.insert(pTable).values({
-			...id0,
-			ms,
-			by_ms: input.callerMs,
-			code: pc.id__signedInEmailRules,
+			code: pc._signedInEmailRules_mb,
 			txt,
+			p1: now,
+			p2: input.callerMs,
 		});
 	} else {
 		await tdb
 			.update(pTable)
 			.set({
-				ms,
-				by_ms: input.callerMs,
 				txt,
+				p1: now,
+				p2: input.callerMs,
 			})
-			.where(id__signedInEmailRulesRowsFilter);
+			.where(pf.code.eq(pc._signedInEmailRules_mb));
 	}
 
 	if (input.signedInEmailRules.length) {
 		// TODO: only sign out accounts whose emails the new rules do not allow
-		await tdb
-			.delete(pTable)
-			.where(
-				and(
-					pf.notAtId({ at_ms: input.callerMs }),
-					pf.at_ms.gt0,
-					pf.at_by_ms.gt0,
-					pf.at_in_ms.gt0,
-					pf.ms.gt0,
-					pf.in_ms.eq0,
-					pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
-					pf.txt.isNotNull,
-				),
-			);
+		await tdb.delete(pTable).where(
+			and(
+				pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
+				pf.p2.notEq(input.callerMs), //
+			),
+		);
 	}
 
 	return {};

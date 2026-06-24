@@ -1,58 +1,48 @@
+// part code naming schema:
+// if txt col is used, it's the first col name starting with _
+// The order of the names is the p (priority) number (limited by "index by" comment)
+// i: in_ms
+// m: ms
+// b: by_ms
+// e.g. postImb: post in_ms (p1), ms (p2), by_ms (p3)
+// Col names are generally split with a "_" unless using shorthand involving i, m, or b
+
 import { uniqueMapVals } from '$lib/js';
 
-// part code naming schema: <id>__<at_id>_<num>_<txt>
-// <id> schema: <ms>_<by_ms>_<in_ms>
-// <at_id> schema: <at_ms>_<at_by_ms>_<at_in_ms>
-// <id> and <at_id> may have their values repurposed for efficiency
-// omit __<at_id> if no at id
-// omit _<num>_<txt> if no num or txt
-// omit <num> if no num
-// omit _<txt> if no txt
-
+// comment next line during `bun run db:push`
 export let pc = uniqueMapVals({
-	postId__parentPostId_lastVersion: 0,
-	childPostId__rootId_depth: 1,
-	reactionId__postId__emoji: 3,
+	// uncomment next line during `bun run db:push`
+	// export let pc = ((a) => a)({
+	postImb_parentMb_rootMb_childCount: 0, // idx_code_p1_to_p3 idx_code_p1_p3_p2 idx_code_p1_p5_p2 idx_code_p1_p6_p7
+	tagImb_postMb_lastVersion: 1, // idx_code_p1_to_p3 idx_code_p1_p4_p5_p6
+	_core_postImb_lastVersion_m: 2, // idx_code_p1_to_p3
+	_tag_imBy8_count: 3, // idx_code_p1_txt idx_code_p1_to_p3 idx_code_p1_p4_p5_p6
+	tagImb_postMb_oldVersion: 4, // idx_code_p1_p4_p5_p6
+	_core_postImb_oldVersion_m: 5, // idx_code_p1_to_p4
+	_emoji_postImb_count: 6, // idx_code_p1_to_p3
+	_emoji_postImb_reactionBm: 7, // idx_code_p1_to_p4
+	_email_ms_strikeCount_pin: 8, // idx_code_p1
 
-	postId__ms_sd_lastVersion__core: 10, // sd is a binary flag for softDeleted
-	postId__ms_sd_oldVersion__core: 11, // if sd=1, core should be null
+	_spaceName_imb: 9, // idx_code_p1
+	imb_spaceIsPublic: 10, // idx_code_p1
+	_spacePinnedQuery_imb: 11, // idx_code_p1
+	_spaceDescription_imb_memberCount: 12, // idx_code_p1
+	acceptBm_inviteIbm: 13, // idx_code_p1_p3_p4
+	_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs: 14, // idx_code_p1_p2 idx_code_p3
+	imb_newMemberPermissionCode: 15, // idx_code_p1
 
-	postTagId__postId_lastVersion: 20,
-	postTagId__postId_oldVersion: 21,
-	// postTagId__postMsByMs_lastVersion_val_val: 20,
-	// postTagId__postMsByMs_oldVersion_val_val: 21,
-
-	idBy8__count_val_tag: 30, // val is only notNull if tag.endsWith(`=<number>`)
-	// idBy8__isKey_count__tag: 30,
-	postId_count_emoji: 32,
-
-	id_spaceIsPublic: 40,
-	id__spaceName: 41,
-	id_memberCount_spaceDescription: 42,
-	id__spacePinnedQuery: 43,
-	id_newMemberPermissionCode: 44,
-	id__accountMs_roleCode: 45,
-	id__accountMs_permissionCode: 46,
-	id__accountMs__flair: 47,
-	spacePriorityId__accountMs_accentCode: 48,
-
-	msByMs__accountEmail: 50,
-	msByMs__accountPwHash: 51,
-	msByMs__accountName: 52,
-	msByMs__accountBio: 53,
-	msByMs__accountSavedTags: 54,
-
-	ms__accountMs__clientKey: 60,
-	ms_ExpiryMs__accountMs__sessionKey: 61,
-	otpMs_pin_strikeCount__email: 62,
-
-	inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd: 70,
-	acceptMsByMs__inviteId: 71,
-
-	// lastSpaceViewId: 81,
-	// lastSpacePostId: 82,
-	// lastSpacePostMsAtLastSpaceViewId: 81,
-
-	id__signedInEmailRules: 90,
-	banMsByMs__accountMs: 91,
+	_accountName_bm: 16, // idx_code_p1
+	_accountSavedTags_bm: 17, // idx_code_p1
+	_accountBio_bm: 18, // idx_code_p1
+	_accountEmail_bm: 19, // idx_code_p1 idx_code_txt
+	_accountPwHash_bm: 20, // idx_code_p1
+	_sessionKey_m_accountMs_expiryMs: 21, // idx_code_p1 idx_code_p2
+	_clientKey_m_accountMs: 22, // idx_code_p1 idx_code_p2
+	_apiKey_m_accountMs_expiryMs: 23, // idx_code_p1
+	_flair_i_accountMs_mb: 24, // idx_code_p1_p2
+	i_accountMs_permCode_mb: 25, // idx_code_p1_p2
+	i_accountMs_roleCode_mb: 26, // idx_code_p1_p2 idx_code_p1_p3_p4
+	i_accountMs_accentCode_lastViewMs_sidePriority: 27, // idx_code_p1_p2 idx_code_p1_p3_p4
+	accountMs_banMb: 28, // idx_code_p1
+	_signedInEmailRules_mb: 29, // idx_code
 });

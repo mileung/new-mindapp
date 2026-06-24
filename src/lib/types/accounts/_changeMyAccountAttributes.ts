@@ -11,39 +11,35 @@ export let _changeMyAccountAttributes = async (
 		bioTxt?: string; //
 	},
 ) => {
-	let ms = Date.now();
+	let now = Date.now();
 	if (input.nameTxt !== undefined) {
 		await tdb
 			.update(pTable)
-			.set({ ms, txt: input.nameTxt })
+			.set({
+				txt: input.nameTxt,
+				p2: now, //
+			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.by_ms.eq(input.callerMs),
-					pf.in_ms.eq0,
-					pf.code.eq(pc.msByMs__accountName),
-					pf.num.isNull,
-					pf.txt.isNotNull,
+					pf.code.eq(pc._accountName_bm),
+					pf.p1.eq(input.callerMs), //
 				),
 			);
 	}
 	if (input.bioTxt !== undefined) {
 		await tdb
 			.update(pTable)
-			.set({ ms, txt: input.bioTxt })
+			.set({
+				txt: input.bioTxt,
+				p2: now, //
+			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.by_ms.eq(input.callerMs),
-					pf.in_ms.eq0,
-					pf.code.eq(pc.msByMs__accountBio),
-					pf.num.isNull,
-					pf.txt.isNotNull,
+					pf.code.eq(pc._accountBio_bm),
+					pf.p1.eq(input.callerMs), //
 				),
 			);
 	}
 
-	return { ms };
+	return { ms: now };
 };

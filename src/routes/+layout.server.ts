@@ -24,7 +24,7 @@ export const load: LayoutServerLoad = async (event) => {
 		console.log('slug:', slug);
 
 		if (isSpaceSlug(slug)) {
-			let lastSeenInMs = +slug.slice(2);
+			let lastSeenInMs = +slug.slice(-2);
 			console.log('lastSeenInMs:', lastSeenInMs);
 			boldBottomOgText = 'spaceName';
 		}

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { gotoIfNeeded } from '$lib/dom';
 	import { getSpaceContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
 	import { alertError, splitUntil } from '$lib/js';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
@@ -44,6 +44,7 @@
 	};
 
 	onMount(async () => {
+		console.time('layout onMount');
 		if (isEmbed) return;
 		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
 		gs.theme = (['light', 'dark', 'system'].includes(theme!) ? theme : 'system')!;
@@ -55,13 +56,15 @@
 		set_msToProfileMap();
 
 		try {
+			console.time('initLocalDb');
 			await initLocalDb();
+			console.timeEnd('initLocalDb');
 			let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
 			gs.db = drizzle(driver, batchDriver);
 		} catch (error) {
 			console.error(error);
 			gs.localDbFailed = true;
-			goto('/settings');
+			gotoIfNeeded('/settings');
 		}
 
 		'serviceWorker' in navigator &&
@@ -69,6 +72,7 @@
 				// unregister service workers at chrome://serviceworker-internals
 				navigator.serviceWorker.register('./service-worker.js');
 			});
+		console.timeEnd('layout onMount');
 	});
 
 	$effect(() => {
@@ -85,12 +89,11 @@
 	let lastHref = '';
 	$effect(() => {
 		let [, firstSlug, ending] = splitUntil(page.url.pathname, '/', 2);
-		if (gs.accounts?.[0].ms && firstSlug.endsWith('_8')) {
+		if (gs.accounts?.[0].ms && firstSlug.startsWith('8_')) {
 			let newHref =
-				`/${firstSlug.slice(0, -1)}${gs.accounts[0].ms}${ending ? `/${ending}` : ''}` +
-				page.url.search;
+				`/${gs.accounts[0].ms}${firstSlug.slice(1)}${ending ? `/${ending}` : ''}` + page.url.search;
 			if (newHref !== lastHref) {
-				goto(newHref);
+				gotoIfNeeded(newHref);
 				lastHref = newHref;
 			}
 		}
@@ -100,11 +103,12 @@
 	$effect(() => {
 		if (urlInMs !== undefined && gs.lastSeenInMs !== urlInMs) {
 			updateLocalCache((lc) => ({ ...lc, lastSeenInMs: urlInMs }));
-			if (gs.writingTo || gs.writingEdit) gs.writingNew = true;
-			gs.writingTo = gs.writingEdit = gs.showReactionHistory = null;
+			if (gs.postingTo || gs.postingEdit) gs.postingNew = true;
+			gs.postingTo = gs.postingEdit = gs.showReactionHistory = null;
 		}
 	});
 
+	let visitedSpaceMsSet = new Set<number>();
 	$effect(() => {
 		try {
 			(async () => {
@@ -133,7 +137,10 @@
 								isPublic: space?.isPublic || { num: -1 },
 								pinnedQuery: space?.pinnedQuery || { txt: '' },
 								name:
-									space?.name || (urlInMs > 1 && urlInMs !== callerMs ? { txt: '' } : undefined),
+									space?.name ||
+									(urlInMs > 1 && urlInMs !== callerMs
+										? { txt: '' } //
+										: undefined),
 								...(() => {
 									let spaceContext = getSpaceContext(urlInMs);
 									return {
@@ -141,7 +148,8 @@
 										roleCode: spaceContext?.roleCode || { num: -1 },
 										permissionCode: spaceContext?.permissionCode || { num: -1 },
 										flair: spaceContext?.flair || { txt: '' },
-										accentCode: spaceContext?.accentCode || { num: -1 },
+										accentCode: spaceContext?.accentCode ?? -1,
+										sidePriority: spaceContext?.sidePriority ?? -1,
 									};
 								})(),
 							};
@@ -170,6 +178,8 @@
 																	roleCode: spaceCtx.roleCode,
 																	permissionCode: spaceCtx.permissionCode,
 																	flair: spaceCtx.flair,
+																	accentCode: spaceCtx.accentCode,
+																	sidePriority: spaceCtx.sidePriority,
 																}
 															: {}),
 													}
@@ -221,6 +231,7 @@
 								spaceMs: urlInMs,
 								get,
 							});
+							// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 						}
 					} catch (error) {
 						console.log('error:', error);
@@ -240,7 +251,7 @@
 							...(urlInMs === undefined ? {} : { [urlInMs]: true }),
 						},
 					};
-					if (visitingPublicSpaceUpdate) gs.visitedSpaceMsSet.add(visitingPublicSpaceUpdate.ms);
+					if (visitingPublicSpaceUpdate) visitedSpaceMsSet.add(visitingPublicSpaceUpdate.ms);
 					updateLocalCache((lc) => {
 						[...spaceUpdates, visitingPublicSpaceUpdate].forEach((spaceUpdate) => {
 							if (spaceUpdate) {
@@ -290,10 +301,10 @@
 											roleCode: su.roleCode || { num: -1 },
 											permissionCode: su.permissionCode || { num: -1 },
 											flair: su.flair || { txt: '' },
-											accentCode: su.accentCode || { num: -1 },
+											accentCode: su.accentCode ?? -1,
+											sidePriority: su.accentCode ?? -1,
 										}) satisfies SpaceContext,
 								);
-							console.log('newJoinedSpaceContexts:', newJoinedSpaceContexts);
 							lc.accounts[0] = {
 								...lc.accounts[0],
 								joinedSpaceContexts: [
@@ -309,17 +320,17 @@
 											permissionCode: spaceUpdate?.permissionCode || sc.permissionCode,
 											flair: spaceUpdate?.flair || sc.flair,
 											accentCode: spaceUpdate?.accentCode || sc.accentCode,
+											sidePriority: spaceUpdate?.sidePriority || sc.sidePriority,
 										};
 									})
-									.sort((a, b) => (b.accentCode.ms ?? 0) - (a.accentCode.ms ?? 0)),
+									.sort((a, b) => b.sidePriority - a.sidePriority),
 							};
 						}
-
 						Object.values(lc.msToSpaceMap).forEach((space) => {
 							if (
 								space &&
 								space.ms > 1 &&
-								!gs.visitedSpaceMsSet.has(space.ms) &&
+								!visitedSpaceMsSet.has(space.ms) &&
 								!lc.accounts.some(
 									(a) =>
 										a.signedIn &&

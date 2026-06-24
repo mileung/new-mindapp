@@ -16,9 +16,10 @@
 		alertError,
 		atDomainRegex,
 		emailRegex,
+		getAlteredSearchParams,
+		makeErrorReadable,
 		ownerViewItemsPerLoad,
 		rulesAllowEmail,
-		setSearchParams,
 	} from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs } from '$lib/time';
@@ -47,7 +48,7 @@
 	});
 
 	let makeParams = (newView: 'posts' | 'accounts' | 'spaces') => {
-		return setSearchParams({
+		return getAlteredSearchParams({
 			...{
 				posts: null,
 				accounts: null,
@@ -69,71 +70,80 @@
 				: 'posts',
 	);
 	let error = $derived(view === 'accounts' ? gs.ownerView.accountsError : gs.ownerView.spacesError);
-
 	// gs.ownerView.accountMss
 	// gs.ownerView.accountEndReached
 	// gs.ownerView.spacesMss
 	// gs.ownerView.spacesEndReached
 
 	let loadMoreAccounts = async (e: InfiniteEvent) => {
-		if (gs.ownerView.accountsEndReached) {
-			gs.ownerView.accountMss?.length && e.detail.loaded();
-			return e.detail.complete();
+		try {
+			if (gs.ownerView.accountsEndReached) {
+				gs.ownerView.accountMss?.length && e.detail.loaded();
+				return e.detail.complete();
+			}
+			let msLt = gs.ownerView.accountMss?.at(-1);
+			let res = await trpc().getOwnerViewAccounts.query({
+				...(await getWhoObj()),
+				msLt,
+			});
+			res.accounts.length && e.detail.loaded();
+			let endReached = res.accounts.length < ownerViewItemsPerLoad;
+			endReached && e.detail.complete();
+			draft_signedInEmailRulesTxt = res.signedInEmailRulesTxt;
+			gs.ownerView = {
+				...gs.ownerView,
+				signedInEmailRulesTxt: res.signedInEmailRulesTxt,
+				accountsEndReached: endReached,
+				accountMss: [
+					...(gs.ownerView.accountMss || []),
+					...res.accounts.map((a) => {
+						mergeMsToAccountNameTxtMap({ [a.ms]: a.nameTxt });
+						a.banMs !== undefined && (gs.msToProfileMap[a.ms]!.banned = { ms: a.banMs });
+						gs.msToProfileMap[a.ms]!.email = { txt: a.emailTxt };
+						return a.ms;
+					}),
+				],
+			};
+		} catch (error) {
+			gs.ownerView.accountsError = makeErrorReadable(error);
+			e.detail.error();
 		}
-		let msBefore = gs.ownerView.accountMss?.slice(-1)[0];
-		let res = await trpc().getOwnerViewAccounts.query({
-			...(await getWhoObj()),
-			msBefore,
-		});
-		res.accounts.length && e.detail.loaded();
-		let endReached = res.accounts.length < ownerViewItemsPerLoad;
-		endReached && e.detail.complete();
-		draft_signedInEmailRulesTxt = res.signedInEmailRulesTxt;
-		gs.ownerView = {
-			...gs.ownerView,
-			signedInEmailRulesTxt: res.signedInEmailRulesTxt,
-			accountsEndReached: endReached,
-			accountMss: [
-				...(gs.ownerView.accountMss || []),
-				...res.accounts.map((a) => {
-					mergeMsToAccountNameTxtMap({ [a.ms]: a.nameTxt });
-					gs.msToProfileMap[a.ms]!.banned = a.banned;
-					gs.msToProfileMap[a.ms]!.email = { txt: a.emailTxt };
-					return a.ms;
-				}),
-			],
-		};
 	};
 
 	let loadMoreSpaces = async (e: InfiniteEvent) => {
-		if (gs.ownerView.spacesEndReached) {
-			gs.ownerView.spaceMss?.length && e.detail.loaded();
-			return e.detail.complete();
+		try {
+			if (gs.ownerView.spacesEndReached) {
+				gs.ownerView.spaceMss?.length && e.detail.loaded();
+				return e.detail.complete();
+			}
+			let msLt = gs.ownerView.spaceMss?.at(-1);
+			let res = await trpc().getOwnerViewSpaces.query({
+				...(await getWhoObj()),
+				msLt,
+			});
+			res.spaces.length && e.detail.loaded();
+			let endReached = res.spaces.length < ownerViewItemsPerLoad;
+			endReached && e.detail.complete();
+			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
+			gs.ownerView = {
+				...gs.ownerView,
+				spacesEndReached: endReached,
+				msToSpaceAdminMssMap: {
+					...gs.ownerView.msToSpaceAdminMssMap,
+					...res.msToSpaceAdminMssMap,
+				},
+				spaceMss: [
+					...(gs.ownerView.spaceMss || []),
+					...res.spaces.map((s) => {
+						mergeMsToSpaceNameTxtMap({ [s.ms]: s.nameTxt });
+						return s.ms;
+					}),
+				],
+			};
+		} catch (error) {
+			gs.ownerView.spacesError = makeErrorReadable(error);
+			e.detail.error();
 		}
-		let msBefore = gs.ownerView.spaceMss?.slice(-1)[0];
-		let res = await trpc().getOwnerViewSpaces.query({
-			...(await getWhoObj()),
-			msBefore,
-		});
-		res.spaces.length && e.detail.loaded();
-		let endReached = res.spaces.length < ownerViewItemsPerLoad;
-		endReached && e.detail.complete();
-		mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
-		gs.ownerView = {
-			...gs.ownerView,
-			spacesEndReached: endReached,
-			msToSpaceAdminMssMap: {
-				...gs.ownerView.msToSpaceAdminMssMap,
-				...res.msToSpaceAdminMssMap,
-			},
-			spaceMss: [
-				...(gs.ownerView.spaceMss || []),
-				...res.spaces.map((s) => {
-					mergeMsToSpaceNameTxtMap({ [s.ms]: s.nameTxt });
-					return s.ms;
-				}),
-			],
-		};
 	};
 
 	let accounts = $derived(
@@ -144,7 +154,7 @@
 {#if !gs.accounts}
 	<!--  -->
 {:else}
-	<div class="flex w-full text-fg2 overflow-scroll h-8">
+	<div class="fixed bg-bg1 top-0 flex w-full text-fg2 overflow-scroll h-8">
 		<a
 			href={makeParams('posts')}
 			class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'posts' ? 'text-fg1' : ''}`}
@@ -167,7 +177,7 @@
 	{#if view === 'posts'}
 		<PostFeed />
 	{:else}
-		<div class="w-full max-w-2xl">
+		<div class="pt-8 w-full max-w-2xl">
 			{#if view === 'accounts'}
 				{#if editing_signedInEmailRulesTxt}
 					<div class="max-w-lg px-2">
@@ -258,7 +268,7 @@
 				{#each accounts as account}
 					<div class="flex h-8">
 						<a
-							href={`/_${account.ms}_`}
+							href={`/__${account.ms}`}
 							class="flex-1 px-2 gap-1 fx hover:text-fg3 hover:bg-bg4 text-nowrap overflow-scroll"
 						>
 							{#if account.banned}
@@ -301,7 +311,7 @@
 							<p class="">{formatMs(spaceMs, 'min')}</p>
 						</a>
 						{#each gs.ownerView.msToSpaceAdminMssMap?.[spaceMs] || [] as adminMs}
-							<a href={`/_${adminMs}_`} class="fx px-2 hover:text-fg3 hover:bg-bg4">
+							<a href={`/__${adminMs}`} class="fx px-2 hover:text-fg3 hover:bg-bg4">
 								<AccountIcon ms={adminMs} class="shrink-0 h-5 w-5" />
 								{msToAccountNameTxt(adminMs)}
 							</a>
@@ -315,10 +325,10 @@
 				on:infinite={view === 'accounts' ? loadMoreAccounts : loadMoreSpaces}
 			>
 				<p slot="error" class="m-2 text-lg text-fg2">{error}</p>
-				<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
+				<div slot="noResults" class="h-[calc(100vh-36px-32px)] xs:h-[calc(100vh-36px)]">
 					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 				</div>
-				<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
+				<div slot="noMore" class="h-[calc(100vh-36px-32px)] xs:h-[calc(100vh-36px)]">
 					<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
 				</div>
 			</InfiniteLoading>

@@ -5,7 +5,7 @@ import { pTable } from '$lib/types/parts/partsTable';
 import { and } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { get_id__accountMs_roleCode } from '../spaces/db-spaces';
+import { getRow4i_accountMs_roleCode_mb } from '../spaces/db-spaces';
 
 export let _setSpaceMemberPermission = async (
 	{
@@ -23,27 +23,27 @@ export let _setSpaceMemberPermission = async (
 ) => {
 	throwIf(callerMs === accountMs);
 
-	let updatee_id__accountMs_roleCode = await get_id__accountMs_roleCode(spaceMs, accountMs);
+	let i_accountMs_roleCode_mbUpdateeRow = await getRow4i_accountMs_roleCode_mb(spaceMs, accountMs);
 	!ownerCalled &&
 		throwIf(
-			!updatee_id__accountMs_roleCode || //
-				callerRoleCodeNum! <= updatee_id__accountMs_roleCode.num!,
+			!i_accountMs_roleCode_mbUpdateeRow || //
+				callerRoleCodeNum! <= i_accountMs_roleCode_mbUpdateeRow.p3!,
 		);
 
-	let ms = Date.now();
+	let now = Date.now();
 	await tdb
 		.update(pTable)
 		.set({
-			ms,
-			by_ms: callerMs,
-			num: newPermissionCodeNum,
+			p3: newPermissionCodeNum,
+			p4: now,
+			p5: callerMs,
 		})
 		.where(
 			and(
-				pf.atId({ at_ms: accountMs }),
-				pf.in_ms.eq(spaceMs),
-				pf.code.eq(pc.id__accountMs_permissionCode),
+				pf.code.eq(pc.i_accountMs_permCode_mb),
+				pf.p1.eq(spaceMs), //
+				pf.p2.eq(accountMs),
 			),
 		);
-	return { ms };
+	return { ms: now };
 };

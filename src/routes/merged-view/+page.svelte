@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { getPromptSigningIn, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
-	import { setSearchParams } from '$lib/js';
+	import { getAlteredSearchParams } from '$lib/js';
 	import PostFeed from '../PostFeed.svelte';
 	import PromptSignIn from '../PromptSignIn.svelte';
 	import SpaceIcon from '../SpaceIcon.svelte';
@@ -17,10 +17,10 @@
 	]);
 
 	$effect(() => {
-		if (!page.url.searchParams.has('in_mss')) {
+		if (!page.url.searchParams.has('inMss')) {
 			goto(
-				setSearchParams({
-					in_mss: cloudSpaceMss.join(','),
+				getAlteredSearchParams({
+					inMss: cloudSpaceMss.join(','),
 				}),
 				{ replaceState: true },
 			);
@@ -30,14 +30,14 @@
 	let mergedMssSet = $derived(
 		new Set(
 			page.url.searchParams
-				.get('in_ms')
+				.get('inMss')
 				?.split(',') //
 				.map(Number) || [],
 		),
 	);
 
 	let makeParams = (toggleSpaceMs: number) => {
-		let in_ms = cloudSpaceMss
+		let inMss = cloudSpaceMss
 			.map((ms) =>
 				ms === toggleSpaceMs
 					? mergedMssSet.has(toggleSpaceMs)
@@ -49,7 +49,7 @@
 			)
 			.filter((ms) => ms >= 0)
 			.join(',');
-		return setSearchParams({ in_ms });
+		return getAlteredSearchParams({ inMss });
 	};
 </script>
 
@@ -58,7 +58,7 @@
 {:else if promptSignIn}
 	<PromptSignIn />
 {:else}
-	<div class="flex flex-wrap text-fg2">
+	<div class="w-full bg-bg1 fixed top-0 flex flex-wrap text-fg2">
 		{#each cloudSpaceMss as cloudSpaceMs (cloudSpaceMs)}
 			<a
 				href={makeParams(cloudSpaceMs)}

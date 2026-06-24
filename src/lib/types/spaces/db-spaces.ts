@@ -11,16 +11,15 @@ import { pTable } from '../parts/partsTable';
 export let moveSpaceMemberCountBy1 = async (spaceMs: number, increment: boolean) =>
 	await tdb
 		.update(pTable)
-		.set({ num: increment ? sql`${pTable.num} + 1` : sql`${pTable.num} - 1` })
+		.set({ p4: increment ? sql`${pTable.p4} + 1` : sql`${pTable.p4} - 1` })
 		.where(
 			and(
-				pf.noAtId, //
-				pf.in_ms.eq(spaceMs),
-				pf.code.eq(pc.id_memberCount_spaceDescription),
+				pf.code.eq(pc._spaceDescription_imb_memberCount),
+				pf.p1.eq(spaceMs), //
 			),
 		);
 
-export let getAnotherAdmin_id__accountMs_roleCodeRow = async (
+export let getAnotherAdminRow4i_accountMs_roleCode_mbRow = async (
 	spaceMs: number,
 	callerMs: number,
 ): Promise<undefined | PartSelect> =>
@@ -30,16 +29,16 @@ export let getAnotherAdmin_id__accountMs_roleCodeRow = async (
 			.from(pTable)
 			.where(
 				and(
-					pf.notAtId({ at_ms: callerMs }),
-					pf.in_ms.eq(spaceMs),
-					pf.code.eq(pc.id__accountMs_roleCode),
-					pf.num.eq(roleCodes.admin),
+					pf.code.eq(pc.i_accountMs_roleCode_mb),
+					pf.p1.eq(spaceMs),
+					pf.p2.notEq(callerMs),
+					pf.p3.eq(roleCodes.admin),
 				),
 			)
 			.limit(1)
 	)[0];
 
-export let get_id__accountMs_roleCode = async (
+export let getRow4i_accountMs_roleCode_mb = async (
 	spaceMs: number,
 	accountMs: number,
 ): Promise<undefined | PartSelect> =>
@@ -49,9 +48,9 @@ export let get_id__accountMs_roleCode = async (
 			.from(pTable)
 			.where(
 				and(
-					pf.atId({ at_ms: accountMs }),
-					pf.in_ms.eq(spaceMs),
-					pf.code.eq(pc.id__accountMs_roleCode),
+					pf.code.eq(pc.i_accountMs_roleCode_mb),
+					pf.p1.eq(spaceMs), //
+					pf.p2.eq(accountMs),
 				),
 			)
 			.limit(1)

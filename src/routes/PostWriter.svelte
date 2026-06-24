@@ -1,28 +1,22 @@
 <script lang="ts">
 	import { getPostWriterHeight, scrollToHighlight, textInputFocused } from '$lib/dom';
 	import {
-		getSpaceContext,
+		getSpacePermissions,
 		gs,
 		msToSpaceNameTxt,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 
 	import { goto } from '$app/navigation';
-	import { getTagVal, is1Emoji } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
-	import { getIdObj, getIdStr, getUrlInMs } from '$lib/types/parts/partIds';
-	import { getLastVersion, normalizeTag, normalizeTags } from '$lib/types/posts';
-	import { shortReactionList } from '$lib/types/reactions/reactionList';
-	import { toggleReaction } from '$lib/types/reactions/toggleReaction';
-	import { permissionCodes } from '$lib/types/spaces';
+	import { getIdStr, getUrlInMs } from '$lib/types/parts/partIds';
+	import { cleanTags, getLastVersion, normalizeTag } from '$lib/types/posts';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
 		IconGripVertical,
-		IconHandStop,
 		IconMessage2Plus,
-		IconMoodPlus,
 		IconPencil,
 		IconPencilPlus,
 		IconX,
@@ -48,30 +42,14 @@
 	let tagIndex = $state(0);
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
-	let typedEmoji = $state('');
 
-	let writingToMyRxnEmojis = $derived(gs.writingTo?.myRxnEmojis || []);
-	let writingInMs = $derived.by(() => (gs.writingTo || gs.writingEdit)?.in_ms ?? getUrlInMs()!);
-	let writingInSpaceName = $derived(msToSpaceNameTxt(writingInMs));
-	let writingInMsPermissionCodeNum = $derived(getSpaceContext(writingInMs)?.permissionCode.num);
-	let canReactAndPost = $derived(writingInMsPermissionCodeNum === permissionCodes.reactAndPost);
-	let canReact = $derived(
-		canReactAndPost || writingInMsPermissionCodeNum === permissionCodes.reactOnly,
-	);
-	let canPost = $derived(
-		canReactAndPost || writingInMsPermissionCodeNum === permissionCodes.postOnly,
-	);
-	let showGoToDifferentSpace = $derived(
-		!canPost && !!(gs.writingNew || gs.writerCore || gs.writerTags.length || gs.writerTagVal),
-	);
-	let reactEmojiOptions = $derived([
-		...writingToMyRxnEmojis.filter((e) => !shortReactionList.includes(e)),
-		...shortReactionList,
-		...Object.entries(gs.writingTo?.rxnEmojiCount || {})
-			.filter(([e]) => !shortReactionList.includes(e) && !writingToMyRxnEmojis.includes(e))
-			.sort((a, b) => b[1] - a[1])
-			.map(([e]) => e),
-	]);
+	let postingInMs = $derived.by(() => (gs.postingTo || gs.postingEdit)?.in_ms ?? getUrlInMs());
+	let postingInSpaceName = $derived(postingInMs === undefined ? '' : msToSpaceNameTxt(postingInMs));
+	let { canPost } = $derived(getSpacePermissions(postingInMs));
+	$effect(() => {
+		if (!canPost) gs.postingNew = gs.postingTo = gs.postingEdit = null;
+	});
+
 	let tagFilter = $derived(normalizeTag(gs.writerTagVal));
 	let savedTagsSet = $derived(
 		new Set(
@@ -89,30 +67,15 @@
 		return [...new Set(arr)];
 	});
 
-	let toggleEmoji = async (emoji: string) => {
-		await toggleReaction({
-			postIdObj: getIdObj(gs.writingTo!),
-			emoji,
-		});
-	};
-
-	$effect(() => {
-		if (typedEmoji && gs.writingTo) {
-			is1Emoji(typedEmoji) //
-				? toggleEmoji(typedEmoji)
-				: alert(m.useYourDevicesEmojiKeyboard());
-		}
-		typedEmoji = '';
-	});
 	$effect(() => {
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
-		if (gs.writingNew || gs.writingTo || gs.writingEdit) tagsIpt.focus();
+		if (gs.postingNew || gs.postingTo || gs.postingEdit) tagsIpt.focus();
 	});
 	$effect(() => {
-		if (gs.writingEdit) {
-			let post = gs.idToPostMap[getIdStr(gs.writingEdit)]!;
+		if (gs.postingEdit) {
+			let post = gs.idToPostMap[getIdStr(gs.postingEdit)]!;
 			if (post.history !== null) {
 				let lastHistory = post.history[getLastVersion(post)!];
 				gs.writerTags = lastHistory?.tags || [];
@@ -124,7 +87,7 @@
 	onMount(() => {
 		tagsIpt.focus();
 		let onKeyDown = (e: KeyboardEvent) => {
-			(gs.writingNew || gs.writingTo || gs.writingEdit) &&
+			(gs.postingNew || gs.postingTo || gs.postingEdit) &&
 				!tagsIptFocused &&
 				!textInputFocused() &&
 				!e.altKey &&
@@ -160,14 +123,11 @@
 		if (!canPost) return;
 		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || gs.writerTagVal.trim();
 		p.onSubmit(
-			normalizeTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])]),
+			cleanTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])]),
 			gs.writerCore.trim(),
 		);
 		tagsIpt.blur();
 		coreTa.blur();
-		gs.writerTags = [];
-		gs.writerTagVal = '';
-		gs.writerCore = '';
 	};
 
 	let addTag = (tagToAdd?: string) => {
@@ -179,57 +139,36 @@
 	};
 </script>
 
-{#snippet styledTag(tag: string)}
-	{#if tag.includes('=')}
-		<p class="font-mono whitespace-pre">
-			{tag.slice(0, tag.indexOf('='))}<span
-				class={typeof getTagVal(tag) === 'string' ? 'text-amber-500' : 'text-emerald-500'}>=</span
-			>{tag.slice(tag.indexOf('=') + 1)}
-		</p>
-	{:else}
-		<p class="whitespace-pre">{tag}</p>
-	{/if}
-{/snippet}
-
 <div class="h-[var(--h-post-writer)] flex flex-col">
 	<div class="flex group bg-bg4 relative w-full">
 		<!-- TODO: save writer data so it persists after page refresh. If the post it's editing or linking to is not on the feed, open it in a modal? -->
-		<button
-			class={`flex-1 h-8 pl-2 fx gap-1 text-left text-nowrap overflow-scroll ${showGoToDifferentSpace ? 'pointer-events-none' : 'hover:bg-bg7 hover:text-fg3'}`}
-			onclick={() => {
-				let post = gs.writingEdit || gs.writingTo;
-				if (post) {
-					let postIdStr = getIdStr(post);
-					getUrlInMs() !== post.in_ms
-						? goto(`/${postIdStr}`) //
-						: scrollToHighlight(postIdStr, true);
-				}
-			}}
-		>
-			{#if showGoToDifferentSpace}
-				<IconHandStop class="w-5" />
-			{:else if gs.writingTo}
-				<IconMessage2Plus class="w-5" />
-			{:else if gs.writingNew}
-				<IconPencilPlus class="w-5" />
-			{:else}
-				<IconPencil class="w-5" />
-			{/if}
-			<p class="">
-				{showGoToDifferentSpace
-					? m.goToADifferentSpaceToPost()
-					: gs.writingTo
-						? m.replyingIn()
-						: gs.writingNew
-							? m.newPostIn()
-							: m.editingIn()}
-			</p>
-			{#if !showGoToDifferentSpace && (canReact || canPost)}
-				<SpaceIcon ms={writingInMs} class="h-5 w-5" />
-				<p class="flex-1">{writingInSpaceName}</p>
-			{/if}
-		</button>
-		<!-- TODO: reactions stuff -->
+		{#if postingInMs !== undefined}
+			<button
+				class="flex-1 h-8 pl-2 fx gap-1 text-left text-nowrap overflow-scroll hover:bg-bg7 hover:text-fg3"
+				onclick={() => {
+					let post = gs.postingEdit || gs.postingTo;
+					if (post) {
+						let postIdStr = getIdStr(post);
+						getUrlInMs() !== post.in_ms
+							? goto(`/${postIdStr}`) //
+							: scrollToHighlight(postIdStr, true);
+					}
+				}}
+			>
+				{#if gs.postingTo}
+					<IconMessage2Plus class="w-5" />
+				{:else if gs.postingNew}
+					<IconPencilPlus class="w-5" />
+				{:else}
+					<IconPencil class="w-5" />
+				{/if}
+				<p class="">
+					{gs.postingTo ? m.replyingIn() : gs.postingNew ? m.newPostIn() : m.editingIn()}
+				</p>
+				<SpaceIcon ms={postingInMs} class="h-5 w-5" />
+				<p class="flex-1">{postingInSpaceName}</p>
+			</button>
+		{/if}
 		<button
 			class="w-8 xy hover:bg-bg7 hover:text-fg3"
 			onclick={() => {
@@ -241,24 +180,23 @@
 		</button>
 		<Highlight
 			noScrollId
-			red={showGoToDifferentSpace}
-			postIdStr={gs.writingTo
-				? getIdStr(gs.writingTo)
-				: gs.writingEdit
-					? getIdStr(gs.writingEdit)
+			postIdStr={gs.postingTo
+				? getIdStr(gs.postingTo)
+				: gs.postingEdit
+					? getIdStr(gs.postingEdit)
 					: ''}
 		/>
 	</div>
 	<div class="flex-1 relative flex flex-col">
 		<div
 			tabindex="-1"
-			class={`bg-bg3 fx flex-wrap px-2 py-0.5 gap-1 ${gs.writerTags.length ? '' : 'hidden'}`}
+			class={`bg-bg3 fx px-2 py-0.5 gap-1 overflow-scroll ${gs.writerTags.length ? '' : 'hidden'}`}
 			onclick={() => tagsIpt.focus()}
 			onmousedown={(e) => e.preventDefault()}
 		>
 			{#each gs.writerTags as tag, i}
 				<div class="fx">
-					{@render styledTag(tag)}
+					<p class="whitespace-pre">{tag}</p>
 					<button
 						class="xy -ml-0.5 h-7 w-7 text-fg2 hover:text-fg1"
 						bind:this={undoTagRefs[i]}
@@ -272,6 +210,7 @@
 							e.stopPropagation(); // this is needed to focus the next tag
 							gs.writerTags = gs.writerTags.filter((t) => t !== tag);
 							if (!gs.writerTags.length) tagsIpt.focus();
+							else if (e.shiftKey) undoTagRefs[i - 1]?.focus();
 						}}
 					>
 						<IconCircleXFilled class="w-4 h-4" />
@@ -330,8 +269,8 @@
 						} else if (gs.writerTags.length && e.key === 'Tab') {
 							return undoTagRefs
 								.filter((r) => !!r)
-								.slice(-1)[0]
-								.focus();
+								.at(-1)
+								?.focus();
 						}
 
 						let index = Math.max(tagIndex - 1, -1);
@@ -373,19 +312,12 @@
 						{/if}
 						<button
 							bind:this={tagSuggestionsRefs[i]}
-							class={`flex w-full ${tag.includes('=') ? 'font-mono' : ''} relative h-8 flex-1 px-2 text-lg`}
+							class={`flex w-full relative h-8 flex-1 px-2 text-lg ${gs.writerTags.includes(tag) ? 'text-fg2' : ''}`}
 							onclick={() => addTag(tag)}
 						>
 							<div class="flex-1 text-left text-nowrap overflow-scroll">
-								{@render styledTag(tag)}
+								<p class="whitespace-pre">{tag}</p>
 							</div>
-							{#if tag.includes('=')}
-								{#if typeof getTagVal(tag) === 'string'}
-									<p class="xy text-amber-500">{m.text()}</p>
-								{:else}
-									<p class="xy text-emerald-500">{m.number()}</p>
-								{/if}
-							{/if}
 						</button>
 						{#if savedTagsSet.has(tag)}
 							<button
@@ -405,7 +337,7 @@
 					bind:value={gs.writerCore}
 					maxlength={888888}
 					placeholder={m.core()}
-					class="resize-none h-full w-full px-2 py-0.5 text-lg pr-9 bg-bg3 hover:bg-bg5"
+					class="resize-none h-full min-h-0 w-full px-2 py-0.5 text-lg pr-9 bg-bg3 hover:bg-bg6"
 					onkeydown={(e) => {
 						e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 						e.metaKey && e.key === 'Enter' && submit();
@@ -433,19 +365,5 @@
 				{/if}
 			</div>
 		</div>
-	</div>
-	<div class={`h-8 overflow-scroll w-full flex bg-bg4 ${gs.writingTo && canReact ? '' : 'hidden'}`}>
-		<div class="h-8 min-w-8 -mr-8 xy">
-			<IconMoodPlus class="h-4.5 w-4.5" />
-		</div>
-		<input bind:value={typedEmoji} class="h-8 w-8 min-w-8" />
-		{#each reactEmojiOptions as emoji}
-			<button
-				class={`h-8 min-w-8 xy hover:bg-bg7 ${writingToMyRxnEmojis.includes(emoji) ? 'border-b-2 border-hl1 hover:border-hl2' : ''}`}
-				onclick={() => toggleEmoji(emoji)}
-			>
-				{emoji}
-			</button>
-		{/each}
 	</div>
 </div>

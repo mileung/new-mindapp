@@ -1,323 +1,177 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
-import { ranInt } from '$lib/js';
+import { ranInt, throwIf } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
-import { and, eq, or } from 'drizzle-orm';
-import { getLastVersion, moveTagOrRxnCountsBy1, PostSchema, type Post } from '.';
+import { and, or } from 'drizzle-orm';
+import { getLastVersion, moveTagOrRxnCountsBy1, type Post } from '.';
 import { type Database } from '../../local-db';
-import {
-	assert1Row,
-	assertLt2Rows,
-	channelPartsByCode,
-	idObjMatchesIdObj,
-	type PartInsert,
-	type PartSelect,
-} from '../parts';
+import { assert1Row, channelPartsByCode, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getIdObjAsAtIdObj, getIdStr, id0, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let editPost = async (post: Post, useLocalDb?: boolean) => {
-	let parsedPost = PostSchema.safeParse(post);
-	if (!parsedPost.success) {
-		console.log(String(JSON.stringify(parsedPost.error.issues, null, 2)));
-		throw new Error(`Invalid post`);
-	}
+export let editPost = async (post: Post, useLocalDb: boolean, useLastLayerMs: boolean) => {
 	let baseInput = await getWhoWhereObj();
 	return useLocalDb || !baseInput.spaceMs
-		? _editPost(await gsdb(), parsedPost.data)
-		: trpc().editPost.mutate({ ...baseInput, post: parsedPost.data });
+		? _editPost(await gsdb(), post, useLastLayerMs)
+		: trpc().editPost.mutate({ ...baseInput, post: post });
 };
 
-export let _editPost = async (db: Database, post: Post) => {
+export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean) => {
 	let newLastVersion = getLastVersion(post);
-	if (!newLastVersion) throw new Error(`Cannot edit deleted posts`);
-	if (newLastVersion <= 0) throw new Error('newLastVersion must be gt0');
-	let curLastVersion = newLastVersion - 1;
-
-	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
-		pf.atId(post),
-		pf.id(post),
-		pf.code.eq(pc.postId__parentPostId_lastVersion),
-		pf.num.gte0,
-		pf.txt.isNull,
-	);
-
+	if (newLastVersion === null) throw new Error(`Cannot edit soft deleted posts`);
+	let oldLastVersion = newLastVersion - 1;
 	let {
-		[pc.postId__parentPostId_lastVersion]: postIdWNumAsLastVersionAtPPostIdRows = [],
-		[pc.postTagId__postId_lastVersion]: currentPostTagId__postId_versionRows = [],
-		[pc.currentPostCoreId__postId_version]: currentPostCoreId__postId_versionRows = [],
+		[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows = [],
+		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					mainPIdWNumAsLastVersionAtPPIdRowsFilter,
 					and(
-						pf.idAsAtId(post),
-						or(
-							...[pc.postTagId__postId_lastVersion, pc.currentPostCoreId__postId_version].map(
-								(code) => pf.code.eq(code),
-							),
-						),
-						eq(pTable.num, curLastVersion),
+						pf.code.eq(pc.tagImb_postMb_lastVersion),
+						pf.p1.eq(post.in_ms),
+						pf.p4.eq(post.ms),
+						pf.p5.eq(post.by_ms),
+						pf.p6.eq(oldLastVersion),
+					),
+					and(
+						pf.code.eq(pc._core_postImb_lastVersion_m),
+						pf.p1.eq(post.in_ms),
+						pf.p2.eq(post.ms),
+						pf.p3.eq(post.by_ms),
+						pf.p4.eq(oldLastVersion),
 					),
 				),
 			),
 	);
-
-	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(postIdWNumAsLastVersionAtPPostIdRows);
-	if (!mainPIdWNumAsLastVersionAtPPIdRow.num) throw new Error('Cannot edit deleted posts');
-	// TODO: what do if trying to edit post in cloud space from local space
-	// and the last versions don't match?
-	if (mainPIdWNumAsLastVersionAtPPIdRow.num > curLastVersion)
-		throw new Error(`Post edit history out of sync`);
-	if (mainPIdWNumAsLastVersionAtPPIdRow.num !== curLastVersion)
-		throw new Error(`Invalid newLastVersion`);
-
-	let ms = Date.now();
+	let _core_postImb_lastVersion_mRow = assert1Row(_core_postImb_lastVersion_mRows);
+	throwIf(_core_postImb_lastVersion_mRow.p4! !== oldLastVersion);
+	let lastLayerMs = useLastLayerMs ? post.history![newLastVersion]!.ms : Date.now();
+	let newPostTagStrs = post.history![newLastVersion]!.tags;
+	let newPostCoreStr = post.history![newLastVersion]!.core.trim();
 	let partsToInsert: PartInsert[] = [
 		{
-			...id0,
-			...getIdObjAsAtIdObj(post),
-			ms,
-			code: pc.postId__ms_sd_lastVersion__core,
-			num: newLastVersion,
+			code: pc._core_postImb_lastVersion_m,
+			txt: newPostCoreStr,
+			p1: post.in_ms,
+			p2: post.ms,
+			p3: post.by_ms,
+			p4: newLastVersion,
+			p5: lastLayerMs,
 		},
 	];
-	let newPostTagStrs = post.history![newLastVersion]!.tags || [];
-	let newPostCoreStr = (post.history![newLastVersion]!.core ?? '').trim();
-	assertLt2Rows(currentPostCoreId__postId_versionRows);
 
-	let {
-		[pc.idBy8__count_val_tag]: existingTagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8_count_txt]: existingCoreIdAndTxtWithNumAsCountRows = [],
-	} = channelPartsByCode(
-		currentPostTagId__postId_versionRows.length ||
-			newPostTagStrs.length ||
-			currentPostCoreId__postId_versionRows.length ||
-			newPostCoreStr
+	let _tag_imBy8_countRows =
+		newPostTagStrs.length || tagImb_postMb_lastVersionRows.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
 						or(
 							and(
-								pf.noAtId,
+								pf.code.eq(pc._tag_imBy8_count),
 								or(
-									...currentPostTagId__postId_versionRows.map((r) => pf.id(r)),
-									...newPostTagStrs.map((t) => pf.txt.eq(t)),
+									...newPostTagStrs.map((s) => pf.txt.eq(s)),
+									...tagImb_postMb_lastVersionRows.map((r) =>
+										and(
+											pf.p1.eq(r.p1!), //
+											pf.p2.eq(r.p2!),
+											pf.p3.eq(r.p3!),
+										),
+									),
 								),
-								pf.code.eq(pc.idBy8__count_val_tag),
-								pf.num.gte0,
-							),
-							and(
-								pf.noAtId,
-								or(
-									...currentPostCoreId__postId_versionRows.map((cio) => pf.id(cio)),
-									pf.txt.eq(newPostCoreStr),
-								),
-								pf.code.eq(pc.coreId8_count_txt),
-								pf.num.gte0,
 							),
 						),
 					)
-			: [],
-	);
+			: [];
 
-	let {
-		txtToTagOrCoreIdAndTxtWNumAsCtObjMap: txtToTagIdAndTxtWNumAsCtObjMap,
-		tagOrCoresChanged: tagsChanged,
-		tagOrCoreTxtRowsToIncrementCountBy1: tagTxtRowsToIncrementCountBy1,
-		removedTagOrCoreStrs: removedTags,
-	} = processStuff(
-		ms,
-		newLastVersion,
-		mainPIdWNumAsLastVersionAtPPIdRow,
-		newPostTagStrs,
-		existingTagIdAndTxtWithNumAsCountRows,
-		currentPostTagId__postId_versionRows,
-		true,
-		partsToInsert,
-	);
-
-	let {
-		txtToTagOrCoreIdAndTxtWNumAsCtObjMap: txtToCoreIdAndTxtWNumAsCtObjMap,
-		tagOrCoresChanged: coreChanged,
-		tagOrCoreTxtRowsToIncrementCountBy1: coreTxtRowsToIncrementCountBy1,
-		removedTagOrCoreStrs: removedCores,
-	} = processStuff(
-		ms,
-		newLastVersion,
-		mainPIdWNumAsLastVersionAtPPIdRow,
-		newPostCoreStr ? [newPostCoreStr] : [],
-		existingCoreIdAndTxtWithNumAsCountRows,
-		currentPostCoreId__postId_versionRows,
-		false,
-		partsToInsert,
-	);
-
-	if (!tagsChanged && !coreChanged) throw new Error(`No edit detected`);
-
-	await moveTagOrRxnCountsBy1(
-		db,
-		tagTxtRowsToIncrementCountBy1,
-		coreTxtRowsToIncrementCountBy1,
-		[],
-		true,
-	);
-
-	let tagTxtRowsToDecrementCountBy1: PartInsert[] = [];
-	for (let i = 0; i < removedTags.length; i++) {
-		let tagTxtRow = txtToTagIdAndTxtWNumAsCtObjMap[removedTags[i]];
-		if (tagTxtRow) tagTxtRowsToDecrementCountBy1.push(tagTxtRow);
-	}
-	let coreTxtRowsToDecrementCountBy1: PartInsert[] = [];
-	for (let i = 0; i < removedCores.length; i++) {
-		let coreTxtRow = txtToCoreIdAndTxtWNumAsCtObjMap[removedCores[i]];
-		if (coreTxtRow) coreTxtRowsToDecrementCountBy1.push(coreTxtRow);
-	}
-
-	await moveTagOrRxnCountsBy1(
-		db,
-		tagTxtRowsToDecrementCountBy1,
-		coreTxtRowsToDecrementCountBy1,
-		[],
-		false,
-	);
-	await db
-		.update(pTable)
-		.set({ code: pc.postTagId__postId_oldVersion })
-		.where(
-			and(
-				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
-				pf.code.eq(pc.postTagId__postId_lastVersion),
-				pf.txt.isNull,
-				eq(pTable.num, curLastVersion),
-			),
-		);
-	await db
-		.update(pTable)
-		.set({ code: pc.exPostCoreId__postId_version })
-		.where(
-			and(
-				pf.idAsAtId(mainPIdWNumAsLastVersionAtPPIdRow),
-				pf.code.eq(pc.currentPostCoreId__postId_version),
-				eq(pTable.num, curLastVersion),
-			),
-		);
-	await db
-		.update(pTable)
-		.set({ num: newLastVersion })
-		.where(mainPIdWNumAsLastVersionAtPPIdRowsFilter);
-	await db
-		.update(pTable)
-		.set({ code: pc.postId__ms_sd_oldVersion__core })
-		.where(
-			and(
-				pf.idAsAtId(post),
-				pf.ms.gt0,
-				pf.by_ms.eq0,
-				pf.in_ms.eq0,
-				pf.code.eq(pc.postId__ms_sd_lastVersion__core),
-				pf.num.eq(curLastVersion),
-				pf.txt.isNull,
-			),
-		);
-
-	// partsToInsert.push({
-	// 	at_ms: mainPIdWNumAsLastVersionAtPPIdObj.ms,
-	// 	at_by_ms: mainPIdWNumAsLastVersionAtPPIdObj.by_ms,
-	// 	at_in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
-	// 	...(coreChanged
-	// 		? {
-	// 				ms,
-	// 				by_ms: ranInt(8, 88888888),
-	// 				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
-	// 			}
-	// 		: {
-	// 				ms: curPostCoreIdWNumAsVrsnAtPIdObj.ms,
-	// 				by_ms: curPostCoreIdWNumAsVrsnAtPIdObj.by_ms,
-	// 				in_ms: curPostCoreIdWNumAsVrsnAtPIdObj.in_ms,
-	// 			}),
-	// 	code: pc.currentPostCoreIdWithNumAsVersionAtPostId,
-	// 	txt: newPostCore,
-	// 	num: newLastVersion,
-	// });
-
-	await db.insert(pTable).values(partsToInsert);
-
-	return { ms };
-};
-
-let processStuff = (
-	ms: number,
-	newLastVersion: number,
-	mainPIdWNumAsLastVersionAtPPIdObj: IdObj,
-	newPostTagOrCoreStrs: string[],
-	existingTagOrCoreTxtRows: PartSelect[],
-	curPostTagOrCoreIdWNumAsVersionAtPIdRows: PartSelect[],
-	isTag: boolean,
-	partsToInsert: PartInsert[],
-) => {
-	let txtToTagOrCoreIdAndTxtWNumAsCtObjMap: Record<string, undefined | PartInsert> = {};
+	let txt2_tag_imBy8_countRowMap: Record<string, undefined | PartInsert> = {};
 	let tagIdToTxtMap: Record<string, string> = {};
-	for (let i = 0; i < existingTagOrCoreTxtRows.length; i++) {
-		let tagIdAndTxtWNumAsCtObj = existingTagOrCoreTxtRows[i];
-		txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tagIdAndTxtWNumAsCtObj.txt!] = tagIdAndTxtWNumAsCtObj;
-		tagIdToTxtMap[getIdStr(tagIdAndTxtWNumAsCtObj)] = tagIdAndTxtWNumAsCtObj.txt!;
+	for (let i = 0; i < _tag_imBy8_countRows.length; i++) {
+		let _tag_imBy8_countRow = _tag_imBy8_countRows[i];
+		let { txt, p1, p2, p3 } = _tag_imBy8_countRow;
+		txt2_tag_imBy8_countRowMap[txt!] = _tag_imBy8_countRow;
+		tagIdToTxtMap[`${p1}_${p2}_${p3}`] = _tag_imBy8_countRow.txt!;
 	}
-	let tagOrCoreTxtRowsToIncrementCountBy1: PartInsert[] = [];
-	let newTagOrCoresCount = 0;
-	for (let i = 0; i < newPostTagOrCoreStrs.length; i++) {
-		let tag = newPostTagOrCoreStrs[i];
-		let tagTxtRow = txtToTagOrCoreIdAndTxtWNumAsCtObjMap[tag];
-		if (tagTxtRow) {
+	let _tag_imBy8_countRowsToUpCountBy1: PartInsert[] = [];
+	let newTagCount = 0;
+	let by8Ms = ranInt(8, 88888888);
+	for (let i = 0; i < newPostTagStrs.length; i++) {
+		let tagStr = newPostTagStrs[i];
+		let _tag_imBy8_countRow = txt2_tag_imBy8_countRowMap[tagStr];
+		if (_tag_imBy8_countRow) {
 			if (
-				!curPostTagOrCoreIdWNumAsVersionAtPIdRows.find((curPostTagIdWNumAsVersionAtPIdObj) =>
-					idObjMatchesIdObj(curPostTagIdWNumAsVersionAtPIdObj, tagTxtRow!),
+				!tagImb_postMb_lastVersionRows.find(
+					(r) =>
+						r.p1 === _tag_imBy8_countRow!.p1 &&
+						r.p2 === _tag_imBy8_countRow!.p2 &&
+						r.p2 === _tag_imBy8_countRow!.p2,
 				)
 			)
-				tagOrCoreTxtRowsToIncrementCountBy1.push(tagTxtRow);
+				_tag_imBy8_countRowsToUpCountBy1.push(_tag_imBy8_countRow);
 		} else {
-			tagTxtRow = {
-				...id0,
-				ms: ms + newTagOrCoresCount++,
-				by_ms: ranInt(8, 88888888),
-				in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
-				code: isTag ? pc.idBy8__count_val_tag : pc.coreId8_count_txt,
-				txt: tag,
-				num: 1,
+			_tag_imBy8_countRow = {
+				code: pc._tag_imBy8_count,
+				txt: tagStr,
+				p1: post.in_ms,
+				p2: lastLayerMs + newTagCount++,
+				p3: by8Ms,
+				p4: 1,
 			};
-			partsToInsert.push(tagTxtRow);
+			partsToInsert.push(_tag_imBy8_countRow);
 		}
 		partsToInsert.push({
-			at_ms: mainPIdWNumAsLastVersionAtPPIdObj.ms,
-			at_by_ms: mainPIdWNumAsLastVersionAtPPIdObj.by_ms,
-			at_in_ms: mainPIdWNumAsLastVersionAtPPIdObj.in_ms,
-			ms: tagTxtRow.ms,
-			by_ms: tagTxtRow.by_ms,
-			in_ms: tagTxtRow.in_ms,
-			code: isTag ? pc.postTagId__postId_lastVersion : pc.currentPostCoreId__postId_version,
-			num: newLastVersion,
+			code: pc.tagImb_postMb_lastVersion,
+			p1: _tag_imBy8_countRow.p1,
+			p2: _tag_imBy8_countRow.p2,
+			p3: _tag_imBy8_countRow.p3,
+			p4: post.ms,
+			p5: post.by_ms,
+			p6: newLastVersion,
 		});
 	}
 
-	let curPostTagStrs = curPostTagOrCoreIdWNumAsVersionAtPIdRows.map(
-		(curPostTagOrCoreIdWNumAsVersionAtPIdObj) =>
-			tagIdToTxtMap[getIdStr(curPostTagOrCoreIdWNumAsVersionAtPIdObj)],
+	let oldPostTagStrs = tagImb_postMb_lastVersionRows.map(
+		(r) => tagIdToTxtMap[`${r.p1}_${r.p2}_${r.p3}`],
 	);
-	let removedTagOrCoreStrs = curPostTagStrs.filter((t) => !newPostTagOrCoreStrs.includes(t));
-	let tagOrCoresChanged =
-		!!newTagOrCoresCount ||
-		!!tagOrCoreTxtRowsToIncrementCountBy1.length ||
-		!!removedTagOrCoreStrs.length;
-
-	return {
-		txtToTagOrCoreIdAndTxtWNumAsCtObjMap,
-		tagOrCoresChanged,
-		tagOrCoreTxtRowsToIncrementCountBy1,
-		removedTagOrCoreStrs,
-	};
+	let removedTags = oldPostTagStrs.filter((t) => !newPostTagStrs.includes(t));
+	let tagsChanged =
+		!!newTagCount || !!_tag_imBy8_countRowsToUpCountBy1.length || !!removedTags.length;
+	let coreChanged = newPostCoreStr !== _core_postImb_lastVersion_mRow.txt;
+	throwIf(!tagsChanged && !coreChanged);
+	await moveTagOrRxnCountsBy1(db, _tag_imBy8_countRowsToUpCountBy1, [], true);
+	let _tag_imBy8_countRowsToDownCountBy1: PartInsert[] = [];
+	for (let i = 0; i < removedTags.length; i++) {
+		let tagTxtRow = txt2_tag_imBy8_countRowMap[removedTags[i]];
+		if (tagTxtRow) _tag_imBy8_countRowsToDownCountBy1.push(tagTxtRow);
+	}
+	await moveTagOrRxnCountsBy1(db, _tag_imBy8_countRowsToDownCountBy1, [], false);
+	await db
+		.update(pTable)
+		.set({ code: pc.tagImb_postMb_oldVersion })
+		.where(
+			and(
+				pf.code.eq(pc.tagImb_postMb_lastVersion),
+				pf.p1.eq(post.in_ms),
+				pf.p4.eq(post.ms),
+				pf.p5.eq(post.by_ms),
+				pf.p6.eq(oldLastVersion),
+			),
+		);
+	await db
+		.update(pTable)
+		.set({ code: pc._core_postImb_oldVersion_m })
+		.where(
+			and(
+				pf.code.eq(pc._core_postImb_lastVersion_m),
+				pf.p1.eq(post.in_ms),
+				pf.p2.eq(post.ms),
+				pf.p3.eq(post.by_ms),
+				pf.p4.eq(oldLastVersion),
+			),
+		);
+	await db.insert(pTable).values(partsToInsert);
+	return { ms: lastLayerMs };
 };

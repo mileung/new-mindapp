@@ -25,29 +25,26 @@ export let _getSpaceTags = async (
 ) => {
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
-
 	let tagIdAndTxtWithNumAsCountRows = await db
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				!input.spaceMs ? undefined : pf.in_ms.eq(input.spaceMs),
-				pf.code.eq(pc.idBy8__count_val_tag),
-				pf.num.lte(input.fromCount),
-				pf.num.gt0,
+				pf.code.eq(pc._tag_imBy8_count),
+				pf.txt.notLike('%?%=%'),
+				!input.spaceMs ? undefined : pf.p1.eq(input.spaceMs),
+				pf.p4.lte(input.fromCount),
 				and(...input.excludeTags.map((t) => pf.txt.notEq(t))),
 			),
 		)
-		.orderBy(desc(pTable.num), asc(pTable.txt))
+		.orderBy(desc(pTable.p4), asc(pTable.txt))
 		.limit(tagsPerLoad);
 
 	return {
 		tags: tagIdAndTxtWithNumAsCountRows.map((r) => ({
 			txt: r.txt!,
-			num: r.num!,
-			...(r.in_ms ? { in_ms: r.in_ms } : {}),
+			num: r.p4!,
+			...(!input.spaceMs && r.p1 ? { in_ms: r.p1 } : {}),
 		})),
 	};
 };

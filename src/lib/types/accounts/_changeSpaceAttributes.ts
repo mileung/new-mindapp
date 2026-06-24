@@ -14,24 +14,20 @@ export let _changeSpaceAttributes = async (
 		newMemberPermissionCodeNum?: number;
 	},
 ) => {
-	let ms = Date.now();
+	let now = Date.now();
 	// console.log('input:', input);
 	if (input.nameTxt !== undefined) {
 		await tdb
 			.update(pTable)
 			.set({
-				ms, //
-				by_ms: input.callerMs,
 				txt: input.nameTxt,
+				p2: now, //
+				p3: input.callerMs,
 			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.id__spaceName),
-					pf.num.isNull,
-					pf.txt.isNotNull,
+					pf.code.eq(pc._spaceName_imb),
+					pf.p1.eq(input.spaceMs), //
 				),
 			);
 	}
@@ -39,18 +35,14 @@ export let _changeSpaceAttributes = async (
 		await tdb
 			.update(pTable)
 			.set({
-				ms, //
-				by_ms: input.callerMs,
 				txt: input.descriptionTxt,
+				p2: now, //
+				p3: input.callerMs,
 			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.id_memberCount_spaceDescription),
-					pf.num.gt0,
-					pf.txt.isNotNull,
+					pf.code.eq(pc._spaceDescription_imb_memberCount),
+					pf.p1.eq(input.spaceMs), //
 				),
 			);
 	}
@@ -58,18 +50,14 @@ export let _changeSpaceAttributes = async (
 		await tdb
 			.update(pTable)
 			.set({
-				ms, //
-				by_ms: input.callerMs,
 				txt: input.pinnedQueryTxt,
+				p2: now, //
+				p3: input.callerMs,
 			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.id__spacePinnedQuery),
-					pf.num.isNull,
-					pf.txt.isNotNull,
+					pf.code.eq(pc._spacePinnedQuery_imb),
+					pf.p1.eq(input.spaceMs), //
 				),
 			);
 	}
@@ -83,20 +71,17 @@ export let _changeSpaceAttributes = async (
 			// Therefore it should also be impossible for a personal input.spaceMs to be different from input.callerMs.
 			if (input.spaceMs === input.callerMs) throw new Error(`Personal space cannot be made public`);
 		} else if (input.spaceMs === 1) throw new Error(`Global space cannot be made private`);
-		console.log('input.isPublicNum:', input.isPublicNum);
 		await tdb
 			.update(pTable)
 			.set({
-				ms,
-				by_ms: input.callerMs,
-				num: input.isPublicNum,
+				p2: now,
+				p3: input.callerMs,
+				p4: input.isPublicNum,
 			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0, //
-					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.id_spaceIsPublic),
+					pf.code.eq(pc.imb_spaceIsPublic),
+					pf.p1.eq(input.spaceMs), //
 				),
 			);
 	}
@@ -104,18 +89,16 @@ export let _changeSpaceAttributes = async (
 		await tdb
 			.update(pTable)
 			.set({
-				ms, //
-				by_ms: input.callerMs,
-				num: input.newMemberPermissionCodeNum,
+				p2: now,
+				p3: input.callerMs,
+				p4: input.newMemberPermissionCodeNum,
 			})
 			.where(
 				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.in_ms.eq(input.spaceMs),
-					pf.code.eq(pc.id_newMemberPermissionCode),
+					pf.code.eq(pc.imb_newMemberPermissionCode),
+					pf.p1.eq(input.spaceMs), //
 				),
 			);
 	}
-	return { ms };
+	return { ms: now };
 };

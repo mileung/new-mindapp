@@ -5,6 +5,7 @@
 		getSpaceContext,
 		getWhoWhereObj,
 		gs,
+		msToAccountItalic,
 		msToAccountNameTxt,
 	} from '$lib/global-state.svelte';
 	import { alertError } from '$lib/js';
@@ -214,15 +215,17 @@
 </script>
 
 <div class="fx h-8">
-	<a class="flex-1 fx hover:text-fg3 hover:bg-bg4" href={`/_${accepteeMs}_`}>
+	<a class="flex-1 fx hover:text-fg3 hover:bg-bg4" href={`/__${accepteeMs}`}>
 		{#if memberIsAdmin}
 			<IconCrownFilled />
 		{:else if memberIsMod}
 			<IconShieldFilled />
 		{/if}
 		<AccountIcon ms={accepteeMs} class="mx-1 h-6 w-6" />
-		<p class={`text-lg ${gs.msToProfileMap[accepteeMs]?.name.txt ? '' : 'italic'}`}>
-			{accepteeName}
+		<p class="text-lg">
+			<span class={msToAccountItalic(accepteeMs)}>
+				{accepteeName}
+			</span>
 			{#if membershipFlair.txt}
 				<span class="text-fg2">
 					{membershipFlair.txt}
@@ -247,7 +250,7 @@
 								...(await getWhoWhereObj()),
 								accountMs: accepteeMs,
 							});
-							if (membershipIsByCaller && !space.isPublic.num) goto('/__0');
+							if (membershipIsByCaller && !space.isPublic.num) goto('/0__');
 							updateLocalCache((lc) => {
 								lc.msToSpaceMap = {
 									...lc.msToSpaceMap,
@@ -370,7 +373,7 @@
 				<p class="mr-1">{m.flairSetBySelf()}</p>
 			{:else}
 				<p class="mr-1">{m.flairSetBy()}</p>
-				<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${membershipFlair.by_ms}_`}>
+				<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/__${membershipFlair.by_ms}`}>
 					<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={membershipFlair.by_ms!} />
 					{msToAccountNameTxt(membershipFlair.by_ms!, true)}
 				</a>
@@ -380,7 +383,7 @@
 	{/if}
 	<div class="fx justify-between">
 		<p class="mr-1">{m.acceptedInviteBy()}</p>
-		<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${p.membership.invite.by_ms}_`}>
+		<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/__${p.membership.invite.by_ms}`}>
 			<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={p.membership.invite.by_ms} />
 			{msToAccountNameTxt(p.membership.invite.by_ms, true)}
 		</a>
@@ -391,7 +394,7 @@
 			<p class="mr-1">{memberIsMod ? m.assignedSelfToMod() : m.assignedSelfToMember()}</p>
 		{:else}
 			<p class="mr-1">{roleText}</p>
-			<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/_${membershipRoleCode.by_ms}_`}>
+			<a class="flex-1 fx hover:text-fg1 hover:bg-bg4" href={`/__${membershipRoleCode.by_ms}`}>
 				<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={membershipRoleCode.by_ms!} />
 				{msToAccountNameTxt(membershipRoleCode.by_ms!, true)}
 			</a>
@@ -402,7 +405,7 @@
 		<p class="mr-1">{permissionText}</p>
 		<a
 			class="flex-1 fx hover:text-fg1 hover:bg-bg4"
-			href={`/_${p.membership.permissionCode.by_ms}_`}
+			href={`/__${p.membership.permissionCode.by_ms}`}
 		>
 			<AccountIcon isSystem class="h-5 w-5 mr-0.5" ms={p.membership.permissionCode.by_ms!} />
 			{msToAccountNameTxt(p.membership.permissionCode.by_ms!, true)}

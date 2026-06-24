@@ -18,7 +18,7 @@
 
 	let caller = $derived(gs.accounts?.[0]);
 	let callerMs = $derived(caller?.ms);
-	let profileMs = $derived(+page.params.profileSlug!.slice(1, -1));
+	let profileMs = $derived(+page.params.profileSlug!.slice(2));
 	let publicProfile = $derived(gs.msToProfileMap[profileMs]);
 	let mutualSpaceMsToJoinMsMap = $derived(
 		publicProfile?.callerMsToMutualSpaceMsToJoinMsMap?.[callerMs!],
@@ -74,10 +74,10 @@
 	});
 </script>
 
-{#if publicProfile === null}
-	<!--  -->
-{:else if publicProfile}
-	<div class="p-2 max-w-lg">
+<div class="p-2 max-w-lg">
+	{#if publicProfile === null}
+		<p class="text-xl font-bold">{m.profileNotFound()}</p>
+	{:else if publicProfile}
 		<SpaceOrAccountHeader account={publicProfile} />
 		{#if publicProfile.ms}
 			{#if publicProfile.ms === callerMs}
@@ -124,5 +124,5 @@
 				<p class="text-fg2">{@html callerMs ? m.noMutualSpaces() : m.signInToSeeMutualSpaces()}</p>
 			{/if}
 		{/if}
-	</div>
-{/if}
+	{/if}
+</div>

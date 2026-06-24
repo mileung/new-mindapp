@@ -1,4 +1,4 @@
-import { uniqueMapVals } from '$lib/js';
+import { throwIf, uniqueMapVals } from '$lib/js';
 import { and, lt, or } from 'drizzle-orm';
 import { z } from 'zod';
 import {
@@ -52,12 +52,9 @@ export let permissionCodes = uniqueMapVals({
 export type PermissionCode = (typeof permissionCodes)[keyof typeof permissionCodes];
 
 export let accentCodes = uniqueMapVals({
-	// TODO: use bitmasking if this gets more complex?
-	disabled: 0,
-	none: 1,
-	newPosts: 2,
-	ignoredPostsForYou: 3,
-	unreadPostsForYou: 4, // Either a someone else replied one of your posts or someone included your profile slug in their core
+	none: 0,
+	newPosts: 1,
+	newPostsForCaller: 2,
 });
 
 // These are space props specific to the caller and only exist for members
@@ -66,7 +63,8 @@ export let SpaceContextSchema = z.strictObject({
 	roleCode: GranularNumPropSchema,
 	permissionCode: GranularNumPropSchema,
 	flair: GranularTxtPropSchema,
-	accentCode: GranularNumPropSchema,
+	accentCode: z.number(),
+	sidePriority: z.number(),
 });
 export type SpaceContext = z.infer<typeof SpaceContextSchema>;
 
@@ -88,7 +86,8 @@ export let MySpaceUpdateSchema = z.strictObject({
 	roleCode: GranularNumPropSchema.optional(),
 	permissionCode: GranularNumPropSchema.optional(),
 	flair: GranularTxtPropSchema.optional(),
-	accentCode: GranularNumPropSchema.optional(),
+	accentCode: z.number().optional(),
+	sidePriority: z.number().optional(),
 });
 export type MySpaceUpdate = z.infer<typeof MySpaceUpdateSchema>;
 
@@ -97,29 +96,31 @@ export let MySpaceUpdateFromSchema = MySpaceUpdateSchema.extend({
 	permissionCode: GranularNumPropSchema.optional(),
 	roleCode: GranularNumPropSchema.optional(),
 	flair: GranularTxtPropSchema.optional(),
-	accentCode: GranularNumPropSchema.optional(),
+	accentCode: z.number().optional(),
+	sidePriority: z.number().optional(),
 });
 export type MySpaceUpdateFrom = z.infer<typeof MySpaceUpdateFromSchema>;
 
-export let reduceMySpaceUpdateRows = (rows: PartInsert[]) => {
-	let spaceUpdates: MySpaceUpdate = { ms: 0 };
+export let reduceMySpaceUpdateRows = (rows: PartInsert[] = [], spaceMs: number) => {
+	let spaceUpdates: MySpaceUpdate = { ms: spaceMs };
 	for (let i = 0; i < rows.length; i++) {
-		let part = rows[i];
-		!i && (spaceUpdates.ms = part.in_ms);
-		if (part.code === pc.id_spaceIsPublic) {
-			spaceUpdates.isPublic = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.id__spaceName) {
-			spaceUpdates.name = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.id__spacePinnedQuery) {
-			spaceUpdates.pinnedQuery = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.id__accountMs_permissionCode) {
-			spaceUpdates.permissionCode = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.id__accountMs_roleCode) {
-			spaceUpdates.roleCode = { ms: part.ms, num: part.num! };
-		} else if (part.code === pc.id__accountMs__flair) {
-			spaceUpdates.flair = { ms: part.ms, txt: part.txt! };
-		} else if (part.code === pc.spacePriorityId__accountMs_accentCode) {
-			spaceUpdates.accentCode = { ms: part.ms, num: part.num! };
+		let { code, txt, p1, p2, p3, p4, p5 } = rows[i];
+		throwIf(p1 !== spaceMs);
+		if (code === pc.imb_spaceIsPublic) {
+			spaceUpdates.isPublic = { ms: p2!, num: p4! };
+		} else if (code === pc._spaceName_imb) {
+			spaceUpdates.name = { ms: p2!, txt: txt! };
+		} else if (code === pc._spacePinnedQuery_imb) {
+			spaceUpdates.pinnedQuery = { ms: p2!, txt: txt! };
+		} else if (code === pc.i_accountMs_permCode_mb) {
+			spaceUpdates.permissionCode = { ms: p4!, num: p3! };
+		} else if (code === pc.i_accountMs_roleCode_mb) {
+			spaceUpdates.roleCode = { ms: p4!, num: p3! };
+		} else if (code === pc._flair_i_accountMs_mb) {
+			spaceUpdates.flair = { ms: p3!, txt: txt! };
+		} else if (code === pc.i_accountMs_accentCode_lastViewMs_sidePriority) {
+			spaceUpdates.accentCode = p3!;
+			spaceUpdates.sidePriority = p5!;
 		}
 	}
 	return spaceUpdates;
@@ -155,12 +156,16 @@ export type Membership = {
 
 export let makeMyValidInvitesFilter = (callerMs: number, spaceMs: number, now = Date.now()) =>
 	and(
-		or(pf.at_ms.eq0, pf.at_ms.gt(now)),
-		or(pf.at_in_ms.eq0, lt(pTable.at_by_ms, pTable.at_in_ms)),
-		pf.ms.gt0,
-		pf.by_ms.eq(callerMs),
-		pf.in_ms.eq(spaceMs),
-		pf.code.eq(pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd),
-		pf.num.isNull,
-		pf.txt.isNotNull,
+		pf.code.eq(pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs),
+		pf.p1.eq(spaceMs),
+		pf.p2.eq(callerMs),
+		or(
+			pf.p4.eq0, //
+			pf.p4.gt(now),
+		),
+		or(
+			lt(pTable.p5, pTable.p6),
+			pf.p6.eq0, //
+		),
+		pf.p7.eq0,
 	);

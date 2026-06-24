@@ -1,109 +1,79 @@
 import { ownerViewItemsPerLoad } from '$lib/js';
 import { tdb } from '$lib/server/db';
 import { roleCodes } from '$lib/types/spaces';
-import { and, desc, or } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import { channelPartsByCode } from '../../types/parts';
 import { pc } from '../../types/parts/partCodes';
 import { pf } from '../../types/parts/partFilters';
 import { pTable } from '../../types/parts/partsTable';
 
-export let _getOwnerViewSpaces = async (input: { msBefore?: number }) => {
-	let id__spaceNameRows = await tdb
+export let _getOwnerViewSpaces = async (input: { msLt?: number }) => {
+	let _spaceName_imbRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.noAtId,
-				pf.in_ms.lt(input.msBefore || Number.MAX_SAFE_INTEGER),
-				pf.code.eq(pc.id__spaceName),
-				pf.num.isNull,
-				pf.txt.isNotNull,
+				pf.code.eq(pc._spaceName_imb), //
+				pf.p1.lt(input.msLt || Number.MAX_SAFE_INTEGER),
 			),
 		)
-		.orderBy(desc(pTable.in_ms))
+		.orderBy(pf.p1.desc)
 		.limit(ownerViewItemsPerLoad);
 
 	let {
-		[pc.id__accountMs_roleCode]: id__accountMs_roleCodeRows = [],
-		// [pc.banIdAtSpaceId]: banIdAtSpaceIdRows = [],
+		//
+		[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
 			.from(pTable)
 			.where(
-				or(
-					and(
-						pf.at_ms.gt0,
-						pf.at_by_ms.eq0,
-						pf.at_in_ms.eq0,
-						or(
-							pf.in_ms.eq(1), //
-							...id__spaceNameRows.map((r) => pf.in_ms.eq(r.in_ms)),
-						),
-						pf.code.eq(pc.id__accountMs_roleCode),
-						pf.num.eq(roleCodes.admin),
-						pf.txt.isNull,
+				and(
+					pf.code.eq(pc.i_accountMs_roleCode_mb),
+					or(
+						pf.p1.eq(1), //
+						..._spaceName_imbRows.map((r) => pf.p1.eq(r.p1!)),
 					),
-					// and(
-					// 	or(...id__spaceNameRows.map((r) => pf.atId({ at_ms: r.in_ms }))),
-					// 	pf.ms.gt0,
-					// 	pf.by_ms.gt0,
-					// 	pf.in_ms.eq0,
-					// 	pf.code.eq(pc.banIdAtSpaceId),
-					// 	pf.num.isNull,
-					// 	pf.txt.isNull,
-					// ),
+					pf.p3.eq(roleCodes.admin),
 				),
 			),
 	);
 
-	let msByMs__accountNameRows = await tdb
+	let _accountName_bmRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				or(...id__accountMs_roleCodeRows.map((r) => pf.by_ms.eq(r.at_ms))),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.msByMs__accountName),
-				pf.num.isNull,
-				pf.txt.isNotNull,
+				pf.code.eq(pc._accountName_bm),
+				or(...i_accountMs_roleCode_mbRows.map((r) => pf.p1.eq(r.p2!))),
 			),
 		);
 
 	let msToSpaceNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < id__spaceNameRows.length; i++) {
-		let { txt, in_ms } = id__spaceNameRows[i];
-		msToSpaceNameTxtMap[in_ms] = txt!;
+	for (let i = 0; i < _spaceName_imbRows.length; i++) {
+		let { txt, p1 } = _spaceName_imbRows[i];
+		msToSpaceNameTxtMap[p1!] = txt!;
 	}
 
 	let msToSpaceAdminMssMap: Record<number, number[]> = {};
-	for (let i = 0; i < id__accountMs_roleCodeRows.length; i++) {
-		let { in_ms, at_ms } = id__accountMs_roleCodeRows[i];
-		msToSpaceAdminMssMap[in_ms] ||= [];
-		msToSpaceAdminMssMap[in_ms].push(at_ms);
+	for (let i = 0; i < i_accountMs_roleCode_mbRows.length; i++) {
+		let { p1, p2 } = i_accountMs_roleCode_mbRows[i];
+		msToSpaceAdminMssMap[p1!] ||= [];
+		msToSpaceAdminMssMap[p1!].push(p2!);
 	}
 
 	let msToAccountNameTxtMap: Record<number, string> = {};
-	for (let i = 0; i < msByMs__accountNameRows.length; i++) {
-		let { txt, by_ms } = msByMs__accountNameRows[i];
-		msToAccountNameTxtMap[by_ms] = txt!;
+	for (let i = 0; i < _accountName_bmRows.length; i++) {
+		let { txt, p1 } = _accountName_bmRows[i];
+		msToAccountNameTxtMap[p1!] = txt!;
 	}
-
-	// let spaceMsToBannedIdMap: Record<number, undefined | Pick<IdObj, 'ms' | 'by_ms'>> = {};
-	// for (let i = 0; i < banIdAtSpaceIdRows.length; i++) {
-	// 	let { ms, by_ms, at_ms } = banIdAtSpaceIdRows[i];
-	// 	spaceMsToBannedIdMap[at_ms] = { ms, by_ms };
-	// }
 
 	return {
 		msToSpaceAdminMssMap,
 		msToAccountNameTxtMap,
-		spaces: id__spaceNameRows.map((r) => ({
-			ms: r.in_ms,
-			nameTxt: msToSpaceNameTxtMap[r.in_ms],
-			// banned: spaceMsToBannedIdMap[r.in_ms],
+		spaces: _spaceName_imbRows.map((r) => ({
+			ms: r.p1!,
+			nameTxt: msToSpaceNameTxtMap[r.p1!],
 		})),
 	};
 };

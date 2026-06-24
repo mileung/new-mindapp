@@ -1,38 +1,36 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
-import { and, asc, desc } from 'drizzle-orm';
-import type { Reaction, RxnEmoji } from '.';
+import { and, asc, desc, not } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { getIdObj, id0, type IdObj } from '../parts/partIds';
+import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let reactionsPerLoad = 88;
 
 export let getReactionHistory = async ({
 	postIdObj,
-	msBefore,
-	rxnIdObjsExclude,
+	msLte,
+	rxnMsByMssExclude,
 }: {
 	postIdObj: IdObj;
-	msBefore: number;
-	rxnIdObjsExclude: IdObj[];
+	msLte: number;
+	rxnMsByMssExclude: { ms: number; by_ms: number }[];
 }) => {
 	let baseInput = await getWhoWhereObj();
-	postIdObj = getIdObj(postIdObj);
 	return baseInput.spaceMs
 		? trpc().getReactionHistory.query({
 				...baseInput,
 				postIdObj,
-				msBefore,
-				rxnIdObjsExclude,
+				msLte,
+				rxnMsByMssExclude,
 			})
 		: _getReactionHistory(await gsdb(), {
 				...baseInput,
 				postIdObj,
-				msBefore,
-				rxnIdObjsExclude,
+				msLte,
+				rxnMsByMssExclude,
 			});
 };
 
@@ -40,36 +38,63 @@ export let _getReactionHistory = async (
 	db: Database,
 	input: {
 		postIdObj: IdObj;
-		msBefore: number;
-		rxnIdObjsExclude: IdObj[];
+		msLte: number;
+		rxnMsByMssExclude: { ms: number; by_ms: number }[];
 	},
 ) => {
 	// console.table(await db.select().from(pTable));
 	// console.log(await db.select().from(pTable));
+	// console.log('input:', input);
 
-	let reactionId__postId__emojiRows = await db
+	let _emoji_postImb_reactionBmRows = await db
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.idAsAtId(input.postIdObj),
-				and(...input.rxnIdObjsExclude.map((t) => pf.notId(t))),
-				pf.code.eq(pc.reactionId__postId__emoji),
-				// pf.ms.lte(input.fromMs),
-				// TODO: pf.ms.lt(input.msBefore),
+				pf.code.eq(pc._emoji_postImb_reactionBm),
+				pf.p1.eq(input.postIdObj.in_ms),
+				pf.p2.eq(input.postIdObj.ms),
+				pf.p3.eq(input.postIdObj.by_ms),
+				and(
+					...input.rxnMsByMssExclude.map((t) =>
+						not(
+							and(
+								pf.p4.eq(t.by_ms),
+								pf.p5.eq(t.ms), //
+							)!,
+						),
+					),
+				),
+				pf.p4.lte(input.msLte),
 			),
 		)
-		.orderBy(desc(pTable.num), asc(pTable.txt))
+		.orderBy(desc(pTable.p4), asc(pTable.txt))
 		.limit(reactionsPerLoad);
 
+	let _accountName_bmRows = await db
+		.select()
+		.from(pTable)
+		.where(
+			and(
+				pf.code.eq(pc._accountName_bm),
+				and(
+					..._emoji_postImb_reactionBmRows.map(
+						(r) => pf.p1.eq(r.p4!), //
+					),
+				),
+			),
+		);
+	let msToAccountNameTxtMap: Record<number, string> = {};
+	for (let i = 0; i < _accountName_bmRows.length; i++) {
+		let { txt, p1 } = _accountName_bmRows[i];
+		msToAccountNameTxtMap[p1!] = txt!;
+	}
 	return {
-		reactions: reactionId__postId__emojiRows.map(
-			(r) =>
-				({
-					...id0,
-					...getIdObj(r),
-					emoji: r.txt as RxnEmoji,
-				}) satisfies Reaction,
-		),
+		msToAccountNameTxtMap,
+		reactions: _emoji_postImb_reactionBmRows.map((r) => ({
+			ms: r.p5!,
+			by_ms: r.p4!,
+			emoji: r.txt!,
+		})),
 	};
 };

@@ -1,5 +1,4 @@
 import { tdb } from '$lib/server/db';
-import { id0 } from '$lib/types/parts/partIds';
 import { and, or } from 'drizzle-orm';
 import { type WhoObj } from '../../types/parts';
 import { pc } from '../../types/parts/partCodes';
@@ -13,40 +12,36 @@ export let _setAccountBan = async (
 		banned: boolean;
 	},
 ) => {
-	// let partCode = input.isSpace ? pc.banIdAtSpaceId : pc.banIdAtAccountId;
-	let banRowFilter = and(
-		pf.atId({ at_ms: input.accountMs }),
-		pf.code.eq(pc.banMsByMs__accountMs),
-		pf.num.isNull,
+	let accountMs_banMbFilter = and(
+		pf.code.eq(pc.accountMs_banMb),
+		pf.p1.eq(input.accountMs), //
 	);
 
-	let ms = Date.now();
+	let now = Date.now();
 	if (input.banned) {
-		if (!(await tdb.select().from(pTable).where(banRowFilter)).length) {
+		if (!(await tdb.select().from(pTable).where(accountMs_banMbFilter)).length) {
 			await tdb.insert(pTable).values({
-				...id0,
-				at_ms: input.accountMs,
-				ms,
-				by_ms: input.callerMs,
-				code: pc.banMsByMs__accountMs,
+				code: pc.accountMs_banMb,
+				p1: input.accountMs,
+				p2: now,
+				p3: input.callerMs,
 			});
 			await tdb
 				.delete(pTable)
 				.where(
 					or(
-						...getExpiredRowsFilters(ms),
+						...getExpiredRowsFilters(now),
 						and(
-							pf.atId({ at_ms: input.accountMs }),
 							or(
-								pf.code.eq(pc.ms__accountMs__clientKey),
-								pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
+								pf.code.eq(pc._clientKey_m_accountMs),
+								pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
 							),
-							pf.txt.isNotNull,
+							pf.p2.eq(input.accountMs),
 						),
 					),
 				);
 		}
-	} else await tdb.delete(pTable).where(banRowFilter);
+	} else await tdb.delete(pTable).where(accountMs_banMbFilter);
 
-	return { ms };
+	return { ms: now };
 };

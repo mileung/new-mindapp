@@ -4,7 +4,6 @@ import { tdb } from '$lib/server/db';
 import { makeMyValidInvitesFilter } from '.';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
-import { id0 } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 let validInviteLimit = 88;
@@ -15,34 +14,33 @@ export let _createInviteLink = async (
 		maxUses: number;
 	},
 ) => {
-	let ms = Date.now();
+	let now = Date.now();
 	let slugEnd = ranStr(8);
-	let expiryMs = input.validFor ? ms + input.validFor : 0;
+	let expiryMs = input.validFor ? now + input.validFor : 0;
 
 	if (input.spaceMs === input.callerMs) throw new Error(`Cannot invite people to personal space`);
 
 	let myInviteRows = await tdb
 		.select()
 		.from(pTable)
-		.where(makeMyValidInvitesFilter(input.callerMs, input.spaceMs, ms))
+		.where(makeMyValidInvitesFilter(input.callerMs, input.spaceMs, now))
 		.limit(validInviteLimit);
 	if (myInviteRows.length >= validInviteLimit) throw new Error(m.limitReached());
 
-	await tdb.insert(pTable).values([
-		{
-			...id0,
-			at_ms: expiryMs,
-			at_in_ms: input.maxUses,
-			ms,
-			by_ms: input.callerMs,
-			in_ms: input.spaceMs,
-			code: pc.inviteId__expiryMs_useCount_maxUses_revokedMs_slugEnd,
-			txt: slugEnd,
-		},
-	]);
+	await tdb.insert(pTable).values({
+		code: pc._slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMs,
+		txt: slugEnd,
+		p1: input.spaceMs,
+		p2: input.callerMs,
+		p3: now,
+		p4: expiryMs,
+		p5: 0,
+		p6: input.maxUses,
+		p7: 0,
+	});
 
 	return {
-		ms,
+		ms: now,
 		slugEnd,
 		expiryMs,
 	};

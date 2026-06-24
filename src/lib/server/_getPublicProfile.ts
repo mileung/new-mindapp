@@ -4,7 +4,7 @@ import {
 	assert1Row,
 	assertLt2Rows,
 	channelPartsByCode,
-	type PartSelect,
+	type PartInsert,
 	type WhoObj,
 } from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
@@ -17,11 +17,13 @@ export let _getPublicProfile = async (
 	ownerCalled: boolean,
 ) => {
 	let {
-		[pc.msByMs__accountEmail]: msByMs__accountEmailRows = [],
-		[pc.msByMs__accountName]: msByMs__accountNameRows = [],
-		[pc.msByMs__accountBio]: msByMs__accountBioRows = [],
-		[pc.acceptMsByMs__inviteId]: acceptMsByMs__inviteIdRows = [],
-		[pc.banMsByMs__accountMs]: banMsByMs__accountMsRows = [],
+		// [pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
+		// [pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
+		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc.accountMs_banMb]: accountMs_banMbRows = [],
+		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
+		[pc._accountName_bm]: _accountName_bmRows = [],
+		[pc._accountBio_bm]: _accountBio_bmRows = [],
 	} = channelPartsByCode(
 		await tdb
 			.select()
@@ -29,112 +31,95 @@ export let _getPublicProfile = async (
 			.where(
 				or(
 					and(
-						pf.noAtId,
-						pf.ms.gt0,
-						pf.by_ms.eq(input.profileMs),
-						pf.in_ms.eq0,
 						or(
-							ownerCalled ? pf.code.eq(pc.msByMs__accountEmail) : undefined,
-							pf.code.eq(pc.msByMs__accountName),
-							pf.code.eq(pc.msByMs__accountBio),
+							ownerCalled ? pf.code.eq(pc._accountEmail_bm) : undefined,
+							pf.code.eq(pc._accountName_bm),
+							pf.code.eq(pc._accountBio_bm),
 						),
-						pf.num.isNull,
-						pf.txt.isNotNull,
+						pf.p1.eq(input.profileMs),
 					),
 					input.profileMs !== input.callerMs &&
 						(ownerCalled || input.possibleMutualSpaceMss?.length)
 						? and(
-								pf.ms.gt0,
+								pf.code.eq(pc.acceptBm_inviteIbm),
 								or(
-									pf.by_ms.eq(input.profileMs),
-									ownerCalled ? undefined : pf.by_ms.eq(input.callerMs),
+									pf.p1.eq(input.profileMs), //
+									ownerCalled ? undefined : pf.p1.eq(input.callerMs),
 								),
 								ownerCalled
 									? undefined
-									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.at_in_ms.eq(ms))),
-								pf.code.eq(pc.acceptMsByMs__inviteId),
-								pf.num.isNull,
-								pf.txt.isNull,
+									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.p3.eq(ms))),
 							)
 						: undefined,
 					and(
-						pf.atId({ at_ms: input.profileMs }),
-						pf.ms.gt0,
-						pf.by_ms.gt0,
-						pf.in_ms.eq0,
-						pf.code.eq(pc.banMsByMs__accountMs),
-						pf.num.isNull,
-						pf.txt.isNull,
+						pf.code.eq(pc.accountMs_banMb),
+						pf.p1.eq(input.profileMs), //
 					),
 				),
 			),
 	);
 
-	let msByMs__accountNameRow = assert1Row(msByMs__accountNameRows);
-	let msByMs__accountBioRow = assert1Row(msByMs__accountBioRows);
+	let _accountName_bmRow = assert1Row(_accountName_bmRows);
+	let _accountBio_bmRow = assert1Row(_accountBio_bmRows);
 	let mutualSpaceMsToJoinMsMap: undefined | Record<number, number>;
 
-	if (acceptMsByMs__inviteIdRows.length) {
-		let caller_acceptMsByMs__inviteIdRows: PartSelect[] = [];
-		let profile_acceptMsByMs__inviteIdRows: PartSelect[] = [];
-		for (let i = 0; i < acceptMsByMs__inviteIdRows.length; i++) {
-			let acceptMsByMs__inviteIdRow = acceptMsByMs__inviteIdRows[i];
-			(acceptMsByMs__inviteIdRow.by_ms === input.callerMs
-				? caller_acceptMsByMs__inviteIdRows
-				: profile_acceptMsByMs__inviteIdRows
-			).push(acceptMsByMs__inviteIdRow);
+	if (acceptBm_inviteIbmRows.length) {
+		let acceptBm_inviteIbmCallerRows: PartInsert[] = [];
+		let acceptBm_inviteIbmProfileRows: PartInsert[] = [];
+		for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
+			let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
+			(acceptBm_inviteIbmRow.p1 === input.callerMs
+				? acceptBm_inviteIbmCallerRows
+				: acceptBm_inviteIbmProfileRows
+			).push(acceptBm_inviteIbmRow);
 		}
 
 		mutualSpaceMsToJoinMsMap = {};
 		if (ownerCalled) {
-			for (let i = 0; i < profile_acceptMsByMs__inviteIdRows.length; i++) {
-				let profile_acceptMsByMs__inviteIdRow = profile_acceptMsByMs__inviteIdRows[i];
-				let spaceMs = profile_acceptMsByMs__inviteIdRow.at_in_ms;
-				mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMs__inviteIdRow.ms;
+			for (let i = 0; i < acceptBm_inviteIbmProfileRows.length; i++) {
+				let acceptBm_inviteIbmProfileRow = acceptBm_inviteIbmProfileRows[i];
+				let spaceMs = acceptBm_inviteIbmProfileRow.p3!;
+				mutualSpaceMsToJoinMsMap[spaceMs] = acceptBm_inviteIbmProfileRow.p2!;
 			}
 		} else {
-			for (let i = 0; i < caller_acceptMsByMs__inviteIdRows.length; i++) {
-				let spaceMs = caller_acceptMsByMs__inviteIdRows[i].at_in_ms;
-				let profile_acceptMsByMs__inviteIdRow = profile_acceptMsByMs__inviteIdRows.find(
-					(r) => r.at_in_ms === spaceMs,
+			for (let i = 0; i < acceptBm_inviteIbmCallerRows.length; i++) {
+				let spaceMs = acceptBm_inviteIbmCallerRows[i].p3!;
+				let acceptBm_inviteIbmProfileRow = acceptBm_inviteIbmProfileRows.find(
+					(r) => r.p3 === spaceMs,
 				);
-				if (profile_acceptMsByMs__inviteIdRow) {
-					mutualSpaceMsToJoinMsMap[spaceMs] = profile_acceptMsByMs__inviteIdRow.ms;
+				if (acceptBm_inviteIbmProfileRow) {
+					mutualSpaceMsToJoinMsMap[spaceMs] = acceptBm_inviteIbmProfileRow.p2!;
 				}
 			}
 		}
 	}
 
-	let banMsByMs__accountMsRow = assertLt2Rows(banMsByMs__accountMsRows);
+	let accountMs_banMbRow = assertLt2Rows(accountMs_banMbRows);
 	let bannerNameTxt = '';
-	if (banMsByMs__accountMsRow) {
-		let owner_msByMs__accountNameRows = await tdb
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					pf.noAtId,
-					pf.ms.gt0,
-					pf.by_ms.eq(banMsByMs__accountMsRow.by_ms),
-					pf.in_ms.eq0,
-					pf.code.eq(pc.msByMs__accountName),
-					pf.num.isNull,
-					pf.txt.isNotNull,
+	if (accountMs_banMbRow) {
+		bannerNameTxt = assert1Row(
+			await tdb
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc._accountName_bm), //
+						pf.p1.eq(accountMs_banMbRow.p2!),
+					),
 				),
-			);
-		bannerNameTxt = assert1Row(owner_msByMs__accountNameRows).txt!;
+		).txt!;
 	}
 
 	return {
 		email: ownerCalled //
-			? { txt: assert1Row(msByMs__accountEmailRows).txt! }
+			? { txt: assert1Row(_accountEmail_bmRows).txt! }
 			: undefined,
-		banned: banMsByMs__accountMsRow
-			? { bannerNameTxt, ms: banMsByMs__accountMsRow.ms, by_ms: banMsByMs__accountMsRow.by_ms }
+		banned: accountMs_banMbRow
+			? { bannerNameTxt, ms: accountMs_banMbRow.p2!, by_ms: accountMs_banMbRow.p3! }
 			: undefined,
 		mutualSpaceMsToJoinMsMap,
-		name: { txt: msByMs__accountNameRow.txt! },
-		bio: { txt: msByMs__accountBioRow.txt! },
+		name: { txt: _accountName_bmRow.txt! },
+		bio: { txt: _accountBio_bmRow.txt! },
 	} satisfies Omit<PublicProfile, 'ms' | 'callerMsToMutualSpaceMsToJoinMsMap'> & {
 		mutualSpaceMsToJoinMsMap?: Record<number, number>;
 	};

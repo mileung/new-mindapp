@@ -1,194 +1,184 @@
 import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
-import { and, or, type SQL } from 'drizzle-orm';
-import { moveTagOrRxnCountsBy1, selectTagTxtRowsToDelete } from '.';
+import { and, or, sql, type SQL } from 'drizzle-orm';
+import { moveTagOrRxnCountsBy1 } from '.';
 import { type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode, makePartsUniqueById, type PartInsert } from '../parts';
+import { assert1Row, channelPartsByCode, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
-import { type FullIdObj } from '../parts/partIds';
+import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
-export let deletePost = async (
-	fullPostIdObj: FullIdObj,
-	version: null | number,
-	useLocalDb: boolean,
-) => {
+export let deletePost = async (postIdObj: IdObj, useLocalDb: boolean) => {
 	let baseInput = await getWhoObj();
 	return useLocalDb
-		? _deletePost(await gsdb(), fullPostIdObj, version)
-		: trpc().deletePost.mutate({ ...baseInput, fullPostIdObj, version });
+		? _deletePost(await gsdb(), postIdObj)
+		: trpc().deletePost.mutate({ ...baseInput, postIdObj });
 };
 
-export let _deletePost = async (db: Database, fullPostIdObj: FullIdObj, version: null | number) => {
-	let deleteAllVersions = version === null;
-	let partsToInsert: PartInsert[] = [];
-
-	let mainPIdWNumAsLastVersionAtPPIdRowsFilter = and(
-		pf.atId(fullPostIdObj),
-		pf.id(fullPostIdObj),
-		pf.code.eq(pc.postId__parentPostId_lastVersion),
-		pf.txt.isNull,
+export let _deletePost = async (db: Database, postIdObj: IdObj) => {
+	let postImb_parentMb_rootMb_childCountRowsFilter = and(
+		pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+		pf.p1.eq(postIdObj.in_ms),
+		pf.p2.eq(postIdObj.ms), //
+		pf.p3.eq(postIdObj.by_ms),
 	);
+	let tagAndCoreFilters = [
+		and(
+			or(
+				pf.code.eq(pc.tagImb_postMb_lastVersion),
+				pf.code.eq(pc.tagImb_postMb_oldVersion), //
+			),
+			pf.p1.eq(postIdObj.in_ms),
+			pf.p4.eq(postIdObj.ms),
+			pf.p5.eq(postIdObj.by_ms),
+		),
+		and(
+			or(
+				pf.code.eq(pc._core_postImb_lastVersion_m),
+				pf.code.eq(pc._core_postImb_oldVersion_m), //
+			),
+			pf.p1.eq(postIdObj.in_ms),
+			pf.p2.eq(postIdObj.ms),
+			pf.p3.eq(postIdObj.by_ms),
+		),
+	];
 
 	let {
-		[pc.postId__parentPostId_lastVersion]: mainPIdWNumAsLastVersionAtPPIdRows = [],
-		[pc.postTagId__postId_lastVersion]: curPostTagIdWNumAsVersionAtPIdRowsToDelete = [],
-		[pc.postTagId__postId_oldVersion]: exPostTagIdWithNumAsVersionAtPostIdRows = [],
-		[pc.currentPostCoreId__postId_version]: currentPostCoreId__postId_versionRowsToDelete = [],
-		[pc.exPostCoreId__postId_version]: exPostCoreIdWithNumAsVersionAtPostIdRows = [],
+		[pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountRows = [],
+		[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows = [],
+		[pc.tagImb_postMb_oldVersion]: tagImb_postMb_oldVersionRows = [],
+		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
+		[pc._core_postImb_oldVersion_m]: _core_postImb_oldVersion_mRows = [],
+		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
 	} = channelPartsByCode(
 		await db
 			.select()
 			.from(pTable)
 			.where(
 				or(
-					mainPIdWNumAsLastVersionAtPPIdRowsFilter,
+					postImb_parentMb_rootMb_childCountRowsFilter,
+					...tagAndCoreFilters, //
 					and(
-						pf.idAsAtId(fullPostIdObj),
-						pf.ms.gt0,
-						or(
-							pf.code.eq(pc.postTagId__postId_lastVersion),
-							pf.code.eq(pc.postTagId__postId_oldVersion),
-							pf.code.eq(pc.currentPostCoreId__postId_version),
-							pf.code.eq(pc.exPostCoreId__postId_version),
-						),
-						version === null ? undefined : pf.num.eq(version),
-						pf.txt.isNull,
+						// TODO: is there a way to limit this to 1 fetched _emoji_postImb_countRow?
+						pf.code.eq(pc._emoji_postImb_count),
+						pf.p1.eq(postIdObj.in_ms),
+						pf.p2.eq(postIdObj.ms),
+						pf.p3.eq(postIdObj.by_ms),
 					),
 				),
 			),
 	);
 
-	console.log('mainPIdWNumAsLastVersionAtPPIdRows:', mainPIdWNumAsLastVersionAtPPIdRows);
-	let mainPIdWNumAsLastVersionAtPPIdRow = assert1Row(mainPIdWNumAsLastVersionAtPPIdRows);
-	let lastVersion = mainPIdWNumAsLastVersionAtPPIdRow.num;
-	let versionIsLastVersion = version === lastVersion;
-	if (!lastVersion && versionIsLastVersion && !deleteAllVersions) deleteAllVersions = true;
-
-	if (deleteAllVersions || versionIsLastVersion) {
-		await moveTagOrRxnCountsBy1(
-			db,
-			curPostTagIdWNumAsVersionAtPIdRowsToDelete,
-			currentPostCoreId__postId_versionRowsToDelete,
-			[],
-			false,
-		);
-	} else {
-		// Bump up tags from previous version? What if last version is deleted but already has interactions? Then the last version would be soft deleted. May end up scrapping the idea of deleting individual versions.
-		throw new Error(`cannot delete specific version yet?`);
-	}
-
-	let postIsParent = !!(
-		await db
-			.select()
-			.from(pTable)
-			.where(
-				and(
-					pf.idAsAtId(fullPostIdObj),
-					pf.code.eq(pc.postId__parentPostId_lastVersion),
-					pf.num.gte0,
-					pf.txt.isNull,
-				),
-			)
-			.limit(1)
-	).length;
-
+	await moveTagOrRxnCountsBy1(db, tagImb_postMb_lastVersionRows, [], false);
+	let postImb_parentMb_rootMb_childCountRow = assert1Row(postImb_parentMb_rootMb_childCountRows);
+	let postIsParent = !!postImb_parentMb_rootMb_childCountRow.p8;
+	let postHasReactions = !!_emoji_postImb_countRows.length;
+	let softDelete = postIsParent || postHasReactions;
 	let deleteFilters: (undefined | SQL)[] = [];
 
-	if (deleteAllVersions) {
-		postIsParent &&
-			(await db.update(pTable).set({ num: 0 }).where(mainPIdWNumAsLastVersionAtPPIdRowsFilter));
-		deleteFilters.push(
-			...(postIsParent
-				? []
-				: [
-						mainPIdWNumAsLastVersionAtPPIdRowsFilter,
-						and(
-							pf.id(fullPostIdObj), //
-							pf.code.eq(pc.childPostId__rootId_depth),
-							pf.num.gte0,
-						),
-					]),
-			and(
-				pf.idAsAtId(fullPostIdObj),
-				or(
-					...[
-						pc.postId__ms_sd_lastVersion__core,
-						pc.postId__ms_sd_oldVersion__core,
-						pc.postId__ms_softDeletedNewestVersion,
-						pc.postId__ms_softDeletedOldVersion,
-						pc.postTagId__postId_lastVersion,
-						pc.postTagId__postId_oldVersion,
-						pc.currentPostCoreId__postId_version,
-						pc.exPostCoreId__postId_version,
-					].map((c) => pf.code.eq(c)),
-				),
-				pf.num.gte0,
-			),
-		);
-	} else {
-		// TODO: delete specific version
-		throw new Error(`cannot delete specific version yet?`);
-	}
+	deleteFilters.push(
+		...(softDelete
+			? [] //
+			: [postImb_parentMb_rootMb_childCountRowsFilter]),
+		...tagAndCoreFilters,
+	);
 
-	let checkForNum0Tags =
-		curPostTagIdWNumAsVersionAtPIdRowsToDelete.length ||
-		exPostTagIdWithNumAsVersionAtPostIdRows.length;
-	let checkForNum0Cores =
-		currentPostCoreId__postId_versionRowsToDelete.length ||
-		exPostCoreIdWithNumAsVersionAtPostIdRows.length;
-	let {
-		[pc.idBy8__count_val_tag]: num0tagIdAndTxtWithNumAsCountRows = [],
-		[pc.coreId8_count_txt]: num0coreIdAndTxtWithNumAsCountRows = [],
-	} = channelPartsByCode(
-		checkForNum0Tags || checkForNum0Cores
+	let _tag_imBy8_countRowsWith0Count =
+		tagImb_postMb_lastVersionRows.length || tagImb_postMb_oldVersionRows.length
 			? await db
 					.select()
 					.from(pTable)
 					.where(
-						or(
-							checkForNum0Tags
-								? and(
-										pf.noAtId,
-										pf.ms.gt0,
-										or(
-											...makePartsUniqueById([
-												...curPostTagIdWNumAsVersionAtPIdRowsToDelete,
-												...exPostTagIdWithNumAsVersionAtPostIdRows,
-											]).map((r) => pf.id(r)),
-										),
-										pf.code.eq(pc.idBy8__count_val_tag),
-										pf.num.eq0,
-										pf.txt.isNotNull,
-									)
-								: undefined,
-							checkForNum0Cores
-								? and(
-										pf.noAtId,
-										pf.ms.gt0,
-										or(
-											...makePartsUniqueById([
-												...currentPostCoreId__postId_versionRowsToDelete,
-												...exPostCoreIdWithNumAsVersionAtPostIdRows,
-											]).map((r) => pf.id(r)),
-										),
-										pf.code.eq(pc.coreId8_count_txt),
-										pf.num.eq0,
-										pf.txt.isNotNull,
-									)
-								: undefined,
+						and(
+							pf.code.eq(pc._tag_imBy8_count),
+							or(
+								...[
+									...new Set(
+										[
+											...tagImb_postMb_lastVersionRows,
+											...tagImb_postMb_oldVersionRows, //
+										].map((r) => `${r.p2}_${r.p3}`),
+									),
+								].map((s) => {
+									let [msStr, byMsStr] = s.split('_');
+									return and(
+										pf.p1.eq(postIdObj.in_ms),
+										pf.p2.eq(+msStr), //
+										pf.p3.eq(+byMsStr),
+									);
+								}),
+							),
+							pf.p4.eq0,
 						),
 					)
-			: [],
-	);
-	await selectTagTxtRowsToDelete(
-		db,
-		fullPostIdObj,
-		num0tagIdAndTxtWithNumAsCountRows,
-		deleteFilters,
-	);
+			: [];
+
+	if (_tag_imBy8_countRowsWith0Count.length) {
+		let tagImb_postMb_oldVersionRowsUsing0CountTags = await Promise.all(
+			_tag_imBy8_countRowsWith0Count.map(
+				async (_tag_imBy8_countRow) =>
+					(
+						await db
+							.select()
+							.from(pTable)
+							.where(
+								and(
+									pf.code.eq(pc.tagImb_postMb_oldVersion),
+									pf.p1.eq(postIdObj.in_ms),
+									pf.p2.eq(_tag_imBy8_countRow.p2!),
+									pf.p3.eq(_tag_imBy8_countRow.p3!),
+									pf.p4.notEq(postIdObj.ms),
+									pf.p5.notEq(postIdObj.by_ms),
+								),
+							)
+							.limit(1)
+					)[0] as undefined | PartSelect,
+			),
+		);
+		let _tag_imBy8_countRowsToDelete = _tag_imBy8_countRowsWith0Count.filter(
+			(_tag_imBy8_countRowWith0Count) =>
+				!tagImb_postMb_oldVersionRowsUsing0CountTags.find(
+					(r) =>
+						r &&
+						r.p1 === _tag_imBy8_countRowWith0Count.p1 &&
+						r.p2 === _tag_imBy8_countRowWith0Count.p2 &&
+						r.p3 === _tag_imBy8_countRowWith0Count.p3,
+				),
+		);
+		_tag_imBy8_countRowsToDelete.length &&
+			deleteFilters.push(
+				and(
+					pf.code.eq(pc._tag_imBy8_count),
+					or(
+						..._tag_imBy8_countRowsToDelete.map((r) =>
+							and(
+								pf.txt.eq(r.txt!),
+								pf.p1.eq(r.p1!), //
+								pf.p2.eq(r.p2!),
+								pf.p3.eq(r.p3!),
+							),
+						),
+					),
+					pf.p4.eq0,
+				),
+			);
+	}
 	deleteFilters.length && (await db.delete(pTable).where(or(...deleteFilters)));
-	partsToInsert.length && (await db.insert(pTable).values(partsToInsert));
-	return { soft: postIsParent };
+	let { p4, p5 } = postImb_parentMb_rootMb_childCountRow;
+	if (!softDelete && Number.isInteger(p4) && Number.isInteger(p5)) {
+		await db
+			.update(pTable)
+			.set({ p8: sql`${pTable.p8} - 1` })
+			.where(
+				and(
+					pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+					pf.p1.eq(postIdObj.in_ms),
+					pf.p2.eq(p4!),
+					pf.p3.eq(p5!),
+				),
+			);
+	}
+
+	return { soft: softDelete };
 };

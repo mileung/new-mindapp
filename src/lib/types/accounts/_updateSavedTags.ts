@@ -10,23 +10,13 @@ export let _updateSavedTags = async (
 		savedTags: string[];
 	},
 ) => {
-	let ms = Date.now();
+	let now = Date.now();
 	await tdb
 		.update(pTable)
 		.set({
-			ms,
 			txt: JSON.stringify(input.savedTags),
+			p2: now,
 		})
-		.where(
-			and(
-				pf.noAtId,
-				pf.ms.gt0,
-				pf.by_ms.eq(input.callerMs),
-				pf.in_ms.eq0,
-				pf.code.eq(pc.msByMs__accountSavedTags),
-				pf.num.isNull,
-				pf.txt.isNotNull,
-			),
-		);
-	return { ms };
+		.where(and(pf.code.eq(pc._accountSavedTags_bm), pf.p1.eq(input.callerMs)));
+	return { ms: now };
 };

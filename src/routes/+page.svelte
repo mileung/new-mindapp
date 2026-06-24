@@ -7,7 +7,7 @@
 	import { onMount } from 'svelte';
 
 	onMount(() => {
-		goto(`/__${getLocalCache().lastSeenInMs}`, { replaceState: true });
+		goto(`/${getLocalCache().lastSeenInMs}__`, { replaceState: true });
 		if (page.url.searchParams.get('extension') !== null) {
 			window.postMessage({ type: '2-popup-requests-external-page-info' }, '*');
 			window.addEventListener('message', (event) => {
@@ -22,11 +22,7 @@
 						}) || {};
 					if (!url || !externalDomString) return;
 					let scrapedInfo = scrape(url, externalDomString);
-
-					gs.lastSeenInMs && !gs.accounts![0].ms
-						? goto('/sign-in') //
-						: (gs.writingNew = true);
-
+					gs.extensionSearchQ = scrapedInfo.extensionSearchQ;
 					gs.writerTags = scrapedInfo.tags;
 					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
 					gs.writerCore =
@@ -35,6 +31,9 @@
 						scrapedInfo.url +
 						'\n\n' +
 						(scrapedInfo.headline === selectedPlainText ? '' : selectedPlainText);
+					gs.lastSeenInMs && !gs.accounts![0].ms
+						? goto('/sign-in') //
+						: (gs.postingNew = true);
 				}
 			});
 		}

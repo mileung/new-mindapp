@@ -3,7 +3,7 @@ import { minute, week } from '$lib/time';
 import type { Context } from '$lib/trpc/context';
 import { pc } from '$lib/types/parts/partCodes';
 import { pf } from '$lib/types/parts/partFilters';
-import { and, or } from 'drizzle-orm';
+import { and } from 'drizzle-orm';
 
 type CookieName = 'ms_clientKey' | 'ms_sessionKey';
 export type CookieObj = { ms: number; txt: string };
@@ -40,29 +40,13 @@ export let getValidAuthCookie = (ctx: Context, cookieName: CookieName) => {
 	return undefined;
 };
 
-export let getExpiredRowsFilters = (ms = Date.now()) => [
+export let getExpiredRowsFilters = (now: number) => [
 	and(
-		pf.noAtId,
-		pf.ms.lt(ms - 5 * minute),
-		pf.code.eq(pc.otpMs_pin_strikeCount__email),
-		pf.num.isNull,
-		pf.txt.isNotNull,
+		pf.code.eq(pc._email_ms_strikeCount_pin),
+		pf.p1.lt(now - 5 * minute), //
 	),
 	and(
-		pf.at_ms.gt0,
-		pf.at_by_ms.eq0,
-		pf.at_in_ms.eq0,
-		pf.ms.gt0,
-		or(
-			pf.ms.lt(ms - week),
-			and(
-				pf.by_ms.gt0, //
-				pf.by_ms.lt(ms),
-			),
-		),
-		pf.in_ms.eq0,
-		pf.code.eq(pc.ms_ExpiryMs__accountMs__sessionKey),
-		pf.num.isNull,
-		pf.txt.isNotNull,
+		pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
+		pf.p1.lt(now - week), // not checking expiryMs cuz p3 isn't indexed; no need to
 	),
 ];

@@ -11,7 +11,6 @@
 		main?: boolean;
 		reply?: boolean;
 		evenBg?: boolean;
-		red?: boolean;
 	} = $props();
 
 	let urlId = $derived.by(() => {
@@ -21,7 +20,7 @@
 		if (slashIndex > 0) s = s.slice(0, slashIndex);
 		if (isIdStr(s)) return s;
 	});
-	let spotId = $derived(urlId?.startsWith('__') ? '' : urlId);
+	let spotId = $derived(urlId?.endsWith('__') ? '' : urlId);
 	let moreOpaque = $derived(
 		p.evenBg ||
 			gs.theme === 'light' || //
@@ -29,27 +28,26 @@
 	);
 
 	let [lineColor, overlayColor] = $derived.by(() => {
-		if (p.red) return ['bg-red-500', moreOpaque ? 'bg-red-500/10' : 'bg-red-500/5'];
 		if (!p.postIdStr) return ['bg-hl2', moreOpaque ? 'bg-hl2/10' : 'bg-hl2/5'];
-		let post = gs.showReactionHistory || gs.writingTo || gs.writingEdit;
+		let post = gs.showReactionHistory || gs.postingTo || gs.postingEdit;
 		if (post && getIdStr(post) === p.postIdStr) {
 			return gs.showReactionHistory
 				? ['bg-hl-spot', moreOpaque ? 'bg-hl-spot/10' : 'bg-hl-spot/5']
-				: gs.writingTo
+				: gs.postingTo
 					? ['bg-hl-link', moreOpaque ? 'bg-hl-link/10' : 'bg-hl-link/5']
-					: gs.writingEdit
+					: gs.postingEdit
 						? ['bg-hl-edit', moreOpaque ? 'bg-hl-edit/10' : 'bg-hl-edit/5']
 						: [];
 		}
 		if (spotId === p.postIdStr)
 			return ['bg-hl-spot', moreOpaque ? 'bg-hl-spot/10' : 'bg-hl-spot/5'];
-		// TODO: match identicon color
-		if (p.reply) return ['bg-fg1', moreOpaque ? 'bg-fg1/10' : 'bg-fg1/5'];
+		// TODO: match identicon color?
+		if (p.reply) return ['bg-fg2', ''];
 		return [];
 	});
 </script>
 
-{#if lineColor && overlayColor}
+{#if lineColor}
 	<div
 		{...!p.noScrollId && p.main ? { id: 'hl-' + p.postIdStr } : {}}
 		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-40 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}
