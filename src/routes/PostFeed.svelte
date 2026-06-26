@@ -16,7 +16,7 @@
 	} from '$lib/global-state.svelte';
 	import { alertError, getAlteredSearchParams, makeErrorReadable } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { updateSavedTags } from '$lib/types/local-cache';
+	import { updateLocalCache, updateSavedTags } from '$lib/types/local-cache';
 	import { hasParent } from '$lib/types/parts';
 	import {
 		getAtIdStr,
@@ -39,6 +39,7 @@
 		parseSearchQuery,
 		type ParsedQ,
 	} from '$lib/types/posts/parseSearchQuery';
+	import { accentCodes } from '$lib/types/spaces';
 	import {
 		IconArchive,
 		IconChevronRight,
@@ -157,6 +158,7 @@
 						sectionHeadings.push({ heading: 'forYou' });
 						forYouPostFeedSection = {
 							...getDefaultSection(),
+							eitherInMss: [urlInMs],
 							eitherAtByMss: [callerMs],
 							// eitherTags: ['__' + callerMs], // TODO: merge posts with account tag and eitherAtByMss
 							// This may require a rewrite to the parser (using an AST, parentheses, and pipes "|") due
@@ -303,6 +305,13 @@
 				}
 			}
 			// console.log('mainPostFeedSection:', mainPostFeedSection);
+			let setLastViewMsInMs =
+				spaceContext &&
+				!postFeed &&
+				callerMs !== urlInMs &&
+				page.route.id === '/[spaceSlug=spaceSlug]'
+					? urlInMs //
+					: undefined;
 			let postFeedUpdate = await getPostFeed(
 				[
 					extensionSearchPostFeedSection,
@@ -311,10 +320,15 @@
 					mainPostFeedSection,
 				].filter((s) => !!s),
 				useLocalDb,
-				callerMs && page.params.spaceSlug && !qSearchParam && !postFeed
-					? urlInMs //
-					: undefined,
+				setLastViewMsInMs,
 			);
+			if (setLastViewMsInMs) {
+				updateLocalCache((lc) => {
+					lc.accounts[0].msToJoinedSpaceContextMap[setLastViewMsInMs]!.accentCode =
+						accentCodes.none;
+					return lc;
+				});
+			}
 			let {
 				topLvlPostIdStrsSections: newTopLvlPostIdStrsSections = [],
 				idToPostMap: newIdToPostMap = {},
@@ -612,21 +626,32 @@
 								<p class="font-medium pl-2 h-full flex-1 fx text-fg2">
 									{sectionObj.secondaryTxt}
 								</p>
-							{:else if sectionObj.heading === 'extSearch'}
-								{m.extensionSearch()}
 							{:else if sectionObj.heading === 'forYou'}
 								{m.forYou()}
-							{:else if sectionObj.heading === 'pinned'}
-								{m.pinned()}
 								<a
 									class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
-									href={`?q=${sectionObj.secondaryTxt}`}
+									href={`?q=@__${callerMs}`}
 								>
-									{sectionObj.secondaryTxt}
+									{m.showMore()}
 									<IconChevronRight />
 								</a>
-							{:else if sectionObj.heading === 'nextUp'}
-								{m.nextUp()}
+							{:else}
+								{#if sectionObj.heading === 'nextUp'}
+									{m.nextUp()}
+								{:else if sectionObj.heading === 'extSearch'}
+									{m.extensionSearch()}
+								{:else if sectionObj.heading === 'pinned'}
+									{m.pinned()}
+								{/if}
+								{#if sectionObj.secondaryTxt}
+									<a
+										class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
+										href={`?q=${sectionObj.secondaryTxt}`}
+									>
+										{sectionObj.secondaryTxt}
+										<IconChevronRight />
+									</a>
+								{/if}
 							{/if}
 						</div>
 						{#if !sectionObj.topLvlPostIdStrs.length}

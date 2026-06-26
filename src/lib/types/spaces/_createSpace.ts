@@ -122,7 +122,7 @@ export let makeRowsForJoiningSpace = (a: {
 			p2: a.callerMs,
 			p3: accentCodes.none,
 			p4: a.now,
-			p5: a.now,
+			p5: a.inviteIdObj.in_ms === 1 ? 0 : a.now,
 		},
 	] satisfies PartInsert[];
 

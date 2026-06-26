@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 // TODO: When the db gets to big, add another db for new rows.
 // ensure uniqueness across all dbs when making an account query all dbs when signing in
@@ -19,6 +19,21 @@ export let pTable = sqliteTable(
 		p8: integer('p8'),
 	},
 	(table) => [
+		primaryKey({
+			// Primary key needed to update/delete rows in Drizzle Studio
+			name: 'primary_key_idx',
+			columns: [
+				table.code,
+				table.p1,
+				table.p2,
+				table.p3,
+				table.p4,
+				table.p5,
+				table.p6,
+				table.p7,
+				table.p8,
+			],
+		}),
 		index('idx_code')
 			.on(table.code)
 			.where(sql`${table.code} IN (29)`),

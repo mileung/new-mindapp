@@ -28,9 +28,10 @@ export let LocalCacheSchema = z
 				...new Set(
 					lc.accounts.map((a) => {
 						if (!a.ms) hasAnonAccount = true;
+						let joinedSpaceContexts = Object.values(a.msToJoinedSpaceContextMap);
 						uniqueJoinedSpaceContextMss =
-							a.joinedSpaceContexts.length ===
-							[...new Set(a.joinedSpaceContexts.map((c) => c.ms))].length;
+							joinedSpaceContexts.length ===
+							[...new Set(joinedSpaceContexts.map((c) => c!.ms))].length;
 						return a.ms;
 					}),
 				),
@@ -169,14 +170,14 @@ export let useCheckedInvite = async () => {
 			if (!redeemMs) return alert(m.invalidInvite());
 			let joinedSpaceMs = gs.checkedInvite.partialSpace.ms;
 			updateLocalCache((lc) => {
-				lc.accounts[0].joinedSpaceContexts.unshift({
+				lc.accounts[0].msToJoinedSpaceContextMap[joinedSpaceMs] = {
 					ms: joinedSpaceMs, // below is just placeholder data getCallerContext will update
 					roleCode: { ms: redeemMs, num: roleCodes.member },
 					permissionCode: { ms: redeemMs, num: permissionCodes.reactAndPost },
 					flair: { ms: redeemMs, txt: '' },
 					accentCode: accentCodes.none,
 					sidePriority: redeemMs,
-				});
+				};
 				return lc;
 			});
 			gs.accountMsToSpaceMsToCheckedMap = {

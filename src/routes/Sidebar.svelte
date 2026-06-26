@@ -1,10 +1,12 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { gotoIfNeeded, textInputFocused } from '$lib/dom';
+	import { gotoIfNeeded, setGlobalCssVariable, textInputFocused } from '$lib/dom';
 	import {
 		getBottomOverlayShown,
 		getCallerIsOwner,
+		getSpaceContext,
+		getWhoObj,
 		gs,
 		msToAccountItalic,
 		msToAccountNameTxt,
@@ -14,7 +16,10 @@
 	} from '$lib/global-state.svelte';
 	import { isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
+	import { trpc } from '$lib/trpc/client';
 	import { signOut, unsaveAccount, updateLocalCache } from '$lib/types/local-cache';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
+	import { accentCodes } from '$lib/types/spaces';
 	import {
 		IconArrowMergeBoth,
 		IconBook2,
@@ -33,15 +38,43 @@
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
+	let draggingSpaceIndex = $state<null | number>(null);
+	let dragStartY: number;
+	let draggedSpaceIndexOffset = $state(0);
+	let disableClickAfterDrag = $state(false);
 	let callerIsOwner = $derived(getCallerIsOwner());
 	let showAccountMenu = $state(false);
 	let hideExtensionLink = $state(isTouchScreen);
 	let showSpaceMenu = $state(false);
 	let isEmbed = $derived(page.url.pathname.startsWith('/embed'));
 
+	let highlightLastSeenInMs = $derived(
+		(page.params.idSlug || page.params.spaceSlug)?.startsWith(`${gs.lastSeenInMs}_`),
+	);
+	let caller = $derived(gs.accounts?.[0]);
+	let callerMs = $derived(caller?.ms);
+	let sidebarSpaceMss = $derived<number[]>([
+		// local space ms - everything private in OPFS
+		0,
+		// personal space ms placeholder - everything private in cloud
+		callerMs || 8,
+		// global space ms - everything public in cloud
+		1,
+		...Object.values(caller?.msToJoinedSpaceContextMap || {})
+			.sort((a, b) => b!.sidePriority - a!.sidePriority)
+			.map((c) => c!.ms)
+			.filter((ms) => ms !== 1),
+	]);
+	let targetIndex = $derived(
+		Math.min(
+			sidebarSpaceMss.length - 1,
+			Math.max(3, (draggingSpaceIndex ?? 0) + draggedSpaceIndexOffset),
+		),
+	);
+
 	onMount(() => {
 		if (isEmbed) return;
-		let handler = (e: KeyboardEvent) => {
+		let onKeyDown = (e: KeyboardEvent) => {
 			if (!textInputFocused() && gs.lastSeenInMs !== undefined) {
 				// setTimeout prevents inputting '/' on focus
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
@@ -71,24 +104,119 @@
 				}
 			}
 		};
-		window.addEventListener('keydown', handler);
-		return () => window.removeEventListener('keydown', handler);
+		let onDrag = (clientY: number) => {
+			if (draggingSpaceIndex === null) return;
+			let deltaY = clientY - dragStartY;
+			setGlobalCssVariable('--y-space-drag', `${deltaY}px`);
+			draggedSpaceIndexOffset = Math.round(deltaY / 40);
+			if (!disableClickAfterDrag) disableClickAfterDrag = Math.abs(deltaY) > 8;
+		};
+		let onMouseMove = (e: MouseEvent) => onDrag(e.clientY);
+		let onTouchMove = (e: TouchEvent) => {
+			e.preventDefault(); // Stops page scrolling
+			let touch = e.touches[0];
+			onDrag(touch.clientY);
+		};
+		let onDragEnd = async () => {
+			if (
+				caller &&
+				draggingSpaceIndex !== null &&
+				draggingSpaceIndex > 2 &&
+				draggingSpaceIndex !== targetIndex
+			) {
+				// console.log(
+				// 	'caller.msToJoinedSpaceContextMap',
+				// 	JSON.stringify(caller.msToJoinedSpaceContextMap, null, 2),
+				// );
+				// console.log('draggingSpaceIndex:', draggingSpaceIndex);
+				// console.log('targetIndex:', targetIndex);
+				let draggedSpaceMs = sidebarSpaceMss[draggingSpaceIndex];
+				let nextAboveSpaceMs =
+					sidebarSpaceMss[targetIndex + (draggedSpaceIndexOffset < 0 ? -1 : 0)];
+				let nextBelowSpaceMs = sidebarSpaceMss[targetIndex + (draggedSpaceIndexOffset < 0 ? 0 : 1)];
+				let aboveSidePriority = getSpaceContext(nextAboveSpaceMs)?.sidePriority;
+				let belowSidePriority = getSpaceContext(nextBelowSpaceMs)?.sidePriority;
+				let nextDraggedSpaceSidePriority = 0;
+				let spaceMsToSidePriorityMap: Record<string, number> = {};
+				if (aboveSidePriority === undefined)
+					nextDraggedSpaceSidePriority = belowSidePriority! + 8 ** 8;
+				else if (belowSidePriority === undefined)
+					nextDraggedSpaceSidePriority = aboveSidePriority! - 8 ** 8;
+				else nextDraggedSpaceSidePriority = Math.round((aboveSidePriority + belowSidePriority) / 2);
+				if (
+					nextDraggedSpaceSidePriority === aboveSidePriority ||
+					nextDraggedSpaceSidePriority === belowSidePriority
+				) {
+					let newSidebarSpaceMss = [...sidebarSpaceMss];
+					newSidebarSpaceMss.splice(
+						targetIndex,
+						0,
+						newSidebarSpaceMss.splice(draggingSpaceIndex, 1)[0],
+					);
+					for (let i = 3; i < newSidebarSpaceMss.length; i++) {
+						spaceMsToSidePriorityMap[newSidebarSpaceMss[i]] = (i - 3) * -(8 ** 8);
+					}
+				} else spaceMsToSidePriorityMap[draggedSpaceMs] = nextDraggedSpaceSidePriority;
+				updateLocalCache((lc) => {
+					Object.entries(spaceMsToSidePriorityMap).map(([msStr, sidePriority]) => {
+						lc.accounts[0].msToJoinedSpaceContextMap[msStr]!.sidePriority = sidePriority;
+					});
+					return lc;
+				});
+				trpc().updateSidePriority.mutate({
+					...(await getWhoObj()),
+					spaceMsToSidePriorityMap,
+				});
+			}
+			setGlobalCssVariable('--y-space-drag', `0px`);
+			draggedSpaceIndexOffset = 0;
+			draggingSpaceIndex = null;
+		};
+
+		window.addEventListener('keydown', onKeyDown);
+		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mouseup', onDragEnd);
+		window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
+		window.addEventListener('touchend', onDragEnd);
+		return () => {
+			window.removeEventListener('keydown', onKeyDown);
+			window.removeEventListener('mousemove', onMouseMove);
+			window.removeEventListener('mouseup', onDragEnd);
+			window.removeEventListener('touchmove', onTouchMove);
+			window.removeEventListener('touchend', onDragEnd);
+		};
 	});
 
-	let highlightLastSeenInMs = $derived(
-		(page.params.idSlug || page.params.spaceSlug)?.startsWith(`${gs.lastSeenInMs}_`),
-	);
-	let caller = $derived(gs.accounts?.[0]);
-	let callerMs = $derived(caller?.ms);
-	let sidebarSpaceMss = $derived<number[]>([
-		// local space ms - everything private in OPFS
-		0,
-		// personal space ms placeholder - everything private in cloud
-		callerMs || 8,
-		// global space ms - everything public in cloud
-		1,
-		...(caller?.joinedSpaceContexts || []).map((s) => s.ms).filter((ms) => ms !== 1),
-	]);
+	let getSpaceTranslateY = (spaceIndex: number) => {
+		if (draggingSpaceIndex !== null) {
+			if (spaceIndex === draggingSpaceIndex) return 'z-50';
+			if (spaceIndex < 3 || draggingSpaceIndex < 3) return '';
+			let targetIndex = draggingSpaceIndex + draggedSpaceIndexOffset;
+			if (
+				draggedSpaceIndexOffset < 0 &&
+				spaceIndex >= targetIndex &&
+				spaceIndex < draggingSpaceIndex
+			)
+				return 'translate-y-10';
+			if (
+				draggedSpaceIndexOffset > 0 &&
+				spaceIndex <= targetIndex &&
+				spaceIndex > draggingSpaceIndex
+			)
+				return '-translate-y-10';
+		}
+		return '';
+	};
+
+	let urlInMs = $derived(getUrlInMs());
+	let getAccentBg = (spaceMs: number) => {
+		let { accentCode } = caller?.msToJoinedSpaceContextMap[spaceMs] || {};
+		if (page.route.id !== '/[spaceSlug=spaceSlug]' || urlInMs !== spaceMs) {
+			if (accentCode === accentCodes.newPostsForCaller) return 'bg-yellow-300';
+			if (accentCode === accentCodes.newPosts) return 'bg-bg8';
+		}
+		return '';
+	};
 </script>
 
 <!-- TODO: remember PostDrop states (open, parsed, etc) when switching spaces -->
@@ -118,13 +246,13 @@
 				{#if showAccountMenu}
 					<!-- {#if showAccountMenu || showSuggestedTags} -->
 					<IconX class="h-6 w-6" />
-				{:else if gs.accounts}
+				{:else if callerMs !== undefined}
 					<div class="w-9 xy">
-						<AccountIcon isUser ms={gs.accounts[0]?.ms} class="h-6 w-6" />
+						<AccountIcon isUser ms={callerMs} class="h-6 w-6" />
 					</div>
 					<div class="hidden xs:block flex-1 pr-2">
-						<p class={`text-left ${msToAccountItalic(gs.accounts[0].ms)}`}>
-							{msToAccountNameTxt(gs.accounts[0].ms)}
+						<p class={`text-left ${msToAccountItalic(callerMs)}`}>
+							{msToAccountNameTxt(callerMs)}
 						</p>
 					</div>
 				{/if}
@@ -238,19 +366,37 @@
 					<IconSquarePlus2 class="shrink-0 w-6" />
 					<p class="text-nowrap overflow-scroll">{m.createSpace()}</p>
 				</a>
-				{#each sidebarSpaceMss as spaceMs (spaceMs)}
+				{#each sidebarSpaceMss as spaceMs, i (spaceMs)}
 					<div
-						class={`flex group/space ${highlightLastSeenInMs && spaceMs === gs.lastSeenInMs ? 'bg-bg5' : ''} hover:bg-bg5`}
+						class={`flex group/space hover:bg-bg5 ${
+							highlightLastSeenInMs && spaceMs === gs.lastSeenInMs
+								? 'bg-bg5' //
+								: ''
+						} ${getSpaceTranslateY(i)}`}
+						style={`${i === draggingSpaceIndex ? 'transform: translateY(var(--y-space-drag));' : ''}`}
+						ontouchstart={(e) => {
+							draggingSpaceIndex = i;
+							dragStartY = e.changedTouches[0].clientY;
+						}}
+						onmousedown={(e) => {
+							e.preventDefault();
+							draggingSpaceIndex = i;
+							dragStartY = e.clientY;
+						}}
 					>
-						<a href={`/${spaceMs}__`} class={`relative flex-1 fx h-10 pl-2 gap-2 overflow-hidden`}>
+						<a
+							href={`/${spaceMs}__`}
+							class={`pl-2 relative flex-1 fx h-10 gap-2 overflow-hidden active:cursor-grabbing`}
+							onclick={(e) => disableClickAfterDrag && e.preventDefault()}
+						>
 							{#if spaceMs === gs.lastSeenInMs}
 								<div
 									class={`absolute left-0 h-full w-0.5 ${page.params.idSlug || page.params.spaceSlug ? 'bg-hl1' : 'bg-fg2'}`}
 								></div>
 							{/if}
-							<!-- {#if space.ms === gs.lastSeenInMs}
-								<div class={`absolute left-0 h-full w-0.5 bg-yellow-300`}></div>
-							{/if} -->
+							{#if caller?.msToJoinedSpaceContextMap[spaceMs]?.accentCode !== undefined}
+								<div class={`absolute left-0 h-full w-0.5 ${getAccentBg(spaceMs)}`}></div>
+							{/if}
 							<SpaceIcon ms={spaceMs} class="shrink-0 w-6" />
 							<p class={`text-nowrap overflow-scroll ${msToSpaceItalic(spaceMs)}`}>
 								{msToSpaceNameTxt(spaceMs)}
@@ -258,13 +404,15 @@
 						</a>
 						<a
 							href={`/${spaceMs}__/tags`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/tags` ? 'bg-bg7 text-fg1' : 'text-fg2'} active:cursor-grabbing`}
+							onclick={(e) => disableClickAfterDrag && e.preventDefault()}
 						>
 							<IconTags class="h-5" />
 						</a>
 						<a
 							href={`/${spaceMs}__/dots`}
-							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'}`}
+							class={`xy w-8 group-hover/space:flex hover:bg-bg7 hover:text-fg1 ${spaceMs !== gs.lastSeenInMs ? 'pointer-fine:hidden' : ''} ${page.url.pathname === `/${spaceMs}__/dots` ? 'bg-bg7 text-fg1' : 'text-fg2'} active:cursor-grabbing`}
+							onclick={(e) => disableClickAfterDrag && e.preventDefault()}
 						>
 							<IconDotsVertical class="h-5" />
 						</a>
@@ -293,7 +441,7 @@
 			<div class={`${showAccountMenu ? '' : 'hidden xs:block'}`}>
 				{#if gs.accounts}
 					<a
-						href={`/__${gs.accounts[0].ms}`}
+						href={`/__${callerMs}`}
 						class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5 ${page.url.pathname === `/__${callerMs}` ? 'bg-bg5' : ''}`}
 					>
 						<IconUserSquare class="shrink-0 w-6" />

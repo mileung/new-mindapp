@@ -76,6 +76,7 @@ export let _addPost = async (
 		// TODO: getPostFeed
 	}
 	let postIsChild = hasParent(post);
+	// console.log('post:', post);
 	let tagStrsFromAllLayers = [...tagStrsFromAllLayersSet];
 	let filters = [
 		postIsChild

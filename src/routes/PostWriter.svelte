@@ -1,5 +1,10 @@
 <script lang="ts">
-	import { getPostWriterHeight, scrollToHighlight, textInputFocused } from '$lib/dom';
+	import {
+		getPostWriterHeight,
+		scrollToHighlight,
+		setGlobalCssVariable,
+		textInputFocused,
+	} from '$lib/dom';
 	import {
 		getSpacePermissions,
 		gs,
@@ -29,7 +34,7 @@
 	let coreTa: HTMLTextAreaElement;
 	let tagsIpt: HTMLInputElement;
 	let draggingHeight: boolean;
-	let startY: number;
+	let dragStartY: number;
 	let startHeight: number;
 	let p: {
 		onSubmit: (tags: string[], core: string) => void;
@@ -98,24 +103,31 @@
 				tagsIpt.focus();
 		};
 
-		let onMouseMove = (moveEvent: MouseEvent) => {
-			// TODO: touchstart, touchmove, and touchend for mobile web
-			if (draggingHeight) {
-				let deltaY = startY - moveEvent.clientY;
-				let newHeight = Math.min(window.innerHeight - 100, Math.max(188, startHeight + deltaY));
-				document.documentElement.style.setProperty('--h-post-writer', `${newHeight}px`);
-			}
+		let onDrag = (clientY: number) => {
+			if (!draggingHeight) return;
+			let deltaY = dragStartY - clientY;
+			let newHeight = Math.min(window.innerHeight - 100, Math.max(128, startHeight + deltaY));
+			setGlobalCssVariable('--h-post-writer', `${newHeight}px`);
 		};
-
-		let onMouseUp = () => (draggingHeight = false);
+		let onMouseMove = (e: MouseEvent) => onDrag(e.clientY);
+		let onTouchMove = (e: TouchEvent) => {
+			e.preventDefault(); // Stops page scrolling
+			let touch = e.touches[0];
+			onDrag(touch.clientY);
+		};
+		let onDragEnd = () => (draggingHeight = false);
 
 		window.addEventListener('keydown', onKeyDown);
 		window.addEventListener('mousemove', onMouseMove);
-		window.addEventListener('mouseup', onMouseUp);
+		window.addEventListener('mouseup', onDragEnd);
+		window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
+		window.addEventListener('touchend', onDragEnd);
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
 			window.removeEventListener('mousemove', onMouseMove);
-			window.removeEventListener('mouseup', onMouseUp);
+			window.removeEventListener('mouseup', onDragEnd);
+			window.removeEventListener('touchmove', onTouchMove);
+			window.removeEventListener('touchend', onDragEnd);
 		};
 	});
 
@@ -331,13 +343,13 @@
 					</div>
 				{/each}
 			</div>
-			<div class="h-full">
+			<div class="h-full flex flex-col">
 				<textarea
 					bind:this={coreTa}
 					bind:value={gs.writerCore}
 					maxlength={888888}
 					placeholder={m.core()}
-					class="resize-none h-full min-h-0 w-full px-2 py-0.5 text-lg pr-9 bg-bg3 hover:bg-bg6"
+					class="resize-none flex-1 min-h-0 w-full px-2 py-0.5 text-lg pr-9 bg-bg3 hover:bg-bg6"
 					onkeydown={(e) => {
 						e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 						e.metaKey && e.key === 'Enter' && submit();
@@ -346,10 +358,15 @@
 				</textarea>
 				<div
 					class="-top-8.5 right-0 absolute xy h-8 w-8 cursor-grab active:cursor-grabbing hover:text-fg3"
+					ontouchstart={(e) => {
+						draggingHeight = true;
+						dragStartY = e.changedTouches[0].clientY;
+						startHeight = getPostWriterHeight();
+					}}
 					onmousedown={(e) => {
 						e.preventDefault();
 						draggingHeight = true;
-						startY = e.clientY;
+						dragStartY = e.clientY;
 						startHeight = getPostWriterHeight();
 					}}
 				>

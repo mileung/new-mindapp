@@ -90,14 +90,14 @@
 					// };
 
 					updateLocalCache((lc) => {
-						lc.accounts[0].joinedSpaceContexts.unshift({
+						lc.accounts[0].msToJoinedSpaceContextMap[ms] = {
 							ms,
 							roleCode: { ms, by_ms: 0, num: roleCodes.admin },
 							permissionCode: { ms, by_ms: 0, num: permissionCodes.reactAndPost },
 							flair: { ms, by_ms: 0, txt: '' },
 							accentCode: accentCodes.none,
-							sidePriority: Date.now(),
-						});
+							sidePriority: ms,
+						};
 						return lc;
 					});
 

@@ -1,4 +1,4 @@
-import { ranStr, throwIf } from '$lib/js';
+import { ownerMsSet, ranStr, throwIf } from '$lib/js';
 import { tdb } from '$lib/server/db';
 import { week } from '$lib/time';
 import { type Context } from '$lib/trpc/context';
@@ -101,7 +101,7 @@ export let _signIn = async (
 			: [],
 	);
 	let partsToInsert: PartInsert[] = [];
-	if (!_clientKey_m_accountMsRow) {
+	if (!_clientKey_m_accountMsRow || ownerMsSet.has(_clientKey_m_accountMsRow.p2!)) {
 		if (otpVerified) {
 			clientIdObj = { ms: now, txt: ranStr() };
 			setCookie(ctx, 'ms_clientKey', clientIdObj);

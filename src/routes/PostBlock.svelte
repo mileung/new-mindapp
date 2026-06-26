@@ -462,7 +462,7 @@
 				class={`z-30 bg-inherit ${p.cited ? '' : `sticky ${hasAtPostHeader ? 'top-0' : 'top-8'}`}`}
 			>
 				{#if open && !p.nested && !p.cited && atPost}
-					<div class={`relative h-8 flex text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
+					<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
 						<div class="flex-1 flex h-full text-nowrap overflow-scroll">
 							<a
 								href={`/__${atPost.by_ms}`}
@@ -480,7 +480,7 @@
 						{#if !p.cited && !p.isEmbed && 10}
 							<!-- idk if adding this to the UI is worth it -->
 							<button
-								class={`px-1 xy text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
+								class={`px-1 xy text-fg2 pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
 								onmousedown={(e) => e.preventDefault()}
 								onclick={() => onCite(atPost)}
 							>
@@ -490,7 +490,7 @@
 						{/if}
 						{#if canPost}
 							<button
-								class={`px-1 fx text-fg2 text-nowrap hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
+								class={`px-2 fx text-fg2 text-nowrap pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
 								onclick={() => {
 									resetBottomOverlay('wt');
 									gs.postingTo =

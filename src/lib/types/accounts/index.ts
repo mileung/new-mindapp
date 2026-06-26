@@ -12,8 +12,7 @@ export let MyAccountSchema = z.strictObject({
 	savedTags: GranularTxtPropSchema,
 	// No good reason to include pwHash, clientIdObj, or clientIdObjMs
 	signedIn: z.boolean().optional(),
-	joinedSpaceContexts: z.array(SpaceContextSchema),
-	// TODO: pastSearches: z.array(z.string()),
+	msToJoinedSpaceContextMap: z.record(z.string(), SpaceContextSchema.optional()),
 });
 
 export type MyAccount = z.infer<typeof MyAccountSchema>;
@@ -25,7 +24,7 @@ export let getDefaultAccount = () =>
 		bio: { txt: '' },
 		email: { txt: '' },
 		savedTags: { txt: JSON.stringify([]) },
-		joinedSpaceContexts: [],
+		msToJoinedSpaceContextMap: {},
 	}) satisfies MyAccount;
 
 export let MyAccountUpdatesSchema = MyAccountSchema.pick({

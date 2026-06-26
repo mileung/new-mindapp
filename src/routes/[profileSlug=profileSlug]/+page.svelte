@@ -49,7 +49,9 @@
 					let res = await trpc().getPublicProfile.query({
 						...whoObj,
 						profileMs,
-						possibleMutualSpaceMss: gs.accounts?.[0].joinedSpaceContexts.map((j) => j.ms),
+						possibleMutualSpaceMss: Object.values(
+							gs.accounts?.[0].msToJoinedSpaceContextMap || {},
+						).map((c) => c!.ms),
 					});
 					// console.log('res:', res);
 					if (res.banned) {

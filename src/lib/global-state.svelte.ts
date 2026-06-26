@@ -187,7 +187,10 @@ export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
 	except !== 'wt' && (gs.postingTo = null);
 };
 
-export let msToSpaceItalic = (ms: number) => (gs.msToSpaceMap[ms]?.name.txt ? '' : 'italic');
+export let msToSpaceItalic = (ms: number) =>
+	ms === 0 || ms === 1 || ms === gs.accounts?.[0].ms || gs.msToSpaceMap[ms]?.name.txt
+		? ''
+		: 'italic';
 export let msToSpaceNameTxt = (ms: number) => {
 	return ms === 8 || (ms && ms === gs.accounts?.[0].ms)
 		? m.personal()
@@ -322,7 +325,7 @@ export let getSpaceContext = (spaceMs?: number): undefined | SpaceContext => {
 				accentCode: accentCodes.none,
 				sidePriority: 0,
 			}
-		: caller.joinedSpaceContexts.find((c) => c.ms === spaceMs);
+		: caller.msToJoinedSpaceContextMap[spaceMs];
 };
 
 export let getSpacePermissions = (spaceMs?: number) => {
@@ -339,7 +342,7 @@ export let getCallerIsOwner = () => {
 };
 
 export let assertCallerIsOwnerOrInGlobal = () => {
-	if (!getCallerIsOwner() && !gs.accounts?.[0].joinedSpaceContexts.some((sc) => sc.ms === 1)) {
+	if (!getCallerIsOwner() && !gs.accounts?.[0].msToJoinedSpaceContextMap[1]) {
 		throw new Error(m.becomeAGlobalMemberToUseThisAction());
 	}
 };

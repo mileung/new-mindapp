@@ -10,6 +10,7 @@ import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { getIdStr, getIdStrAsIdObj, IdObjSchema, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
+import { accentCodes } from '../spaces';
 import {
 	getDefaultParsedQ,
 	getParsedQPaginates,
@@ -80,6 +81,7 @@ export let _getPostFeed = async (
 	// console.log('_getPostFeed q:', q);
 	let { callerMs, sections } = input;
 	// console.log('input:', input);
+	// console.log('sections:', sections);
 
 	// let allSectionPostIdStrsInclude= new Set<string>()
 	let inMssSetBySection: Set<number>[] = [];
@@ -127,6 +129,7 @@ export let _getPostFeed = async (
 	);
 	if (dbIsLocal && allSectionInMssSet.has(0)) viewableSpaceMssSet.add(0);
 	if (callerMs > 0 && allSectionInMssSet.has(callerMs)) viewableSpaceMssSet.add(callerMs);
+	if (allSectionInMssSet.has(1)) viewableSpaceMssSet.add(1);
 	let viewableSpaceMss = [...viewableSpaceMssSet];
 	if (!viewableSpaceMss.length && !ownerCalled) return {};
 
@@ -201,6 +204,7 @@ export let _getPostFeed = async (
 			? sectionInMss //
 			: sectionInMss.filter((ms) => viewableSpaceMssSet.has(ms));
 		if (!dbIsLocal && !ownerCalled && !sectionInMssToCheck.length) {
+			console.warn('Section unauthorized');
 			topLvlPostIdStrsSections.push(topLvlPostIdStrsForSection);
 			continue;
 		}
@@ -539,6 +543,7 @@ export let _getPostFeed = async (
 				} else {
 					possibleResultingPostIdObjsForSection.push(...postIdObjsWithRequiredTagsAndEitherTags);
 				}
+				let resultingPostIdObjsForSectionForThisLoop: IdObj[] = [];
 				if (!sectionHasTags && !sectionHasCores) {
 					let postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch = await db
 						.select()
@@ -559,12 +564,20 @@ export let _getPostFeed = async (
 								msGte === undefined ? undefined : pf.p2.gte(msGte),
 								msLte === undefined ? undefined : pf.p2.lte(msLte),
 								or(...section.eitherByMss.map((byMs) => pf.p3.eq(byMs))),
-								or(...section.eitherAtByMss.map((byMs) => pf.p5.eq(byMs))),
+								or(
+									...section.eitherAtByMss.map((byMs) =>
+										and(
+											pf.p3.notEq(byMs),
+											pf.p5.eq(byMs), //
+										),
+									),
+								),
 							),
 						)
 						.orderBy(newFirst ? pf.p2.desc : pf.p2.asc)
 						.limit(section.topLvlPostLimit);
-					possibleResultingPostIdObjsForSection.push(
+					// possibleResultingPostIdObjsForSection.push(
+					resultingPostIdObjsForSectionForThisLoop.push(
 						...postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch.map(
 							(r) => parseAncestry4postImb_parentMb_rootMb_childCount(r).postIdObj,
 						),
@@ -572,7 +585,6 @@ export let _getPostFeed = async (
 					if (!postImb_parentMb_rootMb_childCountRowsForNoTagOrCoreSearch.length)
 						lastLoopForSection = true;
 				}
-				let resultingPostIdObjsForSectionForThisLoop: IdObj[] = [];
 				if (!section.eitherAtByMss.length) {
 					resultingPostIdObjsForSectionForThisLoop.push(...possibleResultingPostIdObjsForSection);
 					possibleResultingPostIdObjsForSection = [];
@@ -592,7 +604,14 @@ export let _getPostFeed = async (
 										),
 									),
 								),
-								or(...section.eitherAtByMss.map((byMs) => pf.p5.eq(byMs))),
+								or(
+									...section.eitherAtByMss.map((byMs) =>
+										and(
+											pf.p3.notEq(byMs),
+											pf.p5.eq(byMs), //
+										),
+									),
+								),
 							),
 						);
 					for (let r of postImb_parentMb_rootMb_childCountNoAncestryRows) {
@@ -970,19 +989,18 @@ export let _getPostFeed = async (
 		}
 	}
 	if (
-		input.setLastViewMsInMs !== undefined &&
+		input.setLastViewMsInMs &&
 		viewableSpaceMssSet.has(input.setLastViewMsInMs) &&
 		!dbIsLocal &&
 		callerMs
 	) {
-		let now = Date.now();
 		await db
 			.update(pTable)
-			.set({ p3: now })
+			.set({ p3: accentCodes.none, p4: Date.now() })
 			.where(
 				and(
 					pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
-					pf.p1.eq(callerMs), //
+					pf.p1.eq(input.setLastViewMsInMs),
 					pf.p2.eq(callerMs),
 				),
 			);
@@ -994,6 +1012,7 @@ export let _getPostFeed = async (
 	// 	);
 	// });
 	// console.log('allPostsInMapHaveUniqueTags:', allPostsInMapHaveUniqueTags);
+
 	return {
 		topLvlPostIdStrsSections,
 		idToPostMap,

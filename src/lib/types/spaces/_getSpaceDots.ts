@@ -253,7 +253,11 @@ export let _getSpaceDots = async (
 	return {
 		spaceUpdate,
 		invites: invites?.length ? invites : undefined,
-		msToAccountNameTxtMap,
-		accountMsToMembershipMap,
+		msToAccountNameTxtMap: Object.keys(msToAccountNameTxtMap).length
+			? msToAccountNameTxtMap
+			: undefined,
+		accountMsToMembershipMap: Object.keys(accountMsToMembershipMap).length
+			? accountMsToMembershipMap
+			: undefined,
 	};
 };

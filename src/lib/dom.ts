@@ -2,6 +2,9 @@ import { dev } from '$app/environment';
 import { goto } from '$app/navigation';
 import { m } from './paraglide/messages';
 
+export let setGlobalCssVariable = (name: string, val: string) =>
+	document.documentElement.style.setProperty(name, val);
+
 export let textInputFocused = () => ['INPUT', 'TEXTAREA'].includes(document.activeElement!.tagName);
 
 export let getPostWriterHeight = () =>

@@ -1,19 +1,28 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { getPromptSigningIn, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
+	import {
+		getPromptSigningIn,
+		gs,
+		msToSpaceItalic,
+		msToSpaceNameTxt,
+	} from '$lib/global-state.svelte';
 	import { getAlteredSearchParams } from '$lib/js';
 	import PostFeed from '../PostFeed.svelte';
 	import PromptSignIn from '../PromptSignIn.svelte';
 	import SpaceIcon from '../SpaceIcon.svelte';
 
-	let callerMs = $derived(gs.accounts?.[0].ms);
+	let caller = $derived(gs.accounts?.[0]);
+	let callerMs = $derived(caller?.ms);
 	let promptSignIn = $derived(getPromptSigningIn());
 
 	let cloudSpaceMss = $derived<number[]>([
-		gs.accounts?.[0].ms || 8,
+		callerMs || 8,
 		1,
-		...(gs.accounts?.[0].joinedSpaceContexts || []).map((s) => s.ms).filter((ms) => ms !== 1),
+		...Object.values(caller?.msToJoinedSpaceContextMap || {})
+			.sort((a, b) => b!.sidePriority - a!.sidePriority)
+			.map((c) => c!.ms)
+			.filter((ms) => ms !== 1),
 	]);
 
 	$effect(() => {
@@ -62,7 +71,7 @@
 		{#each cloudSpaceMss as cloudSpaceMs (cloudSpaceMs)}
 			<a
 				href={makeParams(cloudSpaceMs)}
-				class={`h-8 group fx pr-1.5 text-nowrap hover:bg-bg4 hover:text-fg1 ${mergedMssSet.has(cloudSpaceMs) ? 'text-fg1' : ''}`}
+				class={`h-8 group fx pr-1.5 text-nowrap hover:bg-bg4 hover:text-fg1 ${msToSpaceItalic(cloudSpaceMs)} ${mergedMssSet.has(cloudSpaceMs) ? 'text-fg1' : ''}`}
 			>
 				<SpaceIcon
 					ms={cloudSpaceMs}

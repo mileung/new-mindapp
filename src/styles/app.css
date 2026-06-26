@@ -7,6 +7,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+	--y-space-drag: 0px;
 	/* --w-sidebar: 100vw; */
 	--w-sidebar: max(10rem, min(17rem, 20vw));
 	--h-post-writer: 180px;

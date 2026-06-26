@@ -120,9 +120,9 @@ export let _getCallerContext = async (
 					callerMs && get.allJoinedSpaces
 						? and(
 								pf.code.eq(pc.acceptBm_inviteIbm),
-								pf.p1.notEq(callerMs),
-								...spaceUpdatesFrom.map((su) => pf.p1.notEq(su.ms)),
 								pf.p1.eq(callerMs),
+								pf.p3.notEq(callerMs),
+								...spaceUpdatesFrom.map((su) => pf.p3.notEq(su.ms)),
 							)
 						: undefined,
 					// pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
@@ -159,12 +159,10 @@ export let _getCallerContext = async (
 							p5: 0,
 						});
 				}
-				// su.accentCode?.num &&
+				// su.accentCode!==undefined&&su.accentCode!==accentCodes.none &&
 				// 	forcedSpaceUpdateRows.push({
-				//
-				// 		code: pc.spacePriorityId__accountMs_accentCode,
-				// 		num: accentCodes.none,
-				//
+				// 		code: pc.i_accountMs_accentCode_lastViewMs_sidePriority,
+				// 		p3: accentCodes.none,
 				// 	});
 			}
 
@@ -177,18 +175,19 @@ export let _getCallerContext = async (
 					p4: 1,
 				});
 			return [
-				// su.ms && su.ms !== callerMs
-				// 	? su.accentCode &&
-				// 		and(
-				// 			pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
-				// 			pf.p1.eq(callerMs),
-				// 			// pf.in_ms.eq(su.ms),
-				// 			or(
-				// 				pf.p2.notEq(su.accentCode.ms ?? 0),
-				// 				pf.num.notEq(su.accentCode.num), //
-				// 			),
-				// 		)
-				// 	: undefined,
+				su.ms &&
+				su.ms !== callerMs &&
+				(su.accentCode !== undefined || su.sidePriority !== undefined)
+					? and(
+							pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+							pf.p1.eq(su.ms),
+							pf.p2.eq(callerMs),
+							or(
+								su.accentCode === undefined ? undefined : pf.p3.notEq(su.accentCode),
+								su.sidePriority === undefined ? undefined : pf.p5.notEq(su.sidePriority),
+							),
+						)
+					: undefined,
 				su.ms === spaceMs && su.pinnedQuery
 					? and(
 							pf.code.eq(pc._spacePinnedQuery_imb),
@@ -356,6 +355,8 @@ export let _getCallerContext = async (
 		}
 		if (unfetchedSpaceMss.length) {
 			let {
+				[pc.i_accountMs_accentCode_lastViewMs_sidePriority]:
+					i_accountMs_accentCode_lastViewMs_sidePriorityRows_ = [],
 				[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows_ = [],
 				[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows_ = [],
 				[pc._spacePinnedQuery_imb]: _spacePinnedQuery_imbRows_ = [],
@@ -370,6 +371,7 @@ export let _getCallerContext = async (
 							and(
 								or(...unfetchedSpaceMss.map((ms) => pf.p1.eq(ms))),
 								or(
+									pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
 									pf.code.eq(pc.i_accountMs_roleCode_mb),
 									pf.code.eq(pc.i_accountMs_permCode_mb),
 									pf.code.eq(pc._spacePinnedQuery_imb),
@@ -379,6 +381,9 @@ export let _getCallerContext = async (
 							),
 						),
 					),
+			);
+			i_accountMs_accentCode_lastViewMs_sidePriorityRows.push(
+				...i_accountMs_accentCode_lastViewMs_sidePriorityRows_,
 			);
 			i_accountMs_roleCode_mbRows.push(...i_accountMs_roleCode_mbRows_);
 			i_accountMs_permCode_mbRows.push(...i_accountMs_permCode_mbRows_);

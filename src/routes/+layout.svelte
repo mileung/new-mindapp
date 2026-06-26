@@ -15,12 +15,7 @@
 	} from '$lib/types/accounts';
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
-	import {
-		getDefaultSpace,
-		type MySpaceUpdate,
-		type MySpaceUpdateFrom,
-		type SpaceContext,
-	} from '$lib/types/spaces';
+	import { getDefaultSpace, type MySpaceUpdateFrom } from '$lib/types/spaces';
 	import { drizzle } from 'drizzle-orm/sqlite-proxy';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
@@ -161,32 +156,34 @@
 							: checkedThisAccountBefore
 								? currentSpaceUpdateFromArr
 								: [
-										// personal space stuff
-										...caller.joinedSpaceContexts
+										...Object.values(caller.msToJoinedSpaceContextMap)
 											.map((spaceCtx) => {
+												if (!spaceCtx) return;
 												let space = gs.msToSpaceMap[spaceCtx.ms];
 												return (
 													space?.ms && {
-														ms: spaceCtx.ms,
-														name: space.ms > 1 && space.ms !== callerMs ? space.name : undefined,
-														accentCode:
-															space.ms && space.ms !== callerMs ? spaceCtx.accentCode : undefined,
-														...(spaceCtx.ms === urlInMs
+														ms: space.ms,
+														...(space.ms && space.ms !== callerMs
+															? {
+																	name: space.ms > 1 ? space.name : undefined,
+																	accentCode: spaceCtx.accentCode,
+																	sidePriority: spaceCtx.sidePriority,
+																}
+															: {}),
+														...(space.ms === urlInMs
 															? {
 																	isPublic: space.isPublic,
 																	pinnedQuery: space.pinnedQuery,
 																	roleCode: spaceCtx.roleCode,
 																	permissionCode: spaceCtx.permissionCode,
 																	flair: spaceCtx.flair,
-																	accentCode: spaceCtx.accentCode,
-																	sidePriority: spaceCtx.sidePriority,
 																}
 															: {}),
 													}
 												);
 											})
 											.filter((s) => !!s),
-										...(caller.joinedSpaceContexts.some((sc) => sc.ms === urlInMs)
+										...(urlInMs !== undefined && caller.msToJoinedSpaceContextMap[urlInMs]
 											? []
 											: currentSpaceUpdateFromArr),
 									],
@@ -231,7 +228,7 @@
 								spaceMs: urlInMs,
 								get,
 							});
-							// console.log('callerContext', JSON.stringify(callerContext, null, 2));
+							console.log('callerContext', JSON.stringify(callerContext, null, 2));
 						}
 					} catch (error) {
 						console.log('error:', error);
@@ -281,50 +278,24 @@
 							a.savedTags = accountUpdate?.savedTags || a.savedTags;
 							return a;
 						});
-
 						if (lc.accounts[0].signedIn) {
-							let msToJoinedSpaceUpdateMap: Record<number, MySpaceUpdate> = {};
 							for (let i = 0; i < spaceUpdates.length; i++) {
-								let u = spaceUpdates[i];
-								msToJoinedSpaceUpdateMap[u.ms] = u;
+								let spaceUpdate = spaceUpdates[i];
+								if (spaceUpdate.ms !== callerMs) {
+									let sc = lc.accounts[0].msToJoinedSpaceContextMap[spaceUpdate.ms];
+									lc.accounts[0].msToJoinedSpaceContextMap[spaceUpdate.ms] = {
+										...sc,
+										ms: spaceUpdate.ms,
+										roleCode: spaceUpdate?.roleCode || sc?.roleCode || { num: -1 },
+										permissionCode: spaceUpdate?.permissionCode ||
+											sc?.permissionCode || { num: -1 },
+										flair: spaceUpdate?.flair || sc?.flair || { txt: '' },
+										accentCode: spaceUpdate?.accentCode ?? sc?.accentCode ?? -1,
+										sidePriority: spaceUpdate?.sidePriority ?? sc?.sidePriority ?? -1,
+									};
+								}
 							}
-							let newJoinedSpaceContexts: SpaceContext[] = spaceUpdates
-								.filter(
-									(spaceUpdate) =>
-										spaceUpdate.ms !== callerMs &&
-										!lc.accounts[0].joinedSpaceContexts.some((sc) => sc.ms === spaceUpdate?.ms),
-								)
-								.map(
-									(su) =>
-										({
-											ms: su.ms,
-											roleCode: su.roleCode || { num: -1 },
-											permissionCode: su.permissionCode || { num: -1 },
-											flair: su.flair || { txt: '' },
-											accentCode: su.accentCode ?? -1,
-											sidePriority: su.accentCode ?? -1,
-										}) satisfies SpaceContext,
-								);
-							lc.accounts[0] = {
-								...lc.accounts[0],
-								joinedSpaceContexts: [
-									...lc.accounts[0].joinedSpaceContexts,
-									...newJoinedSpaceContexts,
-								]
-									.filter(({ ms }) => !removedSpaceMss.includes(ms))
-									.map((sc) => {
-										let spaceUpdate = msToJoinedSpaceUpdateMap[sc.ms];
-										return {
-											ms: sc.ms,
-											roleCode: spaceUpdate?.roleCode || sc.roleCode,
-											permissionCode: spaceUpdate?.permissionCode || sc.permissionCode,
-											flair: spaceUpdate?.flair || sc.flair,
-											accentCode: spaceUpdate?.accentCode || sc.accentCode,
-											sidePriority: spaceUpdate?.sidePriority || sc.sidePriority,
-										};
-									})
-									.sort((a, b) => b.sidePriority - a.sidePriority),
-							};
+							for (let ms of removedSpaceMss) delete lc.accounts[0].msToJoinedSpaceContextMap[ms];
 						}
 						Object.values(lc.msToSpaceMap).forEach((space) => {
 							if (
@@ -332,9 +303,7 @@
 								space.ms > 1 &&
 								!visitedSpaceMsSet.has(space.ms) &&
 								!lc.accounts.some(
-									(a) =>
-										a.signedIn &&
-										(a.ms === space.ms || a.joinedSpaceContexts.some((c) => c.ms === space.ms)),
+									(a) => a.signedIn && (a.ms === space.ms || a.msToJoinedSpaceContextMap[space.ms]),
 								)
 							)
 								delete lc.msToSpaceMap[space.ms];

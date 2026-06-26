@@ -98,13 +98,10 @@
 				},
 			},
 		};
-
 		updateLocalCache((lc) => {
 			let accountIndex = lc.accounts.findIndex((a) => a.ms === accepteeMs);
 			if (accountIndex >= 0) {
-				let joinedSpaceContext = lc.accounts[accountIndex].joinedSpaceContexts.find(
-					(c) => c.ms === spaceMs,
-				)!;
+				let joinedSpaceContext = lc.accounts[accountIndex].msToJoinedSpaceContextMap[spaceMs];
 				if (joinedSpaceContext) Object.assign(joinedSpaceContext, update);
 			}
 			return lc;
@@ -259,11 +256,7 @@
 										memberCount: space.memberCount - 1,
 									},
 								};
-								if (membershipIsByCaller) {
-									lc.accounts[0].joinedSpaceContexts = lc.accounts[0].joinedSpaceContexts.filter(
-										(sc) => sc.ms !== spaceMs,
-									);
-								}
+								if (membershipIsByCaller) delete lc.accounts[0].msToJoinedSpaceContextMap[spaceMs];
 								return lc;
 							});
 							gs.spaceMsToAccountMsToMembershipMap = {

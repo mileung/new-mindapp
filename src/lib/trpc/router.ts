@@ -46,6 +46,7 @@ import { _createInviteLink } from '$lib/types/spaces/_createInviteLink';
 import { _createSpace } from '$lib/types/spaces/_createSpace';
 import { _getSpaceDots } from '$lib/types/spaces/_getSpaceDots';
 import { _revokeInviteLink } from '$lib/types/spaces/_revokeInviteLink';
+import { _updateSidePriority } from '$lib/types/spaces/_updateSidePriority';
 import { _getSpaceTags } from '$lib/types/spaces/getSpaceTags';
 import { initTRPC } from '@trpc/server';
 import { z } from 'zod';
@@ -253,6 +254,17 @@ export let router = t.router({
 			let c = await _getCallerContext(ctx, input, { signedIn: true, inGlobal: !ownerCalled });
 			throwIf(!c.signedIn || (!ownerCalled && !c.inGlobal));
 			return _createSpace(input);
+		}),
+	updateSidePriority: makeProcedure()
+		.input(
+			WhoObjSchema.extend({
+				spaceMsToSidePriorityMap: z.record(z.string(), z.number()),
+			}).strict(),
+		)
+		.mutation(async ({ ctx, input }) => {
+			let c = await _getCallerContext(ctx, input, { signedIn: true });
+			throwIf(!c.signedIn);
+			return _updateSidePriority(input);
 		}),
 	removeSpaceMember: makeProcedure()
 		.input(WhoWhereObjSchema.extend({ accountMs: z.number() }).strict())

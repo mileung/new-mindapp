@@ -141,11 +141,11 @@
 					return lc;
 				});
 			}
-			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
-			mergeSpaceMsToAccountMsToMembershipMap({ [urlInMs]: res.accountMsToMembershipMap });
+			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap ?? {});
+			mergeSpaceMsToAccountMsToMembershipMap({ [urlInMs]: res.accountMsToMembershipMap ?? {} });
 
 			e.detail.loaded();
-			let endReached = Object.keys(res.accountMsToMembershipMap).length < membersPerLoad;
+			let endReached = Object.keys(res.accountMsToMembershipMap ?? {}).length < membersPerLoad;
 
 			gs.accountMsToSpaceMsToDots = {
 				...gs.accountMsToSpaceMsToDots,
