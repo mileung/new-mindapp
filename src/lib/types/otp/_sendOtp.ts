@@ -1,6 +1,9 @@
 import { dev } from '$app/environment';
+import { RESEND_API_KEY } from '$env/static/private';
+import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
 import { and } from 'drizzle-orm';
+import { Resend } from 'resend';
 import { assertLt2Rows } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
@@ -43,13 +46,20 @@ export let _sendOtp = async (input: {
 	let pin = -1;
 	let now = Date.now();
 	if (sendOtp) {
-		pin = dev ? 0 : +('' + Math.random()).slice(-8);
-		// await sendEmail({
-		// 	from: 'noreply@yourdomain.com',
-		// 	to: email,
-		// 	subject: 'Your Login Code',
-		// 	html: `${otp}`,
-		// });
+		if (dev) pin = 0;
+		else {
+			pin = +('' + Math.random()).slice(-8);
+			let result = await sendEmail({
+				from: 'Mindapp <noreply@updates.mindapp.cc>',
+				to: email,
+				subject: m.oneTimePinP({ p: pin }),
+				html:
+					m.yourOneTimePinForMindappIs() +
+					`\n<p style="font-family: monospace; font-size: 24px; font-weight: bold;">${pin}</p>\n\n` +
+					m.thisCanOnlyBeUsedOnTheDeviceUsedToRequestThisEmail(),
+			});
+			if (result.error) throw new Error(m.emailServiceProviderError());
+		}
 	}
 	await tdb.insert(pTable).values({
 		code: pc._email_ms_strikeCount_pin,
@@ -59,4 +69,9 @@ export let _sendOtp = async (input: {
 		p3: pin,
 	});
 	return { otpMs: now };
+};
+
+let sendEmail = async (config: { from: string; to: string; subject: string; html: string }) => {
+	let resend = new Resend(RESEND_API_KEY);
+	return await resend.emails.send(config);
 };

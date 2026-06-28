@@ -284,6 +284,7 @@
 						let signedInAccount = gs.accounts?.find(
 							(a) => a.signedIn && a.email.txt === normalizedEmail,
 						);
+						otpMs = -1;
 						if (signedInAccount) {
 							updateLocalCache((lc) => ({
 								...lc,
@@ -305,21 +306,26 @@
 						}
 						onAccountAuth(res.account);
 					} else {
+						otpMs = -1;
 						let res = await trpc().sendOtp.mutate({
 							email,
 							will: p.creatingAccount //
 								? { createAccount: true }
 								: { resetPassword: true },
 						});
-						if (res.fail) return alert(m.anErrorOccurred());
+						if (res.fail) {
+							otpMs = 0;
+							return alert(m.anErrorOccurred());
+						}
 						if (res.otpMs) {
-							name = name.trim();
 							otpMs = res.otpMs;
+							name = name.trim();
 							email = normalizedEmail;
 							pin = dev ? '00000000' : '';
 						}
 					}
 				} catch (error) {
+					otpMs = 0;
 					alertError(error);
 				}
 			}}

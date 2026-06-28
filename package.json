@@ -20,6 +20,7 @@
 		"format": "prettier --write .",
 		"lint": "prettier --check . && eslint .",
 		"db:push": "drizzle-kit push",
+		"db:push:cloud": "FOR_CLOUD=true drizzle-kit push",
 		"db:migrate": "drizzle-kit migrate",
 		"db:studio": "drizzle-kit studio"
 	},
@@ -60,6 +61,7 @@
 		"drizzle-zod": "^0.8.3",
 		"match-sorter": "^8.3.0",
 		"rate-limiter-flexible": "^7.1.1",
+		"resend": "^6.16.0",
 		"sqlocal": "^0.17.0",
 		"svelte-infinite-loading": "^1.4.0",
 		"trpc-sveltekit": "^3.6.3",
