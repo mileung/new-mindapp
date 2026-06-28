@@ -295,8 +295,8 @@ export let _getCallerContext = async (
 		]),
 	];
 	let {
-		[pc.i_accountMs_accentCode_lastViewMs_sidePriority]:
-			i_accountMs_accentCode_lastViewMs_sidePriorityRows = [],
+		// prettier-ignore
+		[pc.i_accountMs_accentCode_lastViewMs_sidePriority]: i_accountMs_accentCode_lastViewMs_sidePriorityRows = [],
 		[pc._sessionKey_m_accountMs_expiryMs]: _sessionKey_m_accountMs_expiryMsRows = [],
 		[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
 		[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows = [],
@@ -355,8 +355,8 @@ export let _getCallerContext = async (
 		}
 		if (unfetchedSpaceMss.length) {
 			let {
-				[pc.i_accountMs_accentCode_lastViewMs_sidePriority]:
-					i_accountMs_accentCode_lastViewMs_sidePriorityRows_ = [],
+				// prettier-ignore
+				[pc.i_accountMs_accentCode_lastViewMs_sidePriority]: i_accountMs_accentCode_lastViewMs_sidePriorityRows_ = [],
 				[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows_ = [],
 				[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows_ = [],
 				[pc._spacePinnedQuery_imb]: _spacePinnedQuery_imbRows_ = [],
@@ -382,9 +382,8 @@ export let _getCallerContext = async (
 						),
 					),
 			);
-			i_accountMs_accentCode_lastViewMs_sidePriorityRows.push(
-				...i_accountMs_accentCode_lastViewMs_sidePriorityRows_,
-			);
+			// prettier-ignore
+			i_accountMs_accentCode_lastViewMs_sidePriorityRows.push(...i_accountMs_accentCode_lastViewMs_sidePriorityRows_);
 			i_accountMs_roleCode_mbRows.push(...i_accountMs_roleCode_mbRows_);
 			i_accountMs_permCode_mbRows.push(...i_accountMs_permCode_mbRows_);
 			_spacePinnedQuery_imbRows.push(..._spacePinnedQuery_imbRows_);
@@ -423,6 +422,8 @@ export let _getCallerContext = async (
 			sameGranularNum(su.permissionCode, spaceUpdateFrom?.permissionCode)
 		)
 			su.permissionCode = undefined;
+		if (spaceUpdateFrom?.accentCode === su.accentCode) su.accentCode = undefined;
+		if (spaceUpdateFrom?.sidePriority === su.sidePriority) su.sidePriority = undefined;
 		return su;
 	});
 	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =

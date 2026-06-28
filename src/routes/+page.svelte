@@ -33,7 +33,7 @@
 						(scrapedInfo.headline === selectedPlainText ? '' : selectedPlainText);
 					gs.lastSeenInMs && !gs.accounts![0].ms
 						? goto('/sign-in') //
-						: (gs.postingNew = true);
+						: (gs.writingNewPost = true);
 				}
 			});
 		}

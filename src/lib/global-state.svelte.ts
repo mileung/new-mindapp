@@ -145,9 +145,9 @@ class GlobalState {
 		spacesError?: string;
 	}>({});
 
-	postingNew = $state<null | true>(null);
-	postingEdit = $state<null | Post>(null);
-	postingTo = $state<null | Post>(null);
+	writingNewPost = $state<null | true>(null);
+	writingEditFor = $state<null | Post>(null);
+	writingReplyTo = $state<null | Post>(null);
 	showReactionHistory = $state<null | Post>(null);
 	extensionSearchQ = $state('');
 	writerTags = $state<string[]>([]);
@@ -178,13 +178,13 @@ export let getPromptSigningIn = () =>
 		page.url.pathname === '/owner-view');
 
 export let getBottomOverlayShown = () =>
-	gs.showReactionHistory || gs.postingNew || gs.postingTo || gs.postingEdit;
+	gs.showReactionHistory || gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor;
 
 export let resetBottomOverlay = (except?: 'rh' | 'wn' | 'we' | 'wt') => {
 	except !== 'rh' && (gs.showReactionHistory = null);
-	except !== 'wn' && (gs.postingNew = null);
-	except !== 'we' && (gs.postingEdit = null);
-	except !== 'wt' && (gs.postingTo = null);
+	except !== 'wn' && (gs.writingNewPost = null);
+	except !== 'we' && (gs.writingEditFor = null);
+	except !== 'wt' && (gs.writingReplyTo = null);
 };
 
 export let msToSpaceItalic = (ms: number) =>
@@ -235,7 +235,7 @@ export let getWhoWhereObj = async (useLocalDb?: boolean) => {
 	} satisfies WhoWhereObj;
 };
 
-export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, string>) => {
+export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, string> = {}) => {
 	gs.msToProfileMap = {
 		...gs.msToProfileMap,
 		...Object.entries(msToAccountNameTxtMap).reduce(
@@ -255,7 +255,7 @@ export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, s
 	};
 };
 
-export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, string>) => {
+export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, string> = {}) => {
 	updateLocalCache((lc) => {
 		lc.msToSpaceMap = {
 			...lc.msToSpaceMap,
@@ -279,7 +279,7 @@ export let mergeMsToSpaceNameTxtMap = (msToSpaceNameTxtMap: Record<number, strin
 };
 
 export let mergeSpaceMsToAccountMsToMembershipMap = (
-	spaceMsToAccountMsToMembershipMap: Record<number, Record<number, Partial<Membership>>>,
+	spaceMsToAccountMsToMembershipMap: Record<number, Record<number, Partial<Membership>>> = {},
 ) => {
 	// TODO: exclude fetching already fetched role and flair in post feed
 	// Only going to dots should override entries, right?
@@ -374,12 +374,11 @@ export let toggleAccountBan = async (accountMs: number) => {
 export let onCite = (post: Post) => {
 	// TODO: second click within 1s of first click: copy post url?
 	// TODO: third click within 1s of second click: copy whole post?
-	gs.postingNew = true;
+	gs.writingNewPost = true;
 	let lastVersion = getLastVersion(post);
 	if (lastVersion !== null) {
 		let tags = post.history?.[lastVersion]?.tags || [];
-		let postIdStr = getIdStr(post);
-		gs.writerTags = [...new Set([...gs.writerTags, ...tags, postIdStr])];
-		gs.writerCore = `${gs.writerCore}\n${postIdStr}`.trim();
+		gs.writerTags = [...new Set([...gs.writerTags, ...tags])];
+		gs.writerCore = `${gs.writerCore}\n${getIdStr(post)}`.trim();
 	}
 };

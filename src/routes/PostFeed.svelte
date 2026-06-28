@@ -26,7 +26,7 @@
 		getUrlInMs,
 		type IdObj,
 	} from '$lib/types/parts/partIds';
-	import { cleanTags, getLastVersion, type Post } from '$lib/types/posts';
+	import { cleanTags, getCitedPostIds, getLastVersion, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
 	import { editPost } from '$lib/types/posts/editPost';
 	import {
@@ -105,6 +105,30 @@
 		sectionObjs.some((o) => o.topLvlPostIdStrs.some((s) => gs.idToPostMap[s])),
 	);
 
+	let mergePostFeedUpdate = (postFeedUpdate: Awaited<ReturnType<typeof getPostFeed>>) => {
+		mergeMsToAccountNameTxtMap(postFeedUpdate.msToAccountNameTxtMap);
+		mergeMsToSpaceNameTxtMap(postFeedUpdate.msToSpaceNameTxtMap);
+		mergeSpaceMsToAccountMsToMembershipMap(postFeedUpdate.spaceMsToAccountMsToMembershipMap);
+		Object.entries(postFeedUpdate.idToPostMap || {}).forEach(([id, post]) => {
+			let lastVersion = getLastVersion(post);
+			if (lastVersion !== null && post.history?.[lastVersion])
+				(post.history[lastVersion].tags ??= []).sort();
+			// if (!gs.idToPostMap[id]) {
+			// 	gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...post };
+			// }
+			gs.idToPostMap[id] = post;
+			if (hasParent(post)) {
+				let atIdStr = getAtIdStr(post);
+				gs.postIdToSubIdsMap[atIdStr] = [
+					...new Set([...(gs.postIdToSubIdsMap[atIdStr] || []), id]),
+				].sort(
+					// TODO: sort reply posts by reactions and atPost author?
+					(a, b) => getIdStrAsIdObj(b).ms - getIdStrAsIdObj(a).ms,
+				);
+			}
+		});
+	};
+
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// console.log('loadMorePosts');
 		// if (1) return;
@@ -120,6 +144,7 @@
 		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or
 		// interacts with the feed. This is to reduce unnecessary requests when the user just wants
 		// to add a post via the extension
+		// TODO: use local db as a fallback when cloud db can't find a post
 		if (endReached) return e.detail.complete();
 		try {
 			let firstLoad = !sectionObjs.length;
@@ -207,6 +232,7 @@
 				let lastSectionTopLvlPostIdStrs = sectionObjs.at(-1)?.topLvlPostIdStrs;
 				let lastTopLvlPostIdStr = lastSectionTopLvlPostIdStrs?.at(-1);
 				let lastTopLvlPostIdObj = lastTopLvlPostIdStr ? getIdStrAsIdObj(lastTopLvlPostIdStr) : null;
+				if (!firstLoad) mainPostFeedSection.postIdObjsInclude = [];
 				if (lastTopLvlPostIdObj && getParsedQPaginates(parsedQ)) {
 					if (flatView) {
 						mainPostFeedSection[newFirst ? 'msLte' : 'msGte'] = lastTopLvlPostIdObj.ms;
@@ -335,36 +361,13 @@
 			} = postFeedUpdate;
 			// console.log('postFeedUpdate:', postFeedUpdate);
 			// TODO: add account and space names to to local db using msToAccountNameTxtMap and msToSpaceNameTxtMap
-			mergeMsToAccountNameTxtMap(postFeedUpdate.msToAccountNameTxtMap || {});
-			mergeMsToSpaceNameTxtMap(postFeedUpdate.msToSpaceNameTxtMap || {});
-			mergeSpaceMsToAccountMsToMembershipMap(
-				postFeedUpdate.spaceMsToAccountMsToMembershipMap || {},
-			);
-			Object.entries(newIdToPostMap).forEach(([id, post]) => {
-				let lastVersion = getLastVersion(post);
-				if (lastVersion !== null && post.history?.[lastVersion])
-					(post.history[lastVersion].tags ??= []).sort();
-				// if (!gs.idToPostMap[id]) {
-				// 	gs.idToPostMap[id] = { ...gs.idToPostMap[id], ...post };
-				// }
-				gs.idToPostMap[id] = post;
-				if (hasParent(post)) {
-					let atIdStr = getAtIdStr(post);
-					gs.postIdToSubIdsMap[atIdStr] = [
-						...new Set([...(gs.postIdToSubIdsMap[atIdStr] || []), id]),
-					].sort(
-						// TODO: sort reply posts by reactions and atPost author?
-						(a, b) => getIdStrAsIdObj(b).ms - getIdStrAsIdObj(a).ms,
-					);
-				}
-			});
+			mergePostFeedUpdate(postFeedUpdate);
 			let lastSectionTopLvlPostIdStrs = newTopLvlPostIdStrsSections?.at(-1) || [];
 			lastSectionTopLvlPostIdStrs.length && e.detail.loaded();
 			let endReached =
 				!getParsedQPaginates(mainPostFeedSection) ||
 				lastSectionTopLvlPostIdStrs.length < mainPostFeedSection.topLvlPostLimit;
 			endReached && e.detail.complete();
-			// console.log('endReached:', endReached);
 
 			//
 
@@ -416,8 +419,8 @@
 			assertCallerIsOwnerOrInGlobal();
 			await updateSavedTags(tags);
 			let post: Post;
-			if (gs.postingEdit) {
-				let postBeingEdited = gs.idToPostMap[getIdStr(gs.postingEdit)]!;
+			if (gs.writingEditFor) {
+				let postBeingEdited = gs.idToPostMap[getIdStr(gs.writingEditFor)]!;
 				let newLastVersion = getLastVersion(postBeingEdited)! + 1;
 				post = {
 					...postBeingEdited,
@@ -431,9 +434,11 @@
 					},
 				};
 				post.history![newLastVersion]!.ms = (await editPost(post, false, false)).ms;
-				if (!useLocalDb) {
+
+				if (0 && !useLocalDb) {
+					// TODO:
 					let locallySavedPost = getLocallySavedPost(post);
-					if (!locallySavedPost) await addPost(post, true, true, false);
+					if (!locallySavedPost) await addPost(post, true, true, []);
 					await editPost(post, true, true);
 				}
 			} else {
@@ -441,10 +446,10 @@
 					in_ms: urlInMs,
 					ms: 0,
 					by_ms: gs.accounts[0].ms,
-					...(gs.postingTo
+					...(gs.writingReplyTo
 						? {
-								at_ms: gs.postingTo.ms,
-								at_by_ms: gs.postingTo.by_ms,
+								at_ms: gs.writingReplyTo.ms,
+								at_by_ms: gs.writingReplyTo.by_ms,
 							}
 						: {}),
 					childCount: 0,
@@ -456,25 +461,35 @@
 						},
 					},
 				};
-				// TODO: fetch cited posts if not already in feed
-				let { ms } = await addPost(post, useLocalDb, false, true);
-				post.ms = ms;
-				post.history![1]!.ms = post.ms;
-				!useLocalDb && (await addPost(post, true, true, false));
+				let res = await addPost(
+					post,
+					useLocalDb,
+					false,
+					getCitedPostIds(core)
+						.filter((s) => gs.idToPostMap[s] === undefined)
+						.map((s) => getIdStrAsIdObj(s)),
+				);
+				post.ms = post.history![1]!.ms = res.ms;
+				mergePostFeedUpdate(res);
+				// 	if (!locallySavedPost) await addPost(post, true, true, []);
+				// !useLocalDb && (await addPost(post, true, true, []));
+				// let strPostId = getIdStr(post);
+				// gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
 			}
 			gs.writerTags = [];
 			gs.writerTagVal = '';
 			gs.writerCore = '';
 			let strPostId = getIdStr(post);
 			gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
-			if (gs.postingTo) {
+			if (gs.writingReplyTo) {
 				let atPostId = getAtIdStr(post);
 				gs.idToPostMap[atPostId]!.childCount!++;
 				gs.postIdToSubIdsMap[atPostId] ??= [];
 				gs.postIdToSubIdsMap[atPostId].unshift(strPostId);
 			}
-			if (gs.postingNew && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
-			if (gs.postingNew || gs.postingTo) {
+
+			if (gs.writingNewPost || gs.writingReplyTo) {
+				if (flatView && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
 				viewPostToastId = strPostId;
 				setTimeout(() => (viewPostToastId = ''), 3000);
 			}
@@ -526,7 +541,7 @@
 				if (canPost && e.key === 'n') {
 					e.preventDefault();
 					resetBottomOverlay();
-					gs.postingNew = true;
+					gs.writingNewPost = true;
 				}
 			}
 		};
@@ -610,13 +625,13 @@
 				<div>
 					{#if sectionObj.heading}
 						<div
-							class={`h-8 flex w-full pl-2 font-semibold fx bg-bg1 ${sectionObj.heading === 'post' ? 'z-50 fixed top-0' : ''}`}
+							class={`h-8 flex w-full xs:w-[calc(100vw-var(--w-sidebar))] pl-2 font-semibold fx bg-bg1 ${sectionObj.heading === 'post' ? 'z-50 fixed top-0' : ''}`}
 						>
 							{#if sectionObj.heading === 'post'}
 								{m.post()}
 								<a
-									class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
-									href={`/merged-view?q=[${idSlug}]`}
+									class="font-medium pl-2 h-full flex-1 fx text-fg2 hover:bg-bg4 hover:text-fg1"
+									href={`/merged-view?q="${idSlug}"`}
 								>
 									{m.citedIn()}
 									<IconChevronRight />
@@ -702,8 +717,8 @@
 				</a>
 			{:else if canPost}
 				<button
-					class="xy h-9 w-9 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
-					onclick={() => (gs.postingNew = true)}
+					class="xy h-9 w-9 twritingNewPost-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
+					onclick={() => (gs.writingNewPost = true)}
 				>
 					<IconPencilPlus class="h-8 xs:h-9" />
 				</button>

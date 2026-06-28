@@ -6,6 +6,7 @@
 		getWhoObj,
 		gs,
 	} from '$lib/global-state.svelte';
+	import { alertError } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { trpc } from '$lib/trpc/client';
 	import { updateLocalCache } from '$lib/types/local-cache';
@@ -103,8 +104,7 @@
 
 					goto(`/${ms}__`);
 				} catch (error) {
-					console.error(error);
-					alert(error);
+					alertError(error);
 				}
 			}}
 		>

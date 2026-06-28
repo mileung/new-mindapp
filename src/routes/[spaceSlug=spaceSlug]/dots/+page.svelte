@@ -141,7 +141,7 @@
 					return lc;
 				});
 			}
-			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap ?? {});
+			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
 			mergeSpaceMsToAccountMsToMembershipMap({ [urlInMs]: res.accountMsToMembershipMap ?? {} });
 
 			e.detail.loaded();

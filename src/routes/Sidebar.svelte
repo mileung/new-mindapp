@@ -213,7 +213,7 @@
 		let { accentCode } = caller?.msToJoinedSpaceContextMap[spaceMs] || {};
 		if (page.route.id !== '/[spaceSlug=spaceSlug]' || urlInMs !== spaceMs) {
 			if (accentCode === accentCodes.newPostsForCaller) return 'bg-yellow-300';
-			if (accentCode === accentCodes.newPosts) return 'bg-bg8';
+			if (accentCode === accentCodes.newPosts) return 'bg-fg2';
 		}
 		return '';
 	};

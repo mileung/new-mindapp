@@ -3,7 +3,7 @@
 	import { gotoIfNeeded } from '$lib/dom';
 	import { getSpaceContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
 	import { alertError, splitUntil } from '$lib/js';
-	import { initLocalDb, localDbFilename } from '$lib/local-db';
+	import { initLocalDb } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
 	import { trpc } from '$lib/trpc/client';
@@ -16,8 +16,6 @@
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { getDefaultSpace, type MySpaceUpdateFrom } from '$lib/types/spaces';
-	import { drizzle } from 'drizzle-orm/sqlite-proxy';
-	import { SQLocalDrizzle } from 'sqlocal/drizzle';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
 	import type { LayoutData, LayoutServerData } from './$types';
@@ -54,8 +52,6 @@
 			console.time('initLocalDb');
 			await initLocalDb();
 			console.timeEnd('initLocalDb');
-			let { driver, batchDriver } = new SQLocalDrizzle(localDbFilename);
-			gs.db = drizzle(driver, batchDriver);
 		} catch (error) {
 			console.error(error);
 			gs.localDbFailed = true;
@@ -98,8 +94,8 @@
 	$effect(() => {
 		if (urlInMs !== undefined && gs.lastSeenInMs !== urlInMs) {
 			updateLocalCache((lc) => ({ ...lc, lastSeenInMs: urlInMs }));
-			if (gs.postingTo || gs.postingEdit) gs.postingNew = true;
-			gs.postingTo = gs.postingEdit = gs.showReactionHistory = null;
+			if (gs.writingReplyTo || gs.writingEditFor) gs.writingNewPost = true;
+			gs.writingReplyTo = gs.writingEditFor = gs.showReactionHistory = null;
 		}
 	});
 

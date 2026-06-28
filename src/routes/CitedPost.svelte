@@ -7,6 +7,8 @@
 	} = $props();
 </script>
 
-<div class={`relative z-0 border-l-2 border-bg8 pl-2 my-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg2'}`}>
+<div
+	class={`relative z-0 border-l-2 border-bg8 pl-2 overflow-visible my-1 ${!(p.depth % 2) ? 'bg-bg1' : 'bg-bg2'}`}
+>
 	<PostBlock {...p} cited />
 </div>

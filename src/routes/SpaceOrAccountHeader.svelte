@@ -24,6 +24,7 @@
 		IconDeviceFloppy,
 		IconEdit,
 		IconPin,
+		IconTrash,
 		IconUserPlus,
 		IconX,
 	} from '@tabler/icons-svelte';
@@ -65,8 +66,9 @@
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let spaceContext = $derived(p.space ? getSpaceContext(getUrlInMs()) : undefined);
+	let callerIsAdmin = $derived(spaceContext?.roleCode?.num === roleCodes.admin);
 	let userCanEdit = $derived.by(() => {
-		if (p.space) return spaceContext?.roleCode?.num === roleCodes.admin;
+		if (p.space) return callerIsAdmin;
 		if (p.account) return p.account.ms === callerMs;
 		return false;
 	});
@@ -308,6 +310,29 @@
 					</div>
 				</div>
 			</div>
+			{#if callerIsAdmin || callerIsOwner}
+				<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+				<button
+					class="mt-2 px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
+					onclick={async () => {
+						try {
+							await trpc().deleteSpace.mutate(await getWhoWhereObj());
+							updateLocalCache((lc) => {
+								delete lc.msToSpaceMap[accountOrSpaceMs];
+								lc.accounts.forEach((a) => {
+									delete a.msToJoinedSpaceContextMap[accountOrSpaceMs];
+								});
+								return lc;
+							});
+						} catch (error) {
+							alertError(error);
+						}
+					}}
+				>
+					<IconTrash class="w-5 mr-1" />
+					{m.deleteSpace()}
+				</button>
+			{/if}
 		{/if}
 	{:else}
 		<div class="flex">

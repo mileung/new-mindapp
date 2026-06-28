@@ -44,6 +44,7 @@ import { permissionCodes, roleCodes } from '$lib/types/spaces';
 import { _checkInvite } from '$lib/types/spaces/_checkInvite';
 import { _createInviteLink } from '$lib/types/spaces/_createInviteLink';
 import { _createSpace } from '$lib/types/spaces/_createSpace';
+import { _deleteSpace } from '$lib/types/spaces/_deleteSpace';
 import { _getSpaceDots } from '$lib/types/spaces/_getSpaceDots';
 import { _revokeInviteLink } from '$lib/types/spaces/_revokeInviteLink';
 import { _updateSidePriority } from '$lib/types/spaces/_updateSidePriority';
@@ -255,6 +256,18 @@ export let router = t.router({
 			throwIf(!c.signedIn || (!ownerCalled && !c.inGlobal));
 			return _createSpace(input);
 		}),
+	deleteSpace: makeProcedure()
+		.input(WhoWhereObjSchema.strict())
+		.mutation(async ({ ctx, input }) => {
+			let ownerCalled = inputIsOwner(input);
+			let c = await _getCallerContext(ctx, input, {
+				signedIn: true,
+				roleCode: !ownerCalled,
+			});
+			throwIf(!c.signedIn);
+			if (!ownerCalled) throwIf(c.roleCode?.num !== roleCodes.admin);
+			return _deleteSpace(input);
+		}),
 	updateSidePriority: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
@@ -392,7 +405,12 @@ export let router = t.router({
 			return _changeSpaceAttributes(input);
 		}),
 	addPost: makeProcedure(postLimiter)
-		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
+		.input(
+			WhoWhereObjSchema.extend({
+				post: PostSchema,
+				citedPostIdObjsToFetch: z.array(IdObjSchema).max(88),
+			}).strict(),
+		)
 		.mutation(async ({ ctx, input }) => {
 			let { post } = input;
 			// TODO: allow non zero ms if the caller is an admin of the space (useful for importing old posts)
@@ -416,27 +434,33 @@ export let router = t.router({
 						c.permissionCode?.num !== permissionCodes.reactAndPost,
 				);
 			}
-			return _addPost(tdb, post, false, false, true);
+			return _addPost(tdb, post, false, false, input.citedPostIdObjsToFetch);
 		}),
 	editPost: makeProcedure(postLimiter)
-		.input(WhoWhereObjSchema.extend({ post: PostSchema }).strict())
+		.input(PostSchema.strict())
 		.mutation(async ({ ctx, input }) => {
-			let { post } = input;
-			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid callerMs');
-			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid callerMs');
-			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, {
-				signedIn: true,
-				permissionCode: true,
-				inGlobal: !ownerCalled,
-			});
-			throwIf(!c.signedIn);
-			throwIf(
-				c.permissionCode?.num !== permissionCodes.postOnly &&
-					c.permissionCode?.num !== permissionCodes.reactAndPost,
+			let callerMs = input.by_ms;
+			let spaceMs = input.in_ms;
+			throwIf(!callerMs || !spaceMs);
+			let ownerCalled = inputIsOwner({ callerMs });
+			let c = await _getCallerContext(
+				ctx,
+				{ callerMs, spaceMs },
+				{
+					signedIn: true,
+					permissionCode: true,
+					inGlobal: !ownerCalled,
+				},
 			);
-			!ownerCalled && throwIf(!c.inGlobal);
-			return _editPost(tdb, post, false);
+			throwIf(!c.signedIn);
+			if (!ownerCalled) {
+				throwIf(!c.inGlobal);
+				throwIf(
+					c.permissionCode?.num !== permissionCodes.postOnly &&
+						c.permissionCode?.num !== permissionCodes.reactAndPost,
+				);
+			}
+			return _editPost(tdb, input, false);
 		}),
 	deletePost: makeProcedure(postLimiter)
 		.input(
@@ -573,20 +597,23 @@ export let router = t.router({
 		}),
 	getPostHistory: makeProcedure()
 		.input(
-			WhoWhereObjSchema.extend({
+			WhoObjSchema.extend({
 				postIdObj: IdObjSchema,
 				version: z.number().gt(0),
 			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {
-			if (!input.callerMs) throw new Error('anon disallowed');
-			if (input.postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
+			throwIf(!input.callerMs || !input.postIdObj.in_ms);
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, {
-				permissionCode: !ownerCalled,
-				signedIn: true,
-				isPublic: !ownerCalled,
-			});
+			let c = await _getCallerContext(
+				ctx,
+				{ ...input, spaceMs: input.postIdObj.in_ms },
+				{
+					permissionCode: !ownerCalled,
+					signedIn: true,
+					isPublic: !ownerCalled,
+				},
+			);
 			throwIf(!c.signedIn);
 			!ownerCalled && throwIf(!c.isPublic && c.permissionCode === undefined);
 			return _getPostHistory(tdb, input.postIdObj, input.version);

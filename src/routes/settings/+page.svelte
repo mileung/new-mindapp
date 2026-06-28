@@ -20,10 +20,10 @@
 		if (promptSum((a, b) => m.enterTheSumOfAAndBToIrreversiblyDeleteYourLocalDatabase({ a, b }))) {
 			try {
 				await new SQLocalDrizzle(localDbFilename).sql`DROP TABLE "parts";`;
-			} catch (e) {
-				console.error('error deleteDatabaseFile:', e);
+			} catch (error) {
+				console.error(error);
 				// deleteDatabaseFile is slow and unreliable
-				await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
+				// await new SQLocalDrizzle(localDbFilename).deleteDatabaseFile();
 			}
 			await initLocalDb();
 			// not great to assume the new local db works after deleting the old one - same for localCache
@@ -218,11 +218,12 @@
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
 			onclick={async () => {
+				// TODO
 				await resetLocalDatabase();
 				let testTags: string[] = [];
 				// let totalPosts = 1;
-				// let totalPosts = 88;
-				let totalPosts = 188;
+				let totalPosts = 88;
+				// let totalPosts = 188;
 				// let totalPosts = 888;
 				// let totalPosts = 8888;
 

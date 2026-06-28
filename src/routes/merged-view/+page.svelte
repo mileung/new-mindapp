@@ -67,7 +67,7 @@
 {:else if promptSignIn}
 	<PromptSignIn />
 {:else}
-	<div class="w-full bg-bg1 fixed top-0 flex flex-wrap text-fg2">
+	<div class="z-50 w-full bg-bg1 fixed top-0 flex flex-wrap text-fg2">
 		{#each cloudSpaceMss as cloudSpaceMs (cloudSpaceMs)}
 			<a
 				href={makeParams(cloudSpaceMs)}

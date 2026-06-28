@@ -53,7 +53,7 @@ export let searchGuideArr = [
 export let maxTopLvlPostLimitPerSection = 15;
 
 export let ParsedQSchema = z.strictObject({
-	postIdObjsInclude: z.array(IdObjSchema).max(maxTopLvlPostLimitPerSection),
+	postIdObjsInclude: z.array(IdObjSchema).max(88),
 	eitherInMss: z.array(z.number()),
 	eitherByMss: z.array(z.number()),
 	eitherAtByMss: z.array(z.number()),
@@ -90,7 +90,7 @@ export let getDefaultParsedQ = (): ParsedQ => ({
 
 export let getParsedQPaginates = (p: ParsedQ) =>
 	!p.postIdObjsInclude.length ||
-	p.eitherInMss.length ||
+	// p.eitherInMss.length ||
 	p.eitherByMss.length ||
 	p.eitherAtByMss.length ||
 	p.requiredTags.length ||

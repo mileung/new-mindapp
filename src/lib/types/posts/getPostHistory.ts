@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import { type Post } from '.';
@@ -10,15 +10,12 @@ import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 
 export let getPostHistory = async (postIdObj: IdObj, version: number) => {
-	// console.log('postIdObj:', postIdObj);
-	// console.log('version:', version);
-	let baseInput = await getWhoWhereObj();
-	return baseInput.spaceMs
-		? trpc().getPostHistory.query({ ...baseInput, postIdObj, version })
+	return postIdObj.in_ms
+		? trpc().getPostHistory.query({ ...(await getWhoObj()), postIdObj, version })
 		: _getPostHistory(await gsdb(), postIdObj, version);
 };
 
-// TODO: paginate history versions?
+// TODO: if version === 0, fetch all old versions?
 export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: number) => {
 	let {
 		[pc._core_postImb_oldVersion_m]: _core_postImb_oldVersion_mRows = [],
@@ -28,12 +25,21 @@ export let _getPostHistory = async (db: Database, postIdObj: IdObj, version: num
 			.select()
 			.from(pTable)
 			.where(
-				and(
-					or(pf.code.eq(pc._core_postImb_oldVersion_m), pf.code.eq(pc.tagImb_postMb_oldVersion)),
-					pf.p1.eq(postIdObj.in_ms),
-					pf.p2.eq(postIdObj.ms),
-					pf.p3.eq(postIdObj.by_ms),
-					pf.p4.eq(version),
+				or(
+					and(
+						pf.code.eq(pc.tagImb_postMb_oldVersion),
+						pf.p1.eq(postIdObj.in_ms),
+						pf.p4.eq(postIdObj.ms),
+						pf.p5.eq(postIdObj.by_ms),
+						pf.p6.eq(version),
+					),
+					and(
+						pf.code.eq(pc._core_postImb_oldVersion_m),
+						pf.p1.eq(postIdObj.in_ms),
+						pf.p2.eq(postIdObj.ms),
+						pf.p3.eq(postIdObj.by_ms),
+						pf.p4.eq(version),
+					),
 				),
 			),
 	);

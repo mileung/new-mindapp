@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { gsdb } from '$lib/global-state.svelte';
 import { ranInt, throwIf } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
@@ -10,10 +10,9 @@ import { pf } from '../parts/partFilters';
 import { pTable } from '../parts/partsTable';
 
 export let editPost = async (post: Post, useLocalDb: boolean, useLastLayerMs: boolean) => {
-	let baseInput = await getWhoWhereObj();
-	return useLocalDb || !baseInput.spaceMs
+	return useLocalDb || !post.in_ms
 		? _editPost(await gsdb(), post, useLastLayerMs)
-		: trpc().editPost.mutate({ ...baseInput, post: post });
+		: trpc().editPost.mutate(post);
 };
 
 export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean) => {

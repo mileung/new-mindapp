@@ -12,7 +12,6 @@
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
 
-	import { goto } from '$app/navigation';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getIdStr, getUrlInMs } from '$lib/types/parts/partIds';
@@ -48,11 +47,13 @@
 	let xFocused = $state(false);
 	let suggestingTags = $state(false);
 
-	let postingInMs = $derived.by(() => (gs.postingTo || gs.postingEdit)?.in_ms ?? getUrlInMs());
+	let postingInMs = $derived.by(
+		() => (gs.writingReplyTo || gs.writingEditFor)?.in_ms ?? getUrlInMs(),
+	);
 	let postingInSpaceName = $derived(postingInMs === undefined ? '' : msToSpaceNameTxt(postingInMs));
 	let { canPost } = $derived(getSpacePermissions(postingInMs));
 	$effect(() => {
-		if (!canPost) gs.postingNew = gs.postingTo = gs.postingEdit = null;
+		if (!canPost) gs.writingNewPost = gs.writingReplyTo = gs.writingEditFor = null;
 	});
 
 	let tagFilter = $derived(normalizeTag(gs.writerTagVal));
@@ -76,11 +77,11 @@
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
 	});
 	$effect(() => {
-		if (gs.postingNew || gs.postingTo || gs.postingEdit) tagsIpt.focus();
+		if (gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor) tagsIpt.focus();
 	});
 	$effect(() => {
-		if (gs.postingEdit) {
-			let post = gs.idToPostMap[getIdStr(gs.postingEdit)]!;
+		if (gs.writingEditFor) {
+			let post = gs.idToPostMap[getIdStr(gs.writingEditFor)]!;
 			if (post.history !== null) {
 				let lastHistory = post.history[getLastVersion(post)!];
 				gs.writerTags = lastHistory?.tags || [];
@@ -92,7 +93,7 @@
 	onMount(() => {
 		tagsIpt.focus();
 		let onKeyDown = (e: KeyboardEvent) => {
-			(gs.postingNew || gs.postingTo || gs.postingEdit) &&
+			(gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor) &&
 				!tagsIptFocused &&
 				!textInputFocused() &&
 				!e.altKey &&
@@ -158,24 +159,22 @@
 			<button
 				class="flex-1 h-8 pl-2 fx gap-1 text-left text-nowrap overflow-scroll hover:bg-bg7 hover:text-fg3"
 				onclick={() => {
-					let post = gs.postingEdit || gs.postingTo;
+					let post = gs.writingEditFor || gs.writingReplyTo;
 					if (post) {
 						let postIdStr = getIdStr(post);
-						getUrlInMs() !== post.in_ms
-							? goto(`/${postIdStr}`) //
-							: scrollToHighlight(postIdStr, true);
+						scrollToHighlight(postIdStr, true);
 					}
 				}}
 			>
-				{#if gs.postingTo}
+				{#if gs.writingReplyTo}
 					<IconMessage2Plus class="w-5" />
-				{:else if gs.postingNew}
+				{:else if gs.writingNewPost}
 					<IconPencilPlus class="w-5" />
 				{:else}
 					<IconPencil class="w-5" />
 				{/if}
 				<p class="">
-					{gs.postingTo ? m.replyingIn() : gs.postingNew ? m.newPostIn() : m.editingIn()}
+					{gs.writingReplyTo ? m.replyingIn() : gs.writingNewPost ? m.newPostIn() : m.editingIn()}
 				</p>
 				<SpaceIcon ms={postingInMs} class="h-5 w-5" />
 				<p class="flex-1">{postingInSpaceName}</p>
@@ -192,10 +191,10 @@
 		</button>
 		<Highlight
 			noScrollId
-			postIdStr={gs.postingTo
-				? getIdStr(gs.postingTo)
-				: gs.postingEdit
-					? getIdStr(gs.postingEdit)
+			postIdStr={gs.writingReplyTo
+				? getIdStr(gs.writingReplyTo)
+				: gs.writingEditFor
+					? getIdStr(gs.writingEditFor)
 					: ''}
 		/>
 	</div>

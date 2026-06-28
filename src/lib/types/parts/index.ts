@@ -34,7 +34,8 @@ export let WhoWhereObjSchema = WhoObjSchema.extend({
 export type WhoWhereObj = z.infer<typeof WhoWhereObjSchema>;
 
 export let hasParent = (part: FullIdObj) =>
-	Number.isInteger(part.in_ms) && Number.isInteger(part.at_ms) && Number.isInteger(part.at_by_ms);
+	Number.isInteger(part.at_ms) && Number.isInteger(part.at_by_ms);
+
 export let assertLt2Rows = (parts: PartInsert[]) => {
 	throwIf(parts.length > 1);
 	let row = parts[0];

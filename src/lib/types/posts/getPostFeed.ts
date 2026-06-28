@@ -499,7 +499,17 @@ export let _getPostFeed = async (
 						.where(
 							and(
 								pf.code.eq(pc._core_postImb_lastVersion_m),
+								...section.requiredCoreIncludes.map((coreIncludes) =>
+									pf.txt.like(`%${coreIncludes}%`),
+								),
+								or(
+									...section.eitherCoreIncludes.map((coreIncludes) =>
+										pf.txt.like(`%${coreIncludes}%`),
+									),
+								),
 								or(...sectionInMssToCheck.map((inMs) => pf.p1.eq(inMs))),
+								msGte === undefined ? undefined : pf.p2.gte(msGte),
+								msLte === undefined ? undefined : pf.p2.lte(msLte),
 								...getPostIdObjsNotToFetchMoreStuffFor().map((o) =>
 									not(
 										and(
@@ -507,14 +517,6 @@ export let _getPostFeed = async (
 											pf.p2.eq(o.ms), //
 											pf.p3.eq(o.by_ms),
 										)!,
-									),
-								),
-								...section.requiredCoreIncludes.map((coreIncludes) =>
-									pf.txt.like(`%${coreIncludes}%`),
-								),
-								or(
-									...section.eitherCoreIncludes.map((coreIncludes) =>
-										pf.txt.like(`%${coreIncludes}%`),
 									),
 								),
 								or(
@@ -714,11 +716,10 @@ export let _getPostFeed = async (
 		let inMssSet = new Set<number>();
 		let byMssSet = new Set<number>();
 		let inMsToByMssMap: Record<number, Set<number>> = {};
-		for (let { by_ms, in_ms } of postIdObjs) {
+		for (let { in_ms, by_ms } of postIdObjs) {
 			inMssSet.add(in_ms);
 			byMssSet.add(by_ms);
-			inMsToByMssMap[in_ms] ??= new Set();
-			inMsToByMssMap[in_ms].add(by_ms);
+			(inMsToByMssMap[in_ms] ??= new Set()).add(by_ms);
 		}
 		let inMss = [...inMssSet];
 		let byMss = [...byMssSet];
@@ -759,10 +760,12 @@ export let _getPostFeed = async (
 							),
 							and(
 								or(
-									pf.code.eq(pc._flair_i_accountMs_mb), //
+									and(
+										pf.code.eq(pc._flair_i_accountMs_mb),
+										pf.txt.notEq(''), //
+									),
 									pf.code.eq(pc.i_accountMs_roleCode_mb),
 								),
-								pf.txt.notEq(''),
 								or(
 									...inMss.map((inMs) =>
 										and(
@@ -1012,7 +1015,6 @@ export let _getPostFeed = async (
 	// 	);
 	// });
 	// console.log('allPostsInMapHaveUniqueTags:', allPostsInMapHaveUniqueTags);
-
 	return {
 		topLvlPostIdStrsSections,
 		idToPostMap,

@@ -1,25 +1,27 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
-import { ranInt } from '$lib/js';
+import { ownerMsSet, ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or, sql } from 'drizzle-orm';
-import { getCitedPostIds, getLastVersion, moveTagOrRxnCountsBy1, type Post } from '.';
+import { getLastVersion, moveTagOrRxnCountsBy1, type Post } from '.';
 import { type Database } from '../../local-db';
 import { assert1Row, channelPartsByCode, hasParent, type PartInsert } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
+import type { IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { accentCodes } from '../spaces';
+import { _getPostFeed, getDefaultSection } from './getPostFeed';
 
 export let addPost = async (
 	post: Post,
 	useLocalDb: boolean,
 	usePostMs: boolean,
-	getIdToCitedPostMap: boolean,
+	citedPostIdObjsToFetch: IdObj[],
 ) => {
 	let baseInput = await getWhoWhereObj(useLocalDb);
 	return useLocalDb || !baseInput.spaceMs
-		? _addPost(await gsdb(), post, true, usePostMs, getIdToCitedPostMap)
-		: trpc().addPost.mutate({ ...baseInput, post });
+		? _addPost(await gsdb(), post, true, usePostMs, citedPostIdObjsToFetch)
+		: trpc().addPost.mutate({ ...baseInput, post, citedPostIdObjsToFetch });
 };
 
 export let _addPost = async (
@@ -27,7 +29,7 @@ export let _addPost = async (
 	post: Post,
 	dbIsLocal: boolean,
 	usePostMs: boolean,
-	getIdToCitedPostMap: boolean,
+	citedPostIdObjsToFetch: IdObj[],
 ) => {
 	let postMs = usePostMs ? post.ms : Date.now();
 	let postImb_parentMb_rootMb_childCountMainRow: PartInsert = {
@@ -47,7 +49,6 @@ export let _addPost = async (
 	let idToCitedPostMap: Record<string, Post> = {};
 	let tagStrsFromAllLayersSet = new Set<string>();
 	let currentTagStrs: string[] = [];
-	let citedPostIdStrs: string[] = [];
 	for (let i = 0; i < historyEntries.length; i++) {
 		let [v, l] = historyEntries[i];
 		let version = +v;
@@ -68,12 +69,24 @@ export let _addPost = async (
 			layer.tags.forEach((t) => tagStrsFromAllLayersSet.add(t));
 			if (isLastVersion) currentTagStrs = layer.tags;
 		}
-		if (isLastVersion && layer.core) citedPostIdStrs = getCitedPostIds(layer.core);
 	}
 
-	if (getIdToCitedPostMap) {
-		// citedPostIdStrs
-		// TODO: getPostFeed
+	let citedPostFeed: undefined | Awaited<ReturnType<typeof _getPostFeed>>;
+	if (citedPostIdObjsToFetch.length) {
+		citedPostFeed = await _getPostFeed(
+			db,
+			{
+				callerMs: post.by_ms,
+				sections: [
+					{
+						...getDefaultSection(),
+						postIdObjsInclude: citedPostIdObjsToFetch,
+					},
+				],
+			},
+			ownerMsSet.has(post.by_ms),
+			false,
+		);
 	}
 	let postIsChild = hasParent(post);
 	// console.log('post:', post);
@@ -180,7 +193,7 @@ export let _addPost = async (
 	}
 	await db.insert(pTable).values(partsToInsert);
 	if (!dbIsLocal) {
-		if (post.at_by_ms !== undefined) {
+		if (post.at_by_ms !== undefined && post.at_by_ms !== post.by_ms) {
 			await db
 				.update(pTable)
 				.set({ p3: accentCodes.newPostsForCaller })
@@ -200,10 +213,18 @@ export let _addPost = async (
 				and(
 					pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
 					pf.p1.eq(post.in_ms),
+					pf.p2.notEq(post.by_ms),
 					pf.p3.eq(accentCodes.none),
 				),
 			);
 	}
 
-	return { idToCitedPostMap, ms: postMs };
+	return {
+		idToCitedPostMap,
+		ms: postMs,
+		idToPostMap: citedPostFeed?.idToPostMap,
+		msToAccountNameTxtMap: citedPostFeed?.msToAccountNameTxtMap,
+		msToSpaceNameTxtMap: citedPostFeed?.msToSpaceNameTxtMap,
+		spaceMsToAccountMsToMembershipMap: citedPostFeed?.spaceMsToAccountMsToMembershipMap,
+	};
 };

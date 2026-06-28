@@ -29,13 +29,13 @@
 
 	let [lineColor, overlayColor] = $derived.by(() => {
 		if (!p.postIdStr) return ['bg-hl2', moreOpaque ? 'bg-hl2/10' : 'bg-hl2/5'];
-		let post = gs.showReactionHistory || gs.postingTo || gs.postingEdit;
+		let post = gs.showReactionHistory || gs.writingReplyTo || gs.writingEditFor;
 		if (post && getIdStr(post) === p.postIdStr) {
 			return gs.showReactionHistory
 				? ['bg-hl-spot', moreOpaque ? 'bg-hl-spot/10' : 'bg-hl-spot/5']
-				: gs.postingTo
+				: gs.writingReplyTo
 					? ['bg-hl-link', moreOpaque ? 'bg-hl-link/10' : 'bg-hl-link/5']
-					: gs.postingEdit
+					: gs.writingEditFor
 						? ['bg-hl-edit', moreOpaque ? 'bg-hl-edit/10' : 'bg-hl-edit/5']
 						: [];
 		}
@@ -50,7 +50,7 @@
 {#if lineColor}
 	<div
 		{...!p.noScrollId && p.main ? { id: 'hl-' + p.postIdStr } : {}}
-		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-40 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}
+		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-20 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}
 	>
 		<div class="w-0.5 h-full {lineColor}"></div>
 	</div>

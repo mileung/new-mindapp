@@ -3,11 +3,12 @@ import { trpc } from '$lib/trpc/client';
 import { and, or, sql, type SQL } from 'drizzle-orm';
 import { moveTagOrRxnCountsBy1 } from '.';
 import { type Database } from '../../local-db';
-import { assert1Row, channelPartsByCode, type PartSelect } from '../parts';
+import { assert1Row, assertLt2Rows, channelPartsByCode, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
+import { accentCodes } from '../spaces';
 
 export let deletePost = async (postIdObj: IdObj, useLocalDb: boolean) => {
 	let baseInput = await getWhoObj();
@@ -165,19 +166,104 @@ export let _deletePost = async (db: Database, postIdObj: IdObj) => {
 			);
 	}
 	deleteFilters.length && (await db.delete(pTable).where(or(...deleteFilters)));
-	let { p4, p5 } = postImb_parentMb_rootMb_childCountRow;
-	if (!softDelete && Number.isInteger(p4) && Number.isInteger(p5)) {
+	if (!softDelete) {
+		let postImb_parentMb_rootMb_childCountLastRow = assertLt2Rows(
+			await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+						pf.p1.eq(postIdObj.in_ms), //
+					),
+				)
+				.orderBy(pf.p2.desc)
+				.limit(1),
+		);
+		let lastPostMs = postImb_parentMb_rootMb_childCountLastRow?.p2;
 		await db
 			.update(pTable)
-			.set({ p8: sql`${pTable.p8} - 1` })
+			.set({ p3: accentCodes.none })
 			.where(
 				and(
-					pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+					pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
 					pf.p1.eq(postIdObj.in_ms),
-					pf.p2.eq(p4!),
-					pf.p3.eq(p5!),
+					pf.p3.notEq(accentCodes.none),
+					lastPostMs ? pf.p4.gt(lastPostMs) : undefined,
 				),
 			);
+		let { p4, p5 } = postImb_parentMb_rootMb_childCountRow;
+		if (Number.isInteger(p4) && Number.isInteger(p5)) {
+			let atMs = p4!;
+			let atByMs = p5!;
+			await db
+				.update(pTable)
+				.set({ p8: sql`${pTable.p8} - 1` })
+				.where(
+					and(
+						pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+						pf.p1.eq(postIdObj.in_ms),
+						pf.p2.eq(atMs),
+						pf.p3.eq(atByMs),
+					),
+				);
+			let i_accountMs_accentCode_lastViewMs_sidePriorityRows = await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+						pf.p1.eq(postIdObj.in_ms),
+						pf.p2.eq(atByMs),
+						pf.p3.notEq(accentCodes.none),
+					),
+				)
+				.orderBy(pf.p2.desc)
+				.limit(1);
+			let i_accountMs_accentCode_lastViewMs_sidePriorityRow = assertLt2Rows(
+				i_accountMs_accentCode_lastViewMs_sidePriorityRows,
+			);
+			let lastViewMs = i_accountMs_accentCode_lastViewMs_sidePriorityRow?.p4;
+			if (lastViewMs) {
+				let lastPostRowIsAtByMs = postImb_parentMb_rootMb_childCountLastRow?.p5 === atByMs;
+				let postImb_parentMb_rootMb_childCountAtByMsLastRow = lastPostRowIsAtByMs
+					? postImb_parentMb_rootMb_childCountLastRow
+					: assertLt2Rows(
+							await db
+								.select()
+								.from(pTable)
+								.where(
+									or(
+										and(
+											pf.code.eq(pc.postImb_parentMb_rootMb_childCount),
+											pf.p1.eq(postIdObj.in_ms),
+											pf.p5.eq(atByMs),
+										),
+									),
+								)
+								.orderBy(pf.p2.desc)
+								.limit(1),
+						);
+				if (lastPostMs && lastViewMs < lastPostMs) {
+					await db
+						.update(pTable)
+						.set({
+							p3:
+								postImb_parentMb_rootMb_childCountAtByMsLastRow &&
+								lastViewMs < postImb_parentMb_rootMb_childCountAtByMsLastRow.p2!
+									? accentCodes.newPostsForCaller
+									: accentCodes.newPosts,
+						})
+						.where(
+							and(
+								pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
+								pf.p1.eq(postIdObj.in_ms),
+								pf.p2.eq(atByMs),
+							),
+						);
+				}
+			}
+		}
 	}
 
 	return { soft: softDelete };
