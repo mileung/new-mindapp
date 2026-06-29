@@ -686,7 +686,7 @@
 								{/if}
 							{/if}
 						</div>
-						{#if !sectionObj.topLvlPostIdStrs.length}
+						{#if i !== sectionObjs.length - 1 && !sectionObj.topLvlPostIdStrs.length}
 							<p class="pl-2 text-fg2">{m.nothingFound()}</p>
 						{/if}
 					{/if}

@@ -291,9 +291,9 @@
 					{m.addAccount()}
 				</a>
 				{#each gs.accounts || [] as a, i (a.ms)}
-					<div class={`group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
+					<div class={`h-10 max-w-full group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<button
-							class="max-w-full flex shrink-0 h-10 px-2 gap-2 flex-1"
+							class="flex flex-1 overflow-scroll px-2 gap-2"
 							onclick={() => {
 								if (a.signedIn || !a.ms) {
 									gs.identifierToPostFeedMap = {};
@@ -311,9 +311,7 @@
 							<div class="self-center xy h-6 w-6">
 								<AccountIcon isUser ms={a.ms} class="h-6 w-6" />
 							</div>
-							<div
-								class={`flex-1 text-nowrap overflow-scroll fx justify-start ${msToAccountItalic(a.ms)}`}
-							>
+							<div class={`flex-1 text-nowrap overflow-scroll fx ${msToAccountItalic(a.ms)}`}>
 								{msToAccountNameTxt(a.ms)}
 							</div>
 							{#if a.ms && !a.signedIn}
@@ -324,7 +322,7 @@
 						</button>
 						{#if a.ms}
 							<button
-								class={`${0 === i && a.signedIn ? '' : 'pointer-fine:hidden'} group-hover:flex xy w-8 hover:bg-bg7 text-fg2 hover:text-fg1`}
+								class={`xy min-w-8 ${0 === i && a.signedIn ? '' : 'pointer-fine:hidden'} group-hover:flex hover:bg-bg7 text-fg2 hover:text-fg1`}
 								onclick={(e) => {
 									e.stopPropagation();
 									(a.signedIn ? signOut : unsaveAccount)(a.ms);
@@ -332,8 +330,10 @@
 							>
 								{#if a.signedIn}
 									<IconLogout class="h-5 w-5" />
+									<!-- {m.signOut()} -->
 								{:else}
 									<IconX class="h-5 w-5" />
+									<!-- {m.remove()} -->
 								{/if}
 							</button>
 						{/if}

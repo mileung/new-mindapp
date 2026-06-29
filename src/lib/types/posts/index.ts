@@ -48,6 +48,7 @@ export let PostSchema = z.strictObject({
 	childCount: z.number().optional(),
 	myRxnEmojis: z.array(EmojiStringSchema).optional(),
 	rxnEmojiCount: z.record(z.number()).optional(),
+	pending: z.boolean().optional(),
 
 	history: z
 		.record(

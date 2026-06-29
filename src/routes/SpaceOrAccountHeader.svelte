@@ -383,7 +383,7 @@
 			{:else if p.space}
 				<p class="flex-1 text-fg2">{m.nothingPinned()}</p>
 			{/if}
-			{#if accountOrSpaceMs}
+			{#if accountOrSpaceMs > 1}
 				<p class="text-fg2">
 					{m.createdD({ d: formatMs(accountOrSpaceMs, 'day') })}
 				</p>
