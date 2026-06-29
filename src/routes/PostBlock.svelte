@@ -426,7 +426,7 @@
 					{/if}
 					{#if showVersionControls}
 						<button
-							class={`xy group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
+							class={`xy pr-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
 							onclick={() => changeVersion(Math.max(1, version! - 1))}
 						>
 							<IconCaretLeft class="w-5.5" />
@@ -435,7 +435,7 @@
 							</p>
 						</button>
 						<button
-							class={`xy group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
+							class={`xy pr-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
 							onclick={() => changeVersion(Math.min(lastVersion!, version! + 1))}
 						>
 							<IconCaretRight class="w-5.5" />
