@@ -13,12 +13,14 @@
 	import { accentCodes, permissionCodes, roleCodes } from '$lib/types/spaces';
 	import { IconChevronRight } from '@tabler/icons-svelte';
 	import PromptSignIn from '../PromptSignIn.svelte';
+	import SpinnerOverlay from '../SpinnerOverlay.svelte';
 
 	let spaceNameTxt = $state('');
 	let spaceDescriptionTxt = $state('');
 	let spacePinnedQueryTxt = $state('');
 	let spaceIsPublicBin = $state(0);
 	let newMemberPermissionCodeNum = $state(permissionCodes.reactAndPost);
+	let loading = $state(false);
 </script>
 
 {#if !gs.accounts}
@@ -35,6 +37,7 @@
 			onsubmit={async (e) => {
 				e.preventDefault();
 				try {
+					loading = true;
 					assertCallerIsOwnerOrInGlobal();
 					let whoObj = await getWhoObj();
 					let { ms } = await trpc().createSpace.mutate({
@@ -101,17 +104,23 @@
 						};
 						return lc;
 					});
-
 					goto(`/${ms}__`);
 				} catch (error) {
 					alertError(error);
+				} finally {
+					loading = false;
 				}
 			}}
 		>
 			<p class="font-bold">{m.name()}</p>
-			<input bind:value={spaceNameTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" />
+			<input
+				disabled={loading}
+				bind:value={spaceNameTxt}
+				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
+			/>
 			<p class="mt-1 font-bold">{m.description()}</p>
 			<textarea
+				disabled={loading}
 				bind:value={spaceDescriptionTxt}
 				class="resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 			></textarea>
@@ -121,6 +130,7 @@
 				<div class="flex-1">
 					<p class="text-sm font-bold">{m.visibility()}</p>
 					<select
+						disabled={loading}
 						name={m.visibility()}
 						class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg4 text-fg1"
 						bind:value={spaceIsPublicBin}
@@ -133,6 +143,7 @@
 					<p class="text-sm font-bold">{m.newMembers()}</p>
 					<div class="flex">
 						<select
+							disabled={loading}
 							class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg4 text-fg1"
 							bind:value={newMemberPermissionCodeNum}
 						>
@@ -146,12 +157,14 @@
 			</div>
 
 			<button
+				disabled={loading}
 				type="submit"
-				class="mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
+				class="relative mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 			>
 				{m.continue()}
-				<IconChevronRight class="h-5" stroke={3} /></button
-			>
+				<IconChevronRight class="h-5" stroke={3} />
+				<SpinnerOverlay on={loading} />
+			</button>
 		</form>
 	</div>
 {/if}

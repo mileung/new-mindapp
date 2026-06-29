@@ -174,10 +174,13 @@
 		};
 
 		window.addEventListener('keydown', onKeyDown);
-		window.addEventListener('mousemove', onMouseMove);
-		window.addEventListener('mouseup', onDragEnd);
-		window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
-		window.addEventListener('touchend', onDragEnd);
+		if (!isTouchScreen) {
+			// TODO: long press to rearrange sidebar spaces on mobile
+			window.addEventListener('mousemove', onMouseMove);
+			window.addEventListener('mouseup', onDragEnd);
+			window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
+			window.addEventListener('touchend', onDragEnd);
+		}
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
 			window.removeEventListener('mousemove', onMouseMove);

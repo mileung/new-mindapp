@@ -131,18 +131,21 @@
 			else if (nextCanPost) newPermissionCodeNum = permissionCodes.postOnly;
 			else newPermissionCodeNum = permissionCodes.viewOnly;
 			try {
+				let updateMembership = (ms: number) =>
+					mergeMembershipUpdate({
+						permissionCode: {
+							ms,
+							by_ms: callerMs,
+							num: newPermissionCodeNum,
+						},
+					});
+				updateMembership(Date.now());
 				let { ms } = await trpc().setSpaceMemberPermission.mutate({
 					...(await getWhoWhereObj()),
 					accountMs: accepteeMs,
 					newPermissionCodeNum,
 				});
-				mergeMembershipUpdate({
-					permissionCode: {
-						ms,
-						by_ms: callerMs,
-						num: newPermissionCodeNum,
-					},
-				});
+				updateMembership(ms);
 			} catch (error) {
 				alertError(error);
 			}
@@ -180,18 +183,21 @@
 		}
 		if (ok) {
 			try {
+				let updateMembership = (ms: number) =>
+					mergeMembershipUpdate({
+						roleCode: {
+							ms,
+							by_ms: callerMs,
+							num: newRoleCodeNum,
+						},
+					});
+				updateMembership(Date.now());
 				let { ms, reactAndPostSetBySystem } = await trpc().setSpaceMemberRole.mutate({
 					...(await getWhoWhereObj()),
 					accountMs: accepteeMs,
 					newRoleCodeNum,
 				});
-				mergeMembershipUpdate({
-					roleCode: {
-						ms,
-						by_ms: callerMs,
-						num: newRoleCodeNum,
-					},
-				});
+				updateMembership(ms);
 				if (newRoleCodeNum === roleCodes.admin) {
 					moreOptionsShown = false;
 					if (reactAndPostSetBySystem) {
@@ -243,10 +249,6 @@
 							: confirm(m.youAreAboutToRemoveAFromTheSpace({ a: accepteeName })))
 					) {
 						try {
-							await trpc().removeSpaceMember.mutate({
-								...(await getWhoWhereObj()),
-								accountMs: accepteeMs,
-							});
 							if (membershipIsByCaller && !space.isPublic.num) goto('/0__');
 							updateLocalCache((lc) => {
 								lc.msToSpaceMap = {
@@ -266,6 +268,10 @@
 									[accepteeMs]: null,
 								},
 							};
+							await trpc().removeSpaceMember.mutate({
+								...(await getWhoWhereObj()),
+								accountMs: accepteeMs,
+							});
 						} catch (error) {
 							alertError(error);
 						}
@@ -327,18 +333,21 @@
 				onclick={async () => {
 					let newFlairTxt = prompt(m.setFlair(), p.membership.flair.txt);
 					if (newFlairTxt !== null) {
+						let updateMembership = (ms: number) =>
+							mergeMembershipUpdate({
+								flair: {
+									ms,
+									by_ms: callerMs,
+									txt: newFlairTxt,
+								},
+							});
+						updateMembership(Date.now());
 						let { ms } = await trpc().setSpaceMemberFlair.mutate({
 							...(await getWhoWhereObj()),
 							accountMs: accepteeMs,
 							flairTxt: newFlairTxt,
 						});
-						mergeMembershipUpdate({
-							flair: {
-								ms,
-								by_ms: callerMs,
-								txt: newFlairTxt,
-							},
-						});
+						updateMembership(ms);
 					}
 				}}
 			>

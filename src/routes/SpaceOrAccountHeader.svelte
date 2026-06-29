@@ -30,6 +30,7 @@
 	} from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
+	import SpinnerOverlay from './SpinnerOverlay.svelte';
 
 	type Changes = {
 		nameTxt?: string;
@@ -52,6 +53,7 @@
 		newMemberPermissionCodeNum: p.space?.newMemberPermissionCode?.num ?? 0,
 	});
 	let editing = $state(false);
+	let loading = $state(false);
 	let draftSettings = $state((() => deepClone(currentSettings))());
 
 	$effect(() => {
@@ -122,7 +124,8 @@
 					<IconX class="w-5" />
 				</button>
 				<button
-					class="xy pl-0.5 pr-1 border-b-2 border-hl1 hover:border-hl2 bg-bg2 hover:bg-bg4 hover:text-fg3"
+					disabled={loading}
+					class="relative xy pl-0.5 pr-1 border-b-2 border-hl1 hover:border-hl2 bg-bg2 hover:bg-bg4 hover:text-fg3"
 					onclick={async () => {
 						editing = false;
 						let changes: Changes = {};
@@ -142,6 +145,7 @@
 						)
 							changes.newMemberPermissionCodeNum = draftSettings.newMemberPermissionCodeNum;
 						if (Object.keys(changes).length) {
+							loading = true;
 							try {
 								let ms =
 									p.space?.ms || p.account?.ms
@@ -212,12 +216,15 @@
 								});
 							} catch (error) {
 								alertError(error);
+							} finally {
+								loading = false;
 							}
 						}
 					}}
 				>
 					<IconDeviceFloppy class="w-5 mr-1" />
 					{m.save()}
+					<SpinnerOverlay on={loading} />
 				</button>
 			</div>
 		{:else if userCanEdit}
@@ -264,7 +271,11 @@
 	{#if editing}
 		{#if p.space ? p.space.ms > 1 && p.space.ms !== callerMs : true}
 			<p class="font-bold">{m.name()}</p>
-			<input bind:value={draftSettings.nameTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" />
+			<input
+				disabled={loading}
+				bind:value={draftSettings.nameTxt}
+				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
+			/>
 		{:else}
 			<p class="text-xl font-bold">
 				{msToSpaceNameTxt(accountOrSpaceMs)}
@@ -272,12 +283,14 @@
 		{/if}
 		<p class="mt-1 font-bold">{p.account ? m.bio() : m.description()}</p>
 		<textarea
+			disabled={loading}
 			bind:value={draftSettings.bioOrDescriptionTxt}
 			class="resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 		></textarea>
 		{#if p.space}
 			<p class="font-bold">{m.pinnedQuery()}</p>
 			<input
+				disabled={loading}
 				bind:value={draftSettings.pinnedQueryTxt}
 				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
 			/>
@@ -313,8 +326,9 @@
 			{#if callerIsAdmin || callerIsOwner}
 				<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 				<button
-					class="mt-2 px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
+					class="relative mt-2 px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
 					onclick={async () => {
+						loading = true;
 						try {
 							await trpc().deleteSpace.mutate(await getWhoWhereObj());
 							updateLocalCache((lc) => {
@@ -326,11 +340,14 @@
 							});
 						} catch (error) {
 							alertError(error);
+						} finally {
+							loading = false;
 						}
 					}}
 				>
 					<IconTrash class="w-5 mr-1" />
 					{m.deleteSpace()}
+					<SpinnerOverlay on={loading} />
 				</button>
 			{/if}
 		{/if}

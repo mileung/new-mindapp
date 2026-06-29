@@ -150,7 +150,19 @@
 			gs.writerTagVal = '';
 		}
 	};
+
+	let handleBeforeUnload = (event: BeforeUnloadEvent) => {
+		if (
+			(gs.writerCore || gs.writerTagVal || gs.writerTags.length) &&
+			(gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor)
+		) {
+			event.preventDefault();
+			event.returnValue = '';
+		}
+	};
 </script>
+
+<svelte:window on:beforeunload={handleBeforeUnload} />
 
 <div class="h-[var(--h-post-writer)] flex flex-col">
 	<div class="flex group bg-bg4 relative w-full">

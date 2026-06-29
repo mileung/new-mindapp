@@ -130,12 +130,6 @@ export let unsaveAccount = (accountMs: number) => {
 };
 
 export let signOut = async (callerMs: number, everywhere = false) => {
-	try {
-		await trpc().signOut.mutate({
-			callerMs,
-			everywhere,
-		});
-	} catch (error) {}
 	updateLocalCache((lc) => {
 		lc.accounts = lc.accounts
 			.map((a) => ({
@@ -154,6 +148,12 @@ export let signOut = async (callerMs: number, everywhere = false) => {
 		delete gs.accountMsToSpaceMsToCheckedMap[callerMs];
 		gotoIfNeeded(`/${gs.lastSeenInMs}__`);
 	}
+	try {
+		await trpc().signOut.mutate({
+			callerMs,
+			everywhere,
+		});
+	} catch (error) {}
 };
 
 export let useCheckedInvite = async () => {

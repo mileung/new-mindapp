@@ -127,20 +127,22 @@
 			// console.log('res', JSON.stringify(res, null, 2));
 			// console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
 
-			if (spaceUpdate) {
-				updateLocalCache((lc) => {
-					lc.msToSpaceMap = {
+			updateLocalCache((lc) => {
+				spaceUpdate &&
+					(lc.msToSpaceMap = {
 						...lc.msToSpaceMap,
-						[spaceUpdate!.ms]: {
-							...getDefaultSpace(),
-							...lc.msToSpaceMap[spaceUpdate!.ms]!,
-							...spaceUpdate,
-							// TODO: why do I need this satisfies for correct type checking?
-						} satisfies Space,
-					};
-					return lc;
-				});
-			}
+						[spaceUpdate.ms]: spaceUpdate
+							? ({
+									...getDefaultSpace(),
+									...lc.msToSpaceMap[spaceUpdate!.ms]!,
+									...spaceUpdate,
+									// TODO: why do I need this satisfies for correct type checking?
+								} satisfies Space)
+							: undefined,
+					});
+				return lc;
+			});
+
 			mergeMsToAccountNameTxtMap(res.msToAccountNameTxtMap);
 			mergeSpaceMsToAccountMsToMembershipMap({ [urlInMs]: res.accountMsToMembershipMap ?? {} });
 

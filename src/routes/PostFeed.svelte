@@ -89,13 +89,34 @@
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
 	let callerMs = $derived(gs.accounts?.[0].ms);
-	let identifier = $derived(
-		JSON.stringify({
-			viewable,
-			callerMs,
-			href: page.url.href,
-		}),
+	let okToLoadMorePosts = $derived(
+		callerMs !== undefined &&
+			!promptSignIn &&
+			(urlInMs === undefined
+				? isMergedView || isOwnerView
+				: viewable && gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]),
 	);
+	let identifier = $derived(
+		!okToLoadMorePosts
+			? ''
+			: JSON.stringify({
+					viewable,
+					callerMs,
+					href: page.url.href,
+				}),
+	);
+	$effect(() => {
+		// console.log('viewable:', viewable);
+		// console.log('okToLoadMorePosts:', okToLoadMorePosts);
+		// console.log(
+		// 	callerMs === undefined,
+		// 	promptSignIn,
+		// 	urlInMs === undefined,
+		// 	!isMergedView,
+		// 	!isOwnerView,
+		// );
+		// console.log('identifier:', identifier);
+	});
 	let postFeed = $derived(gs.identifierToPostFeedMap[identifier]);
 	let sectionObjs = $derived(postFeed?.sectionObjs || []);
 	let endReached = $derived(postFeed?.endReached);
@@ -132,14 +153,7 @@
 	let loadMorePosts = async (e: InfiniteEvent) => {
 		// console.log('loadMorePosts');
 		// if (1) return;
-		if (
-			callerMs === undefined ||
-			promptSignIn ||
-			(urlInMs === undefined
-				? !isMergedView && !isOwnerView
-				: !viewable || !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs])
-		)
-			return;
+		if (!okToLoadMorePosts) return;
 		// await new Promise((res) => setTimeout(res, 1000));
 		// TODO: load locally saved topLvlPostIdStrs and only fetch new ones if the user scrolls or
 		// interacts with the feed. This is to reduce unnecessary requests when the user just wants
@@ -338,6 +352,7 @@
 				page.route.id === '/[spaceSlug=spaceSlug]'
 					? urlInMs //
 					: undefined;
+			console.time('getPostFeed');
 			let postFeedUpdate = await getPostFeed(
 				[
 					extensionSearchPostFeedSection,
@@ -348,6 +363,7 @@
 				useLocalDb,
 				setLastViewMsInMs,
 			);
+			console.timeEnd('getPostFeed');
 			if (setLastViewMsInMs) {
 				updateLocalCache((lc) => {
 					lc.accounts[0].msToJoinedSpaceContextMap[setLastViewMsInMs]!.accentCode =
@@ -461,6 +477,7 @@
 						},
 					},
 				};
+				// let tempPostMs = Date.now();
 				let res = await addPost(
 					post,
 					useLocalDb,
@@ -487,7 +504,6 @@
 				gs.postIdToSubIdsMap[atPostId] ??= [];
 				gs.postIdToSubIdsMap[atPostId].unshift(strPostId);
 			}
-
 			if (gs.writingNewPost || gs.writingReplyTo) {
 				if (flatView && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
 				viewPostToastId = strPostId;
@@ -565,7 +581,8 @@
 	);
 </script>
 
-{#if callerMs === undefined || (urlInMs === undefined ? !viewable : !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs])}
+<!-- {#if callerMs === undefined || (urlInMs === undefined ? !viewable : !gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs])} -->
+{#if callerMs === undefined}
 	<!--  -->
 {:else if promptSignIn}
 	<PromptSignIn />
@@ -717,7 +734,7 @@
 				</a>
 			{:else if canPost}
 				<button
-					class="xy h-9 w-9 twritingNewPost-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
+					class="xy h-9 w-9 text-black bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
 					onclick={() => (gs.writingNewPost = true)}
 				>
 					<IconPencilPlus class="h-8 xs:h-9" />

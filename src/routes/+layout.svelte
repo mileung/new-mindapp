@@ -37,7 +37,7 @@
 	};
 
 	onMount(async () => {
-		console.time('layout onMount');
+		// console.time('layout onMount');
 		if (isEmbed) return;
 		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
 		gs.theme = (['light', 'dark', 'system'].includes(theme!) ? theme : 'system')!;
@@ -49,9 +49,9 @@
 		set_msToProfileMap();
 
 		try {
-			console.time('initLocalDb');
+			// console.time('initLocalDb');
 			await initLocalDb();
-			console.timeEnd('initLocalDb');
+			// console.timeEnd('initLocalDb');
 		} catch (error) {
 			console.error(error);
 			gs.localDbFailed = true;
@@ -63,7 +63,7 @@
 				// unregister service workers at chrome://serviceworker-internals
 				navigator.serviceWorker.register('./service-worker.js');
 			});
-		console.timeEnd('layout onMount');
+		// console.timeEnd('layout onMount');
 	});
 
 	$effect(() => {
@@ -111,7 +111,6 @@
 						? !checkedAnythingBefore
 						: !gs.accountMsToSpaceMsToCheckedMap[gs.accounts[0].ms]?.[urlInMs])
 				) {
-					let spaceDne = urlInMs !== undefined && urlInMs > 1 && urlInMs < 1775000111222;
 					let caller = gs.accounts[0];
 					let callerMs = caller.ms;
 					if (urlInMs === 8 && callerMs) return;
@@ -236,7 +235,6 @@
 						signedInAccountUpdates = [],
 						visitingPublicSpaceUpdate,
 					} = callerContext;
-
 					gs.accountMsToSpaceMsToCheckedMap = {
 						...gs.accountMsToSpaceMsToCheckedMap,
 						[callerMs]: {

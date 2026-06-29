@@ -10,6 +10,7 @@
 	import { passwordRegexStr, type MyAccount } from '$lib/types/accounts';
 	import { updateLocalCache, useCheckedInvite } from '$lib/types/local-cache';
 	import { IconChevronRight } from '@tabler/icons-svelte';
+	import SpinnerOverlay from './SpinnerOverlay.svelte';
 
 	let p: {
 		signingIn?: boolean;
@@ -27,6 +28,7 @@
 	let showingOldPw = $state(false);
 	let showingPw = $state(false);
 	let showingRePw = $state(false);
+	let loading = $state(false);
 	let escapedPw = $derived.by(() => password.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
 	let pwIptProps = $derived({
 		minlength: 8,
@@ -69,6 +71,7 @@
 			</button>
 		</div>
 		<input
+			disabled={loading}
 			required
 			bind:value={oldPassword}
 			autocomplete="current-password"
@@ -85,6 +88,7 @@
 		</button>
 	</div>
 	<input
+		disabled={loading}
 		required
 		bind:value={password}
 		autocomplete={p.signingIn ? 'current-password' : 'new-password'}
@@ -109,6 +113,7 @@
 			</button>
 		</div>
 		<input
+			disabled={loading}
 			required
 			bind:value={reenteredPw}
 			autocomplete="new-password"
@@ -123,12 +128,14 @@
 {#snippet continueAndChangeEmailBtn()}
 	<div class="mt-2 flex items-end w-full justify-between">
 		<button
+			disabled={loading}
 			type="submit"
-			class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
+			class="relative fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 		>
 			{m.continue()}
-			<IconChevronRight class="h-5" stroke={3} /></button
-		>
+			<IconChevronRight class="h-5" stroke={3} />
+			<SpinnerOverlay on={loading} />
+		</button>
 		{#if otpMs && p.creatingAccount}
 			<button
 				class="text-fg2 hover:text-fg1"
@@ -151,6 +158,7 @@
 			class="mt-2"
 			onsubmit={async (e) => {
 				e.preventDefault();
+				loading = true;
 				try {
 					let res = await trpc().signIn.mutate({
 						otpMs,
@@ -162,6 +170,8 @@
 					onAccountAuth(res.account);
 				} catch (error) {
 					alertError(error);
+				} finally {
+					loading = false;
 				}
 			}}
 		>
@@ -176,6 +186,7 @@
 			class="mt-2"
 			onsubmit={async (e) => {
 				e.preventDefault();
+				loading = true;
 				try {
 					let strike: undefined | number;
 					let expiredOtp: undefined | true;
@@ -222,11 +233,14 @@
 					}
 				} catch (error) {
 					alertError(error);
+				} finally {
+					loading = false;
 				}
 			}}
 		>
 			<p class="mt-2 font-bold">{m.oneTimePin()}</p>
 			<input
+				disabled={loading}
 				bind:value={pin}
 				class="bg-bg4 w-full px-2 h-9 text-lg"
 				required
@@ -263,6 +277,7 @@
 				if ((p.creatingAccount || p.signingIn) && gs.accounts!.length >= 88) {
 					return alert(m.placeholderError()); // gs.accounts.length must be lte88
 				}
+				loading = true;
 				try {
 					let normalizedEmail = email.trim().toLowerCase();
 					if (p.resettingPassword && email && email === gs.accounts?.[0].email.txt) {
@@ -284,7 +299,6 @@
 						let signedInAccount = gs.accounts?.find(
 							(a) => a.signedIn && a.email.txt === normalizedEmail,
 						);
-						otpMs = -1;
 						if (signedInAccount) {
 							updateLocalCache((lc) => ({
 								...lc,
@@ -306,7 +320,6 @@
 						}
 						onAccountAuth(res.account);
 					} else {
-						otpMs = -1;
 						let res = await trpc().sendOtp.mutate({
 							email,
 							will: p.creatingAccount //
@@ -325,14 +338,16 @@
 						}
 					}
 				} catch (error) {
-					otpMs = 0;
 					alertError(error);
+				} finally {
+					loading = false;
 				}
 			}}
 		>
 			{#if p.creatingAccount}
 				<p class="mt-2 font-bold">{m.name()}</p>
 				<input
+					disabled={loading}
 					required
 					bind:value={name}
 					type="name"
@@ -344,6 +359,7 @@
 			{#if gs.accounts ? gs.accounts?.[0].email.txt !== page.state.prefilledEmail : true}
 				<p class="mt-2 font-bold">{m.email()}</p>
 				<input
+					disabled={loading}
 					required
 					bind:value={email}
 					type="email"

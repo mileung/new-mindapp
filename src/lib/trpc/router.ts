@@ -1,3 +1,4 @@
+import { dev } from '$app/environment';
 import { scrape } from '$lib/dom';
 import { assertInputIsOwner, atDomainRegex, emailRegex, inputIsOwner, throwIf } from '$lib/js';
 import { _getCallerContext } from '$lib/server/_getCallerContext';
@@ -86,6 +87,11 @@ let makeProcedure = (
 	} = generalLimiter,
 ) =>
 	t.procedure.use(async ({ ctx, next }) => {
+		if (dev) {
+			let simulateNetworkLatency = false;
+			simulateNetworkLatency = true;
+			if (simulateNetworkLatency) await new Promise((res) => setTimeout(res, 800));
+		}
 		await rateLimiter.ping(ctx);
 		return next();
 	});
