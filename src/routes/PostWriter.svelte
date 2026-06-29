@@ -121,7 +121,7 @@
 		window.addEventListener('keydown', onKeyDown);
 		window.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('mouseup', onDragEnd);
-		window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
+		// window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
 		window.addEventListener('touchend', onDragEnd);
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
