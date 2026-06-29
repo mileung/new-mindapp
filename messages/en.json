@@ -255,6 +255,7 @@
 	"oneSpaceNameTag": "1 {spaceName} tag",
 	"nSpaceNameTags": "{n} {spaceName} tags",
 	"createdD": "Created {d}",
+	"pending": "Pending",
 	"lessThanMinAgo": "<1m",
 	"timeAgoMinutes": "{count}m",
 	"timeAgoHours": "{count}h",

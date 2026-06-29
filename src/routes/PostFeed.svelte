@@ -371,10 +371,7 @@
 					return lc;
 				});
 			}
-			let {
-				topLvlPostIdStrsSections: newTopLvlPostIdStrsSections = [],
-				idToPostMap: newIdToPostMap = {},
-			} = postFeedUpdate;
+			let { topLvlPostIdStrsSections: newTopLvlPostIdStrsSections = [] } = postFeedUpdate;
 			// console.log('postFeedUpdate:', postFeedUpdate);
 			// TODO: add account and space names to to local db using msToAccountNameTxtMap and msToSpaceNameTxtMap
 			mergePostFeedUpdate(postFeedUpdate);
@@ -385,9 +382,6 @@
 				lastSectionTopLvlPostIdStrs.length < mainPostFeedSection.topLvlPostLimit;
 			endReached && e.detail.complete();
 
-			//
-
-			// console.log('newTopLvlPostIdStrsSections:', newTopLvlPostIdStrsSections);
 			let newSectionObjs: typeof sectionObjs = [];
 			if (firstLoad) {
 				newSectionObjs = newTopLvlPostIdStrsSections.map((newTopLvlPostIdStrsSection, i) => {
@@ -431,17 +425,36 @@
 	let viewPostToastId = $state('');
 	let submitPost = async (tags: string[], core: string) => {
 		if (!gs.accounts || urlInMs === undefined) return;
+		let editPostIdStr = gs.writingEditFor && getIdStr(gs.writingEditFor);
+		let atPostIdStr = gs.writingReplyTo && getIdStr(gs.writingReplyTo);
+		let atPostIdObj = gs.writingReplyTo && getIdObj(gs.writingReplyTo);
+		let writingNewPost = !!gs.writingNewPost;
+		resetBottomOverlay();
+		gs.writerTags = [];
+		gs.writerTagVal = '';
+		gs.writerCore = '';
 		try {
 			assertCallerIsOwnerOrInGlobal();
-			await updateSavedTags(tags);
+			updateSavedTags(tags);
 			let post: Post;
-			if (gs.writingEditFor) {
-				let postBeingEdited = gs.idToPostMap[getIdStr(gs.writingEditFor)]!;
-				let newLastVersion = getLastVersion(postBeingEdited)! + 1;
-				post = {
-					...postBeingEdited,
+			if (editPostIdStr) {
+				let postToEdit = gs.idToPostMap[editPostIdStr]!;
+				let newLastVersion = getLastVersion(postToEdit)! + 1;
+				gs.idToPostMap[editPostIdStr] = {
+					...postToEdit,
 					history: {
-						...postBeingEdited.history,
+						...postToEdit.history,
+						[newLastVersion]: {
+							ms: Date.now(),
+							tags,
+							core,
+						},
+					},
+				};
+				post = {
+					...postToEdit,
+					history: {
+						...postToEdit.history,
 						[newLastVersion]: {
 							ms: 0,
 							tags,
@@ -450,7 +463,6 @@
 					},
 				};
 				post.history![newLastVersion]!.ms = (await editPost(post, false, false)).ms;
-
 				if (0 && !useLocalDb) {
 					// TODO:
 					let locallySavedPost = getLocallySavedPost(post);
@@ -462,10 +474,10 @@
 					in_ms: urlInMs,
 					ms: 0,
 					by_ms: gs.accounts[0].ms,
-					...(gs.writingReplyTo
+					...(atPostIdObj
 						? {
-								at_ms: gs.writingReplyTo.ms,
-								at_by_ms: gs.writingReplyTo.by_ms,
+								at_ms: atPostIdObj.ms,
+								at_by_ms: atPostIdObj.by_ms,
 							}
 						: {}),
 					childCount: 0,
@@ -477,10 +489,15 @@
 						},
 					},
 				};
-				// let tempPost = { ...post, ms: Date.now(), pending: true };
-				// let tempPostIdStr = getIdStr(tempPost);
-				// mergePostFeedUpdate({ idToPostMap: { [tempPostIdStr]: tempPost } });
-
+				let tempPost = { ...post, ms: Date.now(), pending: true };
+				let tempPostIdStr = getIdStr(tempPost);
+				gs.idToPostMap = { ...gs.idToPostMap, [tempPostIdStr]: tempPost };
+				if (flatView && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(tempPostIdStr);
+				if (atPostIdStr) {
+					gs.idToPostMap[atPostIdStr]!.childCount!++;
+					gs.postIdToSubIdsMap[atPostIdStr] ??= [];
+					gs.postIdToSubIdsMap[atPostIdStr].unshift(tempPostIdStr);
+				}
 				let res = await addPost(
 					post,
 					useLocalDb,
@@ -491,29 +508,18 @@
 				);
 				post.ms = post.history![1]!.ms = res.ms;
 				mergePostFeedUpdate(res);
+				gs.idToPostMap[tempPostIdStr] = null;
+				let strPostId = getIdStr(post);
+				gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
+				if (writingNewPost || atPostIdStr) {
+					if (atPostIdStr) gs.postIdToSubIdsMap[getAtIdStr(post)]!.unshift(strPostId);
+					if (flatView && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
+					viewPostToastId = strPostId;
+					setTimeout(() => (viewPostToastId = ''), 3000);
+				}
 				// 	if (!locallySavedPost) await addPost(post, true, true, []);
 				// !useLocalDb && (await addPost(post, true, true, []));
-				// let strPostId = getIdStr(post);
-				// gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
 			}
-			gs.writerTags = [];
-			gs.writerTagVal = '';
-			gs.writerCore = '';
-			let strPostId = getIdStr(post);
-			gs.idToPostMap = { ...gs.idToPostMap, [strPostId]: post };
-			if (gs.writingReplyTo) {
-				let atPostId = getAtIdStr(post);
-				gs.idToPostMap[atPostId]!.childCount!++;
-				gs.postIdToSubIdsMap[atPostId] ??= [];
-				gs.postIdToSubIdsMap[atPostId].unshift(strPostId);
-			}
-			if (gs.writingNewPost || gs.writingReplyTo) {
-				if (flatView && newFirst) sectionObjs.at(-1)!.topLvlPostIdStrs.unshift(strPostId);
-				viewPostToastId = strPostId;
-				setTimeout(() => (viewPostToastId = ''), 3000);
-			}
-			// TODO add new posts to all feeds applicable (merged, new, etc.)?
-			resetBottomOverlay();
 		} catch (error) {
 			return alertError(error);
 		}

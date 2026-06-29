@@ -1,18 +1,12 @@
 import { PopupMessage } from './background';
 
-let dev = import.meta.env.VITE_ENV === 'DEV';
-let preview = import.meta.env.VITE_ENV === 'PREVIEW';
-
 // TODO: Users should be able to assign shortcuts in /settings
 // The frontend and bg script would send messages and
 // save settings in chrome.storage.sync
-
 let oldMindappDevUrl = 'http://localhost:1234';
-let oldMindappUrl = 'https://mindapp.cc';
-
 let newMindappDevUrl = 'http://localhost:8888';
 let newMindappPreviewUrl = 'http://localhost:1111';
-let newMindappUrl = 'https://new.mindapp.cc';
+let newMindappUrl = 'https://mindapp.cc';
 
 chrome.runtime.onMessage.addListener((msg) => {
 	if (['context-menu-clicked', 'extension-icon-clicked'].includes(msg.type))
@@ -22,7 +16,6 @@ chrome.runtime.onMessage.addListener((msg) => {
 if (
 	[
 		oldMindappDevUrl,
-		oldMindappUrl,
 		newMindappDevUrl,
 		newMindappPreviewUrl,
 		newMindappUrl, //

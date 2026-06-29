@@ -76,7 +76,7 @@
 	let parsed = $state(true);
 	let postIdStr = $derived(getIdStr(p.post));
 	let subIds = $derived.by(() => {
-		let arr = gs.postIdToSubIdsMap[postIdStr] || [];
+		let arr = (gs.postIdToSubIdsMap[postIdStr] || []).filter((s) => gs.idToPostMap[s]);
 		if (p.nested && p.post.childCount !== arr.length)
 			console.warn(
 				`nested ${postIdStr} childCount is ${p.post.childCount} but subIds.length is ${arr.length}`,
@@ -309,32 +309,34 @@
 			style={`right:${moreOptionsMenuRight}px`}
 		>
 			<div class={`h-8 flex ${evenBg ? 'bg-bg3' : 'bg-bg4'}`}>
-				<button
-					class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
-					onclick={() => (parsed = !parsed)}
-				>
-					{#if parsed}
-						<IconCube3dSphere class="h-4 w-4" />
-					{:else}
-						<IconCube class="h-4 w-4" />
-					{/if}
-					<p class="text-fg2 group-hover:text-fg1">
-						{parsed ? m.unparse() : m.parse()}
-					</p>
-				</button>
-				<button
-					class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
-					onclick={handleCopyClick}
-				>
-					{#if copyClicked}
-						<IconCheck class="h-4 w-4" />
-					{:else}
-						<IconCopy class="h-4 w-4" />
-					{/if}
-					<p class="text-fg2 group-hover:text-fg1">
-						{m.copy()}
-					</p>
-				</button>
+				{#if core}
+					<button
+						class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
+						onclick={() => (parsed = !parsed)}
+					>
+						{#if parsed}
+							<IconCube3dSphere class="h-4 w-4" />
+						{:else}
+							<IconCube class="h-4 w-4" />
+						{/if}
+						<p class="text-fg2 group-hover:text-fg1">
+							{parsed ? m.unparse() : m.parse()}
+						</p>
+					</button>
+					<button
+						class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
+						onclick={handleCopyClick}
+					>
+						{#if copyClicked}
+							<IconCheck class="h-4 w-4" />
+						{:else}
+							<IconCopy class="h-4 w-4" />
+						{/if}
+						<p class="text-fg2 group-hover:text-fg1">
+							{m.copy()}
+						</p>
+					</button>
+				{/if}
 				<!-- TODO: toggle saving posts -->
 				{#if 0 && p.post.in_ms !== 0}
 					<button
@@ -384,10 +386,9 @@
 									Date.now() - versionMs! < minute ||
 									confirm(m.areYouSureYouWantToDeleteThisPost());
 								if (ok) {
-									let { soft } = await deletePost(getIdObj(p.post), !urlInMs);
-									console.log('soft:', soft);
 									version = null;
-									if (soft) gs.idToPostMap[postIdStr]!.history = null;
+									let postIdObj = getIdObj(p.post);
+									if (p.post.childCount) gs.idToPostMap[postIdStr]!.history = null;
 									else {
 										let parentPostIdStr = getAtIdStr(p.post);
 										if (hasParent(p.post) && gs.idToPostMap[parentPostIdStr]) {
@@ -398,6 +399,7 @@
 										}
 										gs.idToPostMap[postIdStr] = null;
 									}
+									await deletePost(postIdObj, !urlInMs);
 								}
 							}}
 						>
@@ -536,23 +538,27 @@
 					<div
 						class={`flex text-sm font-bold text-fg2 h-8 w-full overflow-x-scroll overflow-y-hidden`}
 					>
-						<a
-							{target}
-							href={`/${postIdStr}`}
-							class={`fx text-nowrap hover:text-fg1 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-							title={isoMsLabel}
-							onclick={(e) => {
-								if (
-									!e.metaKey &&
-									!e.shiftKey &&
-									!e.ctrlKey && //
-									page.params.spaceSlug
-								)
-									gs.lastScrollY = window.scrollY;
-							}}
-						>
-							{msLabel}
-						</a>
+						{#if p.post.pending}
+							<div class="fx">{m.pending()}</div>
+						{:else}
+							<a
+								{target}
+								href={`/${postIdStr}`}
+								class={`fx text-nowrap hover:text-fg1 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+								title={isoMsLabel}
+								onclick={(e) => {
+									if (
+										!e.metaKey &&
+										!e.shiftKey &&
+										!e.ctrlKey && //
+										page.params.spaceSlug
+									)
+										gs.lastScrollY = window.scrollY;
+								}}
+							>
+								{msLabel}
+							</a>
+						{/if}
 						<a
 							{target}
 							href={`/__${p.post.by_ms}`}
@@ -580,83 +586,84 @@
 								</p>
 							</a>
 						{/if}
-						{#if !p.isEmbed}
-							<button
-								class={`fx px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-								onmousedown={(e) => e.preventDefault()}
-								onclick={() => onCite(p.post)}
-							>
-								<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
-								{m.cite()}
-							</button>
-							{#if canPost}
+						{#if !p.post.pending}
+							{#if !p.isEmbed}
 								<button
-									class={`fx px-1 flex-1 text-nowrap  hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-									onclick={() => {
-										resetBottomOverlay('wt');
-										gs.writingReplyTo =
-											gs.writingReplyTo && getIdStr(gs.writingReplyTo) === postIdStr
-												? null
-												: p.post;
-									}}
+									class={`fx px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+									onmousedown={(e) => e.preventDefault()}
+									onclick={() => onCite(p.post)}
 								>
-									<IconMessage2Plus class="w-4.5 mr-1" />
-									{m.replyC({ c: '' + p.post.childCount })}
+									<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
+									{m.cite()}
 								</button>
-							{:else}
-								<div class="fx flex-1 text-nowrap">
-									<IconMessage2 class="w-4.5 mr-1" />
-									{p.post.childCount === 1
-										? m.oneReply()
-										: m.nReplies({ n: '' + p.post.childCount })}
-								</div>
-							{/if}
-							{#if canReact}
-								{@render reactionInput()}
-							{/if}
-						{/if}
-						{#each rxnEmojiCountEntries as [emoji, count], i}
-							<button
-								class={`group fx h-8 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${
-									p.post.myRxnEmojis?.includes(emoji)
-										? 'text-fg1 border-b border-hl1 hover:text-fg3'
-										: 'hover:text-fg1'
-								}`}
-								onclick={async () => {
-									await toggleReaction({
-										postIdObj: getIdObj(p.post),
-										emoji,
-									});
-								}}
-							>
-								{emoji}
-								<p class="ml-1.5 font-bold">
-									{count}
-								</p>
-							</button>
-							{#if i === rxnEmojiCountEntries.length - 1}
-								<div class="h-8 xy">
+								{#if canPost}
 									<button
-										class={`group xy h-8 w-7 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+										class={`fx px-1 flex-1 text-nowrap  hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 										onclick={() => {
-											resetBottomOverlay('rh');
-											gs.showReactionHistory =
-												gs.showReactionHistory && postIdStr === getIdStr(gs.showReactionHistory)
+											resetBottomOverlay('wt');
+											gs.writingReplyTo =
+												gs.writingReplyTo && getIdStr(gs.writingReplyTo) === postIdStr
 													? null
 													: p.post;
 										}}
 									>
-										<IconChartBarPopular stroke={2.5} class="w-3.5" />
+										<IconMessage2Plus class="w-4.5 mr-1" />
+										{m.replyC({ c: '' + p.post.childCount })}
 									</button>
-								</div>
+								{:else}
+									<div class="fx flex-1 text-nowrap">
+										<IconMessage2 class="w-4.5 mr-1" />
+										{p.post.childCount === 1
+											? m.oneReply()
+											: m.nReplies({ n: '' + p.post.childCount })}
+									</div>
+								{/if}
+								{#if canReact}
+									{@render reactionInput()}
+								{/if}
 							{/if}
-						{/each}
-						{#if !p.isEmbed}
-							{@render moreOptionsBtn()}
-						{/if}
-						<!-- {#if gs.devMode && !p.cited} -->
-						{#if gs.devMode}
-							<p class="self-center text-fg2">{postIdStr}</p>
+							{#each rxnEmojiCountEntries as [emoji, count], i}
+								<button
+									class={`group fx h-8 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${
+										p.post.myRxnEmojis?.includes(emoji)
+											? 'text-fg1 border-b border-hl1 hover:text-fg3'
+											: 'hover:text-fg1'
+									}`}
+									onclick={async () => {
+										await toggleReaction({
+											postIdObj: getIdObj(p.post),
+											emoji,
+										});
+									}}
+								>
+									{emoji}
+									<p class="ml-1.5 font-bold">
+										{count}
+									</p>
+								</button>
+								{#if i === rxnEmojiCountEntries.length - 1}
+									<div class="h-8 xy">
+										<button
+											class={`group xy h-8 w-7 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+											onclick={() => {
+												resetBottomOverlay('rh');
+												gs.showReactionHistory =
+													gs.showReactionHistory && postIdStr === getIdStr(gs.showReactionHistory)
+														? null
+														: p.post;
+											}}
+										>
+											<IconChartBarPopular stroke={2.5} class="w-3.5" />
+										</button>
+									</div>
+								{/if}
+							{/each}
+							{#if !p.isEmbed}
+								{@render moreOptionsBtn()}
+							{/if}
+							{#if gs.devMode}
+								<p class="self-center text-fg2">{postIdStr}</p>
+							{/if}
 						{/if}
 					</div>
 					<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->

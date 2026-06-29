@@ -266,5 +266,5 @@ export let _deletePost = async (db: Database, postIdObj: IdObj) => {
 		}
 	}
 
-	return { soft: softDelete };
+	return {};
 };

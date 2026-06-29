@@ -46,7 +46,6 @@ export let _addPost = async (
 	let partsToInsert: PartInsert[] = [postImb_parentMb_rootMb_childCountMainRow];
 	let historyEntries = post.history ? Object.entries(post.history) : [];
 	let lastVersion = getLastVersion(post);
-	let idToCitedPostMap: Record<string, Post> = {};
 	let tagStrsFromAllLayersSet = new Set<string>();
 	let currentTagStrs: string[] = [];
 	for (let i = 0; i < historyEntries.length; i++) {
@@ -220,7 +219,6 @@ export let _addPost = async (
 	}
 
 	return {
-		idToCitedPostMap,
 		ms: postMs,
 		idToPostMap: citedPostFeed?.idToPostMap,
 		msToAccountNameTxtMap: citedPostFeed?.msToAccountNameTxtMap,
