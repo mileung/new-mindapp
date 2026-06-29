@@ -71,7 +71,7 @@
 	let callerIsAdmin = $derived(spaceContext?.roleCode?.num === roleCodes.admin);
 	let userCanEdit = $derived.by(() => {
 		if (p.space) return callerIsAdmin;
-		if (p.account) return p.account.ms === callerMs;
+		if (p.account) return callerMs && callerMs === p.account.ms;
 		return false;
 	});
 
