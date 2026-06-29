@@ -112,16 +112,18 @@
 		};
 		let onMouseMove = (e: MouseEvent) => onDrag(e.clientY);
 		let onTouchMove = (e: TouchEvent) => {
-			e.preventDefault(); // Stops page scrolling
-			let touch = e.touches[0];
-			onDrag(touch.clientY);
+			if (draggingHeight) {
+				e.preventDefault(); // Stops page scrolling
+				let touch = e.touches[0];
+				onDrag(touch.clientY);
+			}
 		};
 		let onDragEnd = () => (draggingHeight = false);
 
 		window.addEventListener('keydown', onKeyDown);
 		window.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('mouseup', onDragEnd);
-		// window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
+		window.addEventListener('touchmove', onTouchMove, { passive: false }); // passive: false needed for preventDefault to work
 		window.addEventListener('touchend', onDragEnd);
 		return () => {
 			window.removeEventListener('keydown', onKeyDown);
