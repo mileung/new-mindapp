@@ -477,7 +477,10 @@
 						},
 					},
 				};
-				// let tempPostMs = Date.now();
+				// let tempPost = { ...post, ms: Date.now(), pending: true };
+				// let tempPostIdStr = getIdStr(tempPost);
+				// mergePostFeedUpdate({ idToPostMap: { [tempPostIdStr]: tempPost } });
+
 				let res = await addPost(
 					post,
 					useLocalDb,

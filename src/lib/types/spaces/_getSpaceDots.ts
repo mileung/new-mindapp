@@ -143,7 +143,7 @@ export let _getSpaceDots = async (
 								and(
 									pf.code.eq(pc.acceptBm_inviteIbm),
 									pf.p3.eq(spaceMs),
-									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p2.eq(r.p2!))),
+									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p1.eq(r.p2!))),
 								),
 								and(
 									or(
@@ -215,6 +215,7 @@ export let _getSpaceDots = async (
 			flair: { txt: '' },
 		};
 	}
+	console.log('acceptBm_inviteIbmRows:', acceptBm_inviteIbmRows);
 	for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
 		let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
 		let { p1, p2, p4 } = acceptBm_inviteIbmRow;

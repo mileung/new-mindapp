@@ -27,6 +27,7 @@
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 	import SpaceOrAccountHeader from '../../SpaceOrAccountHeader.svelte';
+	import SpinnerOverlay from '../../SpinnerOverlay.svelte';
 	import MembershipBlock from './MembershipBlock.svelte';
 
 	// TODO: use a less rounded icon set with the same dx as @tabler/icons-svelte
@@ -36,6 +37,7 @@
 	let validFor = $state(week);
 	let maxUsesStr = $state('1');
 	let copiedInviteMs = $state(0);
+	let loading = $state(false);
 
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let urlInMs = $derived(getUrlInMs()!);
@@ -209,6 +211,7 @@
 					<div class="flex-1">
 						<p class="text-sm font-bold">{m.validFor()}</p>
 						<select
+							disabled={loading}
 							name={m.validFor()}
 							class="h-9 font-normal text-lg mt-1 w-full p-2 bg-bg2 hover:bg-bg5 text-fg1"
 							bind:value={validFor}
@@ -235,6 +238,7 @@
 							</button>
 						</div>
 						<input
+							disabled={loading}
 							required
 							inputmode="numeric"
 							autocomplete="off"
@@ -319,14 +323,18 @@
 							class="fx text-fg2 hover:text-fg1 hover:bg-bg4 w-full"
 							onclick={async () => {
 								if (confirm('Are you sure you want to revoke this invite link?')) {
-									await trpc().revokeInviteLink.mutate({
-										...(await getWhoWhereObj()),
-										inviteMs: invite.ms,
-										slugEnd: invite.slugEnd,
-									});
-									myDots!.invites = myDots!.invites.filter(
-										(i) => i.ms !== invite.ms || i.slugEnd !== invite.slugEnd,
-									);
+									try {
+										myDots!.invites = myDots!.invites.filter(
+											(i) => i.ms !== invite.ms || i.slugEnd !== invite.slugEnd,
+										);
+										await trpc().revokeInviteLink.mutate({
+											...(await getWhoWhereObj()),
+											inviteMs: invite.ms,
+											slugEnd: invite.slugEnd,
+										});
+									} catch (error) {
+										console.error(error);
+									}
 								}
 							}}
 						>
@@ -336,8 +344,9 @@
 					</div>
 				{/each}
 				<button
-					class="mt-2 h-8 xy px-2 py-1 bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
+					class="relative mt-2 h-8 xy px-2 py-1 bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 					onclick={async (e) => {
+						loading = true;
 						try {
 							e.preventDefault();
 							let maxUses = isStrInt(maxUsesStr) ? +maxUsesStr : 0;
@@ -368,11 +377,14 @@
 							};
 						} catch (error) {
 							alertError(error);
+						} finally {
+							loading = false;
 						}
 					}}
 				>
 					<IconLinkPlus class="w-5 mr-1" />
 					{m.createLink()}
+					<SpinnerOverlay on={loading} />
 				</button>
 			{/if}
 			<div class="h-0.5 mt-2 w-full bg-bg8"></div>

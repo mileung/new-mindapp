@@ -117,7 +117,7 @@ export let _checkInvite = async (
 				}),
 				...testMembers,
 				...makeRowsForJoiningSpace({
-					now: now,
+					now,
 					callerMs: input.callerMs,
 					inviteIdObj: { ms: 0, by_ms: 0, in_ms: 1 },
 					permissionCodeNum: permissionCodes.reactAndPost,
