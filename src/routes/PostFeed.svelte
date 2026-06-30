@@ -75,9 +75,6 @@
 	let urlInMs = $derived(getUrlInMs());
 	let { canPost } = $derived(getSpacePermissions(urlInMs));
 	let space = $derived(urlInMs === undefined ? undefined : gs.msToSpaceMap[urlInMs]);
-	$effect(() => {
-		// console.log('space', JSON.stringify(space, null, 2));
-	});
 	let spaceContext = $derived(getSpaceContext(urlInMs));
 	let isMergedView = $derived(page.url.pathname === '/merged-view');
 	let callerIsOwner = $derived(getCallerIsOwner());
