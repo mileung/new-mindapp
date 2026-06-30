@@ -52,7 +52,14 @@ let getDefaultLocalCache = () =>
 		devMode: dev,
 		lastSeenInMs: 0,
 		accounts: [getDefaultAccount()],
-		msToSpaceMap: { 0: getDefaultSpace() },
+		msToSpaceMap: {
+			0: getDefaultSpace(),
+			1: {
+				...getDefaultSpace(),
+				ms: 1,
+				isPublic: { ms: 0, num: 1 },
+			},
+		},
 	} satisfies LocalCache);
 
 export let getLocalCache = () => {

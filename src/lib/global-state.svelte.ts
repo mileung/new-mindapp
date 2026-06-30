@@ -35,13 +35,7 @@ class GlobalState {
 	lastSeenInMs = $state<number>();
 	accounts = $state<undefined | MyAccount[]>();
 	postIdToLocallySavedMap = $state<Record<string, true>>({});
-	msToSpaceMap = $state<Record<number | string, undefined | Space>>({
-		1: {
-			...getDefaultSpace(),
-			ms: 1,
-			isPublic: { ms: 0, num: 1 },
-		},
-	});
+	msToSpaceMap = $state<Record<number | string, undefined | Space>>({});
 	//
 
 	accountMsToSpaceMsToCheckedMap = $state<

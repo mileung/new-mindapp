@@ -195,7 +195,8 @@ export let _getPostFeed = async (
 		// console.log('section:', section);
 		// console.log('section.postIdObjsExclude:', section.postIdObjsExclude);
 		let { newFirst, msGte, msLte } = section;
-		throwIf(!dbIsLocal && !callerMs && (msGte !== undefined || msLte !== undefined));
+		// TODO: gotta think more about limiting public feeds from anon users
+		// throwIf(!dbIsLocal && !callerMs && (msGte !== undefined || msLte !== undefined));
 		let sectionTopLvlPostsLeft = section.topLvlPostLimit;
 		let resultingPostIdObjsForSection: IdObj[] = [];
 		let topLvlPostIdStrsForSection: string[] = [];

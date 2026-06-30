@@ -15,12 +15,15 @@
 	let draftGte = $state<string>('');
 	let draftLte = $state<string>('');
 	let msToDateInput = (ms: number) => new Date(ms).toISOString().slice(0, 10);
-	let dateStrToMs = (val: string) => new Date(val).getTime();
-	let applyDraft = () => {
+	let dateStrToMs = (val: string) => {
+		let [y, m, d] = val.split('-').map(Number);
+		return new Date(y, m - 1, d).getTime();
+	};
+	let applyFromToDates = () => {
 		if (draftGte && draftLte) p.onChange(dateStrToMs(draftGte), dateStrToMs(draftLte) + day - 1);
 		else if (draftGte) p.onChange(dateStrToMs(draftGte), null);
 		else if (draftLte) p.onChange(null, dateStrToMs(draftLte) + day - 1);
-		open = false;
+		else alert(m.invalidFromOrToDate());
 	};
 	type MsRangePreset = {
 		label: string;
@@ -125,7 +128,7 @@
 			<div class="flex">
 				<input
 					type="date"
-					class="pl-2 w-32 group-hover:bg-bg7 dark:[color-scheme:dark]"
+					class="pl-2 w-32 bg-bg3 group-hover:bg-bg6 dark:[color-scheme:dark]"
 					bind:value={draftGte}
 					max={draftLte || undefined}
 				/>
@@ -142,7 +145,7 @@
 			<div class="flex">
 				<input
 					type="date"
-					class="pl-2 w-32 group-hover:bg-bg7 dark:[color-scheme:dark]"
+					class="pl-2 w-32 bg-bg3 group-hover:bg-bg6 dark:[color-scheme:dark]"
 					bind:value={draftLte}
 					min={draftGte || undefined}
 				/>
@@ -154,11 +157,7 @@
 				</button>
 			</div>
 		</label>
-		<button
-			class="w-full px-2 py-1 text-fg1 hover:bg-bg7"
-			disabled={!draftGte && !draftLte}
-			onclick={applyDraft}
-		>
+		<button class="w-full px-2 py-1 text-fg1 hover:bg-bg7" onclick={applyFromToDates}>
 			{m.apply()}
 		</button>
 	</div>

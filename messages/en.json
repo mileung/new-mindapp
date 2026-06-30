@@ -89,6 +89,7 @@
 	"last90Days": "Last 90 days",
 	"from": "From",
 	"to": "To",
+	"invalidFromOrToDate": "Invalid from or to date",
 	"apply": "Apply",
 	"forgotPassword": "Forgot password?",
 	"resetPassword": "Reset password",

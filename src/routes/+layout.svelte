@@ -204,17 +204,7 @@
 										})),
 					};
 
-					// console.log('get:', JSON.parse(JSON.stringify(get)));
 					// console.log('get', JSON.stringify(get, null, 2));
-					// console.log(
-					// 	'get.spaceUpdatesFrom test',
-					// 	JSON.stringify(
-					// 		get.spaceUpdatesFrom?.map((s) => s),
-					// 		// get.spaceUpdatesFrom?.map((s) => s.ms),
-					// 		null,
-					// 		2,
-					// 	),
-					// );
 					let callerContext = getDefaultCallerContext();
 					try {
 						if ((urlInMs && urlInMs !== 8) || gs.accounts.some((a) => a.ms && a.signedIn)) {
@@ -223,7 +213,7 @@
 								spaceMs: urlInMs,
 								get,
 							});
-							console.log('callerContext', JSON.stringify(callerContext, null, 2));
+							// console.log('callerContext', JSON.stringify(callerContext, null, 2));
 						}
 					} catch (error) {
 						console.log('error:', error);
