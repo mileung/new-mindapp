@@ -278,7 +278,7 @@
 	"banned": "Banned",
 	"ban": "Ban",
 	"unban": "Unban",
-	"thisAccountWasBannedByNOnD": "This account was banned by <a href=\"/__{by_ms}\" class=\"hover:underline\">{n}</a> on {d}",
+	"thisAccountWasBannedByNOnD": "This account was banned by {n} (__{by_ms}) on {d}",
 	"pDoesNotMatch": "\"{p}\" does not match patterns like \"test@example.com\" or \"@example.com\"",
 	"anyEmailCanCreateAnAccount": "Any email can create an account",
 	"separateFullEmailsOrDomainsWithANewLine": "Separate full emails or @domains with a new line",

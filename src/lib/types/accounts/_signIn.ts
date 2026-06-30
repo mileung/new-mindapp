@@ -85,21 +85,28 @@ export let _signIn = async (
 		throwIf(!(await argon2.verify(_accountPwHash_bmRow.txt!, input.password)));
 	}
 	let clientIdObj = getValidAuthCookie(ctx, 'ms_clientKey');
-	let _clientKey_m_accountMsRow = assertLt2Rows(
-		clientIdObj
-			? await tdb
-					.select()
-					.from(pTable)
-					.where(
+	let {
+		[pc.accountMs_banMb]: accountMs_banMbRows = [],
+		[pc._clientKey_m_accountMs]: _clientKey_m_accountMsRows = [],
+	} = channelPartsByCode(
+		await tdb
+			.select()
+			.from(pTable)
+			.where(
+				or(
+					and(pf.code.eq(pc.accountMs_banMb), pf.p1.eq(accountMs)),
+					clientIdObj &&
 						and(
 							pf.code.eq(pc._clientKey_m_accountMs),
 							pf.txt.eq(clientIdObj.txt),
 							pf.p1.eq(clientIdObj.ms),
 							pf.p2.eq(accountMs),
 						),
-					)
-			: [],
+				),
+			),
 	);
+	throwIf(accountMs_banMbRows.length);
+	let _clientKey_m_accountMsRow = assertLt2Rows(_clientKey_m_accountMsRows);
 	let partsToInsert: PartInsert[] = [];
 	if (!_clientKey_m_accountMsRow || ownerMsSet.has(_clientKey_m_accountMsRow.p2!)) {
 		if (otpVerified) {

@@ -239,7 +239,7 @@
 	</div>
 	{#if p.account?.banned}
 		<p class="text-red-500">
-			{@html m.thisAccountWasBannedByNOnD({
+			{m.thisAccountWasBannedByNOnD({
 				by_ms: p.account.banned.by_ms!,
 				n: msToAccountNameTxt(p.account.banned.by_ms!),
 				d: formatMs(p.account.banned.ms, 'min'),
