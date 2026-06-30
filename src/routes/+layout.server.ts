@@ -17,11 +17,10 @@ export const load: LayoutServerLoad = async (event) => {
 	let needsOG = /facebookexternalhit|Facebot|Twitterbot/.test(ua.slice(117));
 
 	if (needsOG) {
-		// console.log('needsOG:', needsOG);
 		// console.log('event.url.pathname:', event.url.pathname);
-		console.log('stuff:', event.request.headers.values());
+		// console.log('stuff:', event.request.headers.values());
+		// console.log('slug:', slug);
 		let slug = splitUntil(event.url.pathname, '/', 2)[1];
-		console.log('slug:', slug);
 
 		if (isSpaceSlug(slug)) {
 			let lastSeenInMs = +slug.slice(-2);

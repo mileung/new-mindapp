@@ -28,7 +28,6 @@ export let _createAccount = async (
 		...input,
 		deleteIfCorrect: true,
 	});
-	console.log('res:', res);
 	if (res.strike || res.expiredOtp) return res;
 	let {
 		[pc._accountEmail_bm]: _accountEmail_bmRows = [],

@@ -94,20 +94,19 @@ let openPopup = (baseUrl: string, sendBgMessage = false) => {
 	// tags, core, postId. Allow altMindappUrl for other mindapp instances
 	// TODO: Games where it's your turn show up under "Your turn" on post feed.
 	// The hierarchical nature of the posts would allow games to branch off into many threads
-	let json = JSON.stringify({
-		json: JSON.stringify({
-			// https://news.ycombinator.com/item?id=31871577
-			// 431 Request Header Fields Too Large
-			// https://vitejs.dev/guide/troubleshooting.html#_431-request-header-fields-too-large
-			// TODO: txtHeadline.slice(0, 99999) or something to avoid 431
-			initialContent: `${txtHeadline}\n${selector?.url || location.href}\n\n`,
-			initialTags: selector?.tags,
-		}),
-	});
 	window.open(
 		sendBgMessage //
 			? baseUrl + '?extension'
-			: `${baseUrl}?${new URLSearchParams(JSON.parse(json)).toString()}`,
+			: `${baseUrl}?${new URLSearchParams({
+					json: JSON.stringify({
+						// https://news.ycombinator.com/item?id=31871577
+						// 431 Request Header Fields Too Large
+						// https://vitejs.dev/guide/troubleshooting.html#_431-request-header-fields-too-large
+						// TODO: txtHeadline.slice(0, 99999) or something to avoid 431
+						initialContent: `${txtHeadline}\n${selector?.url || location.href}\n\n`,
+						initialTags: selector?.tags,
+					}),
+				}).toString()}`,
 		'_blank',
 		`width=888,height=500,top=0,left=999999999`,
 	);

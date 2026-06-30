@@ -106,7 +106,7 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 					(r) =>
 						r.p1 === _tag_imBy8_countRow!.p1 &&
 						r.p2 === _tag_imBy8_countRow!.p2 &&
-						r.p2 === _tag_imBy8_countRow!.p2,
+						r.p3 === _tag_imBy8_countRow!.p3,
 				)
 			)
 				_tag_imBy8_countRowsToUpCountBy1.push(_tag_imBy8_countRow);

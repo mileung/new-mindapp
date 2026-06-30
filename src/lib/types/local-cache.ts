@@ -160,7 +160,9 @@ export let signOut = async (callerMs: number, everywhere = false) => {
 			callerMs,
 			everywhere,
 		});
-	} catch (error) {}
+	} catch (error) {
+		console.error(error);
+	}
 };
 
 export let useCheckedInvite = async () => {

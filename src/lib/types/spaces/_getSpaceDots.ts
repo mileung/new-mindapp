@@ -215,7 +215,6 @@ export let _getSpaceDots = async (
 			flair: { txt: '' },
 		};
 	}
-	console.log('acceptBm_inviteIbmRows:', acceptBm_inviteIbmRows);
 	for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
 		let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
 		let { p1, p2, p4 } = acceptBm_inviteIbmRow;

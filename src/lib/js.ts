@@ -219,8 +219,8 @@ export let getAlteredSearchParams = (
 	return `${url.pathname}${newSearch ? '?' + newSearch : ''}${url.hash}`;
 };
 
+let seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
 let countGraphemes = (str: string) => {
-	const seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
 	return [...seg.segment(str)].length;
 };
 // https://github.com/slevithan/emoji-regex-xs
