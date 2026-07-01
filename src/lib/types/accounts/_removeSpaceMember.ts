@@ -24,25 +24,22 @@ export let _removeSpaceMember = async (
 			throw new Error(m.assignAnotherAdminToLeaveThisSpace());
 	}
 	await moveSpaceMemberCountBy1(spaceMs, false);
-	await tdb.delete(pTable).where(
-		or(
+	await tdb
+		.delete(pTable)
+		.where(
 			and(
 				or(
 					pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
 					pf.code.eq(pc.i_accountMs_roleCode_mb),
 					pf.code.eq(pc.i_accountMs_permCode_mb),
 					pf.code.eq(pc._flair_i_accountMs_mb),
+					pf.code.eq(pc._apiKey_ibm_expiryMs),
+					pf.code.eq(pc.acceptIbm_inviteMb),
 				),
 				pf.p1.eq(spaceMs),
 				pf.p2.eq(accountMs),
 			),
-			and(
-				pf.code.eq(pc.acceptBm_inviteIbm),
-				pf.p1.eq(accountMs), //
-				pf.p3.eq(spaceMs),
-			),
-		),
-	);
+		);
 
 	return {};
 };

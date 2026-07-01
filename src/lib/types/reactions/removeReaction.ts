@@ -31,16 +31,16 @@ export let _removeReaction = async (
 	},
 	dbIsLocal: boolean,
 ) => {
-	let _emoji_postImb_reactionBmCallerFilter = and(
-		pf.code.eq(pc._emoji_postImb_reactionBm),
+	let _emoji_reactionImb_postMbCallerFilter = and(
+		pf.code.eq(pc._emoji_reactionImb_postMb),
 		pf.txt.eq(input.emoji),
 		pf.p1.eq(input.postIdObj.in_ms),
-		pf.p2.eq(input.postIdObj.ms),
-		pf.p3.eq(input.postIdObj.by_ms),
-		pf.p4.eq(input.callerMs),
+		pf.p3.eq(input.callerMs),
+		pf.p4.eq(input.postIdObj.ms),
+		pf.p5.eq(input.postIdObj.by_ms),
 	);
 	let {
-		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc._emoji_reactionImb_postMb]: _emoji_reactionImb_postMbRows = [],
 		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
 	} = channelPartsByCode(
 		await db
@@ -48,7 +48,7 @@ export let _removeReaction = async (
 			.from(pTable)
 			.where(
 				or(
-					_emoji_postImb_reactionBmCallerFilter,
+					_emoji_reactionImb_postMbCallerFilter,
 					and(
 						pf.code.eq(pc._emoji_postImb_count),
 						pf.txt.eq(input.emoji),
@@ -59,8 +59,8 @@ export let _removeReaction = async (
 				),
 			),
 	);
-	if (!_emoji_postImb_reactionBmRows.length) return {};
-	let deleteFilters: (undefined | SQL)[] = [_emoji_postImb_reactionBmCallerFilter];
+	if (!_emoji_reactionImb_postMbRows.length) return {};
+	let deleteFilters: (undefined | SQL)[] = [_emoji_reactionImb_postMbCallerFilter];
 	let _emoji_postImb_countRow = assert1Row(_emoji_postImb_countRows);
 	_emoji_postImb_countRow.p4! > 1
 		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], false)

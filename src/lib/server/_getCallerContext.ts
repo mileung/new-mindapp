@@ -119,10 +119,9 @@ export let _getCallerContext = async (
 						: undefined,
 					callerMs && get.allJoinedSpaces
 						? and(
-								pf.code.eq(pc.acceptBm_inviteIbm),
-								pf.p1.eq(callerMs),
-								pf.p3.notEq(callerMs),
-								...spaceUpdatesFrom.map((su) => pf.p3.notEq(su.ms)),
+								pf.code.eq(pc.acceptIbm_inviteMb),
+								...spaceUpdatesFrom.map((su) => pf.p1.notEq(su.ms)),
+								pf.p2.eq(callerMs),
 							)
 						: undefined,
 					// pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),
@@ -303,7 +302,7 @@ export let _getCallerContext = async (
 		[pc._spacePinnedQuery_imb]: _spacePinnedQuery_imbRows = [],
 		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
 		[pc._accountSavedTags_bm]: _accountSavedTags_bmRows = [],
-		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc.acceptIbm_inviteMb]: acceptIbm_inviteMbRows = [],
 		[pc.imb_spaceIsPublic]: imb_spaceIsPublicRows = [],
 		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
 		[pc._accountName_bm]: _accountName_bmRows = [],
@@ -349,9 +348,9 @@ export let _getCallerContext = async (
 	}
 	if (get.allJoinedSpaces && _sessionKey_m_accountMs_expiryMsCallerRow) {
 		let unfetchedSpaceMss: number[] = [];
-		for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
-			let row = acceptBm_inviteIbmRows[i];
-			if (!msToSpaceUpdatesFrom[row.p3!]) unfetchedSpaceMss.push(row.p3!);
+		for (let i = 0; i < acceptIbm_inviteMbRows.length; i++) {
+			let { p1 } = acceptIbm_inviteMbRows[i];
+			if (!msToSpaceUpdatesFrom[p1!]) unfetchedSpaceMss.push(p1!);
 		}
 		if (unfetchedSpaceMss.length) {
 			let {

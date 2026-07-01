@@ -1,6 +1,6 @@
 import { dev } from '$app/environment';
-import { scrape } from '$lib/dom';
 import { assertInputIsOwner, atDomainRegex, emailRegex, inputIsOwner, throwIf } from '$lib/js';
+import { scrape } from '$lib/scrape';
 import { _getCallerContext } from '$lib/server/_getCallerContext';
 import { _getPublicProfile } from '$lib/server/_getPublicProfile';
 import { tdb } from '$lib/server/db';

@@ -10,22 +10,22 @@ export let _updateSidePriority = async (
 		spaceMsToSidePriorityMap: Record<string, number>;
 	},
 ) => {
-	let acceptBm_inviteIbmRows = await tdb
+	let acceptIbm_inviteMbRows = await tdb
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.code.eq(pc.acceptBm_inviteIbm),
-				pf.p1.eq(input.callerMs),
-				pf.p3.notEq(1),
+				pf.code.eq(pc.acceptIbm_inviteMb),
+				pf.p1.notEq(1),
+				pf.p2.eq(input.callerMs),
 				or(...Object.keys(input.spaceMsToSidePriorityMap).map((k) => pf.p3.eq(+k))),
 			),
 		);
 	await Promise.all(
-		acceptBm_inviteIbmRows.map((r) =>
+		acceptIbm_inviteMbRows.map((r) =>
 			tdb
 				.update(pTable)
-				.set({ p5: input.spaceMsToSidePriorityMap[r.p3!] })
+				.set({ p5: input.spaceMsToSidePriorityMap[r.p1!] })
 				.where(
 					and(
 						pf.code.eq(pc.i_accountMs_accentCode_lastViewMs_sidePriority),

@@ -1,5 +1,5 @@
 import { gsdb } from '$lib/global-state.svelte';
-import { is1Emoji } from '$lib/js';
+import { is1Emoji, throwIf } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or } from 'drizzle-orm';
 import { type Database } from '../../local-db';
@@ -38,25 +38,26 @@ export let _addReaction = async (
 	dbIsLocal: boolean,
 ) => {
 	let now = Date.now();
-	let _emoji_postImb_reactionBmRow: PartInsert = {
-		code: pc._emoji_postImb_reactionBm,
+	let _emoji_reactionImb_postMbRow: PartInsert = {
+		code: pc._emoji_reactionImb_postMb,
 		txt: input.emoji,
 		p1: input.postIdObj.in_ms,
-		p2: input.postIdObj.ms,
-		p3: input.postIdObj.by_ms,
-		p4: input.callerMs,
-		p5: now,
+		p2: now,
+		p3: input.callerMs,
+		p4: input.postIdObj.ms,
+		p5: input.postIdObj.by_ms,
 	};
 	let partsToInsert: PartInsert[] = [
-		_emoji_postImb_reactionBmRow,
-		// ...[...Array(88)].map((_, i) => ({ // for testing
-		// 	..._emoji_postImb_reactionBmRow,
-		// 	p5: _emoji_postImb_reactionBmRow.p5! + (i + 1) * 88888888,
+		_emoji_reactionImb_postMbRow,
+		// for testing
+		// ...[...Array(88)].map((_, i) => ({
+		// 	..._emoji_reactionImb_postMbRow,
+		// 	p2: _emoji_reactionImb_postMbRow.p2! + (i + 1) * 88888888,
 		// })),
 	];
 	let {
 		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
-		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc._emoji_reactionImb_postMb]: _emoji_reactionImb_postMbRows = [],
 		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
 	} = channelPartsByCode(
 		await db
@@ -71,12 +72,12 @@ export let _addReaction = async (
 						pf.p3.eq(input.postIdObj.by_ms),
 					),
 					and(
-						pf.code.eq(pc._emoji_postImb_reactionBm),
+						pf.code.eq(pc._emoji_reactionImb_postMb),
 						pf.txt.eq(input.emoji),
 						pf.p1.eq(input.postIdObj.in_ms),
-						pf.p2.eq(input.postIdObj.ms),
-						pf.p3.eq(input.postIdObj.by_ms),
-						pf.p4.eq(input.callerMs),
+						pf.p3.eq(input.callerMs),
+						pf.p4.eq(input.postIdObj.ms),
+						pf.p5.eq(input.postIdObj.by_ms),
 					),
 					and(
 						pf.code.eq(pc._emoji_postImb_count),
@@ -88,7 +89,7 @@ export let _addReaction = async (
 				),
 			),
 	);
-	if (_emoji_postImb_reactionBmRows.length) throw new Error(`Already added this reaction`);
+	throwIf(_emoji_reactionImb_postMbRows.length);
 	assert1Row(_core_postImb_lastVersion_mRows);
 	assertLt2Rows(_emoji_postImb_countRows)
 		? await moveTagOrRxnCountsBy1(db, [], [{ ...input.postIdObj, emoji: input.emoji }], true)
@@ -100,7 +101,6 @@ export let _addReaction = async (
 				p3: input.postIdObj.by_ms,
 				p4: 1,
 			});
-
 	// console.log('partsToInsert', JSON.stringify(partsToInsert, null, 2));
 	await db.insert(pTable).values(partsToInsert);
 	return { ms: now };

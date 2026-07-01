@@ -12,7 +12,7 @@ export let toggleReaction = async (input: { postIdObj: IdObj; emoji: string }) =
 		rxnEmojiCount[input.emoji] ||= 0;
 		let adding = !myRxnEmojis.includes(input.emoji);
 		if (adding) {
-			assertCallerIsOwnerOrInGlobal();
+			input.postIdObj.in_ms && assertCallerIsOwnerOrInGlobal();
 			myRxnEmojis = [...new Set([input.emoji, ...myRxnEmojis])];
 			rxnEmojiCount[input.emoji]++;
 		} else {
@@ -24,8 +24,14 @@ export let toggleReaction = async (input: { postIdObj: IdObj; emoji: string }) =
 		gs.idToPostMap[postIdStr]!.rxnEmojiCount = rxnEmojiCount;
 		await (adding ? addReaction : removeReaction)(
 			{ ...(await getWhoObj()), ...input },
-			!getUrlInMs(),
+			!input.postIdObj.in_ms,
 		);
+		if (input.postIdObj.in_ms && !getUrlInMs()) {
+			await (adding ? addReaction : removeReaction)(
+				{ ...(await getWhoObj()), ...input },
+				true, //
+			);
+		}
 	} catch (error) {
 		alertError(error);
 	}

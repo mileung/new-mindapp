@@ -10,8 +10,13 @@ export let _getOwnerViewAccounts = async (input: { msLt?: number }) => {
 	let _accountEmail_bmRows = await tdb
 		.select()
 		.from(pTable)
-		.where(and(pf.code.eq(pc._accountEmail_bm), pf.p2.lt(input.msLt || Number.MAX_SAFE_INTEGER)))
-		.orderBy(pf.p2.desc)
+		.where(
+			and(
+				pf.code.eq(pc._accountEmail_bm), //
+				pf.p1.lt(input.msLt || Number.MAX_SAFE_INTEGER),
+			),
+		)
+		.orderBy(pf.p1.desc)
 		.limit(ownerViewItemsPerLoad);
 
 	let {

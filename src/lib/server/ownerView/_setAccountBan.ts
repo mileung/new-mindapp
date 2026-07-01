@@ -35,6 +35,7 @@ export let _setAccountBan = async (
 							or(
 								pf.code.eq(pc._clientKey_m_accountMs),
 								pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
+								pf.code.eq(pc._apiKey_ibm_expiryMs),
 							),
 							pf.p2.eq(input.accountMs),
 						),

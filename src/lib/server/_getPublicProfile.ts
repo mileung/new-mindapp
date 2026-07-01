@@ -19,7 +19,7 @@ export let _getPublicProfile = async (
 	let {
 		// [pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
 		// [pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
-		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc.acceptIbm_inviteMb]: acceptIbm_inviteMbRows = [],
 		[pc.accountMs_banMb]: accountMs_banMbRows = [],
 		[pc._accountEmail_bm]: _accountEmail_bmRows = [],
 		[pc._accountName_bm]: _accountName_bmRows = [],
@@ -41,14 +41,14 @@ export let _getPublicProfile = async (
 					input.profileMs !== input.callerMs &&
 						(ownerCalled || input.possibleMutualSpaceMss?.length)
 						? and(
-								pf.code.eq(pc.acceptBm_inviteIbm),
-								or(
-									pf.p1.eq(input.profileMs), //
-									ownerCalled ? undefined : pf.p1.eq(input.callerMs),
-								),
+								pf.code.eq(pc.acceptIbm_inviteMb),
 								ownerCalled
 									? undefined
-									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.p3.eq(ms))),
+									: or(...input.possibleMutualSpaceMss!.map((ms) => pf.p1.eq(ms))),
+								or(
+									pf.p2.eq(input.profileMs), //
+									ownerCalled ? undefined : pf.p2.eq(input.callerMs),
+								),
 							)
 						: undefined,
 					and(
@@ -63,32 +63,32 @@ export let _getPublicProfile = async (
 	let _accountBio_bmRow = assert1Row(_accountBio_bmRows);
 	let mutualSpaceMsToJoinMsMap: undefined | Record<number, number>;
 
-	if (acceptBm_inviteIbmRows.length) {
-		let acceptBm_inviteIbmCallerRows: PartInsert[] = [];
-		let acceptBm_inviteIbmProfileRows: PartInsert[] = [];
-		for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
-			let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
-			(acceptBm_inviteIbmRow.p1 === input.callerMs
-				? acceptBm_inviteIbmCallerRows
-				: acceptBm_inviteIbmProfileRows
-			).push(acceptBm_inviteIbmRow);
+	if (acceptIbm_inviteMbRows.length) {
+		let acceptIbm_inviteMbCallerRows: PartInsert[] = [];
+		let acceptIbm_inviteMbProfileRows: PartInsert[] = [];
+		for (let i = 0; i < acceptIbm_inviteMbRows.length; i++) {
+			let acceptIbm_inviteMbRow = acceptIbm_inviteMbRows[i];
+			(acceptIbm_inviteMbRow.p2 === input.callerMs
+				? acceptIbm_inviteMbCallerRows
+				: acceptIbm_inviteMbProfileRows
+			).push(acceptIbm_inviteMbRow);
 		}
 
 		mutualSpaceMsToJoinMsMap = {};
 		if (ownerCalled) {
-			for (let i = 0; i < acceptBm_inviteIbmProfileRows.length; i++) {
-				let acceptBm_inviteIbmProfileRow = acceptBm_inviteIbmProfileRows[i];
-				let spaceMs = acceptBm_inviteIbmProfileRow.p3!;
-				mutualSpaceMsToJoinMsMap[spaceMs] = acceptBm_inviteIbmProfileRow.p2!;
+			for (let i = 0; i < acceptIbm_inviteMbProfileRows.length; i++) {
+				let acceptIbm_inviteMbProfileRow = acceptIbm_inviteMbProfileRows[i];
+				let spaceMs = acceptIbm_inviteMbProfileRow.p1!;
+				mutualSpaceMsToJoinMsMap[spaceMs] = acceptIbm_inviteMbProfileRow.p3!;
 			}
 		} else {
-			for (let i = 0; i < acceptBm_inviteIbmCallerRows.length; i++) {
-				let spaceMs = acceptBm_inviteIbmCallerRows[i].p3!;
-				let acceptBm_inviteIbmProfileRow = acceptBm_inviteIbmProfileRows.find(
-					(r) => r.p3 === spaceMs,
+			for (let i = 0; i < acceptIbm_inviteMbCallerRows.length; i++) {
+				let spaceMs = acceptIbm_inviteMbCallerRows[i].p1!;
+				let acceptIbm_inviteMbProfileRow = acceptIbm_inviteMbProfileRows.find(
+					(r) => r.p1 === spaceMs,
 				);
-				if (acceptBm_inviteIbmProfileRow) {
-					mutualSpaceMsToJoinMsMap[spaceMs] = acceptBm_inviteIbmProfileRow.p2!;
+				if (acceptIbm_inviteMbProfileRow) {
+					mutualSpaceMsToJoinMsMap[spaceMs] = acceptIbm_inviteMbProfileRow.p3!;
 				}
 			}
 		}

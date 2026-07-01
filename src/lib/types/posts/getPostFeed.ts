@@ -177,7 +177,6 @@ export let _getPostFeed = async (
 							anySectionHasTags
 								? and(
 										pf.code.eq(pc._tag_imBy8_count),
-										// eitherInMss
 										or(...viewableSpaceMss.map((ms) => pf.p1.eq(ms))),
 										or(...allSectionTags.map((t) => pf.txt.eq(t))),
 										or(...allSectionTagStarts.map((t) => pf.txt.like(`${t}%`))),
@@ -818,14 +817,14 @@ export let _getPostFeed = async (
 								),
 							),
 							and(
-								pf.code.eq(pc._emoji_postImb_reactionBm),
+								pf.code.eq(pc._emoji_reactionImb_postMb),
 								or(
 									...postIdObjs.map((o) =>
 										and(
 											pf.p1.eq(o.in_ms),
-											pf.p2.eq(o.ms), //
-											pf.p3.eq(o.by_ms),
-											pf.p4.eq(callerMs),
+											pf.p3.eq(callerMs),
+											pf.p4.eq(o.ms), //
+											pf.p5.eq(o.by_ms),
 										),
 									),
 								),
@@ -841,7 +840,7 @@ export let _getPostFeed = async (
 		[pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountRows = [],
 		[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows = [],
 		[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows = [],
-		[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows = [],
+		[pc._emoji_reactionImb_postMb]: _emoji_reactionImb_postMbRows = [],
 		[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows = [],
 		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
 		[pc._emoji_postImb_count]: _emoji_postImb_countRows = [],
@@ -852,16 +851,17 @@ export let _getPostFeed = async (
 		...new Set(
 			_core_postImb_lastVersion_mRows
 				.flatMap((r) => getCitedPostIds(r.txt!))
-				.filter((s) => !postIdsToSendSet.has(s))
-				.slice(0, 88), // Limit how many cited posts can be fetched
+				.filter((s) => !postIdsToSendSet.has(s)),
 		),
-	].map((s) => getIdStrAsIdObj(s));
+	]
+		.slice(0, 88)
+		.map((s) => getIdStrAsIdObj(s));
 	if (citedIdObjsToFetch.length) {
 		let {
 			[pc.postImb_parentMb_rootMb_childCount]: postImb_parentMb_rootMb_childCountRows2 = [],
 			[pc._core_postImb_lastVersion_m]: _core_postImb_lastVersion_mRows2 = [],
 			[pc.tagImb_postMb_lastVersion]: tagImb_postMb_lastVersionRows2 = [],
-			[pc._emoji_postImb_reactionBm]: _emoji_postImb_reactionBmRows2 = [],
+			[pc._emoji_reactionImb_postMb]: _emoji_reactionImb_postMbRows2 = [],
 			[pc.i_accountMs_roleCode_mb]: i_accountMs_roleCode_mbRows2 = [],
 			[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows2 = [],
 			[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows2 = [],
@@ -892,7 +892,7 @@ export let _getPostFeed = async (
 		postImb_parentMb_rootMb_childCountRows.push(...keepViewable(postImb_parentMb_rootMb_childCountRows2));
 		_core_postImb_lastVersion_mRows.push(...keepViewable(_core_postImb_lastVersion_mRows2));
 		tagImb_postMb_lastVersionRows.push(...keepViewable(tagImb_postMb_lastVersionRows2));
-		_emoji_postImb_reactionBmRows.push(...keepViewable(_emoji_postImb_reactionBmRows2));
+		_emoji_reactionImb_postMbRows.push(...keepViewable(_emoji_reactionImb_postMbRows2));
 		i_accountMs_roleCode_mbRows.push(...keepViewable(i_accountMs_roleCode_mbRows2));
 		_flair_i_accountMs_mbRows.push(...keepViewable(_flair_i_accountMs_mbRows2));
 		_emoji_postImb_countRows.push(...keepViewable(_emoji_postImb_countRows2));
@@ -952,7 +952,7 @@ export let _getPostFeed = async (
 	let subParts = [
 		..._core_postImb_lastVersion_mRows,
 		...tagImb_postMb_lastVersionRows,
-		..._emoji_postImb_reactionBmRows,
+		..._emoji_reactionImb_postMbRows,
 		...i_accountMs_roleCode_mbRows,
 		..._flair_i_accountMs_mbRows,
 		..._emoji_postImb_countRows,
@@ -978,8 +978,8 @@ export let _getPostFeed = async (
 			let postIdStr = `${p1}_${p4}_${p5}`;
 			idToPostMap[postIdStr].history ??= {};
 			idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdToTxtMap[tagIdStr]);
-		} else if (code === pc._emoji_postImb_reactionBm) {
-			(idToPostMap[`${p1}_${p2}_${p3}`].myRxnEmojis ??= []).push(txt!);
+		} else if (code === pc._emoji_reactionImb_postMb) {
+			(idToPostMap[`${p1}_${p4}_${p5}`].myRxnEmojis ??= []).push(txt!);
 		} else if (code === pc.i_accountMs_roleCode_mb) {
 			((spaceMsToAccountMsToMembershipMap[p1!] ??= {})[p2!] ??= {}).roleCode = { num: p3! };
 		} else if (code === pc._flair_i_accountMs_mb) {

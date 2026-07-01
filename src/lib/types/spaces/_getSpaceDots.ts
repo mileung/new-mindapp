@@ -1,6 +1,6 @@
 import { hasDefinedKeysBesidesMs } from '$lib/js';
 import type { Database } from '$lib/local-db';
-import { and, or, sql } from 'drizzle-orm';
+import { and, or } from 'drizzle-orm';
 import {
 	makeMyValidInvitesFilter,
 	roleCodes,
@@ -13,6 +13,7 @@ import {
 	channelPartsByCode,
 	type GranularNumProp,
 	type GranularTxtProp,
+	type PartSelect,
 	type WhoWhereObj,
 } from '../parts';
 import { pc } from '../parts/partCodes';
@@ -52,6 +53,17 @@ export let _getSpaceDots = async (
 	let isPersonal = !isLocal && callerMs === spaceMs;
 	let isLocalOrPersonal = isLocal || isPersonal;
 
+	let i_accountMs_roleCode_mbCallerRow: undefined | PartSelect;
+	if (getCallerMembership) {
+		i_accountMs_roleCode_mbCallerRow = assertLt2Rows(
+			await db
+				.select()
+				.from(pTable)
+				.where(and(pf.code.eq(pc.i_accountMs_roleCode_mb), pf.p1.eq(spaceMs), pf.p2.eq(callerMs)))
+				.limit(2),
+		);
+	}
+
 	let i_accountMs_roleCode_mbRows = isLocalOrPersonal
 		? []
 		: await db
@@ -63,21 +75,18 @@ export let _getSpaceDots = async (
 						pf.p1.eq(spaceMs),
 						...excludeMemberMss.map((memberMs) => pf.p2.notEq(memberMs)),
 						or(
-							getCallerMembership ? pf.p2.eq(callerMs) : undefined,
 							pf.p3.lt(lastMemberListRoleCodeNum),
-							and(pf.p3.eq(lastMemberListRoleCodeNum), pf.p4.lte(msLte || Number.MAX_SAFE_INTEGER)),
+							and(
+								pf.p3.eq(lastMemberListRoleCodeNum), //
+								pf.p4.lte(msLte || Number.MAX_SAFE_INTEGER),
+							),
 						),
 					),
 				)
-				.orderBy(
-					...(getCallerMembership
-						? [sql`CASE WHEN ${pTable.p2} = ${callerMs} THEN 0 ELSE 1 END`]
-						: []),
-					pf.p3.desc,
-					pf.p4.desc,
-				)
-				.limit(membersPerLoad);
-
+				.orderBy(pf.p3.desc, pf.p4.desc)
+				.limit(membersPerLoad - (i_accountMs_roleCode_mbCallerRow ? 1 : 0));
+	if (i_accountMs_roleCode_mbCallerRow)
+		i_accountMs_roleCode_mbRows.unshift(i_accountMs_roleCode_mbCallerRow);
 	// TODO: sort all admins and mods to the top
 
 	let {
@@ -87,7 +96,7 @@ export let _getSpaceDots = async (
 		[pc.imb_newMemberPermissionCode]: imb_newMemberPermissionCodeRows = [],
 		[pc.i_accountMs_permCode_mb]: i_accountMs_permCode_mbRows = [],
 		[pc._flair_i_accountMs_mb]: _flair_i_accountMs_mbRows = [],
-		[pc.acceptBm_inviteIbm]: acceptBm_inviteIbmRows = [],
+		[pc.acceptIbm_inviteMb]: acceptIbm_inviteMbRows = [],
 		[pc._accountName_bm]: _accountName_bmRows = [],
 	} = channelPartsByCode(
 		await db
@@ -141,9 +150,9 @@ export let _getSpaceDots = async (
 									),
 								),
 								and(
-									pf.code.eq(pc.acceptBm_inviteIbm),
-									pf.p3.eq(spaceMs),
-									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p1.eq(r.p2!))),
+									pf.code.eq(pc.acceptIbm_inviteMb),
+									pf.p1.eq(spaceMs),
+									or(...i_accountMs_roleCode_mbRows.map((r) => pf.p2.eq(r.p2!))),
 								),
 								and(
 									or(
@@ -215,12 +224,12 @@ export let _getSpaceDots = async (
 			flair: { txt: '' },
 		};
 	}
-	for (let i = 0; i < acceptBm_inviteIbmRows.length; i++) {
-		let acceptBm_inviteIbmRow = acceptBm_inviteIbmRows[i];
-		let { p1, p2, p4 } = acceptBm_inviteIbmRow;
-		checkMissingAccountMsName(p4!);
-		accountMsToMembershipMap[p1!].invite.by_ms = p4!;
-		accountMsToMembershipMap[p1!].accept.ms = p2!;
+	for (let i = 0; i < acceptIbm_inviteMbRows.length; i++) {
+		let acceptIbm_inviteMbRow = acceptIbm_inviteMbRows[i];
+		let { p2, p3, p5 } = acceptIbm_inviteMbRow;
+		checkMissingAccountMsName(p5!);
+		accountMsToMembershipMap[p2!].invite.by_ms = p5!;
+		accountMsToMembershipMap[p2!].accept.ms = p3!;
 	}
 	for (let i = 0; i < i_accountMs_permCode_mbRows.length; i++) {
 		let { p2, p3, p4, p5 } = i_accountMs_permCode_mbRows[i];

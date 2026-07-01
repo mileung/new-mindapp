@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { scrape } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
+	import { scrape } from '$lib/scrape';
 	import { getLocalCache } from '$lib/types/local-cache';
 	import { onMount } from 'svelte';
 

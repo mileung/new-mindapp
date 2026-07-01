@@ -85,12 +85,12 @@ export let makeRowsForJoiningSpace = (a: {
 }) =>
 	[
 		{
-			code: pc.acceptBm_inviteIbm,
-			p1: a.callerMs,
-			p2: a.now,
-			p3: a.inviteIdObj.in_ms,
-			p4: a.inviteIdObj.by_ms,
-			p5: a.inviteIdObj.ms,
+			code: pc.acceptIbm_inviteMb,
+			p1: a.inviteIdObj.in_ms,
+			p2: a.callerMs,
+			p3: a.now,
+			p4: a.inviteIdObj.ms,
+			p5: a.inviteIdObj.by_ms,
 		},
 		{
 			code: pc.i_accountMs_roleCode_mb,

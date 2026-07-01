@@ -1,7 +1,7 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
-import { and, asc, desc, not } from 'drizzle-orm';
+import { and, not } from 'drizzle-orm';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { type IdObj } from '../parts/partIds';
@@ -46,15 +46,15 @@ export let _getReactionHistory = async (
 	// console.log(await db.select().from(pTable));
 	// console.log('input:', input);
 
-	let _emoji_postImb_reactionBmRows = await db
+	let _emoji_reactionImb_postMbRows = await db
 		.select()
 		.from(pTable)
 		.where(
 			and(
-				pf.code.eq(pc._emoji_postImb_reactionBm),
+				pf.code.eq(pc._emoji_reactionImb_postMb),
 				pf.p1.eq(input.postIdObj.in_ms),
-				pf.p2.eq(input.postIdObj.ms),
-				pf.p3.eq(input.postIdObj.by_ms),
+				pf.p4.eq(input.postIdObj.ms),
+				pf.p5.eq(input.postIdObj.by_ms),
 				and(
 					...input.rxnMsByMssExclude.map((t) =>
 						not(
@@ -65,10 +65,10 @@ export let _getReactionHistory = async (
 						),
 					),
 				),
-				pf.p4.lte(input.msLte),
+				pf.p5.lte(input.msLte),
 			),
 		)
-		.orderBy(desc(pTable.p4), asc(pTable.txt))
+		.orderBy(pf.p5.desc, pf.p4.asc)
 		.limit(reactionsPerLoad);
 
 	let _accountName_bmRows = await db
@@ -78,8 +78,8 @@ export let _getReactionHistory = async (
 			and(
 				pf.code.eq(pc._accountName_bm),
 				and(
-					..._emoji_postImb_reactionBmRows.map(
-						(r) => pf.p1.eq(r.p4!), //
+					..._emoji_reactionImb_postMbRows.map(
+						(r) => pf.p1.eq(r.p3!), //
 					),
 				),
 			),
@@ -91,9 +91,9 @@ export let _getReactionHistory = async (
 	}
 	return {
 		msToAccountNameTxtMap,
-		reactions: _emoji_postImb_reactionBmRows.map((r) => ({
-			ms: r.p5!,
-			by_ms: r.p4!,
+		reactions: _emoji_reactionImb_postMbRows.map((r) => ({
+			ms: r.p2!,
+			by_ms: r.p3!,
 			emoji: r.txt!,
 		})),
 	};
