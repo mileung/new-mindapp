@@ -15,7 +15,9 @@
 	import { onMount } from 'svelte';
 	import AccountIcon from '../../AccountIcon.svelte';
 	import SpaceIcon from '../../SpaceIcon.svelte';
+	import SpinnerOverlay from '../../SpinnerOverlay.svelte';
 
+	let loading = $state(false);
 	let validInvite = $state(true);
 
 	onMount(async () => {
@@ -46,7 +48,7 @@
 	});
 
 	let actionButtonClass = $derived(
-		'inline-flex mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2',
+		'relative inline-flex mt-2 fx z-50 h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2',
 	);
 </script>
 
@@ -80,9 +82,21 @@
 		</div>
 		<p class="">{gs.checkedInvite.partialSpace.description.txt}</p>
 		{#if gs.accounts?.[0].ms}
-			<button onclick={useCheckedInvite} class={actionButtonClass}>
+			<button
+				disabled={loading}
+				class={actionButtonClass}
+				onclick={async () => {
+					loading = true;
+					try {
+						await useCheckedInvite();
+					} finally {
+						loading = false;
+					}
+				}}
+			>
 				{m.joinSpace()}
 				<IconChevronRight class="h-5" stroke={3} />
+				<SpinnerOverlay on={loading} />
 			</button>
 		{:else}
 			<a href="/sign-in" class={actionButtonClass}>

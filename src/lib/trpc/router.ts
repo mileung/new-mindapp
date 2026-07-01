@@ -296,7 +296,7 @@ export let router = t.router({
 			});
 			throwIf(!c.signedIn);
 			if (!ownerCalled) {
-				throwIf(!c.inGlobal);
+				throwIf(!c.inGlobal && input.accountMs !== input.callerMs);
 				throwIf(
 					!c.roleCode ||
 						(input.accountMs !== input.callerMs && //

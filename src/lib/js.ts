@@ -141,8 +141,10 @@ export let identikana = (input: number, romanized = true) => {
 export let isStrInt = (s: string) => /^\d+$/.test(s);
 
 let chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-export let ranStr = (length = 88) =>
-	[...Array(length)].map((_) => chars[Math.floor(Math.random() * chars.length)]).join('');
+export let ranStr = (length = 88) => {
+	let bytes = crypto.getRandomValues(new Uint8Array(length));
+	return Array.from(bytes, (b) => chars[b % chars.length]).join('');
+};
 
 export let sortObjectProps = (obj: Record<string, any>) => {
 	Object.keys(obj)

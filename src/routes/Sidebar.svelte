@@ -124,12 +124,6 @@
 				draggingSpaceIndex > 2 &&
 				draggingSpaceIndex !== targetIndex
 			) {
-				// console.log(
-				// 	'caller.msToJoinedSpaceContextMap',
-				// 	JSON.stringify(caller.msToJoinedSpaceContextMap, null, 2),
-				// );
-				// console.log('draggingSpaceIndex:', draggingSpaceIndex);
-				// console.log('targetIndex:', targetIndex);
 				let draggedSpaceMs = sidebarSpaceMss[draggingSpaceIndex];
 				let nextAboveSpaceMs =
 					sidebarSpaceMss[targetIndex + (draggedSpaceIndexOffset < 0 ? -1 : 0)];
@@ -138,7 +132,9 @@
 				let belowSidePriority = getSpaceContext(nextBelowSpaceMs)?.sidePriority;
 				let nextDraggedSpaceSidePriority = 0;
 				let spaceMsToSidePriorityMap: Record<string, number> = {};
-				if (aboveSidePriority === undefined)
+				if (targetIndex === 3 || nextAboveSpaceMs === 1)
+					nextDraggedSpaceSidePriority = (belowSidePriority ?? 0) + 8 ** 8;
+				else if (aboveSidePriority === undefined)
 					nextDraggedSpaceSidePriority = belowSidePriority! + 8 ** 8;
 				else if (belowSidePriority === undefined)
 					nextDraggedSpaceSidePriority = aboveSidePriority! - 8 ** 8;

@@ -204,13 +204,22 @@ export let _checkInvite = async (
 				let inviterRoleCodeNum = i_accountMs_roleCode_mbInviterRow!.p3!;
 				throwIf(inviterRoleCodeNum !== roleCodes.admin && inviterRoleCodeNum !== roleCodes.mod);
 				let imb_newMemberPermissionCodeRow = assert1Row(imb_newMemberPermissionCodeRows);
+				throwIf(
+					!(
+						await tdb
+							.update(pTable)
+							.set({ p5: sql`${pTable.p5} + 1` })
+							.where(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsFilter)
+							.returning()
+					).length,
+				);
 				await tdb.insert(pTable).values(
 					makeRowsForJoiningSpace({
 						now: now,
 						inviteIdObj: {
 							in_ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!,
-							ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!,
-							by_ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p3!,
+							by_ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p2!,
+							ms: _slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p3!,
 						},
 						callerMs: input.callerMs,
 						permissionCodeNum: imb_newMemberPermissionCodeRow.p4!,
@@ -221,10 +230,6 @@ export let _checkInvite = async (
 					_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsRow.p1!,
 					true,
 				);
-				await tdb
-					.update(pTable)
-					.set({ p5: sql`${pTable.p5} + 1` })
-					.where(_slugEnd_inviteIbm_expiryMs_useCount_maxUses_revokedMsFilter);
 				return { redeemMs: now };
 			} else {
 				let {

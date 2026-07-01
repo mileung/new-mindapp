@@ -94,7 +94,10 @@ export let _signIn = async (
 			.from(pTable)
 			.where(
 				or(
-					and(pf.code.eq(pc.accountMs_banMb), pf.p1.eq(accountMs)),
+					and(
+						pf.code.eq(pc.accountMs_banMb),
+						pf.p1.eq(accountMs), //
+					),
 					clientIdObj &&
 						and(
 							pf.code.eq(pc._clientKey_m_accountMs),
