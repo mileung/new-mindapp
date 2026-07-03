@@ -500,11 +500,11 @@ export let _getPostFeed = async (
 							and(
 								pf.code.eq(pc._core_postImb_lastVersion_m),
 								...section.requiredCoreIncludes.map((coreIncludes) =>
-									pf.txt.like(`%${coreIncludes}%`),
+									pf.txt.likeEscaped(`%${escapeLikePattern(coreIncludes)}%`),
 								),
 								or(
 									...section.eitherCoreIncludes.map((coreIncludes) =>
-										pf.txt.like(`%${coreIncludes}%`),
+										pf.txt.likeEscaped(`%${escapeLikePattern(coreIncludes)}%`),
 									),
 								),
 								or(...sectionInMssToCheck.map((inMs) => pf.p1.eq(inMs))),
@@ -1024,3 +1024,9 @@ export let _getPostFeed = async (
 		spaceMsToAccountMsToMembershipMap,
 	};
 };
+
+let escapeLikePattern = (input: string) =>
+	input
+		.replace(/\\/g, '\\\\') // escape existing backslashes first
+		.replace(/%/g, '\\%') // escape %
+		.replace(/_/g, '\\_'); // escape _

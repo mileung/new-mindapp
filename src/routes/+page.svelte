@@ -25,15 +25,14 @@
 					gs.extensionSearchQ = scrapedInfo.extensionSearchQ;
 					gs.writerTags = scrapedInfo.tags;
 					// TODO: convert selection to md. Include links, images, video, iframes, other stuff if possible
-					gs.writerCore =
+					gs.writerCore = (
 						scrapedInfo.headline +
 						'\n' +
 						scrapedInfo.url +
 						'\n\n' +
-						(scrapedInfo.headline === selectedPlainText ? '' : selectedPlainText);
-					gs.lastSeenInMs && !gs.accounts![0].ms
-						? goto('/sign-in') //
-						: (gs.writingNewPost = true);
+						(scrapedInfo.headline === selectedPlainText ? '' : selectedPlainText)
+					).trim();
+					gs.writingNewPost = true;
 				}
 			});
 		}

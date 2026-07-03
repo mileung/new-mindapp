@@ -455,7 +455,7 @@
 	{/if}
 	{#if !p.cited && !p.isEmbed}
 		<button
-			class={`z-20 w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+			class={`w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 			onclick={() => {
 				let distanceFromTop = container.getBoundingClientRect().top;
 				let willBeOpen = !open;
@@ -468,7 +468,7 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class="z-0 bg-inherit h-8 w-5 xy sticky top-8">
+			<div class="bg-inherit h-8 w-5 xy sticky top-8">
 				{#if open}
 					<!-- TODO: color -/+ with author's identicon color? -->
 					<IconMinus stroke={2.5} class="w-4" />
@@ -532,7 +532,7 @@
 							{#if gs.devMode}
 								<p class="self-center text-fg2">{atPostIdStr}</p>
 							{/if}
-							<Highlight reply {evenBg} postIdStr={atPostIdStr} />
+							<Highlight atPostHeader {evenBg} postIdStr={atPostIdStr} />
 						</div>
 					{/if}
 					<div
@@ -672,14 +672,14 @@
 				{@render moreOptionsMenu()}
 			</div>
 			{#if !open && !p.nested && hasParent(p.post)}
-				<Highlight {evenBg} postIdStr={atPostIdStr} class="-left-0.5" />
+				<Highlight {evenBg} postIdStr={atPostIdStr} />
 			{/if}
 			<Highlight
 				main={!p.cited}
 				{postIdStr}
 				{evenBg}
 				class={p.nested || !p.cited
-					? `-left-5 ${atPost && !p.nested ? 'top-8' : ''}`
+					? `-left-5 w-5 ${open && atPost && !p.nested ? 'top-8' : ''}`
 					: p.cited
 						? '-left-2.5'
 						: ''}
@@ -691,7 +691,7 @@
 							{#each tags as tag (tag)}
 								<a
 									href={`/${gs.lastSeenInMs}__?q=${`[${tag}]`}`}
-									class={`h-8 xy whitespace-pre font-bold text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+									class={`h-6 pb-1 xy whitespace-pre text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}
 								</a>

@@ -1,135 +1,169 @@
-import { getYtVideoId } from './dom';
+export function trimSuffix(str: string, suffix: string): string {
+	if (!suffix) return str;
+	return str.endsWith(suffix) ? str.slice(0, -suffix.length) : str;
+}
 
 export let scrape = (externalUrl: string, externalDomString: string) => {
+	let urlObj = new URL(externalUrl);
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
-	let urlScrapers: Record<
-		string,
-		| undefined
-		| (() => {
-				extensionSearchQ?: string;
-				tags?: string[];
-				headline?: string;
-				url?: string; //
-		  })
-	> = {
-		// TODO: IMDB for Movie genres https://www.imdb.com/title/tt1877832/
-		'www.perplexity.ai': () => {
-			return { headline: externalDom.querySelector('h1')?.innerText };
-		},
-		'www.reddit.com': () => {
-			let subreddit = externalUrl.match(/\/(r\/[^/]+)/)?.[1];
-			// TODO: get the post core as markdown
-			// e.g. https://www.reddit.com/r/UI_Design/comments/vzqe34/menu_knowledge_is_essential/
-			return { tags: subreddit ? [subreddit] : [] };
-		},
-		'www.youtube.com/watch': () => {
-			// @ts-ignore
-			let title: string = externalDom.querySelector('h1.style-scope.ytd-watch-metadata')?.innerText;
-			let nameTag = externalDom.querySelector('#top-row yt-formatted-string a');
-			let ppHref = decodeURIComponent(
-				externalDom.querySelector('#owner > ytd-video-owner-renderer > a')?.getAttribute('href')!,
-			);
+	let querySelector = (s: string) => externalDom.querySelector(s) as null | HTMLElement;
+	let querySelectorAll = (s: string) => [...externalDom.querySelectorAll(s)] as HTMLElement[];
+	let extensionSearchQ = '';
+	let tags: string[] = [];
+	let headline =
+		querySelector('meta[name="title"]')?.getAttribute('content') ||
+		externalDom.title ||
+		decodeURIComponent(
+			externalUrl.slice(externalUrl.lastIndexOf('/') + 1), // for file pages
+		);
+	let url = externalUrl;
+	let pathnameSlugs = urlObj.pathname.split('/').slice(1);
 
-			let author: string = ppHref?.startsWith('/channel/')
-				? // @ts-ignore
-					nameTag.innerText
-				: `YouTube${ppHref?.slice(1)!}`;
-
-			let url = externalUrl.replace('app=desktop&', '');
-			if (url.includes('list=WL')) {
-				url = url.replace('&list=WL', '');
-				url = url.replace(/&index=\d+/, '');
-			}
-			let ytVideoId = getYtVideoId(url);
-			return {
-				extensionSearchQ: `[?v=${ytVideoId}]`,
-				headline: title,
-				tags: [author],
-				url,
-			};
+	// TODO: IMDB for Movie genres https://www.imdb.com/title/tt1877832/
+	let tldToSldToScraperMap: Record<string, undefined | Record<string, undefined | (() => void)>> = {
+		com: {
+			amazon: () => {
+				if (pathnameSlugs.includes('dp')) {
+					headline = querySelector('#productTitle')?.innerText || headline;
+					let endI = Math.min(
+						...[
+							externalUrl.indexOf('?'), //
+							externalUrl.indexOf('/ref='),
+						].filter((n) => n !== -1),
+					);
+					url = externalUrl.slice(0, endI);
+				}
+			},
+			ebay: () => {
+				if (pathnameSlugs[0] === 'itm') {
+					headline = querySelector('#mainContent h1 > span')?.innerText || headline;
+					url = urlObj.origin + urlObj.pathname;
+				}
+			},
+			imdb: () => {
+				if (pathnameSlugs[0] === 'title') {
+					let aTags = querySelectorAll('.ipc-chip-list__scroller a');
+					headline = trimSuffix(headline, ' - IMDb');
+					let year = headline.match(/\((\d+)\)$/)?.[1];
+					headline = `${trimSuffix(headline, `(${year})`)}\n${querySelector('[data-testid="plot"]')?.innerText || ''}`;
+					tags = aTags?.map((t) => t.innerText);
+					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
+					url = urlObj.origin + urlObj.pathname;
+				}
+			},
+			instagram: () => {
+				if (pathnameSlugs[0] === 'p') {
+					let moreOptionsButton = querySelector('[aria-label="More options"]');
+					let handle =
+						moreOptionsButton?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.querySelector(
+							'a',
+						)?.innerText;
+					if (handle) tags = [`@${handle}`];
+					headline = querySelector('span div div+span')?.innerText || '';
+					// headline = selectAll('ul')[1].innerText;
+					// headline = '';
+				} else if (pathnameSlugs[0] === 'reels') {
+					let spans = (
+						querySelector('[aria-label="Adjust volume"]')?.nextSibling as HTMLElement
+					)?.querySelectorAll('span');
+					let texts = [...new Set([...spans].map((s) => s.innerText))].slice(1, -1);
+					let handle = texts[0];
+					tags = [`@${handle}`];
+					headline = texts.slice(1).join('\n');
+				} else if (pathnameSlugs[0] === querySelector('h2')?.innerText) {
+					tags = [`@${pathnameSlugs[0]}`];
+					headline = pathnameSlugs[0];
+				}
+			},
+			reddit: () => {
+				if (pathnameSlugs[0] === 'r') {
+					tags = [pathnameSlugs.slice(0, 2).join('/')];
+					headline = headline.slice(0, headline.lastIndexOf(' : '));
+				}
+			},
+			tiktok: () => {
+				if (pathnameSlugs[1] === 'video') {
+					tags = [pathnameSlugs[0]];
+					let vidDesc = (
+						querySelector('[data-e2e="video-desc"]') ||
+						querySelector('[data-e2e="browse-video-desc"]')
+					)?.innerText;
+					headline = vidDesc || headline;
+				} else if (pathnameSlugs[0][0] === '@') {
+					tags = [pathnameSlugs[0]];
+					let bioElement = querySelector('[data-e2e="user-bio"]');
+					headline = `${querySelector('h1')?.innerText}\n${bioElement?.innerText}\n${(bioElement?.nextSibling as HTMLElement)?.innerText || ''}`;
+				}
+			},
+			x: () => {
+				if (pathnameSlugs[1] === 'status') {
+					let authorTag = `@${pathnameSlugs[0]}`;
+					extensionSearchQ = `[${authorTag}]`;
+					tags = [authorTag];
+					// TODO: X has really messy HTML on purpose I think to make query selectors break. Make this more robust.
+					let tweetBlock = querySelector(`a[href="/${pathnameSlugs.join('/')}"]`)?.parentElement
+						?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
+					headline =
+						tweetBlock?.querySelector<HTMLElement>('[data-testid="tweetText"]')?.innerText ||
+						headline;
+				}
+			},
+			youtube: () => {
+				if (pathnameSlugs[0] === 'watch') {
+					headline = querySelector('yt-formatted-string')?.innerText || headline;
+					let nameTag = querySelector('#top-row yt-formatted-string a');
+					let ppHref = decodeURIComponent(
+						externalDom
+							.querySelector('#owner > ytd-video-owner-renderer > a')
+							?.getAttribute('href')!,
+					);
+					let authorTag: string = ppHref?.startsWith('/channel/')
+						? // @ts-ignore
+							nameTag.innerText
+						: `YouTube${ppHref?.slice(1)!}`;
+					extensionSearchQ = `[${authorTag}]`;
+					tags = [authorTag];
+					url = externalUrl.replace('app=desktop&', '');
+					if (url.includes('list=WL')) {
+						url = url.replace('&list=WL', '');
+						url = url.replace(/&index=\d+/, '');
+					}
+				} else if (pathnameSlugs[0] === 'playlist') {
+					let author: string = decodeURIComponent(
+						querySelector('yt-page-header-view-model a[href^="/@"]')
+							?.getAttribute('href')
+							?.slice(1)!,
+					);
+					tags = [author];
+					headline =
+						querySelector(
+							'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
+						)?.innerText || headline;
+				} else if (pathnameSlugs[0][0] === '@') {
+					tags = [pathnameSlugs[0]];
+				} else if (pathnameSlugs[0] === 'results') {
+					headline = urlObj.searchParams.get('search_query') || headline;
+				}
+				headline = trimSuffix(headline, ' - YouTube');
+			},
 		},
-		'www.youtube.com/playlist': () => {
-			let author: string = decodeURIComponent(
-				document
-					.querySelector('yt-page-header-view-model a[href^="/@"]')
-					?.getAttribute('href')
-					?.slice(1)!,
-			);
-
-			return {
-				headline: externalDom.querySelector<HTMLHeadElement>(
-					'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
-				)?.innerText,
-				tags: [`YouTube${author}`],
-			};
-		},
-		'www.youtube.com': () => {
-			let author = location.pathname.startsWith('/@')
-				? location.pathname.slice(1, location.pathname.indexOf('/', 1))
-				: null;
-			let tags = author ? ['YouTube Channel', `YouTube${author}`] : [];
-			return {
-				headline: externalDom.querySelector<HTMLHeadElement>('h1.dynamic-text-view-model-wiz__h1')
-					?.innerText,
-				tags,
-			};
-		},
-		'x.com': () => {
-			let author = location.pathname.slice(1);
-			let i = author.indexOf('/');
-			if (i !== -1) author = author.slice(0, i);
-			let tweetId = location.pathname.match(/\/status\/(\d+)/)?.[1];
-			// TODO: X has really messy messy HTML on purpose I think to make query selectors break. Make this more robust.
-			let tweetBlock = externalDom.querySelector(`a[href="/${author}/status/${tweetId}"]`)
-				?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
-			let tweetText = tweetBlock?.querySelector<HTMLElement>(
-				'[data-testid="tweetText"]',
-			)?.innerText;
-
-			return {
-				headline: tweetText,
-				tags: [`X@${author}`],
-			};
-		},
-		'www.amazon.com': () => {
-			let headline = externalDom.querySelector<HTMLElement>('#productTitle')?.innerText;
-			let endI = Math.min(
-				...[
-					//
-					externalUrl.indexOf('?'),
-					externalUrl.indexOf('/ref='),
-				].filter((n) => n !== -1),
-			);
-			let url = externalUrl.slice(0, endI);
-			return { headline, url };
-		},
-		// TODO: make a better url matcher. Saving search results doesn't save title as expected, only when you're on a item page
-		'www.ebay.com': () => {
-			let headline = externalDom.querySelector<HTMLElement>('#mainContent h1 > span')?.innerText;
-			let endI = Math.min(
-				...[
-					//
-					externalUrl.indexOf('?'),
-				].filter((n) => n !== -1),
-			);
-			let url = externalUrl.slice(0, endI);
-			return { headline, url };
+		org: {
+			wikipedia: () => {
+				if (pathnameSlugs[0] === 'wiki') {
+					headline = querySelector(`#firstHeading`)?.innerText ?? headline;
+				}
+			},
 		},
 	};
 
-	let urlObj = new URL(externalUrl);
-	let scraped = (urlScrapers[urlObj.host + urlObj.pathname] || urlScrapers[urlObj.host])?.();
-
+	let [tld, sld] = urlObj.hostname.split('.', 3).reverse();
+	tldToSldToScraperMap[tld]?.[sld]?.();
+	tags.unshift(`${sld}.${tld}`);
+	headline = headline.trim();
 	return {
-		extensionSearchQ: scraped?.extensionSearchQ || '',
-		tags: scraped?.tags || [],
-		// getSelectionAsMarkdown() ||
-		headline: (
-			scraped?.headline ||
-			externalDom.querySelector('meta[name="title"]')?.getAttribute('content') ||
-			externalDom.title ||
-			decodeURIComponent(externalUrl.slice(externalUrl.lastIndexOf('/') + 1))
-		).trim(),
-		url: scraped?.url || externalUrl,
+		extensionSearchQ,
+		tags,
+		headline,
+		url,
 	};
 };

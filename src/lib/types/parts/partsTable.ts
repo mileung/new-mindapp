@@ -21,6 +21,12 @@ export let pTable = sqliteTable(
 	(table) => [
 		primaryKey({
 			// Primary key needed to update/delete rows in Drizzle Studio
+			// Makes the following indexes unnecessary for cloud db:
+			// idx_code_p1_p2_p3_p4
+			// idx_code_p1_p2_p3
+			// idx_code_p1_p2
+			// idx_code_p1
+			// local-db.ts doesn't use Drizzle Studio so it should not have a primary_key_idx
 			name: 'primary_key_idx',
 			columns: [
 				table.code,
@@ -34,15 +40,15 @@ export let pTable = sqliteTable(
 				table.p8,
 			],
 		}),
-		index('idx_code_p1_p2_p3_p4')
-			.on(table.code, table.p1, table.p2, table.p3, table.p4)
-			.where(sql`${table.code} IN (5)`),
+		// index('idx_code_p1_p2_p3_p4')
+		// 	.on(table.code, table.p1, table.p2, table.p3, table.p4)
+		// 	.where(sql`${table.code} IN (5)`),
 		index('idx_code_p1_p4_p5_p6')
 			.on(table.code, table.p1, table.p4, table.p5, table.p6)
 			.where(sql`${table.code} IN (1, 2, 3, 4)`),
-		index('idx_code_p1_p2_p3')
-			.on(table.code, table.p1, table.p2, table.p3)
-			.where(sql`${table.code} IN (0, 1, 3, 4, 6, 7)`),
+		// index('idx_code_p1_p2_p3')
+		// 	.on(table.code, table.p1, table.p2, table.p3)
+		// 	.where(sql`${table.code} IN (0, 1, 3, 4, 6, 7)`),
 		index('idx_code_p1_p3_p2')
 			.on(table.code, table.p1, table.p3, table.p2)
 			.where(sql`${table.code} IN (0)`),
@@ -58,15 +64,15 @@ export let pTable = sqliteTable(
 		index('idx_code_p1_txt')
 			.on(table.code, table.p1, table.txt)
 			.where(sql`${table.code} IN (1)`),
-		index('idx_code_p1_p2')
-			.on(table.code, table.p1, table.p2)
-			.where(sql`${table.code} IN (13, 14, 15, 16, 17, 18, 19)`),
+		// index('idx_code_p1_p2')
+		// 	.on(table.code, table.p1, table.p2)
+		// 	.where(sql`${table.code} IN (13, 14, 15, 16, 17, 18, 19)`),
 		index('idx_code_txt')
 			.on(table.code, table.txt)
 			.where(sql`${table.code} IN (22)`),
-		index('idx_code_p1')
-			.on(table.code, table.p1)
-			.where(sql`${table.code} IN (8, 9, 10, 11, 12, 20, 21, 22, 23, 24, 25, 26, 27, 29)`),
+		// index('idx_code_p1')
+		// 	.on(table.code, table.p1)
+		// 	.where(sql`${table.code} IN (8, 9, 10, 11, 12, 20, 21, 22, 23, 24, 25, 26, 27, 29)`),
 		index('idx_code_p2')
 			.on(table.code, table.p2)
 			.where(sql`${table.code} IN (16, 17, 20, 21)`),

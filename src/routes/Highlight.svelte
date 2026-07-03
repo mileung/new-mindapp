@@ -9,7 +9,7 @@
 		class?: string;
 		noScrollId?: boolean;
 		main?: boolean;
-		reply?: boolean;
+		atPostHeader?: boolean;
 		evenBg?: boolean;
 	} = $props();
 
@@ -42,7 +42,7 @@
 		if (spotId === p.postIdStr)
 			return ['bg-hl-spot', moreOpaque ? 'bg-hl-spot/10' : 'bg-hl-spot/5'];
 		// TODO: match identicon color?
-		if (p.reply) return ['bg-fg2', ''];
+		if (p.atPostHeader) return ['bg-fg2', ''];
 		return [];
 	});
 </script>
@@ -50,7 +50,7 @@
 {#if lineColor}
 	<div
 		{...!p.noScrollId && p.main ? { id: 'hl-' + p.postIdStr } : {}}
-		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-20 absolute pointer-events-none inset-0 ${overlayColor} ${p.class}`}
+		class={`${p.main ? '' : 'hl-' + p.postIdStr} z-20 absolute pointer-events-none inset-0 ${p.atPostHeader ? '' : overlayColor} ${p.class}`}
 	>
 		<div class="w-0.5 h-full {lineColor}"></div>
 	</div>

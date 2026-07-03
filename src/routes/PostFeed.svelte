@@ -434,7 +434,10 @@
 		gs.writerTagVal = '';
 		gs.writerCore = '';
 		try {
-			assertCallerIsOwnerOrInGlobal();
+			((editPostIdStr && !editPostIdStr?.startsWith('0_')) ||
+				(writingNewPost && urlInMs) ||
+				atPostIdObj?.in_ms) && //
+				assertCallerIsOwnerOrInGlobal();
 			updateSavedTags(tags);
 			let post: Post;
 			if (editPostIdStr) {

@@ -1,4 +1,4 @@
-import { asc, desc, eq, gt, gte, isNotNull, isNull, like, lt, lte, not } from 'drizzle-orm';
+import { asc, desc, eq, gt, gte, isNotNull, isNull, like, lt, lte, not, sql } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import { pTable } from './partsTable';
 
@@ -35,5 +35,6 @@ export let pf = {
 		notEq: (v: string) => not(eq(pTable.txt, v)),
 		like: (v: string) => like(pTable.txt, v),
 		notLike: (v: string) => not(like(pTable.txt, v)),
+		likeEscaped: (v: string) => sql`${pTable.txt} LIKE ${v} ESCAPE '\\'`,
 	},
 } as const;

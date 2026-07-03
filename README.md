@@ -38,3 +38,5 @@ You can preview the production build with `npm run preview`.
 > To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
 
 https://notesnook.com/
+
+https://repomix.com/?repo=https%3A%2F%2Fgithub.com%2Fmileung%2Fnew-mindapp

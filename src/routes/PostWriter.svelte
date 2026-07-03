@@ -107,7 +107,7 @@
 		let onDrag = (clientY: number) => {
 			if (!draggingHeight) return;
 			let deltaY = dragStartY - clientY;
-			let newHeight = Math.min(window.innerHeight - 100, Math.max(128, startHeight + deltaY));
+			let newHeight = Math.min(window.innerHeight - 100, Math.max(180, startHeight + deltaY));
 			setGlobalCssVariable('--h-post-writer', `${newHeight}px`);
 		};
 		let onMouseMove = (e: MouseEvent) => onDrag(e.clientY);
@@ -150,11 +150,17 @@
 		if (tagToAdd) {
 			gs.writerTags = [...new Set([...gs.writerTags, tagToAdd])];
 			gs.writerTagVal = '';
+			setTimeout(() => {
+				undoTagRefs.at(-1)?.scrollIntoView();
+			}, 0);
 		}
 	};
 
+	let alteredInitialVal = $state(false);
 	let handleBeforeUnload = (event: BeforeUnloadEvent) => {
+		console.log('handleBeforeUnload');
 		if (
+			alteredInitialVal &&
 			(gs.writerCore || gs.writerTagVal || gs.writerTags.length) &&
 			(gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor)
 		) {
@@ -233,6 +239,7 @@
 						}}
 						onclick={(e) => {
 							e.stopPropagation(); // this is needed to focus the next tag
+							alteredInitialVal = true;
 							gs.writerTags = gs.writerTags.filter((t) => t !== tag);
 							if (!gs.writerTags.length) tagsIpt.focus();
 							else if (e.shiftKey) undoTagRefs[i - 1]?.focus();
@@ -252,6 +259,7 @@
 			placeholder={m.tags()}
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
+			onchange={() => (alteredInitialVal = true)}
 			onpaste={(e) => {
 				let pastedText = e.clipboardData?.getData('text') ?? '';
 				let pastedTags = pastedText.split(/\r?\n/);
@@ -356,13 +364,14 @@
 					</div>
 				{/each}
 			</div>
-			<div class="h-full flex flex-col">
+			<div class="h-full flex">
 				<textarea
 					bind:this={coreTa}
 					bind:value={gs.writerCore}
 					maxlength={888888}
 					placeholder={m.core()}
-					class="resize-none flex-1 min-h-0 w-full px-2 py-0.5 text-lg pr-9 bg-bg3 hover:bg-bg6"
+					onchange={() => (alteredInitialVal = true)}
+					class="resize-none flex-1 text-lg p-2 pr-9 bg-bg3 hover:bg-bg6"
 					onkeydown={(e) => {
 						e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
 						e.metaKey && e.key === 'Enter' && submit();

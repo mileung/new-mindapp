@@ -78,6 +78,15 @@ export let _signIn = async (
 				.where(_accountPwHash_bmFilter)
 				.returning()
 		)[0];
+		await tdb.delete(pTable).where(
+			and(
+				or(
+					pf.code.eq(pc._sessionKey_m_accountMs_expiryMs),
+					pf.code.eq(pc._clientKey_m_accountMs), //
+				),
+				pf.p2.eq(accountMs),
+			),
+		);
 	} else {
 		_accountPwHash_bmRow = assert1Row(
 			await tdb.select().from(pTable).where(_accountPwHash_bmFilter),
@@ -98,13 +107,14 @@ export let _signIn = async (
 						pf.code.eq(pc.accountMs_banMb),
 						pf.p1.eq(accountMs), //
 					),
-					clientIdObj &&
-						and(
-							pf.code.eq(pc._clientKey_m_accountMs),
-							pf.txt.eq(clientIdObj.txt),
-							pf.p1.eq(clientIdObj.ms),
-							pf.p2.eq(accountMs),
-						),
+					clientIdObj && !input.resetPassword
+						? and(
+								pf.code.eq(pc._clientKey_m_accountMs),
+								pf.txt.eq(clientIdObj.txt),
+								pf.p1.eq(clientIdObj.ms),
+								pf.p2.eq(accountMs),
+							)
+						: undefined,
 				),
 			),
 	);
