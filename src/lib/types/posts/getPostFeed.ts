@@ -179,8 +179,16 @@ export let _getPostFeed = async (
 										pf.code.eq(pc._tag_imBy8_count),
 										or(...viewableSpaceMss.map((ms) => pf.p1.eq(ms))),
 										or(...allSectionTags.map((t) => pf.txt.eq(t))),
-										or(...allSectionTagStarts.map((t) => pf.txt.like(`${t}%`))),
-										or(...allSectionTagEnds.map((t) => pf.txt.like(`%${t}`))),
+										or(
+											...allSectionTagStarts.map((t) =>
+												pf.txt.likeEscaped(`${escapeLikePattern(t)}%`),
+											),
+										),
+										or(
+											...allSectionTagEnds.map((t) =>
+												pf.txt.likeEscaped(`%${escapeLikePattern(t)}`),
+											),
+										),
 									)
 								: undefined,
 						),

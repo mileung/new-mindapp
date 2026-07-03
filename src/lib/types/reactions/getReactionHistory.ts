@@ -59,16 +59,16 @@ export let _getReactionHistory = async (
 					...input.rxnMsByMssExclude.map((t) =>
 						not(
 							and(
-								pf.p4.eq(t.by_ms),
-								pf.p5.eq(t.ms), //
+								pf.p2.eq(t.ms), //
+								pf.p3.eq(t.by_ms),
 							)!,
 						),
 					),
 				),
-				pf.p5.lte(input.msLte),
+				pf.p2.lte(input.msLte),
 			),
 		)
-		.orderBy(pf.p5.desc, pf.p4.asc)
+		.orderBy(pf.p2.desc, pf.p3.asc)
 		.limit(reactionsPerLoad);
 
 	let _accountName_bmRows = await db
