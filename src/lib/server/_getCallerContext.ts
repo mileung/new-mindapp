@@ -406,11 +406,11 @@ export let _getCallerContext = async (
 		spaceMsToRowsMap[row.p1!] ??= [];
 		spaceMsToRowsMap[row.p1!].push(row);
 	}
-	let SpaceMssWithPermission = _sessionKey_m_accountMs_expiryMsCallerRow
+	let spaceMssWithPermission = _sessionKey_m_accountMs_expiryMsCallerRow
 		? i_accountMs_permCode_mbRows.map((r) => r.p1!)
 		: [];
 	let callerJoinedSpaceMs = false;
-	let spaceUpdates: MySpaceUpdate[] = SpaceMssWithPermission.map((ms) => {
+	let spaceUpdates: MySpaceUpdate[] = spaceMssWithPermission.map((ms) => {
 		if (ms === spaceMs) callerJoinedSpaceMs = true;
 		let su = reduceMySpaceUpdateRows(spaceMsToRowsMap[ms], ms);
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[ms];
@@ -428,20 +428,15 @@ export let _getCallerContext = async (
 	let visitingPublicSpaceUpdate: undefined | MySpaceUpdate =
 		spaceMs !== undefined &&
 		!callerJoinedSpaceMs &&
-		imb_spaceIsPublicRows.some((r) => r.p1 === spaceMs && r.p4)
+		(spaceMs === 1 || imb_spaceIsPublicRows.some((r) => r.p1 === spaceMs && r.p4))
 			? reduceMySpaceUpdateRows(spaceMsToRowsMap[spaceMs], spaceMs)
 			: undefined;
 
 	if (visitingPublicSpaceUpdate) {
 		let spaceUpdateFrom = msToSpaceUpdatesFrom[visitingPublicSpaceUpdate.ms];
-		if (!visitingPublicSpaceUpdate.isPublic?.num) {
-			visitingPublicSpaceUpdate = undefined;
-		} else {
-			if (sameGranularNum(visitingPublicSpaceUpdate.isPublic, spaceUpdateFrom?.isPublic))
-				visitingPublicSpaceUpdate.isPublic = undefined;
-			if (!hasDefinedKeysBesidesMs(visitingPublicSpaceUpdate))
-				visitingPublicSpaceUpdate = undefined;
-		}
+		if (sameGranularNum(visitingPublicSpaceUpdate.isPublic, spaceUpdateFrom?.isPublic))
+			visitingPublicSpaceUpdate.isPublic = undefined;
+		if (!hasDefinedKeysBesidesMs(visitingPublicSpaceUpdate)) visitingPublicSpaceUpdate = undefined;
 	}
 
 	let accountUpdatedRows = [
@@ -547,7 +542,7 @@ export let _getCallerContext = async (
 	}
 
 	let removedSpaceMss: number[] = spaceUpdatesFrom
-		.filter((su) => su.ms && !su.visiting && !SpaceMssWithPermission.includes(su.ms))
+		.filter((su) => su.ms && !su.visiting && !spaceMssWithPermission.includes(su.ms))
 		.map((su) => su.ms);
 	let signedOutAccountMss: number[] = signedInAccountUpdatesFrom
 		.filter(

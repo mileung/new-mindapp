@@ -69,7 +69,9 @@
 	let memberships = $derived(
 		spaceContext && !myDots?.invites
 			? [] // this [] is needed to retrigger on:infinite...
-			: (memberMss.map((ms) => accountMsToMembershipMap![ms]) as Membership[]),
+			: (memberMss
+					.filter((ms) => accountMsToMembershipMap?.[ms]?.accept)
+					.map((ms) => accountMsToMembershipMap![ms]) as Membership[]),
 	);
 
 	let loadMoreDots = async (e: InfiniteEvent) => {
@@ -127,7 +129,7 @@
 			});
 			let { spaceUpdate, invites = [] } = res;
 			// console.log('res', JSON.stringify(res, null, 2));
-			// console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
+			console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
 
 			updateLocalCache((lc) => {
 				spaceUpdate &&
