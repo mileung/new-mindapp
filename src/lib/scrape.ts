@@ -52,14 +52,17 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 				}
 			},
 			instagram: () => {
-				if (pathnameSlugs[0] === 'p') {
+				if (pathnameSlugs[0] === 'p' || pathnameSlugs[0] === 'reel') {
 					let moreOptionsButton = querySelector('[aria-label="More options"]');
 					let handle =
 						moreOptionsButton?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement?.querySelector(
 							'a',
 						)?.innerText;
 					if (handle) tags = [`@${handle}`];
-					headline = querySelector('span div div+span')?.innerText || '';
+					headline =
+						querySelector('span div div+span')?.innerText || //
+						querySelector('h1')?.innerText ||
+						'';
 					// headline = selectAll('ul')[1].innerText;
 					// headline = '';
 				} else if (pathnameSlugs[0] === 'reels') {
