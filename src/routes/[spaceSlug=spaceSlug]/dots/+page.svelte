@@ -129,7 +129,7 @@
 			});
 			let { spaceUpdate, invites = [] } = res;
 			// console.log('res', JSON.stringify(res, null, 2));
-			console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
+			// console.log('spaceUpdate', JSON.stringify(spaceUpdate, null, 2));
 
 			updateLocalCache((lc) => {
 				spaceUpdate &&
