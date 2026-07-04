@@ -121,9 +121,8 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 							?.getAttribute('href')!,
 					);
 					let authorTag: string = ppHref?.startsWith('/channel/')
-						? // @ts-ignore
-							nameTag.innerText
-						: `YouTube${ppHref?.slice(1)!}`;
+						? nameTag!.innerText
+						: ppHref?.slice(1)!;
 					extensionSearchQ = `[${authorTag}]`;
 					tags = [authorTag];
 					url = externalUrl.replace('app=desktop&', '');
