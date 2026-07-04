@@ -66,4 +66,9 @@ For the full list of part codes and how the rows are indexed, see:
 
 The Mindapp client runs a SQLite database with the same schema as the cloud db for saving posts offline.
 
+# How to run on the internet
+TODO:
+1. `bun run build`
+2. `bun run preview` previews the production build locally
+
 https://repomix.com/?repo=https%3A%2F%2Fgithub.com%2Fmileung%2Fnew-mindapp
