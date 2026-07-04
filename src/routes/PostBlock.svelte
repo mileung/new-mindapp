@@ -485,7 +485,9 @@
 			<div>
 				<div class={`bg-inherit ${p.cited ? '' : `sticky ${hasAtPostHeader ? 'top-0' : 'top-8'}`}`}>
 					{#if open && !p.nested && !p.cited && atPost}
-						<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
+						<div
+							class={`overflow-scroll relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}
+						>
 							<div class="flex-1 flex h-full text-nowrap overflow-scroll">
 								<a
 									href={`/__${atPost.by_ms}`}
