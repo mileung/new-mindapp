@@ -8,7 +8,7 @@ import { pf } from '../parts/partFilters';
 
 export let _checkOtp = async (input: {
 	otpMs: number;
-	pin: string;
+	pinStr: string;
 	email: string;
 	deleteIfCorrect: boolean;
 }): Promise<{ strike?: number; expiredOtp?: true }> => {
@@ -26,9 +26,9 @@ export let _checkOtp = async (input: {
 			.where(_email_ms_strikeCount_otpFilter)
 			.limit(1),
 	);
-	let { p3 } = _email_ms_strikeCount_otpRow;
-	if (p3! < 0 || p3 !== +input.pin) {
-		let strike = _email_ms_strikeCount_otpRow.p2!;
+	let { p2, p3 } = _email_ms_strikeCount_otpRow;
+	if (p3! < 0 || p3 !== +input.pinStr) {
+		let strike = p2!;
 		await tdb
 			.update(pTable) //
 			.set({ p2: ++strike })

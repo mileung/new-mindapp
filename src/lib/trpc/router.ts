@@ -62,7 +62,7 @@ import {
 	signInLimiter,
 } from '../server/rateLimiters';
 
-let pinSchema = z.string().length(8);
+let pinStrSchema = z.string().length(8);
 let passwordSchema = z.string().regex(new RegExp(passwordRegexStr));
 let normalizingNameSchema = z
 	.string()
@@ -130,7 +130,7 @@ export let router = t.router({
 		.input(
 			z.strictObject({
 				otpMs: z.number(),
-				pin: pinSchema,
+				pinStr: pinStrSchema,
 				email: normalizingEmailSchema,
 			}),
 		)
@@ -140,7 +140,7 @@ export let router = t.router({
 			z.strictObject({
 				name: normalizingNameSchema,
 				otpMs: z.number(),
-				pin: pinSchema,
+				pinStr: pinStrSchema,
 				email: normalizingEmailSchema,
 				password: passwordSchema,
 			}),
@@ -150,7 +150,7 @@ export let router = t.router({
 		.input(
 			z.strictObject({
 				otpMs: z.number().optional(),
-				pin: pinSchema.optional(),
+				pinStr: pinStrSchema.optional(),
 				email: normalizingEmailSchema,
 				password: passwordSchema,
 				resetPassword: z.boolean().optional(),

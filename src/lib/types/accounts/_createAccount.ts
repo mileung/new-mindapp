@@ -19,7 +19,7 @@ export let _createAccount = async (
 	input: {
 		name: string;
 		otpMs: number;
-		pin: string;
+		pinStr: string;
 		email: string;
 		password: string;
 	},

@@ -20,7 +20,7 @@
 	let allowResettingPwAfterOtp = $state(false);
 	let otpMs = $state(0);
 	let name = $state('');
-	let pin = $state('');
+	let pinStr = $state('');
 	let email = $state(page.state.prefilledEmail ?? '');
 	let oldPassword = $state('');
 	let password = $state('');
@@ -162,7 +162,7 @@
 				try {
 					let res = await trpc().signIn.mutate({
 						otpMs,
-						pin,
+						pinStr,
 						email,
 						password,
 						resetPassword: true,
@@ -196,14 +196,14 @@
 									email,
 									password,
 									otpMs,
-									pin,
+									pinStr: pinStr,
 								})
 							: await trpc().createAccount.mutate({
 									name,
 									email,
 									password,
 									otpMs,
-									pin,
+									pinStr: pinStr,
 								});
 						strike = res.strike;
 						expiredOtp = res.expiredOtp;
@@ -211,7 +211,7 @@
 					} else if (p.resettingPassword) {
 						let res = await trpc().checkOtp.mutate({
 							otpMs,
-							pin,
+							pinStr: pinStr,
 							email,
 						});
 						console.log('checkOtp res:', res);
@@ -221,13 +221,13 @@
 					}
 					if (expiredOtp) {
 						alert(m.expiredOneTimePin());
-						email = pin = '';
+						email = pinStr = '';
 					}
 					if (strike) {
 						if (strike > 2) {
 							alert(m.tooManyFailedAttempts());
 							otpMs = 0;
-							name = pin = email = oldPassword = password = reenteredPw = '';
+							name = pinStr = email = oldPassword = password = reenteredPw = '';
 							showingOldPw = showingPw = showingRePw = false;
 						} else alert(m.incorrectOneTimePin());
 					}
@@ -241,14 +241,14 @@
 			<p class="mt-2 font-bold">{m.oneTimePin()}</p>
 			<input
 				disabled={loading}
-				bind:value={pin}
+				bind:value={pinStr}
 				class="bg-bg4 w-full px-2 h-9 text-lg"
 				required
 				maxlength={8}
 				minlength={8}
 				inputmode="numeric"
 				oninput={(e) => {
-					pin = e.currentTarget.value.replace(/[^0-9]/g, '');
+					pinStr = e.currentTarget.value.replace(/[^0-9]/g, '');
 					// TODO: prevent the "Please lengthen this text" thing from showing up as the user is trying to correct a submitted invalid input
 				}}
 			/>
@@ -316,7 +316,7 @@
 						if (res.otpMs) {
 							otpMs = res.otpMs;
 							email = normalizedEmail;
-							pin = dev ? '00000000' : '';
+							pinStr = dev ? '00000000' : '';
 						}
 						onAccountAuth(res.account);
 					} else {
@@ -334,7 +334,7 @@
 							otpMs = res.otpMs;
 							name = name.trim();
 							email = normalizedEmail;
-							pin = dev ? '00000000' : '';
+							pinStr = dev ? '00000000' : '';
 						}
 					}
 				} catch (error) {

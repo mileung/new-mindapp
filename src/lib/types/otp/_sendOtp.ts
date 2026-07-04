@@ -1,5 +1,6 @@
 import { dev } from '$app/environment';
 import { RESEND_API_KEY } from '$env/static/private';
+import { ranInt } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
 import { and } from 'drizzle-orm';
@@ -43,19 +44,20 @@ export let _sendOtp = async (input: {
 			sendOtp = false;
 	}
 
-	let pin = -1;
+	let pinNum = -1;
 	let now = Date.now();
 	if (sendOtp) {
-		if (dev) pin = 0;
+		if (dev) pinNum = 0;
 		else {
-			pin = +('' + Math.random()).slice(-8);
+			pinNum = ranInt(0, 99999999);
+			let pinStr = `${pinNum}`.padStart(8, '0');
 			let result = await sendEmail({
 				from: 'Mindapp <noreply@updates.mindapp.cc>',
 				to: email,
-				subject: m.oneTimePinP({ p: pin }),
+				subject: m.oneTimePinP({ p: pinStr }),
 				html:
 					m.yourOneTimePinForMindappIs() +
-					`\n<p style="font-family: monospace; font-size: 24px; font-weight: bold;">${pin}</p>\n\n` +
+					`\n<p style="font-family: monospace; font-size: 24px; font-weight: bold;">${pinStr}</p>\n\n` +
 					m.thisCanOnlyBeUsedOnTheDeviceUsedToRequestThisEmail(),
 			});
 			if (result.error) throw new Error(m.emailServiceProviderError());
@@ -66,7 +68,7 @@ export let _sendOtp = async (input: {
 		txt: email,
 		p1: now,
 		p2: 0,
-		p3: pin,
+		p3: pinNum,
 	});
 	return { otpMs: now };
 };

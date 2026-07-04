@@ -41,7 +41,7 @@ export let _signIn = async (
 		let res = await _checkOtp({
 			email,
 			otpMs,
-			pin,
+			pinStr: pin,
 			deleteIfCorrect: true,
 		});
 		if (res.strike || res.expiredOtp) return res;
