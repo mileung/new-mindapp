@@ -23,7 +23,7 @@ export let _signIn = async (
 	ctx: Context,
 	input: {
 		otpMs?: number;
-		pin?: string;
+		pinStr?: string;
 		email: string;
 		password: string;
 		resetPassword?: boolean;
@@ -35,13 +35,13 @@ export let _signIn = async (
 	sessionMs?: number;
 	account?: MyAccount;
 }> => {
-	let { otpMs, pin, email } = input;
+	let { otpMs, pinStr, email } = input;
 	let otpVerified = false;
-	if (otpMs && pin) {
+	if (otpMs && pinStr) {
 		let res = await _checkOtp({
 			email,
 			otpMs,
-			pinStr: pin,
+			pinStr,
 			deleteIfCorrect: true,
 		});
 		if (res.strike || res.expiredOtp) return res;
