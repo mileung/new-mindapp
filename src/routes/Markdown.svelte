@@ -41,7 +41,7 @@
 			<a
 				target="_blank"
 				href={tag.uri}
-				class="text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
+				class="text-fg1 break-all hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
 			>
 				{tag.text}
 			</a>
