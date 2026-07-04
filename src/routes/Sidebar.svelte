@@ -271,7 +271,7 @@
 			</button>
 		</div>
 		<div
-			class={`${showAccountMenu || showSpaceMenu ? '' : 'hidden'} max-h-38 xs:max-h-none relative flex-1 xs:flex flex-col text-nowrap overflow-scroll`}
+			class={`${showAccountMenu || showSpaceMenu ? '' : 'hidden'} max-h-68 xs:max-h-none relative flex-1 xs:flex flex-col text-nowrap overflow-scroll`}
 			onclick={(e) => {
 				setTimeout(() => {
 					if (!e.metaKey) {
