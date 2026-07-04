@@ -12,7 +12,7 @@
 		onCite,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { copyToClipboard, is1Emoji } from '$lib/js';
+	import { copyToClipboard, is1Emoji, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
@@ -194,10 +194,10 @@
 	let hoveringMoreOptionsBtn = $state(false);
 	let hoveringMoreOptionsMenu = $state(false);
 	let showMoreOptionsMenu = $derived(
-		moreOptionsOpen || hoveringMoreOptionsBtn || hoveringMoreOptionsMenu,
+		moreOptionsOpen || (!isTouchScreen && (hoveringMoreOptionsBtn || hoveringMoreOptionsMenu)),
 	);
 	let showReactionMenu = $derived(
-		reactionIptFocused || hoveringReactionInput || hoveringReactionMenu,
+		reactionIptFocused || (!isTouchScreen && (hoveringReactionInput || hoveringReactionMenu)),
 	);
 </script>
 
