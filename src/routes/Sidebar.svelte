@@ -289,7 +289,7 @@
 				{#each gs.accounts || [] as a, i (a.ms)}
 					<div class={`h-10 max-w-full group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>
 						<button
-							class="flex flex-1 overflow-scroll px-2 gap-2"
+							class="fx flex-1 overflow-scroll px-2 gap-2"
 							onclick={() => {
 								if (a.signedIn || !a.ms) {
 									gs.identifierToPostFeedMap = {};
@@ -304,14 +304,16 @@
 							{#if !i}
 								<div class="absolute left-0 h-10 w-0.5 bg-hl1"></div>
 							{/if}
-							<div class="self-center xy h-6 w-6">
+							<div class="xy h-6 w-6">
 								<AccountIcon isUser ms={a.ms} class="h-6 w-6" />
 							</div>
-							<div class={`flex-1 text-nowrap overflow-scroll fx ${msToAccountItalic(a.ms)}`}>
+							<div
+								class={`flex-1 text-nowrap overflow-scroll h-full fx ${msToAccountItalic(a.ms)}`}
+							>
 								{msToAccountNameTxt(a.ms)}
 							</div>
 							{#if a.ms && !a.signedIn}
-								<p class="group-hover:hidden text-nowrap text-fg2 self-center text-sm">
+								<p class="group-hover:hidden text-nowrap text-fg2 text-sm">
 									{m.signedOut()}
 								</p>
 							{/if}
