@@ -101,7 +101,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			x: () => {
 				if (pathnameSlugs[1] === 'status') {
 					let authorTag = `@${pathnameSlugs[0]}`;
-					extensionSearchQ = `[${authorTag}]`;
+					extensionSearchQ = `[${authorTag}] ${pathnameSlugs[2]}`;
 					tags = [authorTag];
 					// TODO: X has really messy HTML on purpose I think to make query selectors break. Make this more robust.
 					let tweetBlock = querySelector(`a[href="/${pathnameSlugs.join('/')}"]`)?.parentElement
@@ -123,7 +123,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					let authorTag: string = ppHref?.startsWith('/channel/')
 						? nameTag!.innerText
 						: ppHref?.slice(1)!;
-					extensionSearchQ = `[${authorTag}]`;
+					extensionSearchQ = `[${authorTag}] ${urlObj.searchParams.get('v') || ''}`;
 					tags = [authorTag];
 					url = externalUrl.replace('app=desktop&', '');
 					if (url.includes('list=WL')) {

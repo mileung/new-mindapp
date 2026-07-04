@@ -192,31 +192,34 @@
 							...parsedExtSearchQ,
 							topLvlPostLimit: getMinTopLvlPostLimit(3, parsedExtSearchQ),
 						};
-					}
-					if (urlInMs && callerMs && urlInMs !== callerMs && spaceContext?.permissionCode) {
-						sectionHeadings.push({ heading: 'forYou' });
-						forYouPostFeedSection = {
-							...getDefaultSection(),
-							eitherInMss: [urlInMs],
-							eitherAtByMss: [callerMs],
-							// eitherTags: ['__' + callerMs], // TODO: merge posts with account tag and eitherAtByMss
-							// This may require a rewrite to the parser (using an AST, parentheses, and pipes "|") due
-							// to the ambiguity of `@__8 [__8]`
-							// Unclear if this should search for posts tagged with __8 at account __8 or
-							// posts at account __8 or posts tagged with __8
-							// TODO: Would also have to make an api for searching current space members.
-							// Would be used in dots page to search for members and PostWriter for tagging account ids
-							topLvlPostLimit: 3,
-						};
-					}
-					if (space?.pinnedQuery.txt) {
-						sectionHeadings.push({ heading: 'pinned', secondaryTxt: space?.pinnedQuery.txt });
-						let parsedPinnedQueryTxt = parseSearchQuery(space?.pinnedQuery.txt);
-						pinnedPostFeedSection = {
-							...getDefaultSection(),
-							...parsedPinnedQueryTxt,
-							topLvlPostLimit: getMinTopLvlPostLimit(3, parsedPinnedQueryTxt),
-						};
+						extensionSearchPostFeedSection.eitherInMss.push(urlInMs!);
+					} else {
+						if (urlInMs && callerMs && urlInMs !== callerMs && spaceContext?.permissionCode) {
+							sectionHeadings.push({ heading: 'forYou' });
+							forYouPostFeedSection = {
+								...getDefaultSection(),
+								eitherInMss: [urlInMs],
+								eitherAtByMss: [callerMs],
+								// eitherTags: ['__' + callerMs], // TODO: merge posts with account tag and eitherAtByMss
+								// This may require a rewrite to the parser (using an AST, parentheses, and pipes "|") due
+								// to the ambiguity of `@__8 [__8]`
+								// Unclear if this should search for posts tagged with __8 at account __8 or
+								// posts at account __8 or posts tagged with __8
+								// TODO: Would also have to make an api for searching current space members.
+								// Would be used in dots page to search for members and PostWriter for tagging account ids
+								topLvlPostLimit: 3,
+							};
+						}
+						if (space?.pinnedQuery.txt) {
+							sectionHeadings.push({ heading: 'pinned', secondaryTxt: space?.pinnedQuery.txt });
+							let parsedPinnedQueryTxt = parseSearchQuery(space?.pinnedQuery.txt);
+							pinnedPostFeedSection = {
+								...getDefaultSection(),
+								...parsedPinnedQueryTxt,
+								topLvlPostLimit: getMinTopLvlPostLimit(3, parsedPinnedQueryTxt),
+							};
+							pinnedPostFeedSection.eitherInMss.push(urlInMs!);
+						}
 					}
 				}
 				sectionHeadings.push({

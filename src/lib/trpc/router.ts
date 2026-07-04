@@ -648,7 +648,7 @@ export let router = t.router({
 	getPostFeed: makeProcedure(feedLimiter)
 		.input(
 			WhoObjSchema.extend({
-				sections: z.array(PostFeedSectionSchema).max(4),
+				sections: z.array(PostFeedSectionSchema).max(3),
 				setLastViewMsInMs: z.number().optional(),
 			}).strict(),
 		)
