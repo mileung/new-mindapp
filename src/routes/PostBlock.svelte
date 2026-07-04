@@ -485,9 +485,7 @@
 			<div>
 				<div class={`bg-inherit ${p.cited ? '' : `sticky ${hasAtPostHeader ? 'top-0' : 'top-8'}`}`}>
 					{#if open && !p.nested && !p.cited && atPost}
-						<div
-							class={`overflow-scroll relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}
-						>
+						<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
 							<div class="flex-1 flex h-full text-nowrap overflow-scroll">
 								<a
 									href={`/__${atPost.by_ms}`}
@@ -502,7 +500,7 @@
 									{atPostTxt || m.blank()}
 								</a>
 							</div>
-							{#if !p.cited && !p.isEmbed}
+							{#if !p.isEmbed}
 								<button
 									class={`px-2 xy text-fg2 pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
 									onmousedown={(e) => e.preventDefault()}
@@ -532,7 +530,7 @@
 								{@render reactionInput()}
 							{/if}
 							{#if gs.devMode}
-								<p class="self-center text-fg2">{atPostIdStr}</p>
+								<p class="max-w-18 truncate self-center text-fg2">{atPostIdStr}</p>
 							{/if}
 							<Highlight atPostHeader {evenBg} postIdStr={atPostIdStr} />
 						</div>
