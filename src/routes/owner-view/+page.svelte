@@ -154,7 +154,7 @@
 {#if !gs.accounts}
 	<!--  -->
 {:else}
-	<div class="fixed bg-bg1 top-0 flex w-full text-fg2 overflow-scroll h-8">
+	<div class="fixed z-50 bg-bg1 top-0 flex w-full text-fg2 overflow-scroll h-8">
 		<a
 			href={makeParams('posts')}
 			class={`fx pr-1.5 hover:bg-bg4 hover:text-fg1 ${view === 'posts' ? 'text-fg1' : ''}`}
