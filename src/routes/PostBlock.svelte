@@ -547,7 +547,7 @@
 				</div>
 			{/if}
 			<div
-				class={`flex bg-inherit text-sm text-nowrap font-bold text-fg2 h-8 w-full overflow-x-scroll`}
+				class={`flex bg-inherit text-sm text-nowrap font-bold text-fg2 h-8 w-full overflow-x-scroll overflow-y-hidden`}
 			>
 				{#if p.post.pending}
 					<div class="fx">{m.pending()}</div>
