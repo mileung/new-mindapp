@@ -885,8 +885,9 @@ export let _getPostFeed = async (
 		viewableSpaceMss = [...viewableSpaceMssSet];
 		let keepViewable = (rows: PartInsert[]) =>
 			ownerCalled ? rows : rows.filter((r) => viewableSpaceMssSet.has(r.p1!));
-		for (let i = 0; i < citedIdObjsToFetch.length; i++) {
-			let idObj = citedIdObjsToFetch[i];
+		for (let i = 0; i < postImb_parentMb_rootMb_childCountRows2.length; i++) {
+			let { p1, p2, p3 } = postImb_parentMb_rootMb_childCountRows2[i];
+			let idObj: IdObj = { in_ms: p1!, ms: p2!, by_ms: p3! };
 			if (ownerCalled || viewableSpaceMssSet.has(idObj.in_ms)) {
 				let idStr = getIdStr(idObj);
 				if (!postIdsToSendSet.has(idStr)) {
