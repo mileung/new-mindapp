@@ -113,7 +113,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			},
 			youtube: () => {
 				if (pathnameSlugs[0] === 'watch') {
-					headline = querySelector('yt-formatted-string')?.innerText || headline;
+					headline = querySelector('h1 yt-formatted-string[title]')?.innerText || headline;
 					let nameTag = querySelector('#top-row yt-formatted-string a');
 					let ppHref = decodeURIComponent(
 						externalDom
