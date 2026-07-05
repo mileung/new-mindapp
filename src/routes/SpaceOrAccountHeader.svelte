@@ -30,7 +30,6 @@
 	} from '@tabler/icons-svelte';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
-	import SpinnerOverlay from './SpinnerOverlay.svelte';
 
 	type Changes = {
 		nameTxt?: string;
@@ -53,7 +52,6 @@
 		newMemberPermissionCodeNum: p.space?.newMemberPermissionCode?.num ?? 0,
 	});
 	let editing = $state(false);
-	let loading = $state(false);
 	let draftSettings = $state((() => deepClone(currentSettings))());
 
 	$effect(() => {
@@ -124,7 +122,6 @@
 					<IconX class="w-5" />
 				</button>
 				<button
-					disabled={loading}
 					class="relative xy pl-0.5 pr-1 border-b-2 border-hl1 hover:border-hl2 bg-bg2 hover:bg-bg4 hover:text-fg3"
 					onclick={async () => {
 						editing = false;
@@ -145,9 +142,64 @@
 						)
 							changes.newMemberPermissionCodeNum = draftSettings.newMemberPermissionCodeNum;
 						if (Object.keys(changes).length) {
-							loading = true;
 							try {
-								let ms =
+								let update = (ms: number) =>
+									updateLocalCache((lc) => {
+										if (p.account) {
+											if (changes.nameTxt !== undefined) {
+												lc.accounts[0].name = {
+													ms,
+													txt: changes.nameTxt,
+												};
+												gs.msToProfileMap[accountOrSpaceMs]!.name = lc.accounts[0].name;
+											}
+											if (changes.bioTxt !== undefined) {
+												lc.accounts[0].bio = {
+													ms,
+													txt: changes.bioTxt,
+												};
+												gs.msToProfileMap[accountOrSpaceMs]!.bio = lc.accounts[0].bio;
+											}
+										}
+										if (p.space) {
+											if (changes.nameTxt !== undefined) {
+												lc.msToSpaceMap[p.space.ms]!.name = { ms, txt: changes.nameTxt };
+												gs.msToSpaceMap[accountOrSpaceMs]!.name = lc.msToSpaceMap[p.space.ms]!.name;
+											}
+											if (changes.descriptionTxt !== undefined) {
+												lc.msToSpaceMap[p.space.ms]!.description = {
+													ms,
+													txt: changes.descriptionTxt,
+												};
+												gs.msToSpaceMap[accountOrSpaceMs]!.description =
+													lc.msToSpaceMap[p.space.ms]!.description;
+											}
+											if (changes.pinnedQueryTxt !== undefined) {
+												lc.msToSpaceMap[p.space.ms]!.pinnedQuery = {
+													ms,
+													txt: changes.pinnedQueryTxt,
+												};
+												gs.msToSpaceMap[accountOrSpaceMs]!.pinnedQuery =
+													lc.msToSpaceMap[p.space.ms]!.pinnedQuery;
+											}
+											if (changes.isPublicNum !== undefined) {
+												lc.msToSpaceMap[p.space.ms]!.isPublic = { ms, num: changes.isPublicNum };
+												gs.msToSpaceMap[accountOrSpaceMs]!.isPublic =
+													lc.msToSpaceMap[p.space.ms]!.isPublic;
+											}
+											if (changes.newMemberPermissionCodeNum !== undefined) {
+												lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode = {
+													ms,
+													num: changes.newMemberPermissionCodeNum,
+												};
+												gs.msToSpaceMap[accountOrSpaceMs]!.newMemberPermissionCode =
+													lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode;
+											}
+										}
+										return lc;
+									});
+								update(Date.now());
+								let newMs =
 									p.space?.ms || p.account?.ms
 										? (p.space
 												? await trpc().changeSpaceAttributes.mutate({
@@ -160,71 +212,15 @@
 													})
 											).ms
 										: 0;
-								updateLocalCache((lc) => {
-									if (p.account) {
-										if (changes.nameTxt !== undefined) {
-											lc.accounts[0].name = {
-												ms,
-												txt: changes.nameTxt,
-											};
-											gs.msToProfileMap[accountOrSpaceMs]!.name = lc.accounts[0].name;
-										}
-										if (changes.bioTxt !== undefined) {
-											lc.accounts[0].bio = {
-												ms,
-												txt: changes.bioTxt,
-											};
-											gs.msToProfileMap[accountOrSpaceMs]!.bio = lc.accounts[0].bio;
-										}
-									}
-									if (p.space) {
-										if (changes.nameTxt !== undefined) {
-											lc.msToSpaceMap[p.space.ms]!.name = { ms, txt: changes.nameTxt };
-											gs.msToSpaceMap[accountOrSpaceMs]!.name = lc.msToSpaceMap[p.space.ms]!.name;
-										}
-										if (changes.descriptionTxt !== undefined) {
-											lc.msToSpaceMap[p.space.ms]!.description = {
-												ms,
-												txt: changes.descriptionTxt,
-											};
-											gs.msToSpaceMap[accountOrSpaceMs]!.description =
-												lc.msToSpaceMap[p.space.ms]!.description;
-										}
-										if (changes.pinnedQueryTxt !== undefined) {
-											lc.msToSpaceMap[p.space.ms]!.pinnedQuery = {
-												ms,
-												txt: changes.pinnedQueryTxt,
-											};
-											gs.msToSpaceMap[accountOrSpaceMs]!.pinnedQuery =
-												lc.msToSpaceMap[p.space.ms]!.pinnedQuery;
-										}
-										if (changes.isPublicNum !== undefined) {
-											lc.msToSpaceMap[p.space.ms]!.isPublic = { ms, num: changes.isPublicNum };
-											gs.msToSpaceMap[accountOrSpaceMs]!.isPublic =
-												lc.msToSpaceMap[p.space.ms]!.isPublic;
-										}
-										if (changes.newMemberPermissionCodeNum !== undefined) {
-											lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode = {
-												ms,
-												num: changes.newMemberPermissionCodeNum,
-											};
-											gs.msToSpaceMap[accountOrSpaceMs]!.newMemberPermissionCode =
-												lc.msToSpaceMap[p.space.ms]!.newMemberPermissionCode;
-										}
-									}
-									return lc;
-								});
+								update(newMs);
 							} catch (error) {
 								alertError(error);
-							} finally {
-								loading = false;
 							}
 						}
 					}}
 				>
 					<IconDeviceFloppy class="w-5 mr-1" />
 					{m.save()}
-					<SpinnerOverlay on={loading} />
 				</button>
 			</div>
 		{:else if userCanEdit}
@@ -271,11 +267,7 @@
 	{#if editing}
 		{#if p.space ? p.space.ms > 1 && p.space.ms !== callerMs : true}
 			<p class="font-bold">{m.name()}</p>
-			<input
-				disabled={loading}
-				bind:value={draftSettings.nameTxt}
-				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
-			/>
+			<input bind:value={draftSettings.nameTxt} class="w-full px-2 text-lg bg-bg2 hover:bg-bg4" />
 		{:else}
 			<p class="text-xl font-bold">
 				{msToSpaceNameTxt(accountOrSpaceMs)}
@@ -283,14 +275,12 @@
 		{/if}
 		<p class="mt-1 font-bold">{p.account ? m.bio() : m.description()}</p>
 		<textarea
-			disabled={loading}
 			bind:value={draftSettings.bioOrDescriptionTxt}
 			class="resize-y w-full px-2 py-0.5 text-lg bg-bg2 hover:bg-bg4 block"
 		></textarea>
 		{#if p.space}
 			<p class="font-bold">{m.pinnedQuery()}</p>
 			<input
-				disabled={loading}
 				bind:value={draftSettings.pinnedQueryTxt}
 				class="w-full px-2 text-lg bg-bg2 hover:bg-bg4"
 			/>
@@ -328,9 +318,7 @@
 				<button
 					class="relative mt-2 px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
 					onclick={async () => {
-						loading = true;
 						try {
-							await trpc().deleteSpace.mutate(await getWhoWhereObj());
 							updateLocalCache((lc) => {
 								delete lc.msToSpaceMap[accountOrSpaceMs];
 								lc.accounts.forEach((a) => {
@@ -338,16 +326,14 @@
 								});
 								return lc;
 							});
+							await trpc().deleteSpace.mutate(await getWhoWhereObj());
 						} catch (error) {
 							alertError(error);
-						} finally {
-							loading = false;
 						}
 					}}
 				>
 					<IconTrash class="w-5 mr-1" />
 					{m.deleteSpace()}
-					<SpinnerOverlay on={loading} />
 				</button>
 			{/if}
 		{/if}

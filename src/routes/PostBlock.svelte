@@ -160,6 +160,9 @@
 	let callerIsAuthor = $derived(callerMs === p.post.by_ms);
 	let postIsInLocal = $derived(p.post.in_ms === 0);
 	let callerIsOwner = $derived(getCallerIsOwner());
+	let isMergedView = $derived(page.url.pathname === '/merged-view');
+	let isOwnerView = $derived(callerIsOwner && page.url.pathname === '/owner-view');
+	let tallPostFeedHeader = $derived(isMergedView || isOwnerView);
 	let callerCanDelete = $derived(
 		(lastVersion !== null || !p.post.childCount) &&
 			(postIsInLocal || callerIsAuthor || callerIsOwner),
@@ -449,7 +452,7 @@
 		</div>
 	</div>
 {/snippet}
-<div bind:this={container} class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
+<div bind:this={container} class={`flex overflow-clip ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
 	{#if p.isEmbed}
 		<div class={`border-l-2 border-hl1 pl-2`}></div>
 	{/if}
@@ -468,7 +471,7 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class="bg-inherit h-8 w-5 xy sticky top-8">
+			<div class={`bg-inherit h-8 w-5 xy sticky ${tallPostFeedHeader ? 'top-16' : 'top-8'}`}>
 				{#if open}
 					<!-- TODO: color -/+ with author's identicon color? -->
 					<IconMinus stroke={2.5} class="w-4" />
@@ -478,199 +481,203 @@
 			</div>
 		</button>
 	{/if}
-	<div
-		class={`bg-inherit flex-1 ${p.cited || p.isEmbed ? 'max-w-full' : 'max-w-[calc(100%-20px)]'}`}
-	>
-		<div class={`relative bg-inherit`}>
-			<div>
-				<div class={`bg-inherit ${p.cited ? '' : `sticky ${hasAtPostHeader ? 'top-0' : 'top-8'}`}`}>
-					{#if open && !p.nested && !p.cited && atPost}
-						<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
-							<div class="flex-1 flex h-full text-nowrap overflow-scroll">
-								<a
-									href={`/__${atPost.by_ms}`}
-									class={`pl-2 pr-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'} ${msToAccountItalic(atPost.by_ms)}`}
-								>
-									{msToAccountNameTxt(atPost.by_ms)}
-								</a>
-								<a
-									href={`/${getIdStr(atPost)}`}
-									class={`flex-1 fx ${atPostDeleted || !atPostTxt ? 'text-fg2 italic' : 'text-fg1 hover:text-fg3'} ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
-								>
-									{atPostTxt || m.blank()}
-								</a>
-							</div>
-							{#if !p.isEmbed}
-								<button
-									class={`px-2 xy text-fg2 pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
-									onmousedown={(e) => e.preventDefault()}
-									onclick={() => onCite(atPost)}
-								>
-									<IconLibraryPlus class="w-4 mr-1" />
-									{m.cite()}
-								</button>
-							{/if}
-							{#if canPost}
-								<button
-									class={`px-2 fx text-fg2 text-nowrap pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
-									onclick={() => {
-										resetBottomOverlay('wt');
-										gs.writingReplyTo =
-											gs.writingReplyTo && getIdStr(gs.writingReplyTo) === atPostIdStr
-												? null
-												: atPost;
-									}}
-								>
-									<IconMessage2Plus class="w-4.5 mr-1" />
-									{m.replyC({ c: '' + atPost.childCount })}
-								</button>
-							{/if}
-							{#if canReact && 0}
-								<!-- TODO: react to atPostHeaders -->
-								{@render reactionInput()}
-							{/if}
-							{#if gs.devMode}
-								<p class="max-w-18 truncate self-center text-fg2">{atPostIdStr}</p>
-							{/if}
-							<Highlight atPostHeader {evenBg} postIdStr={atPostIdStr} />
-						</div>
+	<div class={`flex-1 ${p.cited || p.isEmbed ? 'max-w-full' : 'max-w-[calc(100%-20px)]'}`}>
+		<div
+			class={`z-10 ${evenBg ? 'bg-bg1' : 'bg-bg2'} ${
+				p.cited
+					? ''
+					: `sticky ${
+							hasAtPostHeader
+								? tallPostFeedHeader
+									? 'top-8'
+									: 'top-0' //
+								: tallPostFeedHeader
+									? 'top-16'
+									: 'top-8'
+						}`
+			}`}
+		>
+			{#if open && !p.nested && !p.cited && atPost}
+				<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
+					<div class="flex-1 flex h-full text-nowrap overflow-scroll">
+						<a
+							href={`/__${atPost.by_ms}`}
+							class={`pl-2 pr-1 fx text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'} ${msToAccountItalic(atPost.by_ms)}`}
+						>
+							{msToAccountNameTxt(atPost.by_ms)}
+						</a>
+						<a
+							href={`/${getIdStr(atPost)}`}
+							class={`flex-1 fx ${atPostDeleted || !atPostTxt ? 'text-fg2 italic' : 'text-fg1 hover:text-fg3'} ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
+						>
+							{atPostTxt || m.blank()}
+						</a>
+					</div>
+					{#if !p.isEmbed}
+						<button
+							class={`px-2 xy text-fg2 pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
+							onmousedown={(e) => e.preventDefault()}
+							onclick={() => onCite(atPost)}
+						>
+							<IconLibraryPlus class="w-4 mr-1" />
+							{m.cite()}
+						</button>
 					{/if}
-					<div
-						class={`flex text-sm font-bold text-fg2 h-8 w-full overflow-x-scroll overflow-y-hidden`}
+					{#if canPost}
+						<button
+							class={`px-2 fx text-fg2 text-nowrap pointer-fine:hidden group-hover:flex hover:text-fg1 ${evenBg ? 'hover:bg-bg5' : 'hover:bg-bg4'}`}
+							onclick={() => {
+								resetBottomOverlay('wt');
+								gs.writingReplyTo =
+									gs.writingReplyTo && getIdStr(gs.writingReplyTo) === atPostIdStr ? null : atPost;
+							}}
+						>
+							<IconMessage2Plus class="w-4.5 mr-1" />
+							{m.replyC({ c: '' + atPost.childCount })}
+						</button>
+					{/if}
+					{#if canReact && 0}
+						<!-- TODO: react to atPostHeaders -->
+						{@render reactionInput()}
+					{/if}
+					{#if gs.devMode}
+						<p class="max-w-18 truncate self-center text-fg2">{atPostIdStr}</p>
+					{/if}
+					<Highlight atPostHeader {evenBg} postIdStr={atPostIdStr} />
+				</div>
+			{/if}
+			<div
+				class={`flex bg-inherit text-sm text-nowrap font-bold text-fg2 h-8 w-full overflow-x-scroll`}
+			>
+				{#if p.post.pending}
+					<div class="fx">{m.pending()}</div>
+				{:else}
+					<a
+						{target}
+						href={`/${postIdStr}`}
+						class={`px-1 fx hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+						title={isoMsLabel}
+						onclick={(e) => {
+							if (
+								!e.metaKey &&
+								!e.shiftKey &&
+								!e.ctrlKey && //
+								page.params.spaceSlug
+							)
+								gs.lastScrollY = window.scrollY;
+						}}
 					>
-						{#if p.post.pending}
-							<div class="fx">{m.pending()}</div>
-						{:else}
-							<a
-								{target}
-								href={`/${postIdStr}`}
-								class={`fx text-nowrap hover:text-fg1 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-								title={isoMsLabel}
-								onclick={(e) => {
-									if (
-										!e.metaKey &&
-										!e.shiftKey &&
-										!e.ctrlKey && //
-										page.params.spaceSlug
-									)
-										gs.lastScrollY = window.scrollY;
+						{msLabel}
+					</a>
+				{/if}
+				<a
+					{target}
+					href={`/__${p.post.by_ms}`}
+					class={`px-1 fx text-fg1 hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${msToAccountItalic(p.post.by_ms)}`}
+				>
+					{#if authorRole?.num === roleCodes.admin}
+						<IconCrownFilled class="w-4" />
+					{:else if authorRole?.num === roleCodes.mod}
+						<IconShieldFilled class="w-4" />
+					{/if}
+					<AccountIcon ms={p.post.by_ms} class="mx-0.5 shrink-0 w-4" />
+					<p class="pr-1">
+						{msToAccountNameTxt(p.post.by_ms)}
+					</p>
+				</a>
+				{#if p.post.in_ms !== urlInMs}
+					<a
+						{target}
+						href={`/${p.post.in_ms}__`}
+						class={`fx hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${msToSpaceItalic(p.post.in_ms)}`}
+					>
+						<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
+						<p class="pr-0.5">
+							{msToSpaceNameTxt(p.post.in_ms)}
+						</p>
+					</a>
+				{/if}
+				{#if !p.post.pending}
+					{#if !p.isEmbed}
+						<button
+							class={`fx px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+							onmousedown={(e) => e.preventDefault()}
+							onclick={() => onCite(p.post)}
+						>
+							<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
+							{m.cite()}
+						</button>
+						{#if canPost}
+							<button
+								class={`fx px-1 flex-1 text-nowrap  hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+								onclick={() => {
+									resetBottomOverlay('wt');
+									gs.writingReplyTo =
+										gs.writingReplyTo && getIdStr(gs.writingReplyTo) === postIdStr ? null : p.post;
 								}}
 							>
-								{msLabel}
-							</a>
+								<IconMessage2Plus class="w-4.5 mr-1" />
+								{m.replyC({ c: '' + p.post.childCount })}
+							</button>
+						{:else}
+							<div class="fx flex-1 text-nowrap">
+								<IconMessage2 class="w-4.5 mr-1" />
+								{p.post.childCount === 1 ? m.oneReply() : m.nReplies({ n: '' + p.post.childCount })}
+							</div>
 						{/if}
-						<a
-							{target}
-							href={`/__${p.post.by_ms}`}
-							class={`px-1 fx text-fg1 hover:text-fg3 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${msToAccountItalic(p.post.by_ms)}`}
+						{#if canReact}
+							{@render reactionInput()}
+						{/if}
+					{/if}
+					{#each rxnEmojiCountEntries as [emoji, count], i}
+						<button
+							class={`group fx h-8 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${
+								p.post.myRxnEmojis?.includes(emoji)
+									? 'text-fg1 border-b border-hl1 hover:text-fg3'
+									: 'hover:text-fg1'
+							}`}
+							onclick={async () => {
+								await toggleReaction({
+									postIdObj: getIdObj(p.post),
+									emoji,
+								});
+							}}
 						>
-							{#if authorRole?.num === roleCodes.admin}
-								<IconCrownFilled class="w-4" />
-							{:else if authorRole?.num === roleCodes.mod}
-								<IconShieldFilled class="w-4" />
-							{/if}
-							<AccountIcon ms={p.post.by_ms} class="mx-0.5 shrink-0 w-4" />
-							<p class="pr-1">
-								{msToAccountNameTxt(p.post.by_ms)}
+							{emoji}
+							<p class="ml-1.5 font-bold">
+								{count}
 							</p>
-						</a>
-						{#if p.post.in_ms !== urlInMs}
-							<a
-								{target}
-								href={`/${p.post.in_ms}__`}
-								class={`fx hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${msToSpaceItalic(p.post.in_ms)}`}
-							>
-								<SpaceIcon ms={p.post.in_ms} class="mx-0.5 shrink-0 w-4" />
-								<p class="pr-0.5">
-									{msToSpaceNameTxt(p.post.in_ms)}
-								</p>
-							</a>
-						{/if}
-						{#if !p.post.pending}
-							{#if !p.isEmbed}
+						</button>
+						{#if i === rxnEmojiCountEntries.length - 1}
+							<div class="h-8 xy">
 								<button
-									class={`fx px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-									onmousedown={(e) => e.preventDefault()}
-									onclick={() => onCite(p.post)}
-								>
-									<IconLibraryPlus stroke={2.5} class="w-4 mr-1" />
-									{m.cite()}
-								</button>
-								{#if canPost}
-									<button
-										class={`fx px-1 flex-1 text-nowrap  hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-										onclick={() => {
-											resetBottomOverlay('wt');
-											gs.writingReplyTo =
-												gs.writingReplyTo && getIdStr(gs.writingReplyTo) === postIdStr
-													? null
-													: p.post;
-										}}
-									>
-										<IconMessage2Plus class="w-4.5 mr-1" />
-										{m.replyC({ c: '' + p.post.childCount })}
-									</button>
-								{:else}
-									<div class="fx flex-1 text-nowrap">
-										<IconMessage2 class="w-4.5 mr-1" />
-										{p.post.childCount === 1
-											? m.oneReply()
-											: m.nReplies({ n: '' + p.post.childCount })}
-									</div>
-								{/if}
-								{#if canReact}
-									{@render reactionInput()}
-								{/if}
-							{/if}
-							{#each rxnEmojiCountEntries as [emoji, count], i}
-								<button
-									class={`group fx h-8 px-1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'} ${
-										p.post.myRxnEmojis?.includes(emoji)
-											? 'text-fg1 border-b border-hl1 hover:text-fg3'
-											: 'hover:text-fg1'
-									}`}
-									onclick={async () => {
-										await toggleReaction({
-											postIdObj: getIdObj(p.post),
-											emoji,
-										});
+									class={`group xy h-8 w-7 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
+									onclick={() => {
+										resetBottomOverlay('rh');
+										gs.showReactionHistory =
+											gs.showReactionHistory && postIdStr === getIdStr(gs.showReactionHistory)
+												? null
+												: p.post;
 									}}
 								>
-									{emoji}
-									<p class="ml-1.5 font-bold">
-										{count}
-									</p>
+									<IconChartBarPopular stroke={2.5} class="w-3.5" />
 								</button>
-								{#if i === rxnEmojiCountEntries.length - 1}
-									<div class="h-8 xy">
-										<button
-											class={`group xy h-8 w-7 text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-											onclick={() => {
-												resetBottomOverlay('rh');
-												gs.showReactionHistory =
-													gs.showReactionHistory && postIdStr === getIdStr(gs.showReactionHistory)
-														? null
-														: p.post;
-											}}
-										>
-											<IconChartBarPopular stroke={2.5} class="w-3.5" />
-										</button>
-									</div>
-								{/if}
-							{/each}
-							{#if !p.isEmbed}
-								{@render moreOptionsBtn()}
-							{/if}
-							{#if gs.devMode}
-								<p class="self-center text-fg2">{postIdStr}</p>
-							{/if}
+							</div>
 						{/if}
-					</div>
-					<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->
-				</div>
-				{@render reactionMenu()}
-				{@render moreOptionsMenu()}
+					{/each}
+					{#if !p.isEmbed}
+						{@render moreOptionsBtn()}
+					{/if}
+					{#if gs.devMode}
+						<p class="self-center text-fg2">{postIdStr}</p>
+					{/if}
+				{/if}
 			</div>
+			<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->
+			{@render reactionMenu()}
+			{@render moreOptionsMenu()}
+		</div>
+		<div class="relative">
 			{#if !open && !p.nested && hasParent(p.post)}
 				<Highlight {evenBg} postIdStr={atPostIdStr} />
 			{/if}
@@ -678,11 +685,7 @@
 				main={!p.cited}
 				{postIdStr}
 				{evenBg}
-				class={p.nested || !p.cited
-					? `-left-5 w-5 ${open && atPost && !p.nested ? 'top-8' : ''}`
-					: p.cited
-						? '-left-2.5'
-						: ''}
+				class={`-top-8 ${p.cited ? '-left-2.5' : `-left-5 w-5`}`}
 			/>
 			{#if open}
 				<div class={`${p.cited || p.isEmbed ? '' : 'pb-2'}`}>

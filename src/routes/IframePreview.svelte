@@ -66,15 +66,13 @@
 	});
 </script>
 
-{#snippet thumbnail()}
-	{#if imgSrc}
-		<img
-			crossorigin="anonymous"
-			class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
-			src={imgSrc}
-			alt={m.youTubeThumbnail()}
-		/>
-	{/if}
+{#snippet thumbnail(src: string)}
+	<img
+		crossorigin="anonymous"
+		class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
+		{src}
+		alt={m.youTubeThumbnail()}
+	/>
 {/snippet}
 
 {#if imgSrc || iframeSrc}
@@ -96,7 +94,7 @@
 				<IconArrowsMaximize class="absolute h-5 w-5" />
 			{/if}
 		</button>
-		{#if !open}
+		{#if !open && imgSrc}
 			<br />
 			<button
 				class="-ml-1 mt-2"
@@ -105,7 +103,7 @@
 					toggleBtn?.focus();
 				}}
 			>
-				{@render thumbnail()}
+				{@render thumbnail(imgSrc)}
 			</button>
 		{/if}
 		{#if open && iframeType}
@@ -125,10 +123,9 @@
 				<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
 			</div>
 		{/if}
-	{:else}
-		<br />
+	{:else if imgSrc}
 		<a href={p.url} target="_blank" class="inline-block">
-			{@render thumbnail()}
+			{@render thumbnail(imgSrc)}
 		</a>
 	{/if}
 {/if}
