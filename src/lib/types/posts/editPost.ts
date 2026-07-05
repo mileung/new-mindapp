@@ -47,7 +47,7 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 	);
 	let _core_postImb_lastVersion_mRow = assert1Row(_core_postImb_lastVersion_mRows);
 	throwIf(_core_postImb_lastVersion_mRow.p4! !== oldLastVersion);
-	let lastLayerMs = useLastLayerMs ? post.history![newLastVersion]!.ms : Date.now();
+	let newLastLayerMs = useLastLayerMs ? post.history![newLastVersion]!.ms : Date.now();
 	let newPostTagStrs = post.history![newLastVersion]!.tags;
 	let newPostCoreStr = post.history![newLastVersion]!.core.trim();
 	let partsToInsert: PartInsert[] = [
@@ -58,7 +58,7 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 			p2: post.ms,
 			p3: post.by_ms,
 			p4: newLastVersion,
-			p5: lastLayerMs,
+			p5: newLastLayerMs,
 		},
 	];
 
@@ -115,7 +115,7 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 				code: pc._tag_imBy8_count,
 				txt: tagStr,
 				p1: post.in_ms,
-				p2: lastLayerMs + newTagCount++,
+				p2: newLastLayerMs + newTagCount++,
 				p3: by8Ms,
 				p4: 1,
 			};
@@ -172,5 +172,5 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 			),
 		);
 	await db.insert(pTable).values(partsToInsert);
-	return { ms: lastLayerMs };
+	return { ms: newLastLayerMs };
 };

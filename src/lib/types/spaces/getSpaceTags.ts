@@ -31,7 +31,6 @@ export let _getSpaceTags = async (
 		.where(
 			and(
 				pf.code.eq(pc._tag_imBy8_count),
-				pf.txt.notLike('?%=%'),
 				and(...input.excludeTags.map((t) => pf.txt.notEq(t))),
 				!input.spaceMs ? undefined : pf.p1.eq(input.spaceMs),
 				pf.p4.lte(input.fromCount),

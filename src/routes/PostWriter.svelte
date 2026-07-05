@@ -260,15 +260,6 @@
 			onfocus={() => (tagsIptFocused = true)}
 			onblur={(e) => (tagsIptFocused = false)}
 			onchange={() => (alteredInitialVal = true)}
-			onpaste={(e) => {
-				let pastedText = e.clipboardData?.getData('text') ?? '';
-				let pastedTags = pastedText.split(/\r?\n/);
-				if (pastedTags.length > 1) {
-					gs.writerTags = gs.writerTags.concat(
-						pastedTags.map((t) => t.trim()).filter((t) => !!t && !gs.writerTags.includes(t)),
-					);
-				}
-			}}
 			oninput={() => {
 				tagIndex = 0;
 				xFocused = false;
