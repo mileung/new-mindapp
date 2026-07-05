@@ -89,18 +89,18 @@
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
 	let callerMs = $derived(gs.accounts?.[0].ms);
-	let okToLoadMorePosts = $derived(
+	let callerCheckedSpace = $derived(
 		callerMs !== undefined &&
-			!promptSignIn &&
-			(urlInMs === undefined
-				? isMergedView || isOwnerView
-				: viewable && gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs]),
+			urlInMs !== undefined &&
+			gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs],
+	);
+	let okToLoadMorePosts = $derived(
+		!promptSignIn && (isMergedView || isOwnerView || (viewable && callerCheckedSpace)),
 	);
 	let identifier = $derived(
 		!okToLoadMorePosts
 			? ''
 			: JSON.stringify({
-					viewable,
 					callerMs,
 					href: page.url.href,
 				}),
@@ -602,9 +602,11 @@
 {:else if promptSignIn}
 	<PromptSignIn />
 {:else if !viewable}
-	<p class="m-2 text-lg text-fg2 text-center">
-		{m.spaceNotFound()}
-	</p>
+	{#if callerCheckedSpace}
+		<p class="m-2 text-lg text-fg2 text-center">
+			{m.spaceNotFound()}
+		</p>
+	{/if}
 {:else}
 	<div class="flex flex-col">
 		<div class={isMergedView || (isOwnerView && ownerViewingPosts) ? 'pt-16' : 'pt-8'}>
