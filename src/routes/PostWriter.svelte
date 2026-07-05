@@ -138,7 +138,7 @@
 		if (!canPost) return;
 		let otherTag = (suggestingTags && suggestedTags[tagIndex]) || gs.writerTagVal.trim();
 		p.onSubmit(
-			cleanTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])]),
+			cleanTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])], true),
 			gs.writerCore.trim(),
 		);
 		tagsIpt.blur();
