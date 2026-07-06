@@ -45,7 +45,8 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					let aTags = querySelectorAll('.ipc-chip-list__scroller a');
 					headline = trimSuffix(headline, ' - IMDb');
 					let year = headline.match(/\((\d+)\)$/)?.[1];
-					headline = `${trimSuffix(headline, `(${year})`)}\n${querySelector('[data-testid="plot"]')?.innerText || ''}`;
+					headline = `${trimSuffix(headline, `(${year})`)}\n${querySelector('p[data-testid="plot"] span span span')?.innerText || ''}`;
+					// console.log('headline:', headline);
 					tags = aTags?.map((t) => t.innerText);
 					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
 					url = urlObj.origin + urlObj.pathname;
