@@ -50,7 +50,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					tags = aTags?.map((t) => t.innerText);
 					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
 					url = urlObj.origin + urlObj.pathname;
-					extensionSearchQ = `[imdb.com] ${urlObj.pathname}`;
+					extensionSearchQ = `[imdb.com] ${pathnameSlugs[1]}`;
 				}
 			},
 			instagram: () => {
@@ -157,6 +157,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			wikipedia: () => {
 				if (pathnameSlugs[0] === 'wiki') {
 					headline = querySelector(`#firstHeading`)?.innerText ?? headline;
+					extensionSearchQ = `[wikipedia.org] ${pathnameSlugs[1]}`;
 				}
 			},
 		},
