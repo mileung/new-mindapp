@@ -659,7 +659,7 @@
 				<div>
 					{#if sectionObj.heading}
 						<div
-							class={`h-8 flex w-full xs:w-[calc(100vw-var(--w-sidebar))] pl-2 font-semibold fx bg-bg1 ${sectionObj.heading === 'post' ? 'z-50 fixed top-0' : ''}`}
+							class={`h-8 flex w-full overflow-scroll xs:w-[calc(100vw-var(--w-sidebar))] pl-2 font-semibold fx bg-bg1 ${sectionObj.heading === 'post' ? 'z-50 fixed top-0' : ''}`}
 						>
 							{#if sectionObj.heading === 'post'}
 								{m.post()}

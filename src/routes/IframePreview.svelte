@@ -70,7 +70,7 @@
 {#snippet thumbnail(src: string)}
 	<img
 		crossorigin="anonymous"
-		class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
+		class="-mb-2 -mt-1 h-42 bg-bg3 aspect-video object-cover"
 		{src}
 		alt={m.thumbnail()}
 	/>
