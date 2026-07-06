@@ -110,6 +110,7 @@
 						bind:this={unsaveTagXRefs[i]}
 						class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg3 ${tagXFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 						onclick={() => {
+							tagXFocused = false;
 							updateSavedTags([tag], true);
 						}}
 					>
@@ -174,8 +175,10 @@
 			if (e.key === 'Escape') setTimeout(() => searchIpt.blur(), 0);
 			if (e.key === 'Enter') {
 				let tag = suggestedTags[tagIndex];
-				if (tagXFocused) updateSavedTags([tag], true);
-				else if (tag) addTagToSearchInput(tag);
+				if (tagXFocused) {
+					updateSavedTags([tag], true);
+					tagXFocused = false;
+				} else if (tag) addTagToSearchInput(tag);
 				else if (trimmedSearchVal) {
 					e.metaKey ? open(searchUrl, '_blank') : gotoIfNeeded(searchUrl);
 				}

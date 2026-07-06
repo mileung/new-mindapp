@@ -111,7 +111,14 @@ export let updateSavedTags = async (usedTags: string[], remove = false) => {
 		? savedTags.filter((t) => !usedTags.includes(t))
 		: cleanTags([...savedTags, ...usedTags], true);
 	try {
-		let ms = gs.accounts?.[0].ms
+		let update = (ms: number) =>
+			updateLocalCache((lc) => {
+				lc.accounts[0].savedTags.txt = JSON.stringify(savedTags);
+				if (ms) lc.accounts[0].savedTags.ms = ms;
+				return lc;
+			});
+		update(Date.now());
+		let newMs = gs.accounts?.[0].ms
 			? (
 					await trpc().updateSavedTags.mutate({
 						...(await getWhoObj()),
@@ -119,11 +126,7 @@ export let updateSavedTags = async (usedTags: string[], remove = false) => {
 					})
 				).ms
 			: 0;
-		updateLocalCache((lc) => {
-			lc.accounts[0].savedTags.txt = JSON.stringify(savedTags);
-			if (ms) lc.accounts[0].savedTags.ms = ms;
-			return lc;
-		});
+		update(newMs);
 	} catch (error) {
 		alertError(error);
 	}

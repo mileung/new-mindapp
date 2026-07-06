@@ -273,11 +273,11 @@
 						: setTimeout(() => tagsIpt.blur(), 0);
 				}
 				if (e.key === 'Enter') {
-					xFocused
-						? updateSavedTags([suggestedTags[tagIndex]], true)
-						: e.metaKey
-							? submit()
-							: addTag();
+					if (xFocused) {
+						updateSavedTags([suggestedTags[tagIndex]], true);
+						xFocused = false;
+					} else if (e.metaKey) submit();
+					else addTag();
 				}
 				if (suggestingTags) {
 					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
