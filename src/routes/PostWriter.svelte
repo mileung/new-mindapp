@@ -367,7 +367,7 @@
 					onchange={() => (alteredInitialVal = true)}
 					class="resize-none flex-1 text-lg p-2 pr-9 bg-bg3 hover:bg-bg6"
 					onkeydown={(e) => {
-						e.key === 'Escape' && setTimeout(() => coreTa.blur(), 0);
+						e.key === 'Escape' && setTimeout(() => tagsIpt.focus(), 0);
 						e.metaKey && e.key === 'Enter' && submit();
 					}}
 				>
