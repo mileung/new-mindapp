@@ -32,6 +32,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						].filter((n) => n !== -1),
 					);
 					url = externalUrl.slice(0, endI);
+					extensionSearchQ = `[amazon.com] ${pathnameSlugs[1]}`;
 				}
 			},
 			ebay: () => {
@@ -165,7 +166,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 
 	let [tld, sld] = urlObj.hostname.split('.', 3).reverse();
 	tldToSldToScraperMap[tld]?.[sld]?.();
-	tags.unshift(`${sld}.${tld}`);
+	tags.unshift(`${sld ? `${sld}.` : ''}${tld}`);
 	headline = headline.trim();
 	return {
 		extensionSearchQ,

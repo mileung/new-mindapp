@@ -119,7 +119,7 @@
 				<button class="block" onclick={() => (open = false)}>
 					<img
 						crossorigin="anonymous"
-						class="max-h-[80vh] bg-bg3"
+						class="min-h-42 max-h-[80vh] bg-bg3 object-contain"
 						src={imgSrc}
 						alt={m.thumbnail()}
 					/>

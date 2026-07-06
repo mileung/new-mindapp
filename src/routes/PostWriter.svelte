@@ -67,7 +67,11 @@
 	let suggestedTags = $derived.by(() => {
 		if (!suggestingTags) return [];
 		let filter = tagFilter.replace(/\s+/g, ' ');
-		let arr = matchSorter([...savedTagsSet], filter)
+		let includeAtTags = filter.startsWith('@');
+		let arr = matchSorter(
+			[...savedTagsSet].filter((t) => (includeAtTags ? true : !t.startsWith('@'))),
+			filter,
+		)
 			.slice(0, 88)
 			.concat(tagFilter);
 		return [...new Set(arr)];
