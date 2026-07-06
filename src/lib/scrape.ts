@@ -43,10 +43,10 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			imdb: () => {
 				if (pathnameSlugs[0] === 'title') {
 					let aTags = querySelectorAll('.ipc-chip-list__scroller a');
-					headline = trimSuffix(headline, ' - IMDb');
-					let year = headline.match(/\((\d+)\)$/)?.[1];
-					headline = `${trimSuffix(headline, `(${year})`)}\n${querySelector('p[data-testid="plot"] span span span')?.innerText || ''}`;
-					// console.log('headline:', headline);
+					headline = querySelector('h1')?.innerText || '';
+					let year =
+						(querySelector('h1')?.nextElementSibling?.firstChild as HTMLElement).innerText || '';
+					headline = `${headline}\n${querySelector('span[role="presentation"][data-testid="plot-l"]')?.innerText || ''}`;
 					tags = aTags?.map((t) => t.innerText);
 					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
 					url = urlObj.origin + urlObj.pathname;
