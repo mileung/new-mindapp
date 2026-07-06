@@ -16,6 +16,7 @@
 	let iframeDiv = $state<HTMLDivElement>();
 
 	let { imgSrc, iframeSrc, iframeType } = $derived.by(() => {
+		if (/\.(jpg|jpeg|png|webp|avif|gif|svg)(\?.*)?$/i.test(p.url)) return { imgSrc: p.url };
 		let urlObj = new URL(p.url);
 		let pathnameSlugs = urlObj.pathname.split('/').slice(1);
 		let imgSrc = '';
@@ -71,12 +72,12 @@
 		crossorigin="anonymous"
 		class="-mb-2 -mt-1 max-h-42 bg-bg3 aspect-video object-cover"
 		{src}
-		alt={m.youTubeThumbnail()}
+		alt={m.thumbnail()}
 	/>
 {/snippet}
 
 {#if imgSrc || iframeSrc}
-	{#if supportsCredentiallessIframe}
+	{#if supportsCredentiallessIframe || !iframeSrc}
 		<button
 			bind:this={toggleBtn}
 			class="h-6 w-6 bg-bg5 hover:bg-bg7 hover:text-fg3 xy inline-flex translate-y-1"
@@ -94,18 +95,6 @@
 				<IconArrowsMaximize class="absolute h-5 w-5" />
 			{/if}
 		</button>
-		{#if !open && imgSrc}
-			<br />
-			<button
-				class="-ml-1 mt-2"
-				onclick={() => {
-					open = true;
-					toggleBtn?.focus();
-				}}
-			>
-				{@render thumbnail(imgSrc)}
-			</button>
-		{/if}
 		{#if open && iframeType}
 			<div
 				bind:this={iframeDiv}
@@ -123,9 +112,34 @@
 				<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
 			</div>
 		{/if}
-	{:else if imgSrc}
-		<a href={p.url} target="_blank" class="inline-block">
-			{@render thumbnail(imgSrc)}
-		</a>
+	{/if}
+	{#if imgSrc}
+		{#if open}
+			{#if !iframeSrc}
+				<button class="block" onclick={() => (open = false)}>
+					<img
+						crossorigin="anonymous"
+						class="max-h-[80vh] bg-bg3 aspect-video object-contain"
+						src={imgSrc}
+						alt={m.thumbnail()}
+					/>
+				</button>
+			{/if}
+		{:else if !supportsCredentiallessIframe && iframeSrc}
+			<a href={p.url} target="_blank" class="inline-block">
+				{@render thumbnail(imgSrc)}
+			</a>
+		{:else}
+			<br />
+			<button
+				class="-ml-1 mt-2"
+				onclick={() => {
+					open = true;
+					toggleBtn?.focus();
+				}}
+			>
+				{@render thumbnail(imgSrc)}
+			</button>
+		{/if}
 	{/if}
 {/if}

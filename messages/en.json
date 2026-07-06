@@ -231,7 +231,7 @@
 	"webShareApiNotSupported": "Web Share API not supported",
 	"tooManyFailedAttempts": "Too many failed attempts",
 	"tooManyRequests": "Too many requests",
-	"youTubeThumbnail": "YouTube Thumbnail",
+	"thumbnail": "Thumbnail",
 	"localDatabaseResetComplete": "Local database reset complete",
 	"extension": "Extension",
 	"importJsonFile": "Import JSON file",
