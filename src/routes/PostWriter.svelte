@@ -347,7 +347,10 @@
 							<button
 								bind:this={unsaveTagXRefs[i]}
 								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
-								onclick={() => updateSavedTags([tag], true)}
+								onclick={() => {
+									xFocused = false;
+									updateSavedTags([tag], true);
+								}}
 							>
 								<IconX class="h-5 w-5" />
 							</button>
