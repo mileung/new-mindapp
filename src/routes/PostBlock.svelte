@@ -471,7 +471,7 @@
 				open = willBeOpen;
 			}}
 		>
-			<div class={`bg-inherit h-8 w-5 xy sticky ${tallPostFeedHeader ? 'top-16' : 'top-8'}`}>
+			<div class={`bg-inherit z-10 h-8 w-5 xy sticky ${tallPostFeedHeader ? 'top-16' : 'top-8'}`}>
 				{#if open}
 					<!-- TODO: color -/+ with author's identicon color? -->
 					<IconMinus stroke={2.5} class="w-4" />
