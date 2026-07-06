@@ -125,11 +125,13 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						: ppHref?.slice(1)!;
 					extensionSearchQ = `[${authorTag}] ${urlObj.searchParams.get('v') || ''}`;
 					tags = [authorTag];
-					url = externalUrl.replace('app=desktop&', '');
-					if (url.includes('list=WL')) {
-						url = url.replace('&list=WL', '');
-						url = url.replace(/&index=\d+/, '');
+					urlObj.searchParams.delete('app');
+					urlObj.searchParams.delete('ra');
+					if (urlObj.searchParams.get('list') === 'WL') {
+						urlObj.searchParams.delete('list');
+						urlObj.searchParams.delete('index');
 					}
+					url = urlObj.href;
 				} else if (pathnameSlugs[0] === 'playlist') {
 					let author: string = decodeURIComponent(
 						querySelector('yt-page-header-view-model a[href^="/@"]')
