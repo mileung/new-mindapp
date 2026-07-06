@@ -119,7 +119,7 @@
 				<button class="block" onclick={() => (open = false)}>
 					<img
 						crossorigin="anonymous"
-						class="max-h-[80vh] bg-bg3 aspect-video object-contain"
+						class="max-h-[80vh] bg-bg3"
 						src={imgSrc}
 						alt={m.thumbnail()}
 					/>
