@@ -21,4 +21,13 @@
 		scrollbar-width: none;
 		-ms-overflow-style: none;
 	}
+	.mini-x-scroll {
+		@apply overflow-x-auto whitespace-nowrap;
+	}
+	.mini-x-scroll::-webkit-scrollbar {
+		height: 1px;
+	}
+	.mini-x-scroll::-webkit-scrollbar-thumb {
+		@apply bg-fg1;
+	}
 }

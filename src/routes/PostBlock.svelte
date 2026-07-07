@@ -378,7 +378,7 @@
 					</p>
 				</button>
 			</div>
-			{#if callerCanDelete || callerCanEdit}
+			{#if callerCanDelete || callerCanEdit || showVersionControls}
 				<div class={`h-8 flex ${evenBg ? 'bg-bg3' : 'bg-bg4'}`}>
 					{#if callerCanDelete}
 						<button
@@ -452,10 +452,10 @@
 		</div>
 	</div>
 {/snippet}
-<div bind:this={container} class={`flex overflow-clip ${evenBg ? 'bg-bg1' : 'bg-bg2'}`}>
-	{#if p.isEmbed}
-		<div class={`border-l-2 border-hl1 pl-2`}></div>
-	{/if}
+<div
+	bind:this={container}
+	class={`flex overflow-y-clip ${evenBg ? 'bg-bg1' : 'bg-bg2'} ${p.isEmbed ? 'border-l-2 border-hl1 pl-2' : ''}`}
+>
 	{#if !p.cited && !p.isEmbed}
 		<button
 			class={`w-5 fy bg-inherit text-fg2 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
@@ -498,7 +498,9 @@
 			}`}
 		>
 			{#if open && !p.nested && !p.cited && atPost}
-				<div class={`relative h-8 flex group text-sm ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}>
+				<div
+					class={`relative h-8 flex group text-sm border-l-2 border-fg2 ${evenBg ? 'bg-bg2' : 'bg-bg1'}`}
+				>
 					<div class="flex-1 flex h-full text-nowrap overflow-scroll">
 						<a
 							href={`/__${atPost.by_ms}`}
@@ -543,7 +545,7 @@
 					{#if gs.devMode}
 						<p class="max-w-18 truncate self-center text-fg2">{atPostIdStr}</p>
 					{/if}
-					<Highlight atPostHeader {evenBg} postIdStr={atPostIdStr} />
+					<Highlight {evenBg} postIdStr={atPostIdStr} class="-left-0.5" />
 				</div>
 			{/if}
 			<div
@@ -677,7 +679,13 @@
 			{@render reactionMenu()}
 			{@render moreOptionsMenu()}
 		</div>
-		<div class="relative">
+		<div
+			class={`relative ${
+				showMoreOptionsMenu && (callerCanDelete || callerCanEdit || showVersionControls)
+					? 'min-h-16' // Not proud of this "solution" to clipped moreOptionsMenu
+					: ''
+			}`}
+		>
 			{#if !open && !p.nested && hasParent(p.post)}
 				<Highlight {evenBg} postIdStr={atPostIdStr} />
 			{/if}
@@ -685,6 +693,7 @@
 				main={!p.cited}
 				{postIdStr}
 				{evenBg}
+				noOverlay={p.cited}
 				class={`-top-8 ${p.cited ? '-left-2.5' : `-left-5 w-5`}`}
 			/>
 			{#if open}

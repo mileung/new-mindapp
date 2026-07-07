@@ -590,8 +590,8 @@
 	let endingPanelClass = $derived(
 		`text-lg text-fg2 ${
 			isMergedView || ownerViewingPosts
-				? 'h-[calc(100vh-32px-36px)] xs:h-[calc(100vh-32px-32px)]'
-				: 'h-[calc(100vh-32px-36px)] xs:h-[calc(100vh-32px)]'
+				? 'h-[calc(100vh-64px-36px)]' //
+				: 'h-[calc(100vh-32px-36px)]'
 		}`,
 	);
 </script>
@@ -608,7 +608,7 @@
 		</p>
 	{/if}
 {:else}
-	<div class="flex flex-col">
+	<div class="flex flex-col pb-9">
 		<div class={isMergedView || (isOwnerView && ownerViewingPosts) ? 'pt-16' : 'pt-8'}>
 			<div
 				class={`z-50 fixed ${isMergedView || isOwnerView ? 'top-8' : 'top-0'} bg-bg1 flex w-full xs:w-[calc(100vw-var(--w-sidebar))] text-fg2 shrink-0 h-8 ${idSlug ? 'hidden' : ''}`}
@@ -754,7 +754,7 @@
 					class="xy h-9 w-9 text-black bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2"
 					onclick={() => (gs.writingNewPost = true)}
 				>
-					<IconPencilPlus class="h-8 xs:h-9" />
+					<IconPencilPlus class="h-7 w-7" />
 				</button>
 			{/if}
 		</div>

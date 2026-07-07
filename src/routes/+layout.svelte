@@ -345,6 +345,6 @@
 {#if !isEmbed}
 	<Sidebar />
 {/if}
-<div class={isEmbed ? '' : `xs:pl-[var(--w-sidebar)] pb-9 xs:pb-0`}>
+<div class={isEmbed ? '' : `xs:pl-[var(--w-sidebar)]`}>
 	{@render p.children()}
 </div>

@@ -103,9 +103,9 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			},
 			x: () => {
 				if (pathnameSlugs[1] === 'status') {
-					let authorTag = `@${pathnameSlugs[0]}`;
-					extensionSearchQ = `[${authorTag}] ${pathnameSlugs[2]}`;
-					tags = [authorTag];
+					let atHandle = `@${pathnameSlugs[0]}`;
+					extensionSearchQ = `[${atHandle}] ${pathnameSlugs[2]}`;
+					tags = [atHandle];
 					// TODO: X has really messy HTML on purpose I think to make query selectors break. Make this more robust.
 					let tweetBlock = querySelector(`a[href="/${pathnameSlugs.join('/')}"]`)?.parentElement
 						?.parentElement?.parentElement?.parentElement?.parentElement?.parentElement;
@@ -123,11 +123,11 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 							.querySelector('#owner > ytd-video-owner-renderer > a')
 							?.getAttribute('href')!,
 					);
-					let authorTag: string = ppHref?.startsWith('/channel/')
+					let atHandle: string = ppHref?.startsWith('/channel/')
 						? nameTag!.innerText
 						: ppHref?.slice(1)!;
-					extensionSearchQ = `[${authorTag}] ${urlObj.searchParams.get('v') || ''}`;
-					tags = [authorTag];
+					extensionSearchQ = `[${atHandle}] ${urlObj.searchParams.get('v') || ''}`;
+					tags = [atHandle];
 					urlObj.searchParams.delete('app');
 					urlObj.searchParams.delete('ra');
 					if (urlObj.searchParams.get('list') === 'WL') {
@@ -135,13 +135,19 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						urlObj.searchParams.delete('index');
 					}
 					url = urlObj.href;
+				} else if (pathnameSlugs[0] === 'post') {
+					let atHandle: string =
+						querySelector('#author-thumbnail a')?.getAttribute('href')?.slice(1) || '';
+					tags = [atHandle];
+					headline = querySelector('#content-text')?.innerText || '';
+					extensionSearchQ = `[${atHandle}] ${pathnameSlugs[2]}`;
 				} else if (pathnameSlugs[0] === 'playlist') {
-					let author: string = decodeURIComponent(
+					let atHandle: string = decodeURIComponent(
 						querySelector('yt-page-header-view-model a[href^="/@"]')
 							?.getAttribute('href')
 							?.slice(1)!,
 					);
-					tags = [author];
+					tags = [atHandle];
 					headline =
 						querySelector(
 							'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
