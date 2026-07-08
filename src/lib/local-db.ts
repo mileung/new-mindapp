@@ -3,7 +3,7 @@ import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
 import { drizzle } from 'drizzle-orm/sqlite-proxy';
 import { SQLocalDrizzle } from 'sqlocal/drizzle';
 import { gs } from './global-state.svelte';
-import { alertError } from './js';
+import { alertError, setSqlocalOkClientCookie } from './js';
 
 export type Database = LibSQLDatabase<any> | SqliteRemoteDatabase;
 
@@ -11,6 +11,7 @@ export let localDbFilename = 'mindapp.db';
 
 // https://sqlocal.dev/guide/introduction
 export let initLocalDb = async () => {
+	setSqlocalOkClientCookie(true);
 	return new Promise<SQLocalDrizzle>((resolve, reject) => {
 		try {
 			let db = new SQLocalDrizzle({

@@ -14,6 +14,8 @@
 	let p: { url: string } = $props();
 	let toggleBtn = $state<HTMLButtonElement>();
 	let { imgSrc, iframeSrc, iframeType } = $derived.by(() => {
+		if (!supportsCredentiallessIframe && (page.data as LayoutServerData).sqlocalOk) return {};
+
 		if (/\.(jpg|jpeg|png|webp|avif|gif|svg)(\?.*)?$/i.test(p.url)) return { imgSrc: p.url };
 		let urlObj = new URL(p.url);
 		let pathnameSlugs = urlObj.pathname.split('/').slice(1);
@@ -84,8 +86,6 @@
 		return { imgSrc, iframeSrc, iframeType };
 	});
 	let open = $state((() => (iframeSrc ? !imgSrc : false))());
-	let pageData = $derived(page.data as LayoutServerData);
-	let sqlocalOk = $derived(pageData.sqlocalOk);
 </script>
 
 {#snippet thumbnail(src: string)}

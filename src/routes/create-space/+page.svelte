@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import {
 		assertCallerIsOwnerOrInGlobal,
+		getPromptEnableLocalSpace,
 		getPromptSigningIn,
 		getWhoObj,
 		gs,
@@ -12,6 +13,7 @@
 	import { updateLocalCache } from '$lib/types/local-cache';
 	import { accentCodes, permissionCodes, roleCodes } from '$lib/types/spaces';
 	import { IconChevronRight } from '@tabler/icons-svelte';
+	import PromptEnableLocalSpace from '../PromptEnableLocalSpace.svelte';
 	import PromptSignIn from '../PromptSignIn.svelte';
 	import SpinnerOverlay from '../SpinnerOverlay.svelte';
 
@@ -27,6 +29,8 @@
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
+{:else if getPromptEnableLocalSpace()}
+	<PromptEnableLocalSpace />
 {:else}
 	<div class="p-2 max-w-lg">
 		<p class="text-xl font-black">

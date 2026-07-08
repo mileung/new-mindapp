@@ -50,7 +50,7 @@ export type LocalCache = z.infer<typeof LocalCacheSchema>;
 let getDefaultLocalCache = () =>
 	structuredClone({
 		devMode: dev,
-		lastSeenInMs: 0,
+		lastSeenInMs: 1,
 		accounts: [getDefaultAccount()],
 		msToSpaceMap: {
 			0: getDefaultSpace(),

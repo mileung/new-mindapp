@@ -39,7 +39,6 @@
 	let sqlocalOk = $derived(pageData.sqlocalOk);
 
 	onMount(async () => {
-		console.log('sqlocalOk:', sqlocalOk);
 		// console.time('layout onMount');
 		if (isEmbed) return;
 		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
@@ -52,9 +51,11 @@
 		set_msToProfileMap();
 
 		try {
-			// console.time('initLocalDb');
-			await initLocalDb();
-			// console.timeEnd('initLocalDb');
+			if (sqlocalOk) {
+				// console.time('initLocalDb');
+				await initLocalDb();
+				// console.timeEnd('initLocalDb');
+			}
 		} catch (error) {
 			console.error(error);
 			gs.localDbFailed = true;

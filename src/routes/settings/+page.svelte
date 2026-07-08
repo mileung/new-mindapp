@@ -1,7 +1,13 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { promptSum } from '$lib/dom';
 	import { gs, gsdb } from '$lib/global-state.svelte';
-	import { alertError, ranInt } from '$lib/js';
+	import {
+		alertError,
+		ranInt,
+		setSqlocalOkClientCookie,
+		supportsCredentiallessIframe,
+	} from '$lib/js';
 	import { initLocalDb, localDbFilename } from '$lib/local-db';
 	import { m } from '$lib/paraglide/messages';
 	import { setTheme } from '$lib/theme';
@@ -11,9 +17,16 @@
 	import { getIdStr } from '$lib/types/parts/partIds';
 	import { PostSchema, type Post } from '$lib/types/posts';
 	import { addPost } from '$lib/types/posts/addPost';
-	import { IconArrowMerge, IconDownload, IconTrash } from '@tabler/icons-svelte';
+	import {
+		IconArrowMerge,
+		IconBrowserCheck,
+		IconBrowserX,
+		IconDownload,
+		IconTrash,
+	} from '@tabler/icons-svelte';
 	import { SQLocal } from 'sqlocal';
 	import { SQLocalDrizzle } from 'sqlocal/drizzle';
+	import type { LayoutServerData } from '../$types';
 	let language = $state('en');
 
 	let resetLocalDatabase = async () => {
@@ -35,6 +48,9 @@
 	// TODO: allow user to put in domain patterns that render as iframes
 	// like if you want to render other mindapp instances hosted elsewhere,
 	// you'd list that domain and their urls render iframes in the feed
+
+	let pageData = $derived(page.data as LayoutServerData);
+	let sqlocalOk = $derived(pageData.sqlocalOk);
 </script>
 
 <div class="p-2 max-w-lg">
@@ -84,26 +100,46 @@
 	>
 		<option value="en">English</option>
 	</select>
-	<!-- TODO: Spinners while downloading/importing/deleting local data -->
 	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 	<p class="text-xl font-bold">{m.manageLocalDatabase()}</p>
-
-	{#if gs.localDbFailed}
-		<button
-			class="px-2 h-9 xy bg-bg4 border-b-2 border-amber-400 dark:border-amber-500 hover:bg-bg7 hover:text-fg3 hover:border-amber-500 dark:hover:border-amber-400"
-			onclick={async () => {
-				let { getDatabaseFile } = new SQLocal(localDbFilename);
-				let databaseFile = await getDatabaseFile();
-				let fileUrl = URL.createObjectURL(databaseFile);
-				let a = document.createElement('a');
-				a.href = fileUrl;
-				a.download = `mindapp-${Date.now()}.db`;
-				a.click();
-				a.remove();
-				URL.revokeObjectURL(fileUrl);
-			}}><IconDownload class="w-5 mr-1" />{m.downloadDbFile()}</button
-		>
-	{:else}
+	{#if !sqlocalOk}
+		<p class="">{m.thisExperimentalFeatureWill___()}</p>
+		{#if !supportsCredentiallessIframe}
+			<p class="">{m.yourBrowserWillStopSupporting___()}</p>
+		{/if}
+	{/if}
+	<button
+		class="px-2 h-9 xy bg-bg4 border-b-2 border-local hover:bg-bg7 hover:text-fg3"
+		onclick={async () => {
+			setSqlocalOkClientCookie(!sqlocalOk);
+			location.reload();
+		}}
+	>
+		{#if sqlocalOk}
+			<IconBrowserX class="w-5 mr-1" />
+		{:else}
+			<IconBrowserCheck class="w-5 mr-1" />
+		{/if}
+		{sqlocalOk ? m.disableLocalSpace() : m.enableLocalSpace()}</button
+	>
+	{#if sqlocalOk}
+		{#if gs.localDbFailed}
+			<button
+				class="px-2 h-9 xy bg-bg4 border-b-2 border-amber-400 dark:border-amber-500 hover:bg-bg7 hover:text-fg3 hover:border-amber-500 dark:hover:border-amber-400"
+				onclick={async () => {
+					let { getDatabaseFile } = new SQLocal(localDbFilename);
+					let databaseFile = await getDatabaseFile();
+					let fileUrl = URL.createObjectURL(databaseFile);
+					let a = document.createElement('a');
+					a.href = fileUrl;
+					a.download = `mindapp-${Date.now()}.db`;
+					a.click();
+					a.remove();
+					URL.revokeObjectURL(fileUrl);
+				}}><IconDownload class="w-5 mr-1" />{m.downloadDbFile()}</button
+			>
+		{/if}
+		<!-- TODO: Spinners while downloading/importing/deleting local data -->
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-sky-400 dark:border-sky-500 hover:bg-bg7 hover:text-fg3 hover:border-sky-500 dark:hover:border-sky-400"
 			onclick={async () => {
@@ -202,73 +238,76 @@
 			{m.importJsonFile()}
 		</button>
 	{/if}
-	<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-	<p class="text-xl font-bold">{m.dangerZone()}</p>
-	<!-- TODO: reset local cache button -->
-	<button
-		class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
-		onclick={async () => {
-			await resetLocalDatabase();
-			alert(m.localDatabaseResetComplete());
-		}}><IconTrash class="w-5 mr-1" />{m.resetLocalDatabase()}</button
-	>
 	{#if gs.devMode}
 		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-		<p class="text-xl font-bold">Dev Tools</p>
+		<p class="text-xl font-bold">{m.dangerZone()}</p>
+		<!-- TODO: reset local cache button -->
 		<button
-			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
+			class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
 			onclick={async () => {
-				// TODO
 				await resetLocalDatabase();
-				let testTags: string[] = [];
-				// let totalPosts = 1;
-				let totalPosts = 88;
-				// let totalPosts = 188;
-				// let totalPosts = 888;
-				// let totalPosts = 8888;
-
-				let totalPostTags = 89;
-				for (let i = 0; i < totalPostTags; i++) testTags.push(`tag${i + 1}`);
-				let beginning = new Date('1988-08-08').getTime();
-				let posts: Post[] = [];
-				for (let i = 0; i < totalPosts; i++) {
-					let ranPost = posts[ranInt(0, i * 8)];
-					let cid = ranPost ? getIdStr(ranPost) : '';
-					let ms = beginning + i * 8 * day;
-					let tagCount = ranInt(0, 8);
-					let tagsSet = new Set<string>();
-					for (let t = 0; t < tagCount; t++) {
-						tagsSet.add(testTags[ranInt(0, testTags.length - 1)]);
-					}
-					let atPost = posts[ranInt(0, i * 2)];
-					posts.push({
-						in_ms: 0,
-						ms,
-						by_ms: 0,
-						at_ms: atPost?.ms,
-						at_by_ms: atPost?.by_ms,
-						history: {
-							'1': {
-								ms,
-								core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
-								tags: [...tagsSet],
-							},
-						},
-					});
-				}
-				console.time('adding posts');
-				for (let post of posts) {
-					try {
-						await addPost(post, true, true, []);
-					} catch (error) {
-						alertError(error);
-					}
-					console.log('added post');
-				}
-				gs.identifierToPostFeedMap = {};
-				console.timeEnd('adding posts');
-			}}><IconTrash class="w-5 mr-1" />Replace local db with test data</button
+				alert(m.localDatabaseResetComplete());
+			}}><IconTrash class="w-5 mr-1" />{m.resetLocalDatabase()}</button
 		>
+		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+		<p class="text-xl font-bold">Dev Tools</p>
+		{#if sqlocalOk}
+			<button
+				class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
+				onclick={async () => {
+					// TODO
+					await resetLocalDatabase();
+					let testTags: string[] = [];
+					// let totalPosts = 1;
+					let totalPosts = 88;
+					// let totalPosts = 188;
+					// let totalPosts = 888;
+					// let totalPosts = 8888;
+
+					// let totalPostTags = 89;
+					let totalPostTags = 188;
+					for (let i = 0; i < totalPostTags; i++) testTags.push(`tag${i + 1}`);
+					let beginning = new Date('1988-08-08').getTime();
+					let posts: Post[] = [];
+					for (let i = 0; i < totalPosts; i++) {
+						let ranPost = posts[ranInt(0, i * 8)];
+						let cid = ranPost ? getIdStr(ranPost) : '';
+						let ms = beginning + i * 8 * day;
+						let tagCount = ranInt(0, 8);
+						let tagsSet = new Set<string>();
+						for (let t = 0; t < tagCount; t++) {
+							tagsSet.add(testTags[ranInt(0, testTags.length - 1)]);
+						}
+						let atPost = posts[ranInt(0, i * 2)];
+						posts.push({
+							in_ms: 0,
+							ms,
+							by_ms: 0,
+							at_ms: atPost?.ms,
+							at_by_ms: atPost?.by_ms,
+							history: {
+								'1': {
+									ms,
+									core: `Test post ${i + 1}: Lorem ipsum dolor sit amet ${i} ${cid}`,
+									tags: [...tagsSet],
+								},
+							},
+						});
+					}
+					console.time('adding posts');
+					for (let post of posts) {
+						try {
+							await addPost(post, true, true, []);
+						} catch (error) {
+							alertError(error);
+						}
+						console.log('added post');
+					}
+					gs.identifierToPostFeedMap = {};
+					console.timeEnd('adding posts');
+				}}><IconTrash class="w-5 mr-1" />Replace local db with test data</button
+			>
+		{/if}
 		<button
 			class="px-2 h-9 xy bg-bg4 border-b-2 border-yellow-400 dark:border-yellow-500 hover:bg-bg7 hover:text-fg3 hover:border-yellow-500 dark:hover:border-yellow-400"
 			onclick={async () => {

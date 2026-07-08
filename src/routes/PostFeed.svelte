@@ -5,6 +5,7 @@
 		assertCallerIsOwnerOrInGlobal,
 		getBottomOverlayShown,
 		getCallerIsOwner,
+		getPromptEnableLocalSpace,
 		getPromptSigningIn,
 		getSpaceContext,
 		getSpacePermissions,
@@ -54,6 +55,7 @@
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
 	import PostBlock from './PostBlock.svelte';
 	import PostWriter from './PostWriter.svelte';
+	import PromptEnableLocalSpace from './PromptEnableLocalSpace.svelte';
 	import PromptSignIn from './PromptSignIn.svelte';
 	import ReactionHistory from './ReactionHistory.svelte';
 	import SearchBar from './SearchBar.svelte';
@@ -88,6 +90,7 @@
 			isOwnerView,
 	);
 	let promptSignIn = $derived(getPromptSigningIn());
+	let promptEnableLocalSpace = $derived(getPromptEnableLocalSpace());
 	let callerMs = $derived(gs.accounts?.[0].ms);
 	let callerCheckedSpace = $derived(
 		callerMs !== undefined &&
@@ -95,7 +98,9 @@
 			gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs],
 	);
 	let okToLoadMorePosts = $derived(
-		!promptSignIn && (isMergedView || isOwnerView || (viewable && callerCheckedSpace)),
+		!promptSignIn &&
+			!promptEnableLocalSpace &&
+			(isMergedView || isOwnerView || (viewable && callerCheckedSpace)),
 	);
 	let identifier = $derived(
 		!okToLoadMorePosts
@@ -601,6 +606,8 @@
 	<!--  -->
 {:else if promptSignIn}
 	<PromptSignIn />
+{:else if promptEnableLocalSpace}
+	<PromptEnableLocalSpace />
 {:else if !viewable}
 	{#if callerCheckedSpace}
 		<p class="m-2 text-lg text-fg2 text-center">

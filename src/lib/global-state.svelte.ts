@@ -1,6 +1,7 @@
 import { dev } from '$app/environment';
 import { page } from '$app/state';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
+import type { LayoutServerData } from '../routes/$types';
 import { promptSum } from './dom';
 import { alertError, identikana, ownerMsSet } from './js';
 import { m } from './paraglide/messages';
@@ -170,6 +171,9 @@ export let getPromptSigningIn = () =>
 		page.url.pathname === '/create-space' ||
 		page.url.pathname === '/merged-view' ||
 		page.url.pathname === '/owner-view');
+
+export let getPromptEnableLocalSpace = () =>
+	getUrlInMs() === 0 && !(page.data as LayoutServerData).sqlocalOk;
 
 export let getBottomOverlayShown = () =>
 	gs.showReactionHistory || gs.writingNewPost || gs.writingReplyTo || gs.writingEditFor;

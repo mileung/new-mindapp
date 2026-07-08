@@ -1,6 +1,7 @@
 <script lang="ts">
 	import {
 		getCallerIsOwner,
+		getPromptEnableLocalSpace,
 		getPromptSigningIn,
 		getSpaceContext,
 		gs,
@@ -17,6 +18,7 @@
 		IconSquareCheckFilled,
 	} from '@tabler/icons-svelte';
 	import InfiniteLoading, { type InfiniteEvent } from 'svelte-infinite-loading';
+	import PromptEnableLocalSpace from '../../PromptEnableLocalSpace.svelte';
 	import PromptSignIn from '../../PromptSignIn.svelte';
 	import SpaceIcon from '../../SpaceIcon.svelte';
 
@@ -41,6 +43,7 @@
 			if (tag.num === lastCount) lastTagsWithSameCount.push(tag.txt!);
 			else break;
 		}
+		console.log('lastTagsWithSameCount:', lastTagsWithSameCount);
 		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
 		// console.log('res:', res);
 		res.tags.length && e.detail.loaded();
@@ -68,6 +71,8 @@
 	<!--  -->
 {:else if getPromptSigningIn()}
 	<PromptSignIn />
+{:else if getPromptEnableLocalSpace()}
+	<PromptEnableLocalSpace />
 {:else if !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}

@@ -164,17 +164,14 @@ export let ranInt = (a: number, b: number) => {
 };
 
 export let sqlocalOkCookieName = 'sqlocalOk';
-export let getsqlocalOkClientCookie = () =>
-	document.cookie.split('; ').some((c) => c === `${sqlocalOkCookieName}=1`);
 export let getRequestEnablesSqlocal = (request: Request) =>
 	(request.headers.get('cookie') ?? '')
 		.split(';') //
 		.some((c) => c.trim() === `${sqlocalOkCookieName}=1`);
-export let setsqlocalOkClientCookie = (enabled: boolean) => {
+export let setSqlocalOkClientCookie = (enabled: boolean) => {
 	document.cookie = enabled
 		? `${sqlocalOkCookieName}=1; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
 		: `${sqlocalOkCookieName}=; path=/; max-age=0; samesite=lax`;
-	location.reload();
 };
 
 export let supportsCredentiallessIframe =

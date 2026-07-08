@@ -35,6 +35,7 @@
 		IconX,
 	} from '@tabler/icons-svelte';
 	import { onMount } from 'svelte';
+	import type { LayoutServerData } from './$types';
 	import AccountIcon from './AccountIcon.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
 
@@ -72,6 +73,9 @@
 		),
 	);
 
+	let pageData = $derived(page.data as LayoutServerData);
+	let sqlocalOk = $derived(pageData.sqlocalOk);
+
 	onMount(() => {
 		if (isEmbed) return;
 		let onKeyDown = (e: KeyboardEvent) => {
@@ -97,7 +101,8 @@
 					// TODO: this should work with all the sidebar tabs
 					let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
 					let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
-					if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
+					let minIndex = sqlocalOk ? 0 : 1;
+					if (newSpaceMsIndex < minIndex) newSpaceMsIndex = minIndex;
 					if (newSpaceMsIndex >= sidebarSpaceMss.length)
 						newSpaceMsIndex = sidebarSpaceMss.length - 1;
 					goto(`/${sidebarSpaceMss[newSpaceMsIndex]}__`);
@@ -373,7 +378,7 @@
 							highlightLastSeenInMs && spaceMs === gs.lastSeenInMs
 								? 'bg-bg5' //
 								: ''
-						} ${getSpaceTranslateY(i)}`}
+						} ${getSpaceTranslateY(i)} ${i || sqlocalOk ? '' : 'hidden'}`}
 						style={`${i === draggingSpaceIndex ? 'transform: translateY(var(--y-space-drag));' : ''}`}
 						ontouchstart={(e) => {
 							draggingSpaceIndex = i;
