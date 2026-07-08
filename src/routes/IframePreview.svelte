@@ -121,12 +121,12 @@
 				class={`flex flex-col max-h-[80vh] ${
 					(
 						{
-							'ig-post': 'aspect-[9/16]',
-							'tt-vid': 'aspect-[9/16] max-w-80',
-							'x-post': 'aspect-[5/8]',
+							// 'ig-post': 'aspect-[9/16]',
+							// 'tt-vid': 'aspect-[9/16] max-w-80',
+							// 'x-post': 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]',
 							'yt-vid': 'aspect-video',
 						} as Record<typeof iframeType, string>
-					)[iframeType]
+					)[iframeType] || 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]'
 				}`}
 			>
 				{#if supportsCredentiallessIframe}
