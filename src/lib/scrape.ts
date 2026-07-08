@@ -32,6 +32,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						].filter((n) => n !== -1),
 					);
 					url = externalUrl.slice(0, endI);
+					// extensionSearchQ = `[amazon.com] ${pathnameSlugs[2]}`;
 					extensionSearchQ = `[amazon.com] ${pathnameSlugs[1]}`;
 				}
 			},

@@ -307,6 +307,7 @@ export let _getPostFeed = async (
 			let sectionHasTags = sectionHasRequiredTags || sectionHasEitherTags;
 			let sectionHasCores =
 				section.requiredCoreIncludes.length || section.eitherCoreIncludes.length;
+			let lastLoopForSection = false;
 			if (sectionHasTags) {
 				for (let _tag_imBy8_countRow of _tag_imBy8_countRowsFromInput) {
 					let { txt, p1, p2, p3 } = _tag_imBy8_countRow;
@@ -323,10 +324,10 @@ export let _getPostFeed = async (
 					if (isRequired) _tag_imBy8_countRequiredRows.push(_tag_imBy8_countRow);
 					if (isEither) _tag_imBy8_countEitherRows.push(_tag_imBy8_countRow);
 				}
+				lastLoopForSection = !_tag_imBy8_countRowsFromInput.length;
 			}
 			let possibleResultingPostIdObjsForSection: IdObj[] = [];
 			let notResultingPostIdObjsForSection: IdObj[] = [];
-			let lastLoopForSection = false;
 			let getPostIdObjsNotToFetchMoreStuffFor = () => [
 				...notResultingPostIdObjsForSection,
 				...resultingPostIdObjsForSection,
@@ -500,7 +501,10 @@ export let _getPostFeed = async (
 						if (!tagImb_postMb_lastVersionRowsForThisLoop.length) lastLoopForSection = true;
 					} else lastLoopForSection = true;
 				}
-				if (sectionHasCores) {
+				if (
+					sectionHasCores &&
+					(postIdObjsWithRequiredTagsAndEitherTags.length || !sectionHasTags)
+				) {
 					let _core_postImb_lastVersion_mRows = await db
 						.select()
 						.from(pTable)
