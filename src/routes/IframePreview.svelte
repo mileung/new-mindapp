@@ -125,6 +125,7 @@
 							// 'tt-vid': 'aspect-[9/16] max-w-80',
 							// 'x-post': 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]',
 							'yt-vid': 'aspect-video',
+							sc: 'max-w-[80vw]',
 						} as Record<typeof iframeType, string>
 					)[iframeType] || 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]'
 				}`}
