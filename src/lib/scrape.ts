@@ -102,7 +102,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						(querySelector('a.playbackSoundBadge__titleLink') as HTMLAnchorElement)?.href,
 					);
 					url = urlObj.origin + trackUrlObj.pathname;
-					extensionSearchQ = `${atHandle} ${trackUrlObj.pathname}`;
+					extensionSearchQ = `[${atHandle}] ${trackUrlObj.pathname}`;
 				}
 			},
 			tiktok: () => {
