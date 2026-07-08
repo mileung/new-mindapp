@@ -208,10 +208,10 @@
 	let hoveringMoreOptionsBtn = $state(false);
 	let hoveringMoreOptionsMenu = $state(false);
 	let showMoreOptionsMenu = $derived(
-		moreOptionsOpen || (!isTouchScreen && (hoveringMoreOptionsBtn || hoveringMoreOptionsMenu)),
+		moreOptionsOpen || hoveringMoreOptionsBtn || hoveringMoreOptionsMenu,
 	);
 	let showReactionMenu = $derived(
-		reactionIptFocused || (!isTouchScreen && (hoveringReactionInput || hoveringReactionMenu)),
+		reactionIptFocused || hoveringReactionInput || hoveringReactionMenu,
 	);
 </script>
 
@@ -227,7 +227,7 @@
 			onfocus={() => (reactionIptFocused = true)}
 			onblur={() => (reactionIptFocused = false)}
 			onmouseenter={(e) => {
-				hoveringReactionInput = true;
+				!isTouchScreen && (hoveringReactionInput = true);
 				let reactionMenuBtnRect = e.currentTarget.getBoundingClientRect();
 				let reactionMenuRect = reactionMenuDiv.getBoundingClientRect();
 				let reactionMenuBtnRightSpace = window.innerWidth - reactionMenuBtnRect.right;
@@ -250,7 +250,7 @@
 {#snippet reactionMenu()}
 	<div
 		class={`${stickyMenuTop} ${lastMenuOpen === 'reaction' ? 'z-30' : 'z-20'}`}
-		onmouseenter={() => (hoveringReactionMenu = true)}
+		onmouseenter={() => !isTouchScreen && (hoveringReactionMenu = true)}
 		onmouseleave={() => (hoveringReactionMenu = false)}
 	>
 		<div
@@ -282,7 +282,7 @@
 		class={`z-0 xy px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 		onclick={() => (moreOptionsOpen = !moreOptionsOpen)}
 		onmouseenter={(e) => {
-			hoveringMoreOptionsBtn = true;
+			!isTouchScreen && (hoveringMoreOptionsBtn = true);
 			let moreOptionsBtnRect = e.currentTarget.getBoundingClientRect();
 			let moreOptionsMenuRect = moreOptionsMenuDiv.getBoundingClientRect();
 			let moreOptionsBtnRightSpace = window.innerWidth - moreOptionsBtnRect.right;
@@ -312,7 +312,7 @@
 {#snippet moreOptionsMenu()}
 	<div
 		class={`${stickyMenuTop} ${lastMenuOpen === 'moreOptions' ? (showMoreOptionsMenu ? 'z-40' : 'z-30') : 'z-20'}`}
-		onmouseenter={() => (hoveringMoreOptionsMenu = true)}
+		onmouseenter={() => !isTouchScreen && (hoveringMoreOptionsMenu = true)}
 		onmouseleave={() => (hoveringMoreOptionsMenu = false)}
 	>
 		<div

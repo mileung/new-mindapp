@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { gotoIfNeeded, textInputFocused } from '$lib/dom';
 	import { gs } from '$lib/global-state.svelte';
-	import { getAlteredSearchParams } from '$lib/js';
+	import { getAlteredSearchParams, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { searchGuideArr } from '$lib/types/posts/parseSearchQuery';
@@ -82,8 +82,8 @@
 </script>
 
 <div
-	class={`bg-bg3 fixed flex flex-col ${searchGuideExpanded ? 'max-h-[80vh]' : 'max-h-38'} ${searchGuideExpanded || hoveringTopDiv || searchIptFocused ? '' : 'hidden'} left-0 xs:left-[var(--w-sidebar)] right-0 bottom-9 text-nowrap overflow-scroll`}
-	onmouseenter={() => (hoveringTopDiv = true)}
+	class={`bg-bg3 fixed flex flex-col ${searchGuideExpanded ? 'max-h-[80vh]' : 'max-h-38'} ${searchGuideExpanded || (hoveringTopDiv && !isTouchScreen) || searchIptFocused ? '' : 'hidden'} left-0 xs:left-[var(--w-sidebar)] right-0 bottom-9 text-nowrap overflow-scroll`}
+	onmouseenter={() => !isTouchScreen && (hoveringTopDiv = true)}
 	onmouseleave={() => (hoveringTopDiv = false)}
 >
 	{#if showSuggestedTags}
