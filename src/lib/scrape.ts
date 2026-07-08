@@ -159,16 +159,16 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					headline = querySelector('#content-text')?.innerText || '';
 					extensionSearchQ = `[${atHandle}] ${pathnameSlugs[2]}`;
 				} else if (pathnameSlugs[0] === 'playlist') {
-					let atHandle: string = decodeURIComponent(
-						querySelector('yt-page-header-view-model a[href^="/@"]')
-							?.getAttribute('href')
-							?.slice(1)!,
-					);
-					tags = [atHandle];
-					headline =
-						querySelector(
-							'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
-						)?.innerText || headline;
+					let atHandle = querySelector('yt-page-header-view-model a[href^="/@"]')
+						?.getAttribute('href')
+						?.slice(1);
+					if (atHandle) {
+						tags = [atHandle];
+						headline =
+							querySelector(
+								'h1 .yt-core-attributed-string.yt-core-attributed-string--white-space-pre-wrap',
+							)?.innerText || headline;
+					} // albums have no atHandle: https://www.youtube.com/playlist?list=OLAK5uy_nV_H2i8w-Pm1IpTP1lolyAa2GY4u7tqbA
 				} else if (pathnameSlugs[0][0] === '@') {
 					tags = [pathnameSlugs[0]];
 				} else if (pathnameSlugs[0] === 'results') {

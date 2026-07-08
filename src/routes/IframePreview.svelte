@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { getYtVideoId } from '$lib/dom';
-	import { supportsCredentiallessIframe } from '$lib/js';
+	import { isTouchScreen, supportsCredentiallessIframe } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-svelte';
 	import type { LayoutServerData } from './$types';
@@ -118,7 +118,8 @@
 		</button>
 		{#if open && iframeType}
 			<div
-				class={`flex flex-col max-h-[80vh] ${
+				class={`flex flex-col mr-8 max-h-[64vh] ${
+					// TODO: getting this css right is hard
 					(
 						{
 							// 'ig-post': 'aspect-[9/16]',
@@ -127,7 +128,7 @@
 							'yt-vid': 'aspect-video',
 							sc: 'max-w-[80vw]',
 						} as Record<typeof iframeType, string>
-					)[iframeType] || 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]'
+					)[iframeType] || (isTouchScreen ? 'h-80' : 'aspect-[3/4]')
 				}`}
 			>
 				{#if supportsCredentiallessIframe}
