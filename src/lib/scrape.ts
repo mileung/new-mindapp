@@ -87,6 +87,23 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					headline = headline.slice(0, headline.lastIndexOf(' : '));
 				}
 			},
+			soundcloud: () => {
+				let handlePlaying = querySelector('a.playbackSoundBadge__lightLink')
+					?.getAttribute('href')
+					?.slice(1);
+				if (handlePlaying) {
+					let atHandle = '@' + handlePlaying;
+					tags = [atHandle];
+					headline =
+						querySelector('a.playbackSoundBadge__titleLink span[aria-hidden="true"]')?.innerText ||
+						headline;
+					let trackUrlObj = new URL(
+						(querySelector('a.playbackSoundBadge__titleLink') as HTMLAnchorElement)?.href,
+					);
+					url = urlObj.origin + trackUrlObj.pathname;
+					extensionSearchQ = `${atHandle} ${trackUrlObj.pathname}`;
+				}
+			},
 			tiktok: () => {
 				if (pathnameSlugs[1] === 'video') {
 					tags = [pathnameSlugs[0]];
@@ -118,11 +135,10 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 				if (pathnameSlugs[0] === 'watch') {
 					headline = querySelector('h1 yt-formatted-string[title]')?.innerText || headline;
 					let nameTag = querySelector('#top-row yt-formatted-string a');
-					let ppHref = decodeURIComponent(
-						externalDom
-							.querySelector('#owner > ytd-video-owner-renderer > a')
-							?.getAttribute('href')!,
-					);
+					// TODO: scrape vids with multiple channel authors
+					let ppHref = externalDom
+						.querySelector('#owner > ytd-video-owner-renderer > a')
+						?.getAttribute('href')!;
 					let atHandle: string = ppHref?.startsWith('/channel/')
 						? nameTag!.innerText
 						: ppHref?.slice(1)!;

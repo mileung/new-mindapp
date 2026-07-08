@@ -35,8 +35,11 @@
 			),
 		};
 	};
+	let pageData = $derived(page.data as LayoutServerData);
+	let sqlocalOk = $derived(pageData.sqlocalOk);
 
 	onMount(async () => {
+		console.log('sqlocalOk:', sqlocalOk);
 		// console.time('layout onMount');
 		if (isEmbed) return;
 		let theme = localStorage.getItem('mindappTheme') as typeof gs.theme;
@@ -328,7 +331,6 @@
 		return `${title ? `${title} | ` : ''}Mindapp`;
 	});
 	let siteDescription = $derived('General purpose organizer');
-	let pageData = $derived(page.data as LayoutServerData);
 	let thinTopOgText = $derived(
 		pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
 	);

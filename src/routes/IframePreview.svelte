@@ -1,8 +1,10 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { getYtVideoId } from '$lib/dom';
 	import { supportsCredentiallessIframe } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { IconArrowsMaximize, IconArrowsMinimize } from '@tabler/icons-svelte';
+	import type { LayoutServerData } from './$types';
 	import CredentiallessIframe from './CredentiallessIframe.svelte';
 
 	// TODO: detect when an embedded YouTube video finishes and play next vid
@@ -10,18 +12,14 @@
 	// https://developers.google.com/youtube/iframe_api_reference
 
 	let p: { url: string } = $props();
-	let open = $state(false);
-	// let open = $state(true);
 	let toggleBtn = $state<HTMLButtonElement>();
-	let iframeDiv = $state<HTMLDivElement>();
-
 	let { imgSrc, iframeSrc, iframeType } = $derived.by(() => {
 		if (/\.(jpg|jpeg|png|webp|avif|gif|svg)(\?.*)?$/i.test(p.url)) return { imgSrc: p.url };
 		let urlObj = new URL(p.url);
 		let pathnameSlugs = urlObj.pathname.split('/').slice(1);
 		let imgSrc = '';
 		let iframeSrc = '';
-		let iframeType: undefined | 'ig-post' | 'tt-vid' | 'x-post' | 'yt-vid';
+		let iframeType: undefined | 'ig-post' | 'sc' | 'tt-vid' | 'x-post' | 'yt-vid';
 		let tldToSldToScraperMap: Record<string, undefined | Record<string, undefined | (() => void)>> =
 			{
 				com: {
@@ -34,6 +32,26 @@
 							// iframeSrc = `https://www.instagram.com/reel/${pathnameSlugs[1]}/embed/`;
 							// iframeSrc = `https://www.instagram.com/reels/${pathnameSlugs[1]}/embed/`;
 							// console.log('iframeSrc:', iframeSrc);
+						}
+					},
+					soundcloud: () => {
+						if (pathnameSlugs.length === 2) {
+							iframeType = 'sc';
+							let params = {
+								// color: 'ff5500',
+								// auto_play: false,
+								// hide_related: false,
+								// show_comments: true,
+								// show_user: true,
+								// show_reposts: false,
+								// show_teaser: true,
+								// visual: true,
+							};
+							let query = new URLSearchParams({
+								url: p.url,
+								...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
+							});
+							iframeSrc = `https://w.soundcloud.com/player/?${query.toString()}`;
 						}
 					},
 					tiktok: () => {
@@ -65,6 +83,9 @@
 		tldToSldToScraperMap[tld]?.[sld]?.();
 		return { imgSrc, iframeSrc, iframeType };
 	});
+	let open = $state((() => (iframeSrc ? !imgSrc : false))());
+	let pageData = $derived(page.data as LayoutServerData);
+	let sqlocalOk = $derived(pageData.sqlocalOk);
 </script>
 
 {#snippet thumbnail(src: string)}
@@ -77,7 +98,7 @@
 {/snippet}
 
 {#if imgSrc || iframeSrc}
-	{#if supportsCredentiallessIframe || !iframeSrc}
+	{#if iframeSrc}
 		<button
 			bind:this={toggleBtn}
 			class="h-6 w-6 bg-bg5 hover:bg-bg7 hover:text-fg3 xy inline-flex translate-y-1"
@@ -97,7 +118,6 @@
 		</button>
 		{#if open && iframeType}
 			<div
-				bind:this={iframeDiv}
 				class={`flex flex-col max-h-[80vh] ${
 					(
 						{
@@ -109,7 +129,11 @@
 					)[iframeType]
 				}`}
 			>
-				<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
+				{#if supportsCredentiallessIframe}
+					<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
+				{:else}
+					<iframe allowfullscreen class="flex-1" src={iframeSrc}></iframe>
+				{/if}
 			</div>
 		{/if}
 	{/if}
@@ -125,10 +149,10 @@
 					/>
 				</button>
 			{/if}
-		{:else if !supportsCredentiallessIframe && iframeSrc}
-			<a href={p.url} target="_blank" class="inline-block">
+			<!-- {:else if !supportsCredentiallessIframe && iframeSrc}
+			<a href={p.url} target="_blank" class="block w-fit">
 				{@render thumbnail(imgSrc)}
-			</a>
+			</a> -->
 		{:else}
 			<br />
 			<button

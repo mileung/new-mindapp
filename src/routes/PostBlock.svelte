@@ -177,6 +177,17 @@
 		else gs.postIdToLocallySavedMap[postIdStr] = true;
 	};
 	let hasAtPostHeader = $derived(!p.nested && atPost);
+	let stickyMenuTop = $derived(
+		`sticky ${
+			hasAtPostHeader
+				? tallPostFeedHeader
+					? 'top-16'
+					: 'top-8'
+				: tallPostFeedHeader
+					? 'top-24'
+					: 'top-16'
+		}`,
+	);
 	let target = $derived(p.isEmbed ? '_blank' : undefined);
 	let typedEmoji = $state('');
 	$effect(() => {
@@ -238,7 +249,7 @@
 {/snippet}
 {#snippet reactionMenu()}
 	<div
-		class={`sticky ${lastMenuOpen === 'reaction' ? 'z-30' : 'z-20'} ${hasAtPostHeader ? 'top-16' : 'top-8'}`}
+		class={`${stickyMenuTop} ${lastMenuOpen === 'reaction' ? 'z-30' : 'z-20'}`}
 		onmouseenter={() => (hoveringReactionMenu = true)}
 		onmouseleave={() => (hoveringReactionMenu = false)}
 	>
@@ -300,18 +311,18 @@
 {/snippet}
 {#snippet moreOptionsMenu()}
 	<div
-		class={`sticky ${lastMenuOpen === 'moreOptions' ? (showMoreOptionsMenu ? 'z-40' : 'z-30') : 'z-20'} ${hasAtPostHeader ? 'top-16' : 'top-8'}`}
+		class={`${stickyMenuTop} ${lastMenuOpen === 'moreOptions' ? (showMoreOptionsMenu ? 'z-40' : 'z-30') : 'z-20'}`}
 		onmouseenter={() => (hoveringMoreOptionsMenu = true)}
 		onmouseleave={() => (hoveringMoreOptionsMenu = false)}
 	>
 		<div
 			bind:this={moreOptionsMenuDiv}
-			class={`max-w-screen overflow-scroll flex flex-col items-end absolute ${
+			class={` max-w-screen overflow-x-scroll flex flex-col items-end absolute ${
 				showMoreOptionsMenu ? '' : 'invisible'
-			}`}
+			} ${evenBg ? 'bg-bg3' : 'bg-bg4'}`}
 			style={`right:${moreOptionsMenuRight}px`}
 		>
-			<div class={`h-8 flex ${evenBg ? 'bg-bg3' : 'bg-bg4'}`}>
+			<div class="h-8 flex">
 				{#if core}
 					<button
 						class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
@@ -379,7 +390,7 @@
 				</button>
 			</div>
 			{#if callerCanDelete || callerCanEdit || showVersionControls}
-				<div class={`h-8 flex ${evenBg ? 'bg-bg3' : 'bg-bg4'}`}>
+				<div class="h-8 flex">
 					{#if callerCanDelete}
 						<button
 							class={`xy gap-1 px-1 group hover:text-fg3 ${evenBg ? 'hover:bg-bg6' : 'hover:bg-bg7'}`}
@@ -454,7 +465,7 @@
 {/snippet}
 <div
 	bind:this={container}
-	class={`flex overflow-y-clip ${evenBg ? 'bg-bg1' : 'bg-bg2'} ${p.isEmbed ? 'border-l-2 border-hl1 pl-2' : ''}`}
+	class={`flex ${evenBg ? 'bg-bg1' : 'bg-bg2'} ${p.isEmbed ? 'border-l-2 border-hl1 pl-2' : ''}`}
 >
 	{#if !p.cited && !p.isEmbed}
 		<button
@@ -676,16 +687,8 @@
 				{/if}
 			</div>
 			<!-- TODO: horizontal scroll progress bar for the height of PostBlocks taller than 100vh? What if the PostBlock is nested? Just for 0 depth PostBlocks? vertical scroll progress bar on PostBlocks taller than the page  -->
-			{@render reactionMenu()}
-			{@render moreOptionsMenu()}
 		</div>
-		<div
-			class={`relative ${
-				showMoreOptionsMenu && (callerCanDelete || callerCanEdit || showVersionControls)
-					? 'min-h-16' // Not proud of this "solution" to clipped moreOptionsMenu
-					: ''
-			}`}
-		>
+		<div class="relative">
 			{#if !open && !p.nested && hasParent(p.post)}
 				<Highlight {evenBg} postIdStr={atPostIdStr} />
 			{/if}
@@ -696,6 +699,8 @@
 				noOverlay={p.cited}
 				class={`-top-8 ${p.cited ? '-left-2.5' : `-left-5 w-5`}`}
 			/>
+			{@render reactionMenu()}
+			{@render moreOptionsMenu()}
 			{#if open}
 				<div class={`${p.cited || p.isEmbed ? '' : 'pb-2'}`}>
 					{#if tags.length}

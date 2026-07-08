@@ -163,9 +163,24 @@ export let ranInt = (a: number, b: number) => {
 	return Math.floor(Math.random() * (max - min + 1)) + min;
 };
 
+export let sqlocalOkCookieName = 'sqlocalOk';
+export let getsqlocalOkClientCookie = () =>
+	document.cookie.split('; ').some((c) => c === `${sqlocalOkCookieName}=1`);
+export let getRequestEnablesSqlocal = (request: Request) =>
+	(request.headers.get('cookie') ?? '')
+		.split(';') //
+		.some((c) => c.trim() === `${sqlocalOkCookieName}=1`);
+export let setsqlocalOkClientCookie = (enabled: boolean) => {
+	document.cookie = enabled
+		? `${sqlocalOkCookieName}=1; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
+		: `${sqlocalOkCookieName}=; path=/; max-age=0; samesite=lax`;
+	location.reload();
+};
+
 export let supportsCredentiallessIframe =
-	typeof HTMLIFrameElement !== 'undefined' && //
-	'credentialless' in HTMLIFrameElement.prototype;
+	!0 ||
+	(typeof HTMLIFrameElement !== 'undefined' && //
+		'credentialless' in HTMLIFrameElement.prototype);
 
 export let deepClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj)) as T;
 

@@ -1,4 +1,5 @@
 import { dev } from '$app/environment';
+import { getRequestEnablesSqlocal } from '$lib/js';
 import { getTextDirection } from '$lib/paraglide/runtime';
 import { paraglideMiddleware } from '$lib/paraglide/server';
 import { createContext } from '$lib/trpc/context';
@@ -25,11 +26,14 @@ export let handle: Handle = sequence(
 		// 	response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
 		// 	response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
 		// }
-		response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
-		response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		if (getRequestEnablesSqlocal(event.request)) {
+			response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
+			response.headers.set('Cross-Origin-Opener-Policy', 'same-origin');
+		}
+
 		// if (event.url.pathname.startsWith('/embed')) {
-		// 	response.headers.delete('Cross-Origin-Embedder-Policy');
-		// 	response.headers.delete('Cross-Origin-Opener-Policy');
+		// response.headers.delete('Cross-Origin-Embedder-Policy');
+		// response.headers.delete('Cross-Origin-Opener-Policy');
 		// }
 		return response;
 	},

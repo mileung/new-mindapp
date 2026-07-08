@@ -1,4 +1,4 @@
-import { splitUntil } from '$lib/js';
+import { getRequestEnablesSqlocal, splitUntil } from '$lib/js';
 import { formatMs } from '$lib/time';
 import { getIdStrAsIdObj, isIdStr, isSpaceSlug } from '$lib/types/parts/partIds';
 import type { LayoutServerLoad } from './$types';
@@ -42,5 +42,6 @@ export const load: LayoutServerLoad = async (event) => {
 		title,
 		thinTopOgText,
 		boldBottomOgText,
+		sqlocalOk: getRequestEnablesSqlocal(event.request),
 	};
 };

@@ -1,6 +1,6 @@
 import { assertCallerIsOwnerOrInGlobal, getWhoObj, gs } from '$lib/global-state.svelte';
 import { alertError } from '$lib/js';
-import { getIdStr, getUrlInMs, type IdObj } from '../parts/partIds';
+import { getIdStr, type IdObj } from '../parts/partIds';
 import { addReaction } from './addReaction';
 import { removeReaction } from './removeReaction';
 
@@ -26,12 +26,13 @@ export let toggleReaction = async (input: { postIdObj: IdObj; emoji: string }) =
 			{ ...(await getWhoObj()), ...input },
 			!input.postIdObj.in_ms,
 		);
-		if (input.postIdObj.in_ms && !getUrlInMs()) {
-			await (adding ? addReaction : removeReaction)(
-				{ ...(await getWhoObj()), ...input },
-				true, //
-			);
-		}
+		// TODO: throws error if post isn't saved locally
+		// if (input.postIdObj.in_ms && !getUrlInMs()) {
+		// 	await (adding ? addReaction : removeReaction)(
+		// 		{ ...(await getWhoObj()), ...input },
+		// 		true, //
+		// 	);
+		// }
 	} catch (error) {
 		alertError(error);
 	}
