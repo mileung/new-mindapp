@@ -330,11 +330,18 @@
 	let appendedTitle = $derived.by(() => {
 		return `${title ? `${title} | ` : ''}Mindapp`;
 	});
-	let siteDescription = $derived('General purpose organizer');
-	let thinTopOgText = $derived(
-		pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
+	let siteDescription = $derived(
+		'siteDescription',
+		// || 'General purpose organizer'
 	);
-	let boldBottomOgText = $derived(pageData.boldBottomOgText || title);
+	let thinTopOgText = $derived(
+		'thinTopOgText',
+		// || pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
+	);
+	let boldBottomOgText = $derived(
+		'boldBottomOgText',
+		// || pageData.boldBottomOgText || title
+	);
 </script>
 
 <title>{appendedTitle}</title>

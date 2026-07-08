@@ -21,10 +21,9 @@ export const load: LayoutServerLoad = async (event) => {
 		// console.log('stuff:', event.request.headers.values());
 		// console.log('slug:', slug);
 		let slug = splitUntil(event.url.pathname, '/', 2)[1];
-
 		if (isSpaceSlug(slug)) {
-			let lastSeenInMs = +slug.slice(-2);
-			console.log('lastSeenInMs:', lastSeenInMs);
+			let spaceMs = +slug.slice(0, -2);
+			console.log('spaceMs:', spaceMs);
 			boldBottomOgText = 'spaceName';
 		}
 		if (isIdStr(slug)) {
@@ -32,8 +31,8 @@ export const load: LayoutServerLoad = async (event) => {
 			console.log('idObj:', idObj);
 			thinTopOgText = 'post core'.slice(0, 998);
 			let time = formatMs(0, 'min');
-			let authorName = 'Mike';
-			let spaceName = 'Global';
+			let authorName = 'authorName';
+			let spaceName = 'spaceName';
 			boldBottomOgText = `${time}\n${authorName}\n${spaceName}`;
 		}
 	}
