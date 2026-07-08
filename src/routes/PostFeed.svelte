@@ -677,13 +677,15 @@
 								</p>
 							{:else if sectionObj.heading === 'forYou'}
 								{m.forYou()}
-								<a
-									class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
-									href={`?q=@__${callerMs}`}
-								>
-									{m.showMore()}
-									<IconChevronRight />
-								</a>
+								{#if sectionObj.topLvlPostIdStrs.length > 2}
+									<a
+										class="font-medium pl-2 h-full flex-1 fx text-fg2 justify-between hover:bg-bg4 hover:text-fg1"
+										href={`?q=@__${callerMs}`}
+									>
+										{m.showMore()}
+										<IconChevronRight />
+									</a>
+								{/if}
 							{:else}
 								{#if sectionObj.heading === 'nextUp'}
 									{m.nextUp()}
