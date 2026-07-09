@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
 import { and, not } from 'drizzle-orm';
@@ -18,8 +18,8 @@ export let getReactionHistory = async ({
 	msLte: number;
 	rxnMsByMssExclude: { ms: number; by_ms: number }[];
 }) => {
-	let baseInput = await getWhoWhereObj();
-	return baseInput.spaceMs
+	let baseInput = await getWhoObj();
+	return postIdObj.in_ms
 		? trpc().getReactionHistory.query({
 				...baseInput,
 				postIdObj,

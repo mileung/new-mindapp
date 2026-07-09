@@ -413,7 +413,7 @@ export let router = t.router({
 		}),
 	addPost: makeProcedure(postLimiter)
 		.input(
-			WhoWhereObjSchema.extend({
+			WhoObjSchema.extend({
 				post: PostSchema,
 				citedPostIdObjsToFetch: z.array(IdObjSchema).max(88),
 			}).strict(),
@@ -421,18 +421,20 @@ export let router = t.router({
 		.mutation(async ({ ctx, input }) => {
 			let { post } = input;
 			// TODO: allow non zero ms if the caller is an admin of the space (useful for importing old posts)
-			if (post.ms) throw new Error('post ms must be 0');
-			if (!post.by_ms || post.by_ms !== input.callerMs) throw new Error('Invalid by_ms');
-			if (!post.in_ms || post.in_ms !== input.spaceMs) throw new Error('Invalid in_ms');
+			throwIf(!post.in_ms || post.ms || !post.by_ms);
 			if (!post.history || Object.keys(post.history).length !== 1 || !post.history['1'])
 				throw new Error('History must have only version 1');
 			if (post.history['1'].ms) throw new Error('version 1 ms must be 0');
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, {
-				signedIn: true,
-				permissionCode: !ownerCalled,
-				inGlobal: !ownerCalled,
-			});
+			let c = await _getCallerContext(
+				ctx,
+				{ ...input, spaceMs: post.in_ms },
+				{
+					signedIn: true,
+					permissionCode: !ownerCalled,
+					inGlobal: !ownerCalled,
+				},
+			);
 			throwIf(!c.signedIn);
 			if (!ownerCalled) {
 				throwIf(!c.inGlobal);
@@ -627,7 +629,7 @@ export let router = t.router({
 		}),
 	getReactionHistory: makeProcedure()
 		.input(
-			WhoWhereObjSchema.extend({
+			WhoObjSchema.extend({
 				postIdObj: IdObjSchema,
 				msLte: z.number(),
 				rxnMsByMssExclude: z.array(IdObjSchema.omit({ in_ms: true })),
@@ -635,13 +637,16 @@ export let router = t.router({
 		)
 		.query(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
-			if (input.postIdObj.in_ms !== input.spaceMs) throw new Error('Invalid spaceMs');
 			let ownerCalled = inputIsOwner(input);
-			let c = await _getCallerContext(ctx, input, {
-				permissionCode: !ownerCalled,
-				signedIn: true,
-				isPublic: !ownerCalled,
-			});
+			let c = await _getCallerContext(
+				ctx,
+				{ ...input, spaceMs: input.postIdObj.in_ms },
+				{
+					permissionCode: !ownerCalled,
+					signedIn: true,
+					isPublic: !ownerCalled,
+				},
+			);
 			throwIf(!c.signedIn);
 			!ownerCalled && throwIf(!c.isPublic && c.permissionCode === undefined);
 			return _getReactionHistory(tdb, input);

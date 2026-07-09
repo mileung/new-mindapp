@@ -1,4 +1,4 @@
-import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
+import { getWhoObj, gsdb } from '$lib/global-state.svelte';
 import { ownerMsSet, ranInt } from '$lib/js';
 import { trpc } from '$lib/trpc/client';
 import { and, or, sql } from 'drizzle-orm';
@@ -18,8 +18,8 @@ export let addPost = async (
 	usePostMs: boolean,
 	citedPostIdObjsToFetch: IdObj[],
 ) => {
-	let baseInput = await getWhoWhereObj(useLocalDb);
-	return useLocalDb || !baseInput.spaceMs
+	let baseInput = await getWhoObj();
+	return useLocalDb || !post.in_ms
 		? _addPost(await gsdb(), post, true, usePostMs, citedPostIdObjsToFetch)
 		: trpc().addPost.mutate({ ...baseInput, post, citedPostIdObjsToFetch });
 };

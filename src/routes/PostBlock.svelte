@@ -12,7 +12,7 @@
 		onCite,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { copyToClipboard, is1Emoji, isTouchScreen } from '$lib/js';
+	import { alertError, copyToClipboard, is1Emoji, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
@@ -74,6 +74,7 @@
 	let moreOptionsMenuRight = $state(0);
 	let open = $state(true);
 	let parsed = $state(true);
+	let loading = $state(false);
 	let postIdStr = $derived(getIdStr(p.post));
 	let subIds = $derived.by(() => {
 		let arr = (gs.postIdToSubIdsMap[postIdStr] || []).filter((s) => gs.idToPostMap[s]);
@@ -114,20 +115,26 @@
 		][],
 	);
 	let changeVersion = async (v: number) => {
-		if (!p.post.history![v]) {
-			let { history } = await getPostHistory(getIdObj(p.post), v);
-			if (!history) return;
-			Object.keys(history).forEach((key) => history[key]?.tags?.sort());
-			gs.idToPostMap[postIdStr] = {
-				...gs.idToPostMap[postIdStr]!,
-				history: {
-					...gs.idToPostMap[postIdStr]!.history,
-					...history,
-				},
-			};
-		}
-		// TODO: show loader?
 		version = v;
+		if (!p.post.history![v]) {
+			loading = true;
+			try {
+				let { history } = await getPostHistory(getIdObj(p.post), v);
+				if (!history) return;
+				Object.keys(history).forEach((key) => history[key]?.tags?.sort());
+				gs.idToPostMap[postIdStr] = {
+					...gs.idToPostMap[postIdStr]!,
+					history: {
+						...gs.idToPostMap[postIdStr]!.history,
+						...history,
+					},
+				};
+			} catch (error) {
+				alertError(error);
+			} finally {
+				loading = false;
+			}
+		}
 	};
 
 	let oldLastVersion = (() => lastVersion)();
@@ -724,7 +731,7 @@
 							{/if}
 						{:else}
 							<p class={`text-fg2 font-bold italic`}>
-								{deleted ? m.deleted() : m.blank()}
+								{loading ? m.loading() : deleted ? m.deleted() : m.blank()}
 							</p>
 						{/if}
 					</div>

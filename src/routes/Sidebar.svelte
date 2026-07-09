@@ -79,8 +79,16 @@
 	onMount(() => {
 		if (isEmbed) return;
 		let onKeyDown = (e: KeyboardEvent) => {
-			if (!textInputFocused() && gs.lastSeenInMs !== undefined) {
+			if (
+				!textInputFocused() &&
+				gs.lastSeenInMs !== undefined &&
+				!e.shiftKey &&
+				!e.metaKey &&
+				!e.altKey &&
+				!e.ctrlKey // needed this stuff to stop conflicting with cmd shift d
+			) {
 				// setTimeout prevents inputting '/' on focus
+
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
 				e.key === 'h' && gotoIfNeeded(`/${gs.lastSeenInMs}__`);
