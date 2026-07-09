@@ -9,18 +9,18 @@ import { pTable } from '../parts/partsTable';
 
 export let tagsPerLoad = 88;
 
-export let getSpaceTags = async (fromCount: number, excludeTags: string[]) => {
+export let getSpaceTags = async (fromCount: number, lastTag?: string) => {
 	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
-		? trpc().getSpaceTags.query({ ...baseInput, fromCount, excludeTags })
-		: _getSpaceTags(await gsdb(), { ...baseInput, fromCount, excludeTags });
+		? trpc().getSpaceTags.query({ ...baseInput, fromCount, lastTag })
+		: _getSpaceTags(await gsdb(), { ...baseInput, fromCount, lastTag });
 };
 
 export let _getSpaceTags = async (
 	db: Database,
 	input: WhoWhereObj & {
 		fromCount: number; //
-		excludeTags: string[];
+		lastTag?: string;
 	},
 ) => {
 	// console.table(await db.select().from(pTable));
@@ -31,8 +31,8 @@ export let _getSpaceTags = async (
 		.where(
 			and(
 				pf.code.eq(pc._tag_imBy8_count),
-				and(...input.excludeTags.map((t) => pf.txt.notEq(t))),
-				!input.spaceMs ? undefined : pf.p1.eq(input.spaceMs),
+				input.lastTag ? pf.txt.gt(input.lastTag) : undefined,
+				input.spaceMs ? pf.p1.eq(input.spaceMs) : undefined,
 				pf.p4.lte(input.fromCount),
 				pf.p4.gt(0),
 			),

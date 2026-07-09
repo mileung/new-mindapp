@@ -31,6 +31,8 @@ export let pf = {
 	p7: makeIntegerFilterObj(pTable.p7),
 	p8: makeIntegerFilterObj(pTable.p8),
 	txt: {
+		lt: (v: string) => lt(pTable.txt, v),
+		gt: (v: string) => gt(pTable.txt, v),
 		eq: (v: string) => eq(pTable.txt, v),
 		notEq: (v: string) => not(eq(pTable.txt, v)),
 		like: (v: string) => like(pTable.txt, v),

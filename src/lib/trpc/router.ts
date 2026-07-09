@@ -723,7 +723,7 @@ export let router = t.router({
 		.input(
 			WhoWhereObjSchema.extend({
 				fromCount: z.number(),
-				excludeTags: z.array(z.string()),
+				lastTag: z.string().optional(),
 			}).strict(),
 		)
 		.query(async ({ ctx, input }) => {

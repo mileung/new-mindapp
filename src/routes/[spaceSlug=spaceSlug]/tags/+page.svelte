@@ -37,14 +37,8 @@
 			return e.detail.complete();
 		}
 		let lastCount = tags.at(-1)?.num || Number.MAX_SAFE_INTEGER;
-		let lastTagsWithSameCount: string[] = [];
-		for (let i = tags.length - 1; i >= 0; i--) {
-			let tag = tags[i];
-			if (tag.num === lastCount) lastTagsWithSameCount.push(tag.txt!);
-			else break;
-		}
-		console.log('lastTagsWithSameCount:', lastTagsWithSameCount);
-		let res = await getSpaceTags(lastCount, lastTagsWithSameCount);
+		let lastTag = tags.at(-1)?.txt;
+		let res = await getSpaceTags(lastCount, lastTag);
 		// console.log('res:', res);
 		res.tags.length && e.detail.loaded();
 		let endReached = res.tags.length < tagsPerLoad;
