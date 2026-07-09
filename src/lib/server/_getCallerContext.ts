@@ -90,7 +90,13 @@ export let _getCallerContext = async (
 
 	if (sessionIdObj && callerMs && !signedInAccountUpdatesFrom.some((a) => a.ms === callerMs))
 		signedInAccountUpdatesFrom.push({ ms: callerMs });
-	signedInAccountUpdatesFrom = signedInAccountUpdatesFrom.filter((a) => a.ms);
+	let callerAccountUpdatesFrom: undefined | MyAccountUpdates;
+	signedInAccountUpdatesFrom = signedInAccountUpdatesFrom.filter((a) => {
+		if (a.ms) {
+			if (a.ms === callerMs) callerAccountUpdatesFrom = a;
+			return true;
+		}
+	});
 
 	// Assume spaceUpdatesFrom and signedInAccountUpdatesFrom do not
 	// have duplicate spaces/accounts otherwise garbage out
@@ -452,7 +458,24 @@ export let _getCallerContext = async (
 		accountMsToRowsMap[row.p1!].push(row);
 	}
 	let signedInAccountUpdates: MyAccountUpdates[] = _sessionKey_m_accountMs_expiryMsRows.map(
-		({ p2 }) => reduceMyAccountUpdateRows(accountMsToRowsMap[p2!], p2!),
+		({ p2 }) => {
+			let accountUpdate = reduceMyAccountUpdateRows(accountMsToRowsMap[p2!], p2!);
+			if (accountUpdate.savedTags && callerAccountUpdatesFrom?.savedTags) {
+				let savedTagsFrom = JSON.parse(callerAccountUpdatesFrom?.savedTags.txt) as string[];
+				let latestSavedTags = JSON.parse(accountUpdate.savedTags.txt) as string[];
+
+				let savedTagsFromSet = new Set(savedTagsFrom);
+				let latestSavedTagsSet = new Set(latestSavedTags);
+
+				accountUpdate.savedTagChanges = {
+					ms: accountUpdate.savedTags.ms!,
+					addedTags: latestSavedTags.filter((t) => !savedTagsFromSet.has(t)),
+					removedTags: savedTagsFrom.filter((t) => !latestSavedTagsSet.has(t)),
+				};
+				delete accountUpdate.savedTags;
+			}
+			return accountUpdate;
+		},
 	);
 
 	if (_sessionKey_m_accountMs_expiryMsCallerRow) {

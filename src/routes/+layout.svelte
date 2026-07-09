@@ -15,6 +15,7 @@
 	} from '$lib/types/accounts';
 	import { getLocalCache, updateLocalCache } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
+	import { cleanTags } from '$lib/types/posts';
 	import { getDefaultSpace, type MySpaceUpdateFrom } from '$lib/types/spaces';
 	import { onMount, type Snippet } from 'svelte';
 	import '../styles/app.css';
@@ -250,7 +251,7 @@
 							}
 						});
 
-						let msToSignedInAccountUpdateMap: Record<number, MyAccountUpdates> = {};
+						let msToSignedInAccountUpdateMap: Record<number, undefined | MyAccountUpdates> = {};
 						for (let i = 0; i < signedInAccountUpdates.length; i++) {
 							let u = signedInAccountUpdates[i];
 							msToSignedInAccountUpdateMap[u.ms] = u;
@@ -263,6 +264,18 @@
 							a.name = accountUpdate?.name || a.name;
 							a.bio = accountUpdate?.bio || a.bio;
 							a.savedTags = accountUpdate?.savedTags || a.savedTags;
+							if (accountUpdate?.savedTagChanges) {
+								let { ms, addedTags = [], removedTags = [] } = accountUpdate.savedTagChanges;
+								a.savedTags.ms = ms;
+								a.savedTags.txt = JSON.stringify(
+									cleanTags(
+										[...(JSON.parse(a.savedTags.txt) as string[]), ...addedTags].filter(
+											(t) => !removedTags.includes(t),
+										),
+										true,
+									),
+								);
+							}
 							return a;
 						});
 						if (lc.accounts[0].signedIn) {

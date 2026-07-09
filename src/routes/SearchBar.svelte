@@ -111,7 +111,7 @@
 						class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg3 ${tagXFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 						onclick={() => {
 							tagXFocused = false;
-							updateSavedTags([tag], true);
+							updateSavedTags([], [tag]);
 						}}
 					>
 						<IconX class="h-5 w-5" />
@@ -176,7 +176,7 @@
 			if (e.key === 'Enter') {
 				let tag = suggestedTags[tagIndex];
 				if (tagXFocused) {
-					updateSavedTags([tag], true);
+					updateSavedTags([], [tag]);
 					tagXFocused = false;
 				} else if (tag) addTagToSearchInput(tag);
 				else if (trimmedSearchVal) {

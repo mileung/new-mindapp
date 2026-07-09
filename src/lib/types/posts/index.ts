@@ -8,19 +8,8 @@ import { idsRegex, type IdObj } from '../parts/partIds';
 import { pTable } from '../parts/partsTable';
 import { EmojiStringSchema } from '../reactions';
 
-export let normalizeTag = (t: string) => {
-	t = t.trim();
-	let equalsIndex = t.indexOf('=');
-	if (equalsIndex >= 0) {
-		let key = t.slice(0, equalsIndex).trim();
-		let val = t.slice(equalsIndex + 1).trim();
-		t = `${key}=${val}`;
-	}
-	return t;
-};
-
 export let cleanTags = (tags: string[], sort = false) => {
-	let arr = [...new Set(tags.map(normalizeTag).filter((t) => !!t))];
+	let arr = [...new Set(tags.map((t) => t.trim()).filter((t) => !!t))];
 	if (sort) arr.sort();
 	return arr;
 };

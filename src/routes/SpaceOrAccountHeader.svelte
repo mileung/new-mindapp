@@ -198,7 +198,7 @@
 										}
 										return lc;
 									});
-								update(Date.now());
+								(p.space?.ms || p.account?.ms) && update(Date.now());
 								let newMs =
 									p.space?.ms || p.account?.ms
 										? (p.space

@@ -104,12 +104,13 @@ export let updateLocalCache = (updater: (old: LocalCache) => LocalCache) => {
 	}
 };
 
-export let updateSavedTags = async (usedTags: string[], remove = false) => {
+export let updateSavedTags = async (addTags: string[], removeTags: string[]) => {
 	// TODO: debounce
 	let savedTags = JSON.parse(gs.accounts![0].savedTags.txt) as string[];
-	savedTags = remove
-		? savedTags.filter((t) => !usedTags.includes(t))
-		: cleanTags([...savedTags, ...usedTags], true);
+	savedTags = cleanTags(
+		[...savedTags, ...addTags].filter((t) => !removeTags.includes(t)),
+		true,
+	);
 	try {
 		let update = (ms: number) =>
 			updateLocalCache((lc) => {
@@ -117,12 +118,13 @@ export let updateSavedTags = async (usedTags: string[], remove = false) => {
 				if (ms) lc.accounts[0].savedTags.ms = ms;
 				return lc;
 			});
-		update(Date.now());
+		gs.accounts?.[0].ms && update(Date.now());
 		let newMs = gs.accounts?.[0].ms
 			? (
 					await trpc().updateSavedTags.mutate({
 						...(await getWhoObj()),
-						savedTags,
+						addTags,
+						removeTags,
 					})
 				).ms
 			: 0;

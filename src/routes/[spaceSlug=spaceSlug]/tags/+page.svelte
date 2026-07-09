@@ -82,8 +82,8 @@
 						onclick={() => {
 							if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
 							updateSavedTags(
-								tags.map((t) => t.txt),
-								pageSelected,
+								pageSelected ? [] : tags.map((t) => t.txt),
+								pageSelected ? tags.map((t) => t.txt) : [],
 							);
 						}}
 					>
@@ -113,7 +113,11 @@
 					</a>
 					<button
 						class="group flex-1 hover:bg-bg3 pr-1"
-						onclick={() => updateSavedTags([tag.txt], savedTagsSet.has(tag.txt))}
+						onclick={() =>
+							updateSavedTags(
+								savedTagsSet.has(tag.txt) ? [] : [tag.txt],
+								savedTagsSet.has(tag.txt) ? [tag.txt] : [],
+							)}
 					>
 						<IconSquare class={`ml-auto w-5 ${savedTagsSet.has(tag.txt) ? 'hidden' : 'block'}`} />
 						<IconSquareCheckFilled

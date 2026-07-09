@@ -15,7 +15,7 @@
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getIdStr, getUrlInMs } from '$lib/types/parts/partIds';
-	import { cleanTags, getLastVersion, normalizeTag } from '$lib/types/posts';
+	import { cleanTags, getLastVersion } from '$lib/types/posts';
 	import {
 		IconArrowUp,
 		IconCircleXFilled,
@@ -56,7 +56,7 @@
 		if (!canPost) gs.writingNewPost = gs.writingReplyTo = gs.writingEditFor = null;
 	});
 
-	let tagFilter = $derived(normalizeTag(gs.writerTagVal));
+	let tagFilter = $derived(gs.writerTagVal.trim());
 	let savedTagsSet = $derived(
 		new Set(
 			gs.accounts //
@@ -278,7 +278,7 @@
 				}
 				if (e.key === 'Enter') {
 					if (xFocused) {
-						updateSavedTags([suggestedTags[tagIndex]], true);
+						updateSavedTags([], [suggestedTags[tagIndex]]);
 						xFocused = false;
 					} else if (e.metaKey) submit();
 					else addTag();
@@ -353,7 +353,7 @@
 								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
 								onclick={() => {
 									xFocused = false;
-									updateSavedTags([tag], true);
+									updateSavedTags([], [tag]);
 								}}
 							>
 								<IconX class="h-5 w-5" />

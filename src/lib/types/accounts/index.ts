@@ -34,7 +34,16 @@ export let MyAccountUpdatesSchema = MyAccountSchema.pick({
 	savedTags: true,
 })
 	.partial()
-	.extend({ ms: z.number() });
+	.extend({
+		ms: z.number(),
+		savedTagChanges: z
+			.object({
+				ms: z.number(),
+				addedTags: z.array(z.string()).optional(),
+				removedTags: z.array(z.string()).optional(),
+			})
+			.optional(),
+	});
 export type MyAccountUpdates = z.infer<typeof MyAccountUpdatesSchema>;
 
 export let reduceMyAccountUpdateRows = (rows: PartInsert[] = [], accountMs: number) => {

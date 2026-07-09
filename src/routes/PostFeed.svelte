@@ -446,7 +446,7 @@
 				(writingNewPost && urlInMs) ||
 				atPostIdObj?.in_ms) && //
 				assertCallerIsOwnerOrInGlobal();
-			updateSavedTags(tags);
+			updateSavedTags(tags, []);
 			let post: Post;
 			if (editPostIdStr) {
 				let postToEdit = gs.idToPostMap[editPostIdStr]!;
