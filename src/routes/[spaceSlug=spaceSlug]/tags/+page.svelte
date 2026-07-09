@@ -70,15 +70,15 @@
 {:else if !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
-	<div class="px-2 w-full max-w-lg">
+	<div class="px-2 pb-9 xs:pb-0 w-full max-w-lg">
 		<div class="">
 			<div class="sticky top-0 bg-bg1 fx justify-between">
-				<p class="text-xl font-bold">
+				<p class="text-xl font-bold text-nowrap overflow-scroll">
 					{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
 				</p>
 				{#if tags.length}
 					<button
-						class="h-8 xy pl-0.5 pr-1 hover:bg-bg4 text-fg2 hover:text-fg1"
+						class="h-8 xy pl-0.5 pr-1 text-nowrap hover:bg-bg4 text-fg2 hover:text-fg1"
 						onclick={() => {
 							if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
 							updateSavedTags(

@@ -432,7 +432,7 @@
 
 	let viewPostToastId = $state('');
 	let submitPost = async (tags: string[], core: string) => {
-		if (!gs.accounts || urlInMs === undefined) return;
+		if (!gs.accounts || urlInMs === undefined || !sectionObjs.length) return;
 		let editPostIdStr = gs.writingEditFor && getIdStr(gs.writingEditFor);
 		let atPostIdStr = gs.writingReplyTo && getIdStr(gs.writingReplyTo);
 		let atPostIdObj = gs.writingReplyTo && getIdObj(gs.writingReplyTo);

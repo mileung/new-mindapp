@@ -239,16 +239,18 @@
 		</button>
 	{/if}
 	{#if gs.devMode}
-		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-		<p class="text-xl font-bold">{m.dangerZone()}</p>
-		<!-- TODO: reset local cache button -->
-		<button
-			class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
-			onclick={async () => {
-				await resetLocalDatabase();
-				alert(m.localDatabaseResetComplete());
-			}}><IconTrash class="w-5 mr-1" />{m.resetLocalDatabase()}</button
-		>
+		{#if sqlocalOk}
+			<div class="h-0.5 mt-2 w-full bg-bg8"></div>
+			<p class="text-xl font-bold">{m.dangerZone()}</p>
+			<!-- TODO: reset local cache button -->
+			<button
+				class="px-2 h-9 xy bg-bg4 border-b-2 border-red-400 dark:border-red-500 hover:bg-bg7 hover:text-fg3 hover:border-red-500 dark:hover:border-red-400"
+				onclick={async () => {
+					await resetLocalDatabase();
+					alert(m.localDatabaseResetComplete());
+				}}><IconTrash class="w-5 mr-1" />{m.resetLocalDatabase()}</button
+			>
+		{/if}
 		<div class="h-0.5 mt-2 w-full bg-bg8"></div>
 		<p class="text-xl font-bold">Dev Tools</p>
 		{#if sqlocalOk}

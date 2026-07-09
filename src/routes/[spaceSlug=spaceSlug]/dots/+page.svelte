@@ -192,7 +192,7 @@
 {:else if !space || !viewable}
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
-	<div class="p-2 pb-0 w-full max-w-lg">
+	<div class="p-2 pb-9 xs:pb-0 w-full max-w-lg">
 		<SpaceOrAccountHeader {space} />
 		{#if gs.devMode && space.ms && spaceContext}
 			<div class="h-0.5 mt-2 w-full bg-bg8"></div>

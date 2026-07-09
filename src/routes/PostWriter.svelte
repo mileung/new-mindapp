@@ -145,8 +145,6 @@
 			cleanTags([...gs.writerTags, ...(otherTag ? [otherTag] : [])], true),
 			gs.writerCore.trim(),
 		);
-		tagsIpt.blur();
-		coreTa.blur();
 	};
 
 	let addTag = (tagToAdd?: string) => {
