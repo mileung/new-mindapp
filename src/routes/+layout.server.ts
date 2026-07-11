@@ -1,7 +1,6 @@
 import { getRequestEnablesSqlocal, splitUntil } from '$lib/js';
 import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
-import { formatMs } from '$lib/time';
 import { assertLt2Rows, channelPartsByCode } from '$lib/types/parts';
 import { pc } from '$lib/types/parts/partCodes';
 import { pf } from '$lib/types/parts/partFilters';
@@ -81,7 +80,7 @@ export const load: LayoutServerLoad = async (event) => {
 				let { txt, p5 } = assertLt2Rows(_core_postImb_lastVersion_mRows) || {};
 				if (txt && p5) {
 					thinTopOgText = txt.slice(0, 998);
-					boldBottomOgText = `${formatMs(p5, 'min')}\n${profileNameTxt}\n${spaceNameTxt}`;
+					boldBottomOgText = `${profileNameTxt}\n${spaceNameTxt}`;
 				}
 			}
 		} else if (slugIsProfile) {
