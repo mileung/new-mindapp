@@ -76,6 +76,7 @@
 	let parsed = $state(true);
 	let loading = $state(false);
 	let postIdStr = $derived(getIdStr(p.post));
+	let postIdObj = $derived(getIdObj(p.post));
 	let subIds = $derived.by(() => {
 		let arr = (gs.postIdToSubIdsMap[postIdStr] || []).filter((s) => gs.idToPostMap[s]);
 		if (p.nested && p.post.childCount !== arr.length)
@@ -119,7 +120,7 @@
 		if (!p.post.history![v]) {
 			loading = true;
 			try {
-				let { history } = await getPostHistory(getIdObj(p.post), v);
+				let { history } = await getPostHistory(postIdObj, v);
 				if (!history) return;
 				Object.keys(history).forEach((key) => history[key]?.tags?.sort());
 				gs.idToPostMap[postIdStr] = {
@@ -202,7 +203,7 @@
 			is1Emoji(typedEmoji) //
 				? (async () =>
 						await toggleReaction({
-							postIdObj: getIdObj(p.post),
+							postIdObj,
 							emoji: typedEmoji,
 						}))()
 				: alert(m.useYourDevicesEmojiKeyboard());
@@ -273,7 +274,7 @@
 					onmousedown={(e) => e.preventDefault()}
 					onclick={async () => {
 						await toggleReaction({
-							postIdObj: getIdObj(p.post),
+							postIdObj,
 							emoji,
 						});
 					}}
@@ -408,7 +409,8 @@
 									confirm(m.areYouSureYouWantToDeleteThisPost());
 								if (ok) {
 									version = null;
-									let postIdObj = getIdObj(p.post);
+									if (gs.writingEditFor && getIdStr(gs.writingEditFor) === postIdStr)
+										gs.writingEditFor = null;
 									if (p.post.childCount) gs.idToPostMap[postIdStr]!.history = null;
 									else {
 										let parentPostIdStr = getAtIdStr(p.post);
@@ -658,7 +660,7 @@
 							}`}
 							onclick={async () => {
 								await toggleReaction({
-									postIdObj: getIdObj(p.post),
+									postIdObj,
 									emoji,
 								});
 							}}
@@ -714,7 +716,7 @@
 						<div class="flex flex-wrap text-sm">
 							{#each tags as tag (tag)}
 								<a
-									href={`/${gs.lastSeenInMs}__?q=${`[${tag}]`}`}
+									href={`/${p.post.in_ms}__?q=${`[${tag}]`}`}
 									class={`h-6 pb-1 xy whitespace-pre text-fg2 px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
 								>
 									{tag}

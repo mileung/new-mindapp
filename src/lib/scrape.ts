@@ -143,8 +143,26 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					let atHandle: string = ppHref?.startsWith('/channel/')
 						? nameTag!.innerText
 						: ppHref?.slice(1)!;
-					extensionSearchQ = `[${atHandle}] ${urlObj.searchParams.get('v') || ''}`;
-					tags = [atHandle];
+					if (atHandle) {
+						extensionSearchQ = `[${atHandle}] ${urlObj.searchParams.get('v') || ''}`;
+						tags = [atHandle];
+					} else {
+						tags = [
+							...querySelectorAll(
+								'span.ytAttributedStringHost.ytListItemViewModelSubtitle.ytAttributedStringWhiteSpacePreWrap',
+							),
+						].map((s) => {
+							let atHandle =
+								'@' +
+								s.innerText
+									.slice(s.innerText.indexOf('@') + 1, s.innerText.indexOf(' '))
+									.replace(/[^A-Za-z0-9._-]/g, '')
+									.replace(/^[._-]+|[._-]+$/g, '');
+							return atHandle;
+						});
+						extensionSearchQ = `${tags.map((t) => `[${t}]!`).join(' ')} ${urlObj.searchParams.get('v') || ''}`;
+					}
+
 					urlObj.searchParams.delete('app');
 					urlObj.searchParams.delete('ra');
 					if (urlObj.searchParams.get('list') === 'WL') {

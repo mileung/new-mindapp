@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { gotoIfNeeded } from '$lib/dom';
+	import { getYtVideoId, gotoIfNeeded } from '$lib/dom';
 	import { getSpaceContext, gs, msToSpaceNameTxt } from '$lib/global-state.svelte';
 	import { alertError, splitUntil } from '$lib/js';
 	import { initLocalDb } from '$lib/local-db';
@@ -325,10 +325,16 @@
 		}
 	});
 
-	let searchVal = $state((() => page.url.searchParams.get('q') ?? '')());
+	let searchVal = $derived(page.url.searchParams.get('q') ?? '');
+	let thinTopOgText = $derived(pageData.thinTopOgText || searchVal || page.url.pathname);
+	let boldBottomOgText = $derived(pageData.boldBottomOgText || 'Mindapp');
 	let title = $derived.by(() => {
 		if (urlInMs !== undefined) {
-			return msToSpaceNameTxt(urlInMs);
+			let spaceNameTxt = msToSpaceNameTxt(urlInMs);
+			if (searchVal) return `${spaceNameTxt} • ${searchVal}`;
+			if (page.url.pathname.endsWith('/tags')) return `${spaceNameTxt} | ${m.tags()}`;
+			if (page.url.pathname.endsWith('/dots')) return `${spaceNameTxt} | ...`;
+			return spaceNameTxt;
 		}
 		return (
 			{
@@ -341,29 +347,25 @@
 			} as Record<string, string>
 		)[page.url.pathname];
 	});
-	let appendedTitle = $derived.by(() => {
-		return `${title ? `${title} | ` : ''}Mindapp`;
-	});
-	let siteDescription = $derived(
-		'siteDescription',
-		// || 'General purpose organizer'
-	);
-	let thinTopOgText = $derived(
-		'thinTopOgText',
-		// || pageData.thinTopOgText || page.url.href.slice(page.url.origin.length),
-	);
-	let boldBottomOgText = $derived(
-		'boldBottomOgText',
-		// || pageData.boldBottomOgText || title
-	);
+
+	let ogYtVideoId = $derived(getYtVideoId(thinTopOgText));
 </script>
 
-<title>{appendedTitle}</title>
-<meta name="description" content={siteDescription} />
+<title>{title}</title>
+<meta name="description" content={m.organize()} />
 <meta property="og:description" content={thinTopOgText} />
 <meta property="og:title" content={boldBottomOgText} />
 <!-- this og:url is needed to get ios to properly render the og text -->
 <meta property="og:url" content="https://x.com/_/status/0" />
+{#if ogYtVideoId}
+	<meta property="og:type" content="video.other" />
+	<meta property="og:image" content={`https://i.ytimg.com/vi/${ogYtVideoId}/hqdefault.jpg`} />
+	<meta property="og:video" content={`https://www.youtube.com/embed/${ogYtVideoId}`} />
+	<meta property="og:video:secure_url" content={`https://www.youtube.com/embed/${ogYtVideoId}`} />
+	<meta property="og:video:type" content="text/html" />
+	<meta property="og:video:width" content="1280" />
+	<meta property="og:video:height" content="720" />
+{/if}
 
 {#if !isEmbed}
 	<Sidebar />
