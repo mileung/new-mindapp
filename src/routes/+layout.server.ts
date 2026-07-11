@@ -80,7 +80,7 @@ export const load: LayoutServerLoad = async (event) => {
 				let { txt, p5 } = assertLt2Rows(_core_postImb_lastVersion_mRows) || {};
 				if (txt && p5) {
 					thinTopOgText = txt.slice(0, 998);
-					boldBottomOgText = `${profileNameTxt}\n${spaceNameTxt}`;
+					boldBottomOgText = `${profileNameTxt} | ${spaceNameTxt}`;
 				}
 			}
 		} else if (slugIsProfile) {
