@@ -9,7 +9,7 @@
 		href="/sign-in"
 		class="fx h-10 pl-2 font-semibold bg-bg5 hover:bg-bg7 hover:text-fg3 border-b-2 border-hl1 hover:border-hl2"
 	>
-		{m.addAccount()}
+		{m.signIn()}
 		<IconChevronRight class="h-5" stroke={3} />
 	</a>
 </div>

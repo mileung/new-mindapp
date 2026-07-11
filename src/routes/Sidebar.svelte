@@ -297,7 +297,7 @@
 			{#if showAccountMenu}
 				<a href="/sign-in" class={`fx shrink-0 h-10 px-2 gap-2 hover:bg-bg5`}>
 					<IconUserPlus class="h-6 w-6" />
-					{m.addAccount()}
+					{gs.accounts?.length === 1 ? m.signIn() : m.addAccount()}
 				</a>
 				{#each gs.accounts || [] as a, i (a.ms)}
 					<div class={`h-10 max-w-full group flex ${!i ? 'bg-bg5' : ''} hover:bg-bg5`}>

@@ -51,16 +51,19 @@ export let _sendOtp = async (input: {
 		else {
 			pinNum = ranInt(0, 99999999);
 			let pinStr = `${pinNum}`.padStart(8, '0');
-			let result = await sendEmail({
-				from: 'Mindapp <noreply@updates.mindapp.cc>',
-				to: email,
-				subject: m.oneTimePinP({ p: pinStr }),
-				html:
-					m.yourOneTimePinForMindappIs() +
-					`\n<p style="font-family: monospace; font-size: 24px; font-weight: bold;">${pinStr}</p>\n\n` +
-					m.thisCanOnlyBeUsedOnTheDeviceUsedToRequestThisEmail(),
-			});
-			if (result.error) throw new Error(m.emailServiceProviderError());
+			try {
+				await sendEmail({
+					from: 'Mindapp <noreply@updates.mindapp.cc>',
+					to: email,
+					subject: m.oneTimePinP({ p: pinStr }),
+					html:
+						m.yourOneTimePinForMindappIs() +
+						`\n<p style="font-family: monospace; font-size: 24px; font-weight: bold;">${pinStr}</p>\n\n` +
+						m.thisCanOnlyBeUsedOnTheDeviceUsedToRequestThisEmail(),
+				});
+			} catch (error) {
+				throw new Error(m.emailServiceProviderError());
+			}
 		}
 	}
 	await tdb.insert(pTable).values({

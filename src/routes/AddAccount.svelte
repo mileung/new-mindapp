@@ -17,6 +17,8 @@
 		creatingAccount?: boolean;
 		resettingPassword?: boolean;
 	} = $props();
+	let emailIpt = $state<HTMLInputElement>();
+	let passwordIpt = $state<HTMLInputElement>();
 	let allowResettingPwAfterOtp = $state(false);
 	let otpMs = $state(0);
 	let name = $state('');
@@ -35,6 +37,12 @@
 		maxlength: 64,
 		class: 'font-normal text-lg mt-1 w-full p-2 bg-bg5 hover:bg-bg7 text-fg1',
 	});
+	let refreshAuthFields = () => {
+		let liveEmail = emailIpt?.value || email || '';
+		let livePassword = passwordIpt?.value || password || '';
+		email = liveEmail;
+		password = livePassword;
+	};
 
 	$effect(() => {
 		email = page.state.prefilledEmail ?? '';
@@ -90,6 +98,7 @@
 	<input
 		disabled={loading}
 		required
+		bind:this={passwordIpt}
 		bind:value={password}
 		autocomplete={p.signingIn ? 'current-password' : 'new-password'}
 		{...pwIptProps}
@@ -158,6 +167,7 @@
 			class="mt-2"
 			onsubmit={async (e) => {
 				e.preventDefault();
+				refreshAuthFields();
 				loading = true;
 				try {
 					let res = await trpc().signIn.mutate({
@@ -186,6 +196,7 @@
 			class="mt-2"
 			onsubmit={async (e) => {
 				e.preventDefault();
+				refreshAuthFields();
 				loading = true;
 				try {
 					let strike: undefined | number;
@@ -214,7 +225,6 @@
 							pinStr: pinStr,
 							email,
 						});
-						console.log('checkOtp res:', res);
 						strike = res?.strike;
 						expiredOtp = res?.expiredOtp;
 						if (!strike && !expiredOtp) allowResettingPwAfterOtp = true;
@@ -277,6 +287,7 @@
 				if ((p.creatingAccount || p.signingIn) && gs.accounts!.length >= 88) {
 					return alert(m.placeholderError()); // gs.accounts.length must be lte88
 				}
+				refreshAuthFields();
 				loading = true;
 				try {
 					let normalizedEmail = email.trim().toLowerCase();
@@ -326,6 +337,7 @@
 								? { createAccount: true }
 								: { resetPassword: true },
 						});
+						alert(JSON.stringify(res, null, 2));
 						if (res.fail) {
 							otpMs = 0;
 							return alert(m.anErrorOccurred());
@@ -361,6 +373,7 @@
 				<input
 					disabled={loading}
 					required
+					bind:this={emailIpt}
 					bind:value={email}
 					type="email"
 					minlength={6}
