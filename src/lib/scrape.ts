@@ -3,6 +3,25 @@ export function trimSuffix(str: string, suffix: string): string {
 	return str.endsWith(suffix) ? str.slice(0, -suffix.length) : str;
 }
 
+// prettier-ignore
+let trackingParams = (['app','ra','source','medium','campaign','content','utm_source','utm_medium','utm_campaign','utm_term','utm_content','fbclid','gclid','gbraid','wbraid','mc_eid','pk_campaign','pk_kwd','hsmi','hsenc','_hsenc','_hsmi','oly_enc_id','oly_anon_id','__s','vero_id','mkt_tok']);
+let removeParams = (url: string, params: string[]): string => {
+	try {
+		let urlObj = new URL(url);
+		let keysToDelete: string[] = [];
+		let paramsSet = new Set(params);
+		urlObj.searchParams.forEach((_value, key) => {
+			if (paramsSet.has(key.toLowerCase())) keysToDelete.push(key);
+		});
+		keysToDelete.forEach((key) => urlObj.searchParams.delete(key));
+		if (urlObj.searchParams.toString() === '') urlObj.search = '';
+		return urlObj.toString();
+	} catch (e) {
+		console.error('Invalid URL:', e);
+		return url;
+	}
+};
+
 export let scrape = (externalUrl: string, externalDomString: string) => {
 	let urlObj = new URL(externalUrl);
 	let externalDom = new DOMParser().parseFromString(externalDomString, 'text/html');
@@ -16,7 +35,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 		decodeURIComponent(
 			externalUrl.slice(externalUrl.lastIndexOf('/') + 1), // for file pages
 		);
-	let url = externalUrl;
+	let url = removeParams(externalUrl, trackingParams);
 	let pathnameSlugs = urlObj.pathname.split('/').slice(1);
 
 	// TODO: IMDB for Movie genres https://www.imdb.com/title/tt1877832/
