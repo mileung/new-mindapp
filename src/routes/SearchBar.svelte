@@ -5,6 +5,7 @@
 	import { getAlteredSearchParams, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
+	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { searchGuideArr } from '$lib/types/posts/parseSearchQuery';
 	import { IconArrowsMaximize, IconSearch, IconX } from '@tabler/icons-svelte';
 	import { matchSorter } from 'match-sorter';
@@ -79,6 +80,11 @@
 	});
 
 	let hoveringTopDiv = $state(false);
+
+	let urlInMs = $derived(getUrlInMs());
+	$effect(() => {
+		if (urlInMs !== undefined && gs.lastSeenInMs !== urlInMs) searchVal = '';
+	});
 </script>
 
 <div
