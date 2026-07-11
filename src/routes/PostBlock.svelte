@@ -12,7 +12,7 @@
 		onCite,
 		resetBottomOverlay,
 	} from '$lib/global-state.svelte';
-	import { alertError, copyToClipboard, is1Emoji, isTouchScreen } from '$lib/js';
+	import { alertError, copyToClipboard, deepClone, is1Emoji, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { formatMs, minute } from '$lib/time';
 	import { hasParent } from '$lib/types/parts';
@@ -408,6 +408,7 @@
 									Date.now() - versionMs! < minute ||
 									confirm(m.areYouSureYouWantToDeleteThisPost());
 								if (ok) {
+									let postIdObjClone = deepClone(postIdObj);
 									version = null;
 									if (gs.writingEditFor && getIdStr(gs.writingEditFor) === postIdStr)
 										gs.writingEditFor = null;
@@ -422,7 +423,11 @@
 										}
 										gs.idToPostMap[postIdStr] = null;
 									}
-									await deletePost(postIdObj, !urlInMs);
+									try {
+										await deletePost(postIdObjClone, !urlInMs);
+									} catch (error) {
+										alertError(error);
+									}
 								}
 							}}
 						>
@@ -583,10 +588,24 @@
 							if (
 								!e.metaKey &&
 								!e.shiftKey &&
-								!e.ctrlKey && //
-								page.params.spaceSlug
-							)
-								gs.lastScrollY = window.scrollY;
+								!e.ctrlKey //
+							) {
+								if (page.params.spaceSlug) gs.lastScrollY = window.scrollY;
+								else if (postIdStr === page.params.idSlug) e.preventDefault();
+								else {
+									// TODO: if the postblock exists in the same nested post tree when the idSlug param is on, print "test"
+									let getRootIdStr = (idStr = '') => {
+										let rootPostIdStr = idStr;
+										while (hasParent(gs.idToPostMap[rootPostIdStr]!))
+											rootPostIdStr = getAtIdStr(gs.idToPostMap[rootPostIdStr]!);
+										return rootPostIdStr;
+									};
+									if (getRootIdStr(postIdStr) === getRootIdStr(page.params.idSlug)) {
+										// TODO: don't load if nest already loaded. Same for clicking on posts in nested view
+										// e.preventDefault();
+									}
+								}
+							}
 						}}
 					>
 						{msLabel}
