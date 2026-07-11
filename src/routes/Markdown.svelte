@@ -38,15 +38,13 @@
 		{#if typeof tag === 'string'}
 			{tag}
 		{:else if 'uri' in tag}
-			<span class="inline-block max-w-[calc(100%-88px)] mini-x-scroll">
-				<a
-					target="_blank"
-					href={tag.uri}
-					class="text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
-				>
-					{tag.text}
-				</a>
-			</span>
+			<a
+				target="_blank"
+				href={tag.uri}
+				class="align-top inline-block max-w-[calc(100%-88px)] mini-x-scroll text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
+			>
+				{tag.text}
+			</a>
 			<IframePreview url={tag.uri} />
 		{/if}
 	{/each}
