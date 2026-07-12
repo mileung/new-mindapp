@@ -1,6 +1,7 @@
 import { dev } from '$app/environment';
 import { page } from '$app/state';
 import type { SqliteRemoteDatabase } from 'drizzle-orm/sqlite-proxy';
+import { matchSorter } from 'match-sorter';
 import type { LayoutServerData } from '../routes/$types';
 import { promptSum } from './dom';
 import { alertError, identikana, ownerMsSet } from './js';
@@ -231,6 +232,25 @@ export let getWhoWhereObj = async (useLocalDb?: boolean) => {
 		callerMs: gs.accounts[0].ms,
 		spaceMs: urlInMs,
 	} satisfies WhoWhereObj;
+};
+
+export let getSavedTagsSet = () =>
+	new Set(
+		gs.accounts //
+			? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
+			: [],
+	);
+
+export let getSuggestedTags = (tagFilter: string, savedTagsSet: Set<string>) => {
+	let filter = tagFilter.replace(/\s+/g, ' ');
+	let includeAtTags = filter.startsWith('@');
+	let arr = matchSorter(
+		[...savedTagsSet].filter((t) => (includeAtTags ? true : !t.startsWith('@'))),
+		filter,
+	)
+		.slice(0, 88)
+		.concat(tagFilter);
+	return [...new Set(arr)];
 };
 
 export let mergeMsToAccountNameTxtMap = (msToAccountNameTxtMap: Record<number, string> = {}) => {

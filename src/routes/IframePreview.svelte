@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { dev } from '$app/environment';
 	import { page } from '$app/state';
 	import { getYtVideoId } from '$lib/dom';
 	import { isTouchScreen, supportsCredentiallessIframe } from '$lib/js';
@@ -21,7 +22,7 @@
 		let pathnameSlugs = urlObj.pathname.split('/').slice(1);
 		let imgSrc = '';
 		let iframeSrc = '';
-		let iframeType: undefined | 'ig-post' | 'sc' | 'tt-vid' | 'x-post' | 'yt-vid';
+		let iframeType: undefined | 'ig-post' | 'reddit' | 'sc' | 'tt-vid' | 'x-post' | 'yt-vid';
 		let tldToSldToScraperMap: Record<string, undefined | Record<string, undefined | (() => void)>> =
 			{
 				com: {
@@ -34,6 +35,13 @@
 							// iframeSrc = `https://www.instagram.com/reel/${pathnameSlugs[1]}/embed/`;
 							// iframeSrc = `https://www.instagram.com/reels/${pathnameSlugs[1]}/embed/`;
 							// console.log('iframeSrc:', iframeSrc);
+						}
+					},
+					reddit: () => {
+						if (pathnameSlugs[0] === 'r') {
+							// iframeSrc = `https://rebed.redditmedia.com/embed?url=${p.url}%2F%3Fref%3Dshare%26ref_source%3Dembed`;
+							iframeType = 'reddit';
+							iframeSrc = `https://rebed.redditmedia.com/embed?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fbattlestations%2Fcomments%2F1uqo2z3%2F2_years_of_clutter_later%2F%3Fref%3Dshare%26ref_source%3Dembed`;
 						}
 					},
 					soundcloud: () => {
@@ -85,7 +93,9 @@
 		tldToSldToScraperMap[tld]?.[sld]?.();
 		return { imgSrc, iframeSrc, iframeType };
 	});
-	let open = $state((() => (iframeSrc ? !imgSrc : false))());
+	let openInDev = false;
+	openInDev = true;
+	let open = $state((() => (dev ? openInDev : iframeSrc ? !imgSrc : false))());
 </script>
 
 {#snippet thumbnail(src: string)}
@@ -118,24 +128,35 @@
 		</button>
 		{#if open && iframeType}
 			<div
-				class={`flex flex-col mr-8 max-h-[64vh] ${
+				class={`flex overflow-clip flex-col mr-8 max-h-[64vh] ${
 					// TODO: getting this css right is hard
 					(
 						{
 							// 'ig-post': 'aspect-[9/16]',
 							// 'tt-vid': 'aspect-[9/16] max-w-80',
 							// 'x-post': 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]',
-							'yt-vid': 'aspect-video',
+							reddit: isTouchScreen ? 'h-80' : 'min-h-80 max-w-md aspect-[8/7]',
 							sc: 'max-w-[80vw]',
+							'yt-vid': 'aspect-video',
 						} as Record<typeof iframeType, string>
 					)[iframeType] || (isTouchScreen ? 'h-80' : 'aspect-[3/4]')
 				}`}
 			>
-				{#if supportsCredentiallessIframe}
-					<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
-				{:else}
-					<iframe allowfullscreen class="flex-1" src={iframeSrc}></iframe>
-				{/if}
+				<div
+					class={`flex-1 flex flex-col ${
+						(
+							{
+								reddit: '-mt-64',
+							} as Record<typeof iframeType, string>
+						)[iframeType] || ''
+					}`}
+				>
+					{#if supportsCredentiallessIframe}
+						<CredentiallessIframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc} />
+					{:else}
+						<iframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc}></iframe>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	{/if}

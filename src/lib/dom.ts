@@ -1,5 +1,6 @@
 import { dev } from '$app/environment';
 import { goto } from '$app/navigation';
+import { page } from '$app/state';
 import { m } from './paraglide/messages';
 
 export let setGlobalCssVariable = (name: string, val: string) =>
@@ -22,12 +23,23 @@ export let scrollToHighlight = (id: string, goToIdIfHlDne = false) => {
 		document.querySelector('#hl-' + id) || //
 		document.querySelector('.hl-' + id);
 	if (hl) {
+		let hlRect = hl.getBoundingClientRect();
+		let headerHeight =
+			page.url.pathname === '/merged-view' || page.url.pathname === '/owner-view' ? 64 : 32;
+
 		let top =
 			window.scrollY -
-			(window.innerHeight - hl.getBoundingClientRect().top) +
-			hl.getBoundingClientRect().height + //
+			window.innerHeight +
+			hlRect.top + //
+			hlRect.height +
 			getPostWriterHeight();
-		// console.log('top:', top);
+
+		let scrollAmount = top - window.scrollY;
+		let hlTopAfterScroll = hlRect.top - scrollAmount;
+		if (hlTopAfterScroll < headerHeight) {
+			top -= headerHeight - hlTopAfterScroll;
+		}
+
 		window.scrollTo({
 			top,
 			behavior: 'smooth',

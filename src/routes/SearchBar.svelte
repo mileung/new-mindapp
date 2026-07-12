@@ -1,14 +1,13 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { gotoIfNeeded, textInputFocused } from '$lib/dom';
-	import { gs } from '$lib/global-state.svelte';
+	import { getSavedTagsSet, getSuggestedTags, gs } from '$lib/global-state.svelte';
 	import { getAlteredSearchParams, isTouchScreen } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
 	import { updateSavedTags } from '$lib/types/local-cache';
 	import { getUrlInMs } from '$lib/types/parts/partIds';
 	import { searchGuideArr } from '$lib/types/posts/parseSearchQuery';
 	import { IconArrowsMaximize, IconSearch, IconX } from '@tabler/icons-svelte';
-	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 
 	let searchIpt: HTMLInputElement;
@@ -38,22 +37,9 @@
 			.replace(/\s\s+/g, ' ')
 			.trim(),
 	);
-	let savedTagsSet = $derived(
-		new Set(
-			gs.accounts //
-				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
-				: [],
-		),
-	);
+	let savedTagsSet = $derived(getSavedTagsSet());
 	let showSuggestedTags = $derived(searchIptFocused && tagFilter);
-	let suggestedTags = $derived.by(() => {
-		if (!showSuggestedTags) return [];
-		let filter = tagFilter.replace(/\s+/g, ' ');
-		let arr = matchSorter([...savedTagsSet], filter)
-			.slice(0, 88)
-			.concat(tagFilter);
-		return [...new Set(arr)];
-	});
+	let suggestedTags = $derived(showSuggestedTags ? getSuggestedTags(tagFilter, savedTagsSet) : []);
 
 	$effect(() => {
 		!savedTagsSet.size && (tagXFocused = false);
@@ -63,7 +49,7 @@
 			.replace(/\s\s+/g, ' ')
 			.trim()
 			.replace(new RegExp(tagFilter + '$'), '')
-			.trim()}[${tag}] `.trimStart();
+			.trim()} [${tag}]`.trimStart();
 		setTimeout(() => searchIpt!.scrollTo({ left: Number.MAX_SAFE_INTEGER }), 0);
 	};
 
@@ -93,9 +79,6 @@
 	onmouseleave={() => (hoveringTopDiv = false)}
 >
 	{#if showSuggestedTags}
-		<!-- {#if tagFilter}
-					<p class="ml-1 mt-1 text-sm text-fg2">{m.tags()}</p>
-				{/if} -->
 		{#each suggestedTags as tag, i (tag)}
 			<div
 				class={`group/tag fx hover:bg-bg6 ${tagIndex === i ? 'bg-bg6' : ''}`}
@@ -106,7 +89,7 @@
 				{/if}
 				<button
 					bind:this={tagSuggestionsRefs[i]}
-					class={`relative h-8 text-nowrap overflow-scroll flex-1 text-left px-2 text-lg`}
+					class={`h-8 flex-1 text-left px-2 text-lg text-nowrap whitespace-pre overflow-scroll`}
 					onclick={() => addTagToSearchInput(tag)}
 				>
 					{tag}
@@ -114,7 +97,7 @@
 				{#if savedTagsSet.has(tag)}
 					<button
 						bind:this={unsaveTagXRefs[i]}
-						class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg3 ${tagXFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+						class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg1 ${tagXFocused && tagIndex === i ? 'text-fg1 border-2 border-hl1' : 'text-fg2'}`}
 						onclick={() => {
 							tagXFocused = false;
 							updateSavedTags([], [tag]);

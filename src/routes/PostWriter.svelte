@@ -6,7 +6,9 @@
 		textInputFocused,
 	} from '$lib/dom';
 	import {
+		getSavedTagsSet,
 		getSpacePermissions,
+		getSuggestedTags,
 		gs,
 		msToSpaceNameTxt,
 		resetBottomOverlay,
@@ -25,7 +27,6 @@
 		IconPencilPlus,
 		IconX,
 	} from '@tabler/icons-svelte';
-	import { matchSorter } from 'match-sorter';
 	import { onMount } from 'svelte';
 	import Highlight from './Highlight.svelte';
 	import SpaceIcon from './SpaceIcon.svelte';
@@ -44,7 +45,7 @@
 	let undoTagRefs = $state<(undefined | HTMLButtonElement)[]>([]);
 	let tagsIptFocused = $state(false);
 	let tagIndex = $state(0);
-	let xFocused = $state(false);
+	let tagXFocused = $state(false);
 	let suggestingTags = $state(false);
 
 	let postingInMs = $derived.by(
@@ -57,25 +58,8 @@
 	});
 
 	let tagFilter = $derived(gs.writerTagVal.trim());
-	let savedTagsSet = $derived(
-		new Set(
-			gs.accounts //
-				? (JSON.parse(gs.accounts[0].savedTags.txt) as string[])
-				: [],
-		),
-	);
-	let suggestedTags = $derived.by(() => {
-		if (!suggestingTags) return [];
-		let filter = tagFilter.replace(/\s+/g, ' ');
-		let includeAtTags = filter.startsWith('@');
-		let arr = matchSorter(
-			[...savedTagsSet].filter((t) => (includeAtTags ? true : !t.startsWith('@'))),
-			filter,
-		)
-			.slice(0, 88)
-			.concat(tagFilter);
-		return [...new Set(arr)];
-	});
+	let savedTagsSet = $derived(getSavedTagsSet());
+	let suggestedTags = $derived(suggestingTags ? getSuggestedTags(tagFilter, savedTagsSet) : []);
 
 	$effect(() => {
 		suggestingTags = tagsIptFocused ? !!gs.writerTagVal : false;
@@ -264,7 +248,7 @@
 			onchange={() => (alteredInitialVal = true)}
 			oninput={() => {
 				tagIndex = 0;
-				xFocused = false;
+				tagXFocused = false;
 				tagSuggestionsRefs[0]?.focus();
 				tagsIpt.focus();
 			}}
@@ -275,23 +259,24 @@
 						: setTimeout(() => tagsIpt.blur(), 0);
 				}
 				if (e.key === 'Enter') {
-					if (xFocused) {
+					if (tagXFocused) {
 						updateSavedTags([], [suggestedTags[tagIndex]]);
-						xFocused = false;
+						tagXFocused = false;
 					} else if (e.metaKey) submit();
 					else addTag();
 				}
 				if (suggestingTags) {
 					if ((e.key === 'Tab' && e.shiftKey) || e.key === 'ArrowUp') {
-						if (e.key === 'Tab' && (!suggestedTags.length || (tagIndex <= 0 && !xFocused))) return;
+						if (e.key === 'Tab' && (!suggestedTags.length || (tagIndex <= 0 && !tagXFocused)))
+							return;
 						e.preventDefault();
 						// TODO: on up arrow and can't go up anymore, go to beginning of line
 						// TODO: on down arrow and can't go down anymore, go to end of line
 						if (tagIndex >= 0) {
 							if (e.key === 'Tab') {
-								xFocused = !xFocused;
-								if (!xFocused) return;
-							} else xFocused = false;
+								tagXFocused = !tagXFocused;
+								if (!tagXFocused) return;
+							} else tagXFocused = false;
 						} else if (gs.writerTags.length && e.key === 'Tab') {
 							return undoTagRefs
 								.filter((r) => !!r)
@@ -308,13 +293,13 @@
 						e.preventDefault();
 						if (e.key === 'Tab' && tagIndex === suggestedTags.length - 1) {
 							if (savedTagsSet.has(suggestedTags[tagIndex])) {
-								if (xFocused) return coreTa.focus();
+								if (tagXFocused) return coreTa.focus();
 							} else return coreTa.focus();
 						}
-						if (e.key === 'Tab' && !xFocused && tagIndex > -1) {
-							xFocused = true;
+						if (e.key === 'Tab' && !tagXFocused && tagIndex > -1) {
+							tagXFocused = true;
 						} else {
-							xFocused = false;
+							tagXFocused = false;
 							let index = Math.min(tagIndex + 1, suggestedTags.length - 1);
 							tagSuggestionsRefs[index]?.focus();
 							tagIndex = index;
@@ -333,24 +318,22 @@
 			>
 				{#each suggestedTags as tag, i}
 					<div class={`group/tag fx hover:bg-bg7 ${tagIndex === i ? 'bg-bg7' : ''}`}>
-						{#if tagIndex === i && !xFocused}
+						{#if tagIndex === i && !tagXFocused}
 							<div class="absolute z-10 h-8 w-0.5 bg-hl1 group-hover/tag:bg-hl2"></div>
 						{/if}
 						<button
 							bind:this={tagSuggestionsRefs[i]}
-							class={`flex w-full relative h-8 flex-1 px-2 text-lg ${gs.writerTags.includes(tag) ? 'text-fg2' : ''}`}
+							class={`h-8 flex-1 text-left px-2 text-lg text-nowrap whitespace-pre overflow-scroll ${gs.writerTags.includes(tag) ? 'text-fg2' : ''}`}
 							onclick={() => addTag(tag)}
 						>
-							<div class="flex-1 text-left text-nowrap overflow-scroll">
-								<p class="whitespace-pre">{tag}</p>
-							</div>
+							{tag}
 						</button>
 						{#if savedTagsSet.has(tag)}
 							<button
 								bind:this={unsaveTagXRefs[i]}
-								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 text-fg2 hover:text-fg1 ${xFocused && tagIndex === i ? 'border-2 border-hl1' : ''}`}
+								class={`${tagIndex !== i ? 'pointer-fine:hidden' : ''} group-hover/tag:flex xy h-8 w-8 hover:bg-bg7 hover:text-fg1 ${tagXFocused && tagIndex === i ? 'text-fg1 border-2 border-hl1' : 'text-fg2'}`}
 								onclick={() => {
-									xFocused = false;
+									tagXFocused = false;
 									updateSavedTags([], [tag]);
 								}}
 							>
