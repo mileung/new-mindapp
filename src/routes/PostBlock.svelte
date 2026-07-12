@@ -590,20 +590,21 @@
 								!e.shiftKey &&
 								!e.ctrlKey //
 							) {
+								if (postIdStr === page.params.idSlug) return e.preventDefault();
 								if (page.params.spaceSlug) gs.lastScrollY = window.scrollY;
-								else if (postIdStr === page.params.idSlug) e.preventDefault();
-								else {
-									// TODO: if the postblock exists in the same nested post tree when the idSlug param is on, print "test"
-									let getRootIdStr = (idStr = '') => {
-										let rootPostIdStr = idStr;
-										while (hasParent(gs.idToPostMap[rootPostIdStr]!))
-											rootPostIdStr = getAtIdStr(gs.idToPostMap[rootPostIdStr]!);
-										return rootPostIdStr;
-									};
-									if (getRootIdStr(postIdStr) === getRootIdStr(page.params.idSlug)) {
-										// TODO: don't load if nest already loaded. Same for clicking on posts in nested view
-										// e.preventDefault();
-									}
+								// TODO: if the postblock exists in the same nested post tree when the idSlug param is on, print "test"
+								let getRootIdStr = (idStr: string) => {
+									let rootPostIdStr = idStr;
+									while (hasParent(gs.idToPostMap[rootPostIdStr]!))
+										rootPostIdStr = getAtIdStr(gs.idToPostMap[rootPostIdStr]!);
+									return rootPostIdStr;
+								};
+								if (
+									page.params.idSlug &&
+									getRootIdStr(postIdStr) === getRootIdStr(page.params.idSlug)
+								) {
+									// TODO: don't load if nest already loaded. Same for clicking on posts in nested view
+									// e.preventDefault();
 								}
 							}
 						}}

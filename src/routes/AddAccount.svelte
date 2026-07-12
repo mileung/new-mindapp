@@ -337,7 +337,6 @@
 								? { createAccount: true }
 								: { resetPassword: true },
 						});
-						alert(JSON.stringify(res, null, 2));
 						if (res.fail) {
 							otpMs = 0;
 							return alert(m.anErrorOccurred());
