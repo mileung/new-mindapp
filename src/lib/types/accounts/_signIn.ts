@@ -158,7 +158,7 @@ export let _signIn = async (
 								pf.txt.eq(sessionIdObj.txt),
 								pf.p1.eq(sessionIdObj.ms),
 								pf.p2.eq(accountMs),
-								pf.p3.eq0,
+								pf.p3.gt(now),
 							)
 						: undefined,
 					and(

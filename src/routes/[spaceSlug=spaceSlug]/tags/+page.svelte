@@ -36,9 +36,9 @@
 			tags.length && e.detail.loaded();
 			return e.detail.complete();
 		}
-		let lastCount = tags.at(-1)?.num || Number.MAX_SAFE_INTEGER;
+		let lastCount = tags.at(-1)?.num;
 		let lastTag = tags.at(-1)?.txt;
-		let res = await getSpaceTags(lastCount, lastTag);
+		let res = await getSpaceTags(lastCount || Number.MAX_SAFE_INTEGER, lastTag);
 		// console.log('res:', res);
 		res.tags.length && e.detail.loaded();
 		let endReached = res.tags.length < tagsPerLoad;

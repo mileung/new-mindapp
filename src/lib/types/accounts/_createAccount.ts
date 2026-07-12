@@ -67,6 +67,7 @@ export let _createAccount = async (
 				.orderBy(pf.p4.desc, pf.p2.desc)
 				.limit(88)
 		).map((r) => r.txt!, true),
+		true,
 	);
 
 	let now = Date.now();

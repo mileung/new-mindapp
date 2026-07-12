@@ -1,7 +1,7 @@
 import { getWhoWhereObj, gsdb } from '$lib/global-state.svelte';
 import type { Database } from '$lib/local-db';
 import { trpc } from '$lib/trpc/client';
-import { and, asc, desc } from 'drizzle-orm';
+import { and, asc, desc, or } from 'drizzle-orm';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
@@ -31,9 +31,16 @@ export let _getSpaceTags = async (
 		.where(
 			and(
 				pf.code.eq(pc._tag_imBy8_count),
-				input.lastTag ? pf.txt.gt(input.lastTag) : undefined,
 				input.spaceMs ? pf.p1.eq(input.spaceMs) : undefined,
-				pf.p4.lte(input.fromCount),
+				or(
+					pf.p4.lt(input.fromCount), //
+					input.lastTag
+						? and(
+								pf.txt.gt(input.lastTag), //
+								pf.p4.eq(input.fromCount),
+							)
+						: undefined,
+				),
 				pf.p4.gt(0),
 			),
 		)
