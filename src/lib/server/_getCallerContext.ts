@@ -30,7 +30,7 @@ import { tdb } from './db';
 // 	let baseInput = await getWhoWhereObj();
 // 	// TODO: use local tdb as a fallback when cloud tdb can't find a post
 // 	return baseInput.spaceMs
-// 		? trpc().getCallerContext.query({ ...baseInput, get })
+// 		? trpc().getCallerContext.mutate({ ...baseInput, get })
 // 		: _getCallerContext(await gsdb(), null, baseInput, get);
 // };
 

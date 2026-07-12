@@ -212,7 +212,7 @@
 					let callerContext = getDefaultCallerContext();
 					try {
 						if ((urlInMs && urlInMs !== 8) || gs.accounts.some((a) => a.ms && a.signedIn)) {
-							callerContext = await trpc().getCallerContext.query({
+							callerContext = await trpc().getCallerContext.mutate({
 								callerMs,
 								spaceMs: urlInMs,
 								get,

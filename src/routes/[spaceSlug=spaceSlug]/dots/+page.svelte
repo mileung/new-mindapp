@@ -115,7 +115,7 @@
 			...lastAcceptByMssWithSameRoleMs, //
 		];
 		try {
-			let res = await trpc().getSpaceDots.query({
+			let res = await trpc().getSpaceDots.mutate({
 				...(await getWhoWhereObj()),
 				memberCount: space?.memberCount,
 				description: space?.description,

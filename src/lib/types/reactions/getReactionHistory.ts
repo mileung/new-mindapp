@@ -20,7 +20,7 @@ export let getReactionHistory = async ({
 }) => {
 	let baseInput = await getWhoObj();
 	return postIdObj.in_ms
-		? trpc().getReactionHistory.query({
+		? trpc().getReactionHistory.mutate({
 				...baseInput,
 				postIdObj,
 				msLte,

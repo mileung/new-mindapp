@@ -12,7 +12,7 @@ export let tagsPerLoad = 88;
 export let getSpaceTags = async (fromCount: number, lastTag?: string) => {
 	let baseInput = await getWhoWhereObj();
 	return baseInput.spaceMs
-		? trpc().getSpaceTags.query({ ...baseInput, fromCount, lastTag })
+		? trpc().getSpaceTags.mutate({ ...baseInput, fromCount, lastTag })
 		: _getSpaceTags(await gsdb(), { ...baseInput, fromCount, lastTag });
 };
 

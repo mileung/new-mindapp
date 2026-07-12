@@ -11,7 +11,7 @@ import { pTable } from '../parts/partsTable';
 
 export let getPostHistory = async (postIdObj: IdObj, version: number) => {
 	return postIdObj.in_ms
-		? trpc().getPostHistory.query({ ...(await getWhoObj()), postIdObj, version })
+		? trpc().getPostHistory.mutate({ ...(await getWhoObj()), postIdObj, version })
 		: _getPostHistory(await gsdb(), postIdObj, version);
 };
 

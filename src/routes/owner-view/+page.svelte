@@ -82,7 +82,7 @@
 				return e.detail.complete();
 			}
 			let msLt = gs.ownerView.accountMss?.at(-1);
-			let res = await trpc().getOwnerViewAccounts.query({
+			let res = await trpc().getOwnerViewAccounts.mutate({
 				...(await getWhoObj()),
 				msLt,
 			});
@@ -117,7 +117,7 @@
 				return e.detail.complete();
 			}
 			let msLt = gs.ownerView.spaceMss?.at(-1);
-			let res = await trpc().getOwnerViewSpaces.query({
+			let res = await trpc().getOwnerViewSpaces.mutate({
 				...(await getWhoObj()),
 				msLt,
 			});

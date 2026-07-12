@@ -50,7 +50,7 @@ export let getPostFeed = async (
 	};
 	return useLocalDb //
 		? _getPostFeed(await gsdb(), input, true, true)
-		: trpc().getPostFeed.query(input);
+		: trpc().getPostFeed.mutate(input);
 };
 
 type PartialMembership = Record<

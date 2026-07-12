@@ -99,10 +99,10 @@ let makeProcedure = (
 let test = 0;
 let testLimiter = makeLimiter(3, 1 / 6);
 export let router = t.router({
-	test: makeProcedure(testLimiter).query(() => ({ test: ++test })),
+	test: makeProcedure(testLimiter).mutation(() => ({ test: ++test })),
 	scrape: makeProcedure()
 		.input(z.strictObject({ url: z.string().url() }).strict())
-		.query(async ({ input }) => {
+		.mutation(async ({ input }) => {
 			if (1) return;
 			// TODO: paste a url in mindapp url as a search or maybe under /parse/[text].
 			// fetch the page and scrape it as if using the extension shortcut.
@@ -164,7 +164,7 @@ export let router = t.router({
 				possibleMutualSpaceMss: z.array(z.number()).optional(),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			if (ownerCalled || (input.callerMs && input.possibleMutualSpaceMss?.length)) {
 				let c = await _getCallerContext(ctx, input, { signedIn: true });
@@ -179,7 +179,7 @@ export let router = t.router({
 				get: GetCallerContextGetArgSchema,
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => _getCallerContext(ctx, input, input.get)),
+		.mutation(async ({ ctx, input }) => _getCallerContext(ctx, input, input.get)),
 	resetPasswordSignedIn: makeProcedure()
 		.input(
 			WhoObjSchema.extend({
@@ -553,7 +553,7 @@ export let router = t.router({
 				lastMemberListRoleCodeNum: z.number().optional(),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,
@@ -617,7 +617,7 @@ export let router = t.router({
 				version: z.number().gt(0),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			throwIf(!input.callerMs || !input.postIdObj.in_ms);
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(
@@ -641,7 +641,7 @@ export let router = t.router({
 				rxnMsByMssExclude: z.array(IdObjSchema.omit({ in_ms: true })),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			if (!input.callerMs) throw new Error('anon disallowed');
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(
@@ -664,7 +664,7 @@ export let router = t.router({
 				setLastViewMsInMs: z.number().optional(),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(input.callerMs && !c.signedIn);
@@ -672,7 +672,7 @@ export let router = t.router({
 		}),
 	getOwnerViewAccounts: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(z.object({ msLt: z.number().optional() })).strict())
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
@@ -725,7 +725,7 @@ export let router = t.router({
 		}),
 	getOwnerViewSpaces: makeProcedure(feedLimiter)
 		.input(WhoObjSchema.merge(z.object({ msLt: z.number().optional() })).strict())
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			assertInputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, { signedIn: true });
 			throwIf(!c.signedIn);
@@ -738,7 +738,7 @@ export let router = t.router({
 				lastTag: z.string().optional(),
 			}).strict(),
 		)
-		.query(async ({ ctx, input }) => {
+		.mutation(async ({ ctx, input }) => {
 			let ownerCalled = inputIsOwner(input);
 			let c = await _getCallerContext(ctx, input, {
 				signedIn: true,

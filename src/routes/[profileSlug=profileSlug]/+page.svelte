@@ -46,7 +46,7 @@
 						},
 					};
 				} else {
-					let res = await trpc().getPublicProfile.query({
+					let res = await trpc().getPublicProfile.mutate({
 						...whoObj,
 						profileMs,
 						possibleMutualSpaceMss: Object.values(
