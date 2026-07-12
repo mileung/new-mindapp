@@ -2,6 +2,7 @@
 	import { page } from '$app/state';
 	import {
 		getCallerIsOwner,
+		getCallerIsOwnerOrInGlobal,
 		getPromptSigningIn,
 		getSpaceContext,
 		getWhoWhereObj,
@@ -390,12 +391,14 @@
 				</button>
 			{/if}
 			<div class="h-0.5 mt-2 w-full bg-bg8"></div>
-			<p class="text-xl font-black">
-				{space.memberCount === 1 ? m.oneMember() : m.nMembers({ n: space.memberCount })}
-			</p>
-			{#each memberships as membership (membership.accept.by_ms)}
-				<MembershipBlock {membership} />
-			{/each}
+			{#if getCallerIsOwnerOrInGlobal()}
+				<p class="text-xl font-black">
+					{space.memberCount === 1 ? m.oneMember() : m.nMembers({ n: space.memberCount })}
+				</p>
+				{#each memberships as membership (membership.accept.by_ms)}
+					<MembershipBlock {membership} />
+				{/each}
+			{/if}
 		{/if}
 		{#if viewable}
 			<InfiniteLoading {identifier} spinner="spiral" on:infinite={loadMoreDots}>

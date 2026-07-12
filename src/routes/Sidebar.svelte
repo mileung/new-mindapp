@@ -54,9 +54,22 @@
 	);
 	let caller = $derived(gs.accounts?.[0]);
 	let callerMs = $derived(caller?.ms);
+	let pageData = $derived(page.data as LayoutServerData);
+	let sqlocalOk = $derived(pageData.sqlocalOk);
+	let urlInMs = $derived(getUrlInMs());
 	let sidebarSpaceMss = $derived<number[]>([
 		// local space ms - everything private in OPFS
-		0,
+		...(callerMs !== undefined &&
+		urlInMs !== undefined &&
+		gs.accountMsToSpaceMsToCheckedMap[callerMs]?.[urlInMs] &&
+		urlInMs !== 0 &&
+		urlInMs !== callerMs &&
+		urlInMs !== 8 &&
+		urlInMs !== 1 &&
+		!getSpaceContext(urlInMs)
+			? [urlInMs]
+			: []),
+		...(sqlocalOk ? [0] : []),
 		// personal space ms placeholder - everything private in cloud
 		callerMs || 8,
 		// global space ms - everything public in cloud
@@ -66,15 +79,14 @@
 			.map((c) => c!.ms)
 			.filter((ms) => ms !== 1),
 	]);
+	let globalIndex = $derived(sidebarSpaceMss.indexOf(1));
+	let indexAfterGlobal = $derived(globalIndex + 1);
 	let targetIndex = $derived(
 		Math.min(
 			sidebarSpaceMss.length - 1,
-			Math.max(3, (draggingSpaceIndex ?? 0) + draggedSpaceIndexOffset),
+			Math.max(indexAfterGlobal, (draggingSpaceIndex ?? 0) + draggedSpaceIndexOffset),
 		),
 	);
-
-	let pageData = $derived(page.data as LayoutServerData);
-	let sqlocalOk = $derived(pageData.sqlocalOk);
 
 	onMount(() => {
 		if (isEmbed) return;
@@ -134,7 +146,7 @@
 			if (
 				caller &&
 				draggingSpaceIndex !== null &&
-				draggingSpaceIndex > 2 &&
+				draggingSpaceIndex > globalIndex &&
 				draggingSpaceIndex !== targetIndex
 			) {
 				let draggedSpaceMs = sidebarSpaceMss[draggingSpaceIndex];
@@ -145,7 +157,7 @@
 				let belowSidePriority = getSpaceContext(nextBelowSpaceMs)?.sidePriority;
 				let nextDraggedSpaceSidePriority = 0;
 				let spaceMsToSidePriorityMap: Record<string, number> = {};
-				if (targetIndex === 3 || nextAboveSpaceMs === 1)
+				if (targetIndex === indexAfterGlobal)
 					nextDraggedSpaceSidePriority = (belowSidePriority ?? 0) + 8 ** 8;
 				else if (aboveSidePriority === undefined)
 					nextDraggedSpaceSidePriority = belowSidePriority! + 8 ** 8;
@@ -162,8 +174,8 @@
 						0,
 						newSidebarSpaceMss.splice(draggingSpaceIndex, 1)[0],
 					);
-					for (let i = 3; i < newSidebarSpaceMss.length; i++) {
-						spaceMsToSidePriorityMap[newSidebarSpaceMss[i]] = (i - 3) * -(8 ** 8);
+					for (let i = indexAfterGlobal; i < newSidebarSpaceMss.length; i++) {
+						spaceMsToSidePriorityMap[newSidebarSpaceMss[i]] = (i - indexAfterGlobal) * -(8 ** 8);
 					}
 				} else spaceMsToSidePriorityMap[draggedSpaceMs] = nextDraggedSpaceSidePriority;
 				updateLocalCache((lc) => {
@@ -202,7 +214,7 @@
 	let getSpaceTranslateY = (spaceIndex: number) => {
 		if (draggingSpaceIndex !== null) {
 			if (spaceIndex === draggingSpaceIndex) return 'z-50';
-			if (spaceIndex < 3 || draggingSpaceIndex < 3) return '';
+			if (spaceIndex < indexAfterGlobal || draggingSpaceIndex < indexAfterGlobal) return '';
 			let targetIndex = draggingSpaceIndex + draggedSpaceIndexOffset;
 			if (
 				draggedSpaceIndexOffset < 0 &&
@@ -219,8 +231,6 @@
 		}
 		return '';
 	};
-
-	let urlInMs = $derived(getUrlInMs());
 	let getAccentBg = (spaceMs: number) => {
 		let { accentCode } = caller?.msToJoinedSpaceContextMap[spaceMs] || {};
 		if (page.route.id !== '/[spaceSlug=spaceSlug]' || urlInMs !== spaceMs) {
@@ -386,7 +396,7 @@
 							highlightLastSeenInMs && spaceMs === gs.lastSeenInMs
 								? 'bg-bg5' //
 								: ''
-						} ${getSpaceTranslateY(i)} ${i || sqlocalOk ? '' : 'hidden'}`}
+						} ${getSpaceTranslateY(i)}`}
 						style={`${i === draggingSpaceIndex ? 'transform: translateY(var(--y-space-drag));' : ''}`}
 						ontouchstart={(e) => {
 							draggingSpaceIndex = i;

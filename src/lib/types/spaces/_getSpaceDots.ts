@@ -35,6 +35,7 @@ export let _getSpaceDots = async (
 		lastMemberListRoleCodeNum?: number;
 	},
 	ownerCalled: boolean,
+	callerInGlobal: boolean,
 ) => {
 	let {
 		callerRoleCodeNum,
@@ -53,8 +54,11 @@ export let _getSpaceDots = async (
 	let isPersonal = !isLocal && callerMs === spaceMs;
 	let isLocalOrPersonal = isLocal || isPersonal;
 
+	let getMembers = ownerCalled || callerInGlobal;
+	if (!getMembers) getCallerMembership = false;
+
 	let i_accountMs_roleCode_mbCallerRow: undefined | PartSelect;
-	if (getCallerMembership) {
+	if (getCallerMembership && getMembers) {
 		i_accountMs_roleCode_mbCallerRow = assertLt2Rows(
 			await db
 				.select()
@@ -64,27 +68,28 @@ export let _getSpaceDots = async (
 		);
 	}
 
-	let i_accountMs_roleCode_mbRows = isLocalOrPersonal
-		? []
-		: await db
-				.select()
-				.from(pTable)
-				.where(
-					and(
-						pf.code.eq(pc.i_accountMs_roleCode_mb),
-						pf.p1.eq(spaceMs),
-						...excludeMemberMss.map((memberMs) => pf.p2.notEq(memberMs)),
-						or(
-							pf.p3.lt(lastMemberListRoleCodeNum),
-							and(
-								pf.p3.eq(lastMemberListRoleCodeNum), //
-								pf.p4.lte(msLte || Number.MAX_SAFE_INTEGER),
+	let i_accountMs_roleCode_mbRows =
+		isLocalOrPersonal || !getMembers
+			? []
+			: await db
+					.select()
+					.from(pTable)
+					.where(
+						and(
+							pf.code.eq(pc.i_accountMs_roleCode_mb),
+							pf.p1.eq(spaceMs),
+							...excludeMemberMss.map((memberMs) => pf.p2.notEq(memberMs)),
+							or(
+								pf.p3.lt(lastMemberListRoleCodeNum),
+								and(
+									pf.p3.eq(lastMemberListRoleCodeNum), //
+									pf.p4.lte(msLte || Number.MAX_SAFE_INTEGER),
+								),
 							),
 						),
-					),
-				)
-				.orderBy(pf.p3.desc, pf.p4.desc)
-				.limit(membersPerLoad - (i_accountMs_roleCode_mbCallerRow ? 1 : 0));
+					)
+					.orderBy(pf.p3.desc, pf.p4.desc)
+					.limit(membersPerLoad - (i_accountMs_roleCode_mbCallerRow ? 1 : 0));
 	if (i_accountMs_roleCode_mbCallerRow)
 		i_accountMs_roleCode_mbRows.unshift(i_accountMs_roleCode_mbCallerRow);
 	// TODO: sort all admins and mods to the top
@@ -172,7 +177,7 @@ export let _getSpaceDots = async (
 		spaceUpdate = { ms: spaceMs };
 		let _spaceDescription_imb_memberCountRow = assertLt2Rows(_spaceDescription_imb_memberCountRows);
 		if (_spaceDescription_imb_memberCountRow) {
-			spaceUpdate.memberCount = _spaceDescription_imb_memberCountRow.p4!;
+			if (getMembers) spaceUpdate.memberCount = _spaceDescription_imb_memberCountRow.p4!;
 			spaceUpdate.description = {
 				ms: _spaceDescription_imb_memberCountRow.p2!,
 				by_ms: _spaceDescription_imb_memberCountRow.p3!,

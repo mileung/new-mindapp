@@ -59,6 +59,7 @@
 		),
 	);
 	let pageSelected = $derived(!!tags.length && tags.every((t) => savedTagsSet.has(t.txt)));
+	let endingPanelClass = 'h-[calc(100vh-36px)] xs:h-screen p-2 pt-8 text-lg text-fg2';
 </script>
 
 {#if urlInMs === undefined || !gs.accounts}
@@ -71,14 +72,16 @@
 	<p class="m-2 text-lg text-fg2 text-center">{m.spaceNotFound()}</p>
 {:else}
 	<div class="px-2 pb-9 xs:pb-0 w-full max-w-lg">
-		<div class="">
-			<div class="sticky top-0 bg-bg1 fx justify-between">
-				<p class="text-xl font-bold text-nowrap overflow-scroll">
+		<div class="pt-8">
+			<div
+				class="h-8 w-full max-w-lg fixed top-0 left-0 xs:left-[var(--w-sidebar)] bg-bg1 flex justify-between"
+			>
+				<p class=" text-xl self-center font-bold text-nowrap overflow-scroll">
 					{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
 				</p>
 				{#if tags.length}
 					<button
-						class="h-8 xy pl-0.5 pr-1 text-nowrap hover:bg-bg4 text-fg2 hover:text-fg1"
+						class="xy pl-0.5 pr-1 text-nowrap hover:bg-bg4 text-fg2 hover:text-fg1"
 						onclick={() => {
 							if (pageSelected && !confirm(m.unsavedTagsWillNoLongerBeAutocompleted())) return;
 							updateSavedTags(
@@ -128,14 +131,14 @@
 			{/each}
 		</div>
 		<InfiniteLoading identifier={urlInMs} spinner="spiral" on:infinite={loadMoreTags}>
-			<p slot="error" class="m-2 text-lg text-fg2">
+			<div slot="error" class={endingPanelClass}>
 				{m.placeholderError()}
-			</p>
-			<div slot="noResults" class="h-[calc(100vh-36px)] xs:h-screen">
-				<p class="m-2 text-lg text-fg2">{m.noTagsFound()}</p>
 			</div>
-			<div slot="noMore" class="h-[calc(100vh-36px)] xs:h-screen">
-				<p class="m-2 text-lg text-fg2">{m.theEnd()}</p>
+			<div slot="noResults" class={endingPanelClass}>
+				{m.noTagsFound()}
+			</div>
+			<div slot="noMore" class={endingPanelClass}>
+				{m.theEnd()}
 			</div>
 		</InfiniteLoading>
 	</div>

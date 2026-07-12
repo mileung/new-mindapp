@@ -559,10 +559,16 @@ export let router = t.router({
 				signedIn: true,
 				isPublic: !ownerCalled,
 				roleCode: !ownerCalled,
+				inGlobal: !ownerCalled,
 			});
 			throwIf((input.callerMs || ownerCalled) && !c.signedIn);
 			!ownerCalled && throwIf(!c.isPublic?.num && !c.roleCode);
-			return _getSpaceDots(tdb, { ...input, callerRoleCodeNum: c.roleCode?.num }, ownerCalled);
+			return _getSpaceDots(
+				tdb,
+				{ ...input, callerRoleCodeNum: c.roleCode?.num },
+				ownerCalled,
+				c.inGlobal,
+			);
 		}),
 	createInviteLink: makeProcedure()
 		.input(
