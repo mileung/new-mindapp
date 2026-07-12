@@ -76,7 +76,7 @@
 			<div
 				class="h-8 w-full max-w-lg fixed top-0 left-0 xs:left-[var(--w-sidebar)] bg-bg1 flex justify-between"
 			>
-				<p class=" text-xl self-center font-bold text-nowrap overflow-scroll">
+				<p class="pl-2 text-xl self-center font-bold text-nowrap overflow-scroll">
 					{m.spaceNameTags({ spaceName: msToSpaceNameTxt(urlInMs) })}
 				</p>
 				{#if tags.length}

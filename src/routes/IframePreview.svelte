@@ -94,7 +94,7 @@
 		return { imgSrc, iframeSrc, iframeType };
 	});
 	let openInDev = false;
-	openInDev = true;
+	// openInDev = true;
 	let open = $state((() => (dev ? openInDev : iframeSrc ? !imgSrc : false))());
 </script>
 
