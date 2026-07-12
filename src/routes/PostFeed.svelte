@@ -352,7 +352,7 @@
 					// console.log('mainPostFeedSection.msGte:', mainPostFeedSection.msGte);
 				}
 			}
-			// console.log('mainPostFeedSection:', mainPostFeedSection);
+			console.log('mainPostFeedSection:', mainPostFeedSection);
 			let setLastViewMsInMs =
 				spaceContext &&
 				!postFeed &&
