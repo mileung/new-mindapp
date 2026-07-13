@@ -926,28 +926,26 @@ export let _getPostFeed = async (
 				.filter((s) => !alreadyFetchedTagIdStrSet.has(s)),
 		),
 	];
-	console.log('tagIdStrsToFetch:', tagIdStrsToFetch.length);
-	let _tag_imBy8_countRowsForFetchedPosts =
-		0 && tagIdStrsToFetch.length
-			? await db
-					.select()
-					.from(pTable)
-					.where(
-						and(
-							pf.code.eq(pc._tag_imBy8_count),
-							or(
-								...tagIdStrsToFetch.map((s) => {
-									let o = getIdStrAsIdObj(s);
-									return and(
-										pf.p1.eq(o.in_ms),
-										pf.p2.eq(o.ms), //
-										pf.p3.eq(o.by_ms),
-									);
-								}),
-							),
+	let _tag_imBy8_countRowsForFetchedPosts = tagIdStrsToFetch.length
+		? await db
+				.select()
+				.from(pTable)
+				.where(
+					and(
+						pf.code.eq(pc._tag_imBy8_count),
+						or(
+							...tagIdStrsToFetch.slice(0, 80).map((s) => {
+								let o = getIdStrAsIdObj(s);
+								return and(
+									pf.p1.eq(o.in_ms),
+									pf.p2.eq(o.ms), //
+									pf.p3.eq(o.by_ms),
+								);
+							}),
 						),
-					)
-			: [];
+					),
+				)
+		: [];
 	for (let i = 0; i < _tag_imBy8_countRowsForFetchedPosts.length; i++) {
 		let { txt, p1, p2, p3 } = _tag_imBy8_countRowsForFetchedPosts[i];
 		tagIdToTxtMap[`${p1}_${p2}_${p3}`] = txt!;
@@ -992,8 +990,8 @@ export let _getPostFeed = async (
 			let tagIdStr = `${p1}_${p2}_${p3}`;
 			let postIdStr = `${p1}_${p4}_${p5}`;
 			idToPostMap[postIdStr].history ??= {};
-			// idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdToTxtMap[tagIdStr]);
-			idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdStr);
+			idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdToTxtMap[tagIdStr] || tagIdStr);
+			// idToPostMap[postIdStr].history[p6!]!.tags!.push(tagIdStr);
 		} else if (code === pc._emoji_reactionImb_postMb) {
 			(idToPostMap[`${p1}_${p4}_${p5}`].myRxnEmojis ??= []).push(txt!);
 		} else if (code === pc.i_accountMs_roleCode_mb) {
