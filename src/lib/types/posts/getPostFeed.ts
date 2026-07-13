@@ -5,7 +5,7 @@ import { and, not, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { getCitedPostIds, type Post } from '.';
 import { type Database } from '../../local-db';
-import { channelPartsByCode, type PartInsert } from '../parts';
+import { channelPartsByCode, type PartInsert, type PartSelect } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
 import { getIdStr, getIdStrAsIdObj, IdObjSchema, type IdObj } from '../parts/partIds';
@@ -926,24 +926,60 @@ export let _getPostFeed = async (
 				.filter((s) => !alreadyFetchedTagIdStrSet.has(s)),
 		),
 	];
-	let _tag_imBy8_countRowsForFetchedPosts = tagIdStrsToFetch.length
-		? await db
-				.select()
-				.from(pTable)
-				.where(
-					or(
-						...tagIdStrsToFetch.map((s) => {
-							let o = getIdStrAsIdObj(s);
-							return and(
-								pf.code.eq(pc._tag_imBy8_count),
-								pf.p1.eq(o.in_ms),
-								pf.p2.eq(o.ms),
-								pf.p3.eq(o.by_ms),
-							);
-						}),
-					),
-				)
-		: [];
+	// let _tag_imBy8_countRowsForFetchedPosts = tagIdStrsToFetch.length
+	// 	? await db
+	// 			.select()
+	// 			.from(pTable)
+	// 			.where(
+	// 				or(
+	// 					...tagIdStrsToFetch.map((s) => {
+	// 						let o = getIdStrAsIdObj(s);
+	// 						return and(
+	// 							pf.code.eq(pc._tag_imBy8_count),
+	// 							pf.p1.eq(o.in_ms),
+	// 							pf.p2.eq(o.ms),
+	// 							pf.p3.eq(o.by_ms),
+	// 						);
+	// 					}),
+	// 				),
+	// 			)
+	// 	: [];
+
+	let CHUNK_SIZE = 88;
+
+	let chunkArray = (array: string[], size: number) => {
+		let chunks: string[][] = [];
+		for (let i = 0; i < array.length; i += size) {
+			chunks.push(array.slice(i, i + size));
+		}
+		return chunks;
+	};
+	let _tag_imBy8_countRowsForFetchedPosts: PartSelect[] = [];
+	if (tagIdStrsToFetch.length > 0) {
+		let chunks = chunkArray(tagIdStrsToFetch, CHUNK_SIZE);
+		let results = await Promise.all(
+			chunks.map(async (chunk) => {
+				return await db
+					.select()
+					.from(pTable)
+					.where(
+						or(
+							...chunk.map((s) => {
+								let o = getIdStrAsIdObj(s);
+								return and(
+									pf.code.eq(pc._tag_imBy8_count),
+									pf.p1.eq(o.in_ms),
+									pf.p2.eq(o.ms),
+									pf.p3.eq(o.by_ms),
+								);
+							}),
+						),
+					);
+			}),
+		);
+		_tag_imBy8_countRowsForFetchedPosts = results.flat();
+	}
+
 	for (let i = 0; i < _tag_imBy8_countRowsForFetchedPosts.length; i++) {
 		let { txt, p1, p2, p3 } = _tag_imBy8_countRowsForFetchedPosts[i];
 		tagIdToTxtMap[`${p1}_${p2}_${p3}`] = txt!;
