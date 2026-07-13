@@ -39,9 +39,8 @@
 					},
 					reddit: () => {
 						if (pathnameSlugs[0] === 'r') {
-							// iframeSrc = `https://rebed.redditmedia.com/embed?url=${p.url}%2F%3Fref%3Dshare%26ref_source%3Dembed`;
 							iframeType = 'reddit';
-							iframeSrc = `https://rebed.redditmedia.com/embed?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fbattlestations%2Fcomments%2F1uqo2z3%2F2_years_of_clutter_later%2F%3Fref%3Dshare%26ref_source%3Dembed`;
+							iframeSrc = `https://rebed.redditmedia.com/embed?url=${encodeURIComponent(p.url)}`;
 						}
 					},
 					soundcloud: () => {
@@ -94,7 +93,7 @@
 		return { imgSrc, iframeSrc, iframeType };
 	});
 	let openInDev = false;
-	// openInDev = true;
+	openInDev = true;
 	let open = $state((() => (dev ? openInDev : iframeSrc ? !imgSrc : false))());
 </script>
 
