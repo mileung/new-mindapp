@@ -931,18 +931,16 @@ export let _getPostFeed = async (
 				.select()
 				.from(pTable)
 				.where(
-					and(
-						pf.code.eq(pc._tag_imBy8_count),
-						or(
-							...tagIdStrsToFetch.slice(0, 99).map((s) => {
-								let o = getIdStrAsIdObj(s);
-								return and(
-									pf.p1.eq(o.in_ms),
-									pf.p2.eq(o.ms), //
-									pf.p3.eq(o.by_ms),
-								);
-							}),
-						),
+					or(
+						...tagIdStrsToFetch.map((s) => {
+							let o = getIdStrAsIdObj(s);
+							return and(
+								pf.code.eq(pc._tag_imBy8_count),
+								pf.p1.eq(o.in_ms),
+								pf.p2.eq(o.ms),
+								pf.p3.eq(o.by_ms),
+							);
+						}),
 					),
 				)
 		: [];
