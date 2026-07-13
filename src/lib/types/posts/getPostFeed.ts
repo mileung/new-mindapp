@@ -934,7 +934,7 @@ export let _getPostFeed = async (
 					and(
 						pf.code.eq(pc._tag_imBy8_count),
 						or(
-							...tagIdStrsToFetch.slice(0, 80).map((s) => {
+							...tagIdStrsToFetch.slice(0, 99).map((s) => {
 								let o = getIdStrAsIdObj(s);
 								return and(
 									pf.p1.eq(o.in_ms),
