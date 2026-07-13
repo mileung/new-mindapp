@@ -801,18 +801,18 @@ export let _getPostFeed = async (
 										),
 									)
 								: undefined,
-							// and(
-							// 	pf.code.eq(pc.tagImb_postMb_lastVersion),
-							// 	or(
-							// 		...postIdObjs.map((o) =>
-							// 			and(
-							// 				pf.p1.eq(o.in_ms),
-							// 				pf.p4.eq(o.ms), //
-							// 				pf.p5.eq(o.by_ms),
-							// 			),
-							// 		),
-							// 	),
-							// ),
+							and(
+								pf.code.eq(pc.tagImb_postMb_lastVersion),
+								or(
+									...postIdObjs.map((o) =>
+										and(
+											pf.p1.eq(o.in_ms),
+											pf.p4.eq(o.ms), //
+											pf.p5.eq(o.by_ms),
+										),
+									),
+								),
+							),
 							and(
 								or(
 									pf.code.eq(pc._core_postImb_lastVersion_m),
