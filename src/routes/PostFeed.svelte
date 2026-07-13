@@ -37,6 +37,7 @@
 	} from '$lib/types/posts/getPostFeed';
 	import {
 		getParsedQPaginates,
+		maxTopLvlPostLimitPerSection,
 		parseSearchQuery,
 		type ParsedQ,
 	} from '$lib/types/posts/parseSearchQuery';
@@ -239,7 +240,7 @@
 					msGte,
 					msLte,
 					...parsedQ,
-					topLvlPostLimit: getMinTopLvlPostLimit(15, parsedQ),
+					topLvlPostLimit: getMinTopLvlPostLimit(maxTopLvlPostLimitPerSection, parsedQ),
 					eitherInMss: [
 						...new Set([
 							...(isMergedView
