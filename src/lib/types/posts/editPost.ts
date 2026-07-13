@@ -68,17 +68,15 @@ export let _editPost = async (db: Database, post: Post, useLastLayerMs: boolean)
 					.select()
 					.from(pTable)
 					.where(
-						or(
-							and(
-								pf.code.eq(pc._tag_imBy8_count),
-								or(
-									...newPostTagStrs.map((s) => pf.txt.eq(s)),
-									...tagImb_postMb_lastVersionRows.map((r) =>
-										and(
-											pf.p1.eq(r.p1!), //
-											pf.p2.eq(r.p2!),
-											pf.p3.eq(r.p3!),
-										),
+						and(
+							pf.code.eq(pc._tag_imBy8_count),
+							pf.p1.eq(post.in_ms),
+							or(
+								...newPostTagStrs.map((s) => pf.txt.eq(s)),
+								...tagImb_postMb_lastVersionRows.map((r) =>
+									and(
+										pf.p2.eq(r.p2!), //
+										pf.p3.eq(r.p3!),
 									),
 								),
 							),
