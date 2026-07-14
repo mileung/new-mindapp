@@ -48,9 +48,6 @@
 					if (!i) {
 						if (paragraphNode.type !== 'image')
 							paragraphNode.content = paragraphNode.content.trimStart();
-					} else if (i === paragraphNodes.length - 1) {
-						if (paragraphNode.type !== 'image')
-							paragraphNode.content = paragraphNode.content.trimEnd();
 					} else if (paragraphNodes[i - 1].type === 'image') {
 						if (paragraphNode.type !== 'image')
 							paragraphNode.content = paragraphNode.content.trimStart();
