@@ -146,6 +146,14 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 				if (pathnameSlugs[0] === 'photos') {
 					let imgNode = querySelector('[class^="imageLayout-"] img') as HTMLImageElement;
 					if (imgNode) headline = `${imgNode.alt}\n![](${removeParams(imgNode.src, true)})`;
+					let atHandle = querySelector('header div[class^="photographer-"] a[class^="link-"]')
+						?.getAttribute('href')
+						?.slice(1);
+					console.log('atHandle:', atHandle);
+					if (atHandle) {
+						extensionSearchQ = `[${atHandle}] ${pathnameSlugs[1]}`;
+						tags = [atHandle];
+					}
 				}
 			},
 			x: () => {
