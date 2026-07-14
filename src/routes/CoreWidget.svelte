@@ -158,10 +158,11 @@
 						)[iframeType] || ''
 					}`}
 				>
+					<!-- scrolling="no" -->
 					{#if supportsCredentiallessIframe}
-						<CredentiallessIframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc} />
+						<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
 					{:else}
-						<iframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc}></iframe>
+						<iframe allowfullscreen class="flex-1" src={iframeSrc}></iframe>
 					{/if}
 				</div>
 			</div>
