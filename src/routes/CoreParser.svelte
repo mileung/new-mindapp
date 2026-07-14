@@ -14,6 +14,7 @@
 	type InlineParagraphNode =
 		| { type: 'code'; content: string }
 		| { type: 'image'; alt: string; url: string }
+		| { type: 'boldAndItalic'; content: string }
 		| { type: 'bold'; content: string }
 		| { type: 'italic'; content: string }
 		| { type: 'link'; content: string }
@@ -146,33 +147,25 @@
 				continue;
 			}
 
-			// **bold**
-			if (remaining.startsWith('**')) {
-				let closeIndex = remaining.indexOf('**', 2);
-				if (closeIndex > 2) {
-					flushText();
-					let content = remaining.slice(0, closeIndex + 2);
-					paragraphNodes.push({ type: 'bold', content });
-					i += content.length;
-					prevChar = content.at(-1)!;
-					atLineStart = false;
-					continue;
-				}
-			}
+			let parseEmphasis = (
+				marker: '*' | '**' | '***',
+				type: 'italic' | 'bold' | 'boldAndItalic',
+			) => {
+				if (!remaining.startsWith(marker)) return false;
+				let closeIndex = remaining.indexOf(marker, marker.length);
+				if (closeIndex <= marker.length - 1) return false;
+				flushText();
+				let content = remaining.slice(0, closeIndex + marker.length);
+				paragraphNodes.push({ type, content });
+				i += content.length;
+				prevChar = content.at(-1)!;
+				atLineStart = false;
+				return true;
+			};
 
-			// *italic*
-			if (remaining[0] === '*') {
-				let closeIndex = remaining.indexOf('*', 1);
-				if (closeIndex > 1) {
-					flushText();
-					let content = remaining.slice(0, closeIndex + 1);
-					paragraphNodes.push({ type: 'italic', content });
-					i += content.length;
-					prevChar = content.at(-1)!;
-					atLineStart = false;
-					continue;
-				}
-			}
+			if (parseEmphasis('***', 'boldAndItalic')) continue;
+			if (parseEmphasis('**', 'bold')) continue;
+			if (parseEmphasis('*', 'italic')) continue;
 
 			// scheme://bare-url
 			let uriMatch = remaining.match(uriStartRegex);
@@ -232,6 +225,8 @@
 					{node.content}
 				{:else if node.type === 'code'}
 					<code class="font-mono text-sm bg-bg3 px-1">{node.content}</code>
+				{:else if node.type === 'boldAndItalic'}
+					<strong><em>{node.content}</em></strong>
 				{:else if node.type === 'bold'}
 					<strong>{node.content}</strong>
 				{:else if node.type === 'italic'}
