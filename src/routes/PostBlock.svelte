@@ -592,7 +592,6 @@
 							) {
 								if (postIdStr === page.params.idSlug) return e.preventDefault();
 								if (page.params.spaceSlug) gs.lastScrollY = window.scrollY;
-								// TODO: if the postblock exists in the same nested post tree when the idSlug param is on, print "test"
 								let getRootIdStr = (idStr: string) => {
 									let rootPostIdStr = idStr;
 									while (hasParent(gs.idToPostMap[rootPostIdStr]!))
@@ -603,7 +602,7 @@
 									page.params.idSlug &&
 									getRootIdStr(postIdStr) === getRootIdStr(page.params.idSlug)
 								) {
-									// TODO: don't load if nest already loaded. Same for clicking on posts in nested view
+									// TODO: don't load again if nest is already loaded. Same for clicking on posts in nested view
 									// e.preventDefault();
 								}
 							}

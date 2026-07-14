@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { gs } from '$lib/global-state.svelte';
-	import { isStringifiedRecord } from '$lib/js';
 	import { m } from '$lib/paraglide/messages';
-	import { idsRegex } from '$lib/types/parts/partIds';
 	import CitedPost from './CitedPost.svelte';
-	import Markdown from './Markdown.svelte';
+	import CoreWidget from './CoreWidget.svelte';
 	import MiniCitedPost from './MiniCitedPost.svelte';
 
 	let p: {
@@ -13,34 +11,267 @@
 		miniCites?: boolean;
 	} = $props();
 
-	let separateCites = (text: string) => {
-		let matches = text.matchAll(idsRegex);
-		let result: string[] = [];
-		let start = 0;
-		for (let match of matches) {
-			result.push(text.substring(start, match.index), match[0]);
-			start = match.index + match[0].length;
+	type InlineParagraphNode =
+		| { type: 'code'; content: string }
+		| { type: 'image'; alt: string; url: string }
+		| { type: 'bold'; content: string }
+		| { type: 'italic'; content: string }
+		| { type: 'link'; content: string }
+		| { type: 'text'; content: string };
+
+	type CoreBlock =
+		| { type: 'header'; level: number; content: string }
+		| { type: 'codeBlock'; content: string }
+		| { type: 'citedPost'; idStr: string }
+		| { type: 'paragraph'; nodes: InlineParagraphNode[] };
+
+	let citedPostStartRegex = /^\d+_\d+_\d+/;
+	let headerStartRegex = /^(#{1,6}) ([^\n]*)/;
+	let imageStartRegex = /^!\[([^\]]*)\]\(([^)\s]+)\)/;
+	let uriStartRegex = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+/;
+
+	let isBoundaryChar = (char?: string) => char === undefined || /\s/.test(char);
+
+	let parseCore = (core: string): CoreBlock[] => {
+		let blocks: CoreBlock[] = [];
+		let paragraphNodes: InlineParagraphNode[] = [];
+		let textBuffer = '';
+		let atLineStart = true;
+		let prevChar = '';
+		let i = 0;
+
+		let flushParagraph = () => {
+			if (paragraphNodes.length) {
+				for (let i = 0; i < paragraphNodes.length; i++) {
+					let paragraphNode = paragraphNodes[i];
+					if (!i) {
+						if (paragraphNode.type !== 'image')
+							paragraphNode.content = paragraphNode.content.trimStart();
+					} else if (i === paragraphNodes.length - 1) {
+						if (paragraphNode.type !== 'image')
+							paragraphNode.content = paragraphNode.content.trimEnd();
+					} else if (paragraphNodes[i - 1].type === 'image') {
+						if (paragraphNode.type !== 'image')
+							paragraphNode.content = paragraphNode.content.trimStart();
+					}
+				}
+				blocks.push({ type: 'paragraph', nodes: paragraphNodes });
+				paragraphNodes = [];
+			}
+		};
+
+		let flushText = () => {
+			if (!textBuffer) return;
+			paragraphNodes.push({ type: 'text', content: textBuffer });
+			textBuffer = '';
+		};
+
+		while (i < core.length) {
+			let remaining = core.slice(i);
+			if (atLineStart) {
+				// # Header
+				let headerMatch = remaining.match(headerStartRegex);
+				if (headerMatch) {
+					flushText();
+					flushParagraph();
+					blocks.push({
+						type: 'header',
+						level: headerMatch[1].length,
+						content: headerMatch[0],
+					});
+					i += headerMatch[0].length;
+					prevChar = headerMatch[0].at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+			}
+
+			// ```code block```
+			if (remaining.startsWith('```')) {
+				let closeIndex = remaining.indexOf('```', 3);
+				if (closeIndex !== -1) {
+					flushText();
+					flushParagraph();
+					let content = remaining.slice(0, closeIndex + 3);
+					blocks.push({ type: 'codeBlock', content });
+					i += content.length;
+					prevChar = content.at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+			}
+
+			// `inline code`
+			if (remaining[0] === '`') {
+				let closeIndex = remaining.indexOf('`', 1);
+				if (closeIndex > 1) {
+					flushText();
+					let content = remaining.slice(0, closeIndex + 1);
+					paragraphNodes.push({ type: 'code', content });
+					i += content.length;
+					prevChar = content.at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+			}
+
+			// ![alt](url)
+			let imageMatch = remaining.match(imageStartRegex);
+			if (imageMatch) {
+				flushText();
+				paragraphNodes.push({
+					type: 'image',
+					alt: imageMatch[1],
+					url: imageMatch[2],
+				});
+				i += imageMatch[0].length;
+				prevChar = imageMatch[0].at(-1)!;
+				atLineStart = false;
+				continue;
+			}
+
+			// 123_456_789
+			let citedPostMatch = remaining.match(citedPostStartRegex);
+			if (
+				citedPostMatch &&
+				isBoundaryChar(prevChar || undefined) &&
+				isBoundaryChar(core[i + citedPostMatch[0].length])
+			) {
+				flushText();
+				flushParagraph();
+				blocks.push({ type: 'citedPost', idStr: citedPostMatch[0] });
+				i += citedPostMatch[0].length;
+				prevChar = citedPostMatch[0].at(-1)!;
+				atLineStart = false;
+				continue;
+			}
+
+			// **bold**
+			if (remaining.startsWith('**')) {
+				let closeIndex = remaining.indexOf('**', 2);
+				if (closeIndex > 2) {
+					flushText();
+					let content = remaining.slice(0, closeIndex + 2);
+					paragraphNodes.push({ type: 'bold', content });
+					i += content.length;
+					prevChar = content.at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+			}
+
+			// *italic*
+			if (remaining[0] === '*') {
+				let closeIndex = remaining.indexOf('*', 1);
+				if (closeIndex > 1) {
+					flushText();
+					let content = remaining.slice(0, closeIndex + 1);
+					paragraphNodes.push({ type: 'italic', content });
+					i += content.length;
+					prevChar = content.at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+			}
+
+			// scheme://bare-url
+			let uriMatch = remaining.match(uriStartRegex);
+			if (uriMatch) {
+				flushText();
+				paragraphNodes.push({ type: 'link', content: uriMatch[0] });
+				i += uriMatch[0].length;
+				prevChar = uriMatch[0].at(-1)!;
+				atLineStart = false;
+				continue;
+			}
+
+			// Nothing matched: consume 1 plain character
+			let char = core[i];
+			textBuffer += char;
+			prevChar = char;
+			atLineStart = char === '\n';
+			i++;
 		}
-		start < text.length && result.push(text.substring(start));
-		return result.map((s) => s.trim());
+		flushText();
+		flushParagraph();
+		return blocks;
 	};
-	let coreSegs = $derived(separateCites(p.core));
+
+	let blocks = $derived(parseCore(p.core));
 </script>
 
-{#each coreSegs as str, i}
-	{#if i % 2}
+{#each blocks as block}
+	{#if block.type === 'citedPost'}
 		{#if p.miniCites}
-			<MiniCitedPost {...p} postIdStr={str} depth={p.depth + 1} />
-		{:else if gs.idToPostMap[str]}
-			<CitedPost {...p} post={gs.idToPostMap[str]} depth={p.depth + 1} />
+			<MiniCitedPost postIdStr={block.idStr} depth={p.depth + 1} />
+		{:else if gs.idToPostMap[block.idStr]}
+			<CitedPost post={gs.idToPostMap[block.idStr]!} depth={p.depth + 1} />
 		{:else}
-			<div class={`border-l-2 border-bg8 pl-2 bg-bg1 text-sm font-bold text-fg2`}>
-				{(console.warn(m.idNotFound({ id: str })), m.idNotFound({ id: str }))}
+			<div class="border-l-2 border-bg8 pl-2 bg-bg1 text-sm font-bold text-fg2">
+				{(console.warn(m.idNotFound({ id: block.idStr })), m.idNotFound({ id: block.idStr }))}
 			</div>
 		{/if}
-	{:else if isStringifiedRecord(str)}
-		<pre>{JSON.stringify(JSON.parse(str), null, 2)}</pre>
-	{:else}
-		<Markdown text={str} />
+	{:else if block.type === 'header'}
+		<p
+			class={block.level === 1
+				? 'text-2xl font-bold'
+				: block.level === 2
+					? 'text-xl font-bold'
+					: block.level === 3
+						? 'text-lg font-bold'
+						: 'font-bold'}
+		>
+			{block.content}
+		</p>
+	{:else if block.type === 'codeBlock'}
+		<pre class="whitespace-pre-wrap break-all font-mono text-sm bg-bg3 p-1">{block.content}</pre>
+	{:else if block.type === 'paragraph'}
+		<p class="whitespace-pre-wrap break-words">
+			{#each block.nodes as node}
+				{#if node.type === 'text'}
+					{node.content}
+				{:else if node.type === 'code'}
+					<code class="font-mono text-sm bg-bg3 px-1">{node.content}</code>
+				{:else if node.type === 'bold'}
+					<strong>{node.content}</strong>
+				{:else if node.type === 'italic'}
+					<em>{node.content}</em>
+				{:else if node.type === 'link'}
+					<a
+						target="_blank"
+						href={node.content}
+						class="align-top inline-block max-w-[calc(100%-88px)] mini-x-scroll text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
+					>
+						{node.content}
+					</a>
+					<CoreWidget url={node.content} />
+				{:else if node.type === 'image'}
+					!({node.alt})[<a
+						target="_blank"
+						href={node.url}
+						class="align-top inline-block max-w-[calc(100%-88px)] mini-x-scroll text-fg1 hover:text-fg3 underline decoration-hl1 hover:decoration-hl2"
+					>
+						{node.url}
+					</a>]
+					<CoreWidget imageUrl={node.url} alt={node.alt} />
+				{/if}
+			{/each}
+		</p>
 	{/if}
 {/each}
+
+<!--
+Example core exercising every supported syntax, including priority collisions:
+
+# Header
+**bold** *italic* `inline code`
+Bare url: https://example.com
+```
+a code block
+```
+Note the image line: since it's `![id](url)`, the id is consumed as alt text,
+not rendered as a citation - image match wins because it's checked first and
+consumes the whole `![...](...)` span atomically.
+![1783121360715_1783661989272_1782691298888](https://example.com/image.png)
+Cited post: 1783121360715_1783661989272_1782691298888
+-->

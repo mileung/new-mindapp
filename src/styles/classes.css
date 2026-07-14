@@ -31,3 +31,17 @@
 		@apply bg-fg1;
 	}
 }
+
+/* I need this so the ui is consistent across platforms. Quick fix that Loses the scrollbar. It's ok  */
+@utility scrollbar-hide {
+	-ms-overflow-style: none;
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+/* *:not(:root) { */
+* {
+	@apply scrollbar-hide;
+}

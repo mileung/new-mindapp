@@ -12,10 +12,16 @@
 	// TODO: player controls in sidebar?
 	// https://developers.google.com/youtube/iframe_api_reference
 
-	let p: { url: string } = $props();
+	let p: {
+		url?: string;
+		imageUrl?: string;
+		alt?: string;
+	} = $props();
 	let toggleBtn = $state<HTMLButtonElement>();
 	let { imgSrc, iframeSrc, iframeType } = $derived.by(() => {
 		if (!supportsCredentiallessIframe && (page.data as LayoutServerData).sqlocalOk) return {};
+		if (p.imageUrl) return { imgSrc: p.imageUrl };
+		if (!p.url) return {};
 
 		if (/\.(jpg|jpeg|png|webp|avif|gif|svg)(\?.*)?$/i.test(p.url)) return { imgSrc: p.url };
 		let urlObj = new URL(p.url);
@@ -31,33 +37,20 @@
 							iframeSrc = `https://www.instagram.com/p/${pathnameSlugs[1]}/embed/`;
 							iframeType = 'ig-post';
 						} else if (pathnameSlugs[0] === 'reels') {
-							// iframeSrc = `https://www.instagram.com/p/${pathnameSlugs[1]}/embed/`;
-							// iframeSrc = `https://www.instagram.com/reel/${pathnameSlugs[1]}/embed/`;
-							// iframeSrc = `https://www.instagram.com/reels/${pathnameSlugs[1]}/embed/`;
-							// console.log('iframeSrc:', iframeSrc);
 						}
 					},
 					reddit: () => {
 						if (pathnameSlugs[0] === 'r') {
 							iframeType = 'reddit';
-							iframeSrc = `https://rebed.redditmedia.com/embed?url=${encodeURIComponent(p.url)}`;
+							iframeSrc = `https://rebed.redditmedia.com/embed?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fbattlestations%2Fcomments%2F1uqo2z3%2F2_years_of_clutter_later%2F%3Fref%3Dshare%26ref_source%3Dembed`;
 						}
 					},
 					soundcloud: () => {
 						if (pathnameSlugs.length === 2) {
 							iframeType = 'sc';
-							let params = {
-								// color: 'ff5500',
-								// auto_play: false,
-								// hide_related: false,
-								// show_comments: true,
-								// show_user: true,
-								// show_reposts: false,
-								// show_teaser: true,
-								// visual: true,
-							};
+							let params = {};
 							let query = new URLSearchParams({
-								url: p.url,
+								url: p.url!,
 								...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)])),
 							});
 							iframeSrc = `https://w.soundcloud.com/player/?${query.toString()}`;
@@ -76,11 +69,9 @@
 						}
 					},
 					youtube: () => {
-						let ytVideoId = getYtVideoId(p.url);
+						let ytVideoId = getYtVideoId(p.url!);
 						if (ytVideoId) {
-							// TODO: add allow="autoplay" attribute and add ?autoplay=1 to url once you are able to focus the embedded player when it renders. That way keyboard shortcuts work without having to click pause and play first
-							// TODO: play next youtube video when the current one ends
-							let ytVidStartTime = p.url.match(/[?&](?:t|start)=([0-9]+)/)?.[1];
+							let ytVidStartTime = p.url!.match(/[?&](?:t|start)=([0-9]+)/)?.[1];
 							imgSrc = `https://i.ytimg.com/vi/${ytVideoId}/hqdefault.jpg`;
 							iframeSrc = `https://www.youtube.com/embed/${ytVideoId}?start=${ytVidStartTime}`;
 							iframeType = 'yt-vid';
@@ -92,17 +83,38 @@
 		tldToSldToScraperMap[tld]?.[sld]?.();
 		return { imgSrc, iframeSrc, iframeType };
 	});
-	let openInDev = false;
-	openInDev = true;
-	let open = $state((() => (dev ? openInDev : iframeSrc ? !imgSrc : false))());
+
+	let noImgWidgetsOpenInDev = false;
+	noImgWidgetsOpenInDev = true;
+	let open = $state(
+		(() =>
+			dev
+				? imgSrc
+					? false //
+					: noImgWidgetsOpenInDev
+				: iframeSrc
+					? !imgSrc
+					: false)(),
+	);
+
+	let openImg = $state<HTMLImageElement>();
+	let openImgStyle = $state('');
+	$effect(() => {
+		if (isTouchScreen) {
+			if (!open) openImgStyle = '';
+			else if (!openImgStyle && openImg) {
+				openImgStyle = `height: ${openImg.getBoundingClientRect().height}px;`;
+			}
+		}
+	});
 </script>
 
 {#snippet thumbnail(src: string)}
 	<img
 		crossorigin="anonymous"
-		class="-mb-2 -mt-1 h-42 bg-bg3 aspect-video object-cover"
+		class="h-42 bg-bg3 aspect-video object-cover"
 		{src}
-		alt={m.thumbnail()}
+		alt={p.alt || m.thumbnail()}
 	/>
 {/snippet}
 
@@ -128,12 +140,8 @@
 		{#if open && iframeType}
 			<div
 				class={`flex overflow-clip flex-col mr-8 max-h-[64vh] ${
-					// TODO: getting this css right is hard
 					(
 						{
-							// 'ig-post': 'aspect-[9/16]',
-							// 'tt-vid': 'aspect-[9/16] max-w-80',
-							// 'x-post': 'w-[80vw] h-[calc(8/5*80vw)] xs:h-auto xs:w-auto xs:aspect-[5/8]',
 							reddit: isTouchScreen ? 'h-80' : 'min-h-80 max-w-md aspect-[8/7]',
 							sc: 'max-w-[80vw]',
 							'yt-vid': 'aspect-video',
@@ -150,43 +158,36 @@
 						)[iframeType] || ''
 					}`}
 				>
-					<!-- scrolling="no" -->
 					{#if supportsCredentiallessIframe}
-						<CredentiallessIframe allowfullscreen class="flex-1" src={iframeSrc} />
+						<CredentiallessIframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc} />
 					{:else}
-						<iframe allowfullscreen class="flex-1" src={iframeSrc}></iframe>
+						<iframe allowfullscreen scrolling="no" class="flex-1" src={iframeSrc}></iframe>
 					{/if}
 				</div>
 			</div>
 		{/if}
 	{/if}
 	{#if imgSrc}
-		{#if open}
-			{#if !iframeSrc}
-				<button class="block" onclick={() => (open = false)}>
-					<img
-						crossorigin="anonymous"
-						class="min-h-42 max-h-[80vh] bg-bg3 object-contain"
-						src={imgSrc}
-						alt={m.thumbnail()}
-					/>
-				</button>
-			{/if}
-			<!-- {:else if !supportsCredentiallessIframe && iframeSrc}
-			<a href={p.url} target="_blank" class="block w-fit">
-				{@render thumbnail(imgSrc)}
-			</a> -->
-		{:else}
-			<br />
-			<button
-				class="-ml-1 mt-2"
-				onclick={() => {
-					open = true;
-					toggleBtn?.focus();
-				}}
-			>
-				{@render thumbnail(imgSrc)}
+		{#if !iframeSrc}
+			<button class={`block ${open ? '' : 'hidden'}`} onclick={() => (open = false)}>
+				<img
+					bind:this={openImg}
+					crossorigin="anonymous"
+					src={imgSrc}
+					alt={p.alt ?? m.thumbnail()}
+					class={`min-h-42 ${openImgStyle ? '' : 'max-h-[80vh]'} bg-bg3 object-contain`}
+					style={openImgStyle}
+				/>
 			</button>
 		{/if}
+		<button
+			class={`block ${open ? 'hidden' : ''}`}
+			onclick={() => {
+				open = true;
+				toggleBtn?.focus();
+			}}
+		>
+			{@render thumbnail(imgSrc)}
+		</button>
 	{/if}
 {/if}

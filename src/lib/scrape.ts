@@ -5,9 +5,13 @@ export function trimSuffix(str: string, suffix: string): string {
 
 // prettier-ignore
 let trackingParams = (['app','ra','source','medium','campaign','content','utm_source','utm_medium','utm_campaign','utm_term','utm_content','fbclid','gclid','gbraid','wbraid','mc_eid','pk_campaign','pk_kwd','hsmi','hsenc','_hsenc','_hsmi','oly_enc_id','oly_anon_id','__s','vero_id','mkt_tok']);
-let removeParams = (url: string, params: string[]): string => {
+let removeParams = (url: string, params: string[] | true): string => {
 	try {
 		let urlObj = new URL(url);
+		if (params === true) {
+			urlObj.search = '';
+			return urlObj.toString();
+		}
 		let keysToDelete: string[] = [];
 		let paramsSet = new Set(params);
 		urlObj.searchParams.forEach((_value, key) => {
@@ -136,6 +140,12 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					tags = [pathnameSlugs[0]];
 					let bioElement = querySelector('[data-e2e="user-bio"]');
 					headline = `${querySelector('h1')?.innerText}\n${bioElement?.innerText}\n${(bioElement?.nextSibling as HTMLElement)?.innerText || ''}`;
+				}
+			},
+			unsplash: () => {
+				if (pathnameSlugs[0] === 'photos') {
+					let imgNode = querySelector('[class^="imageLayout-"] img') as HTMLImageElement;
+					if (imgNode) headline = `${imgNode.alt}\n![](${removeParams(imgNode.src, true)})`;
 				}
 			},
 			x: () => {
