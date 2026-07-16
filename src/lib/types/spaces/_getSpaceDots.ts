@@ -35,7 +35,7 @@ export let _getSpaceDots = async (
 		lastMemberListRoleCodeNum?: number;
 	},
 	ownerCalled: boolean,
-	callerInGlobal: boolean,
+	callerInGlobal?: boolean,
 ) => {
 	let {
 		callerRoleCodeNum,

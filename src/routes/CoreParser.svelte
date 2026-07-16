@@ -28,6 +28,7 @@
 
 	let citedPostStartRegex = /^\d+_\d+_\d+/;
 	let headerStartRegex = /^(#{1,6}) ([^\n]*)/;
+	let bulletStartRegex = /^\* /;
 	let imageStartRegex = /^!\[([^\]]*)\]\(([^)\s]+)\)/;
 	let uriStartRegex = /^(https?:\/\/|file:\/\/|mailto:|tel:|sms:|geo:)\S+/;
 
@@ -79,6 +80,16 @@
 					});
 					i += headerMatch[0].length;
 					prevChar = headerMatch[0].at(-1)!;
+					atLineStart = false;
+					continue;
+				}
+
+				// * bullet point
+				let bulletMatch = remaining.match(bulletStartRegex);
+				if (bulletMatch) {
+					textBuffer += bulletMatch[0];
+					i += bulletMatch[0].length;
+					prevChar = bulletMatch[0].at(-1)!;
 					atLineStart = false;
 					continue;
 				}
@@ -149,8 +160,10 @@
 				type: 'italic' | 'bold' | 'boldAndItalic',
 			) => {
 				if (!remaining.startsWith(marker)) return false;
+				let lineEnd = remaining.indexOf('\n');
+				let searchLimit = lineEnd === -1 ? remaining.length : lineEnd;
 				let closeIndex = remaining.indexOf(marker, marker.length);
-				if (closeIndex <= marker.length - 1) return false;
+				if (closeIndex === -1 || closeIndex + marker.length > searchLimit) return false;
 				flushText();
 				let content = remaining.slice(0, closeIndex + marker.length);
 				paragraphNodes.push({ type, content });
