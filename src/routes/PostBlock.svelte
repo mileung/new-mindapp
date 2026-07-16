@@ -221,6 +221,15 @@
 	let showReactionMenu = $derived(
 		reactionIptFocused || hoveringReactionInput || hoveringReactionMenu,
 	);
+
+	let calcMenuRight = (triggerEl: HTMLElement, menuEl: HTMLElement) => {
+		let triggerRect = triggerEl.getBoundingClientRect();
+		let menuRect = menuEl.getBoundingClientRect();
+		let rightSpace = window.innerWidth - triggerRect.right;
+		let leftSpace = window.innerWidth - rightSpace - menuRect.width;
+		if (leftSpace < 0) rightSpace += leftSpace;
+		return Math.max(0, rightSpace);
+	};
 </script>
 
 {#snippet reactionInput()}
@@ -232,17 +241,16 @@
 		<input
 			bind:value={typedEmoji}
 			class="absolute inset-0 p-1"
-			onfocus={() => (reactionIptFocused = true)}
+			onfocus={(e) => {
+				reactionIptFocused = true;
+				lastMenuOpen = 'reaction';
+				reactionMenuRight = calcMenuRight(e.currentTarget, reactionMenuDiv);
+			}}
 			onblur={() => (reactionIptFocused = false)}
 			onmouseenter={(e) => {
-				!isTouchScreen && (hoveringReactionInput = true);
-				let reactionMenuBtnRect = e.currentTarget.getBoundingClientRect();
-				let reactionMenuRect = reactionMenuDiv.getBoundingClientRect();
-				let reactionMenuBtnRightSpace = window.innerWidth - reactionMenuBtnRect.right;
-				let reactionMenuLeftSpace =
-					window.innerWidth - reactionMenuBtnRightSpace - reactionMenuRect.width;
-				if (reactionMenuLeftSpace < 0) reactionMenuBtnRightSpace += reactionMenuLeftSpace;
-				reactionMenuRight = reactionMenuBtnRightSpace;
+				if (isTouchScreen) return;
+				hoveringReactionInput = true;
+				reactionMenuRight = calcMenuRight(e.currentTarget, reactionMenuDiv);
 				lastMenuOpen = 'reaction';
 			}}
 			onmouseleave={() => (hoveringReactionInput = false)}
@@ -288,16 +296,20 @@
 {#snippet moreOptionsBtn()}
 	<button
 		class={`z-0 xy px-1 hover:text-fg1 ${evenBg ? 'hover:bg-bg4' : 'hover:bg-bg5'}`}
-		onclick={() => (moreOptionsOpen = !moreOptionsOpen)}
+		onclick={(e) => {
+			moreOptionsOpen = !moreOptionsOpen;
+			lastMenuOpen = 'moreOptions';
+			moreOptionsMenuRight = calcMenuRight(e.currentTarget, moreOptionsMenuDiv);
+			moreOptionsMenuDiv.scrollTo({
+				top: 0,
+				left: Number.MAX_SAFE_INTEGER,
+				behavior: 'instant',
+			});
+		}}
 		onmouseenter={(e) => {
-			!isTouchScreen && (hoveringMoreOptionsBtn = true);
-			let moreOptionsBtnRect = e.currentTarget.getBoundingClientRect();
-			let moreOptionsMenuRect = moreOptionsMenuDiv.getBoundingClientRect();
-			let moreOptionsBtnRightSpace = window.innerWidth - moreOptionsBtnRect.right;
-			let moreOptionsMenuLeftSpace =
-				window.innerWidth - moreOptionsBtnRightSpace - moreOptionsMenuRect.width;
-			if (moreOptionsMenuLeftSpace < 0) moreOptionsBtnRightSpace += moreOptionsMenuLeftSpace;
-			moreOptionsMenuRight = moreOptionsBtnRightSpace;
+			if (isTouchScreen) return;
+			hoveringMoreOptionsBtn = true;
+			moreOptionsMenuRight = calcMenuRight(e.currentTarget, moreOptionsMenuDiv);
 			lastMenuOpen = 'moreOptions';
 			moreOptionsMenuDiv.scrollTo({
 				top: 0,
@@ -444,6 +456,7 @@
 								gs.showReactionHistory = gs.writingNewPost = gs.writingReplyTo = null;
 								gs.writingEditFor =
 									gs.writingEditFor && getIdStr(gs.writingEditFor) === postIdStr ? null : p.post;
+								showMoreOptionsMenu = false;
 							}}
 						>
 							<IconPencil class="w-4.5" />

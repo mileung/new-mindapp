@@ -164,6 +164,7 @@
 		{#if postingInMs !== undefined}
 			<button
 				class="flex-1 h-8 pl-2 fx gap-1 text-left text-nowrap overflow-scroll hover:bg-bg7 hover:text-fg3"
+				onmousedown={(e) => e.preventDefault()}
 				onclick={() => {
 					let post = gs.writingEditFor || gs.writingReplyTo;
 					if (post) {
@@ -375,7 +376,7 @@
 				</div>
 				{#if canPost}
 					<button
-						class={`absolute bottom-0 right-0 xy h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3 border-b-2 border-hl1 hover:border-hl2`}
+						class={`absolute bottom-0 right-0 xy h-8 w-8 text-bg1 bg-fg1 hover:bg-fg3`}
 						onclick={submit}
 					>
 						<IconArrowUp class="h-8 w-8" />

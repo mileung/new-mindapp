@@ -103,7 +103,7 @@
 		if (isTouchScreen) {
 			if (!open) openImgStyle = '';
 			else if (!openImgStyle && openImg) {
-				openImgStyle = `height: ${openImg.getBoundingClientRect().height}px;`;
+				openImgStyle = `max-height: ${Math.round(window.innerHeight * 0.8)}px;`;
 			}
 		}
 	});
