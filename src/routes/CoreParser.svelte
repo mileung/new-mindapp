@@ -29,7 +29,7 @@
 	let citedPostStartRegex = /^\d+_\d+_\d+/;
 	let headerStartRegex = /^(#{1,6}) ([^\n]*)/;
 	let imageStartRegex = /^!\[([^\]]*)\]\(([^)\s]+)\)/;
-	let uriStartRegex = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/\S+/;
+	let uriStartRegex = /^(https?:\/\/|file:\/\/|mailto:|tel:|sms:|geo:)\S+/;
 
 	let isBoundaryChar = (char?: string) => char === undefined || /\s/.test(char);
 

@@ -2,6 +2,7 @@ import { m } from '$lib/paraglide/messages';
 import { tdb } from '$lib/server/db';
 import { pTable } from '$lib/types/parts/partsTable';
 import { and, or } from 'drizzle-orm';
+import { roleCodes } from '.';
 import { type WhoWhereObj } from '../parts';
 import { pc } from '../parts/partCodes';
 import { pf } from '../parts/partFilters';
@@ -17,6 +18,7 @@ export let _deleteSpace = async (input: WhoWhereObj) => {
 					and(
 						pf.code.eq(pc.i_accountMs_roleCode_mb),
 						pf.p2.notEq(input.callerMs), //
+						pf.p3.eq(roleCodes.admin),
 					),
 					and(
 						pf.code.eq(pc.postImb_parentMb_rootMb_childCount),

@@ -50,7 +50,7 @@ export let scrollToHighlight = (id: string, goToIdIfHlDne = false) => {
 };
 
 let ytRegex =
-	/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+	/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:shorts\/|embed\/|v\/|watch\?.*?v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
 export let getYtVideoId = (url: string) => url.match(ytRegex)?.[1];
 
 export let promptSum = (cb: (a: number, b: number) => string) => {

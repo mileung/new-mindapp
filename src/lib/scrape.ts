@@ -207,6 +207,12 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 						urlObj.searchParams.delete('index');
 					}
 					url = urlObj.href;
+				} else if (pathnameSlugs[0] === 'shorts') {
+					let title = querySelector('.ytShortsVideoTitleViewModelShortsVideoTitle')?.innerText;
+					let atHandle = querySelector('.ytAttributedStringLink')?.innerText;
+					if (title) headline = title;
+					if (atHandle) tags = [atHandle];
+					extensionSearchQ = `[${atHandle}] ${urlObj.searchParams.get('v') || ''}`;
 				} else if (pathnameSlugs[0] === 'post') {
 					let atHandle: string =
 						querySelector('#author-thumbnail a')?.getAttribute('href')?.slice(1) || '';
