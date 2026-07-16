@@ -42,7 +42,7 @@
 					reddit: () => {
 						if (pathnameSlugs[0] === 'r') {
 							iframeType = 'reddit';
-							iframeSrc = `https://rebed.redditmedia.com/embed?url=https%3A%2F%2Fwww.reddit.com%2Fr%2Fbattlestations%2Fcomments%2F1uqo2z3%2F2_years_of_clutter_later%2F%3Fref%3Dshare%26ref_source%3Dembed`;
+							iframeSrc = `https://rebed.redditmedia.com/embed?url=${encodeURIComponent(p.url!)}`;
 						}
 					},
 					soundcloud: () => {
@@ -111,6 +111,7 @@
 
 {#snippet thumbnail(src: string)}
 	<img
+		loading="lazy"
 		crossorigin="anonymous"
 		class="h-42 bg-bg3 aspect-video object-cover"
 		{src}
@@ -173,6 +174,7 @@
 			<button class={`block ${open ? '' : 'hidden'}`} onclick={() => (open = false)}>
 				<img
 					bind:this={openImg}
+					loading="lazy"
 					crossorigin="anonymous"
 					src={imgSrc}
 					alt={p.alt ?? m.thumbnail()}
