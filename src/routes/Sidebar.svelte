@@ -100,7 +100,6 @@
 				!e.ctrlKey // needed this stuff to stop conflicting with cmd shift d
 			) {
 				// setTimeout prevents inputting '/' on focus
-
 				e.key === 'a' && (showAccountMenu = !showAccountMenu);
 				// TODO: shortcut(s) to switch accounts
 				e.key === 'h' && gotoIfNeeded(`/${gs.lastSeenInMs}__`);
@@ -117,16 +116,12 @@
 					else if (showAccountMenu || showSpaceMenu) showAccountMenu = showSpaceMenu = false;
 					else window.scrollTo({ top: 0 });
 				}
-				if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
-					// TODO: this should work with all the sidebar tabs
-					let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
-					let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
-					let minIndex = sqlocalOk ? 0 : 1;
-					if (newSpaceMsIndex < minIndex) newSpaceMsIndex = minIndex;
-					if (newSpaceMsIndex >= sidebarSpaceMss.length)
-						newSpaceMsIndex = sidebarSpaceMss.length - 1;
-					goto(`/${sidebarSpaceMss[newSpaceMsIndex]}__`);
-				}
+			} else if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
+				let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
+				let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
+				if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
+				if (newSpaceMsIndex >= sidebarSpaceMss.length) newSpaceMsIndex = sidebarSpaceMss.length - 1;
+				goto(`/${sidebarSpaceMss[newSpaceMsIndex]}__`, { keepFocus: true });
 			}
 		};
 		let onDrag = (clientY: number) => {
@@ -409,6 +404,7 @@
 						}}
 					>
 						<a
+							data-sveltekit-keepfocus
 							href={`/${spaceMs}__`}
 							class={`pl-2 relative flex-1 fx h-10 gap-2 overflow-hidden active:cursor-grabbing`}
 							onclick={(e) => disableClickAfterDrag && e.preventDefault()}

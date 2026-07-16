@@ -245,7 +245,7 @@
 			class="h-9 px-2 text-lg bg-bg4 hover:bg-bg6"
 			placeholder={m.tags()}
 			onfocus={() => (tagsIptFocused = true)}
-			onblur={(e) => (tagsIptFocused = false)}
+			onblur={() => (tagsIptFocused = false)}
 			onchange={() => (alteredInitialVal = true)}
 			oninput={() => {
 				tagIndex = 0;
