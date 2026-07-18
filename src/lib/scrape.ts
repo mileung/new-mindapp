@@ -72,10 +72,11 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					);
 					headline = querySelector('h1')?.innerText || '';
 					let year = [
-						...(
-							(querySelector('h1')?.nextElementSibling?.firstChild as HTMLElement).innerText || ''
-						).matchAll(/\d+/g),
+						...((querySelector('h1')?.nextElementSibling as HTMLElement).innerText || '').matchAll(
+							/\d\d\d\d/g,
+						),
 					].at(-1)?.[0];
+					console.log('year:', year);
 					headline = `${headline}\n${querySelector('span[role="presentation"][data-testid="plot-l"]')?.innerText || ''}`;
 					tags = aTags?.map((t) => t.innerText);
 					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
