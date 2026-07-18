@@ -17,14 +17,18 @@
 	let searchVal = $state((() => page.url.searchParams.get('q') ?? '')());
 	let trimmedSearchVal = $derived(searchVal.trim());
 
+	let urlInMs = $derived(getUrlInMs());
 	let searchUrl = $derived(
-		getAlteredSearchParams({
-			flat: null,
-			nested: null,
-			new: null,
-			old: null,
-			q: trimmedSearchVal,
-		}),
+		getAlteredSearchParams(
+			{
+				flat: null,
+				nested: null,
+				new: null,
+				old: null,
+				q: trimmedSearchVal,
+			},
+			urlInMs ? `/${urlInMs}__` : page.url.pathname,
+		),
 	);
 
 	let searchGuideExpanded = $state(false);
@@ -67,7 +71,6 @@
 
 	let hoveringTopDiv = $state(false);
 
-	let urlInMs = $derived(getUrlInMs());
 	$effect(() => {
 		if (urlInMs !== undefined && gs.lastSeenInMs !== urlInMs) searchVal = '';
 	});

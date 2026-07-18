@@ -46,12 +46,8 @@
 			if (paragraphNodes.length) {
 				for (let i = 0; i < paragraphNodes.length; i++) {
 					let paragraphNode = paragraphNodes[i];
-					if (!i) {
-						if (paragraphNode.type !== 'image')
-							paragraphNode.content = paragraphNode.content.trimStart();
-					} else if (paragraphNodes[i - 1].type === 'image') {
-						if (paragraphNode.type !== 'image')
-							paragraphNode.content = paragraphNode.content.trimStart();
+					if (paragraphNode.type !== 'image') {
+						paragraphNode.content = paragraphNode.content.trimStart();
 					}
 				}
 				blocks.push({ type: 'paragraph', nodes: paragraphNodes });

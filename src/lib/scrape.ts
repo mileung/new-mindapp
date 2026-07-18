@@ -186,7 +186,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					} else {
 						tags = [
 							...querySelectorAll(
-								'span.ytAttributedStringHost.ytListItemViewModelSubtitle.ytAttributedStringWhiteSpacePreWrap',
+								'.ytListViewModelHost .ytListItemViewModelSubtitleBadgeWrapper+span',
 							),
 						].map((s) => {
 							let atHandle =

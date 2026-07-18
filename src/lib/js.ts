@@ -218,6 +218,7 @@ export let hasDefinedKeysBesidesMs = (obj: Object) =>
 
 export let getAlteredSearchParams = (
 	obj: Record<string, string | number | boolean | null | undefined>,
+	pathname?: string,
 ) => {
 	let url = new URL(page.url);
 	let searchParams = new URLSearchParams(url.search);
@@ -230,7 +231,7 @@ export let getAlteredSearchParams = (
 		.replace(/%2C/g, ',')
 		.replace(/=&/g, '&')
 		.replace(/=(undefined|$)/g, '');
-	return `${url.pathname}${newSearch ? '?' + newSearch : ''}${url.hash}`;
+	return `${pathname || url.pathname}${newSearch ? '?' + newSearch : ''}${url.hash}`;
 };
 
 let seg = new Intl.Segmenter('en', { granularity: 'grapheme' });
