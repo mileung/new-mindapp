@@ -224,6 +224,8 @@
 	"mergedView": "Merged view",
 	"profile": "Profile",
 	"userGuide": "User guide",
+	"privacyPolicy": "Privacy policy",
+	"sourceCode": "Source code",
 	"setPassword": "Set password",
 	"theNewPasswordMustBeDifferent": "The new password must be different",
 	"passwordSuccessfullyChanged": "Password successfully changed",

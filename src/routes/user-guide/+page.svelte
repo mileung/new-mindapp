@@ -1,4 +1,9 @@
+<script lang="ts">
+	import { m } from '$lib/paraglide/messages';
+</script>
+
 <div class="">
-	<p class="">User Guide</p>
-	<a href="/privacy-policy">Privacy Policy</a>
+	<p class="">{m.userGuide()}</p>
+	<a target="_blank" href="https://github.com/mileung/new-mindapp">{m.sourceCode()}</a>
 </div>
+<a href="/privacy-policy">{m.privacyPolicy()}</a>
