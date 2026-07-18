@@ -67,10 +67,15 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 			},
 			imdb: () => {
 				if (pathnameSlugs[0] === 'title') {
-					let aTags = querySelectorAll('.ipc-chip-list__scroller a');
+					let aTags = querySelectorAll(
+						'section[data-testid="hero-parent"] section .ipc-chip-list__scroller a',
+					);
 					headline = querySelector('h1')?.innerText || '';
-					let year =
-						(querySelector('h1')?.nextElementSibling?.firstChild as HTMLElement).innerText || '';
+					let year = [
+						...(
+							(querySelector('h1')?.nextElementSibling?.firstChild as HTMLElement).innerText || ''
+						).matchAll(/\d+/g),
+					].at(-1)?.[0];
 					headline = `${headline}\n${querySelector('span[role="presentation"][data-testid="plot-l"]')?.innerText || ''}`;
 					tags = aTags?.map((t) => t.innerText);
 					if (year) tags.unshift(`${year.slice(0, 3) + '0'}s`);
