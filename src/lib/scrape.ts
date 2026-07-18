@@ -192,7 +192,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 					} else {
 						tags = [
 							...querySelectorAll(
-								'.ytListViewModelHost .ytListItemViewModelSubtitleBadgeWrapper+span',
+								'.ytSpecDialogLayoutContainer .ytListViewModelHost .ytListItemViewModelSubtitleBadgeWrapper+span',
 							),
 						].map((s) => {
 							let atHandle =
