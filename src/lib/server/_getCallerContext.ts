@@ -528,6 +528,7 @@ export let _getCallerContext = async (
 			await tdb
 				.update(pTable)
 				.set({ p3: now + minute })
+				// TODO: Apparently the client can be closed before knowing the cookie is updated
 				.where(
 					and(
 						..._sessionKey_m_accountMs_expiryMsPartialFilter,

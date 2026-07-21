@@ -237,6 +237,7 @@ export let scrape = (externalUrl: string, externalDomString: string) => {
 							)?.innerText || headline;
 					} // albums have no atHandle: https://www.youtube.com/playlist?list=OLAK5uy_nV_H2i8w-Pm1IpTP1lolyAa2GY4u7tqbA
 				} else if (pathnameSlugs[0][0] === '@') {
+					headline = querySelector('h1.dynamicTextViewModelH1')?.innerText || headline;
 					tags = [pathnameSlugs[0]];
 				} else if (pathnameSlugs[0] === 'results') {
 					headline = urlObj.searchParams.get('search_query') || headline;
