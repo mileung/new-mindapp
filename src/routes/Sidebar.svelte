@@ -116,9 +116,14 @@
 					else if (showAccountMenu || showSpaceMenu) showAccountMenu = showSpaceMenu = false;
 					else window.scrollTo({ top: 0 });
 				}
-			} else if (e.metaKey && e.ctrlKey && e.key === 'Tab' && gs.accounts) {
+			} else if (
+				e.metaKey &&
+				e.ctrlKey &&
+				(e.key === 'ArrowUp' || e.key === 'ArrowDown') &&
+				gs.accounts
+			) {
 				let lastSeenInMsIndex = sidebarSpaceMss.findIndex((ms) => ms === gs.lastSeenInMs);
-				let newSpaceMsIndex = lastSeenInMsIndex + (e.shiftKey ? -1 : 1);
+				let newSpaceMsIndex = lastSeenInMsIndex + (e.key === 'ArrowUp' ? -1 : 1);
 				if (newSpaceMsIndex < 0) newSpaceMsIndex = 0;
 				if (newSpaceMsIndex >= sidebarSpaceMss.length) newSpaceMsIndex = sidebarSpaceMss.length - 1;
 				goto(`/${sidebarSpaceMss[newSpaceMsIndex]}__`, { keepFocus: true });
